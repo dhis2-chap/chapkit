@@ -1,11 +1,13 @@
 import json
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 from uuid import UUID
 
 from chapkit.types import ChapConfig
 
 
-class ChapStorage[T: ChapConfig]:
+@runtime_checkable
+class ChapStorage[T: ChapConfig](Protocol):
     def add_config(self, cfg: T) -> None: ...
     def get_config(self, id: UUID) -> T | None: ...
 
@@ -15,8 +17,8 @@ class JsonChapStorage[T: ChapConfig](ChapStorage[T]):
         self._path = Path(path)
         self._model_type = model_type
         self._path.parent.mkdir(parents=True, exist_ok=True)
+
         if not self._path.exists():
-            # initialize with empty "configs" section
             self._write_all({"configs": []})
 
     def get_configs(self) -> list[T]:
