@@ -114,8 +114,8 @@ class ChapService[T: ChapConfig]:
         pass
 
     def _setup_train(self, app: FastAPI) -> None:
-        def endpoint() -> JobResponse:
-            return JobResponse(JobStatus.pending, JobType.train)
+        def endpoint(config: UUID) -> JobResponse:
+            return JobResponse(status=JobStatus.pending, type=JobType.train)
 
         app.add_api_route(
             path="/train",
@@ -127,8 +127,8 @@ class ChapService[T: ChapConfig]:
         )
 
     def _setup_predict(self, app: FastAPI) -> None:
-        def endpoint() -> JobResponse:
-            return JobResponse(JobStatus.pending, JobType.predict)
+        def endpoint(config: UUID) -> JobResponse:
+            return JobResponse(status=JobStatus.pending, type=JobType.predict)
 
         app.add_api_route(
             path="/predict",
