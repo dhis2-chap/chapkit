@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
+from fastapi.responses import JSONResponse, Response
 
 from chapkit.runner import ChapRunner
 from chapkit.storage import ChapStorage
@@ -52,14 +53,27 @@ class ChapService[T: ChapConfig]:
 
             return cfg
 
+        async def delete_config(id: UUID) -> Response:
+            if not self._storage.del_config(id):
+                raise HTTPException(status_code=404, detail=f"Config {id} not found")
+
+            return Response(status_code=204)
+
         async def get_configs() -> list[TModelType]:
             return self._storage.get_configs()
 
         async def get_schema() -> dict:
             return self._model_type.model_json_schema()
 
-        async def add_config(cfg: TModelType) -> None:
-            self._storage.add_config(cfg)
+        async def add_config(cfg: TModelType = Body(...)) -> JSONResponse:  # type: ignore[valid-type]
+            validated = self._model_type.model_validate(cfg)
+            self._storage.add_config(validated)
+
+            return JSONResponse(
+                status_code=201,
+                content=validated.model_dump(mode="json"),
+                headers={"Location": f"/configs/{validated.id}"},
+            )
 
         app.add_api_route(
             path="/configs",
@@ -90,6 +104,18 @@ class ChapService[T: ChapConfig]:
             tags=["configs"],
             name="get_config",
             summary="Get a config by ID",
+            responses={
+                404: {"description": "Config not found"},
+            },
+        )
+
+        app.add_api_route(
+            path="/configs/{id}",
+            endpoint=delete_config,
+            methods=["DELETE"],
+            tags=["configs"],
+            name="delete_config",
+            summary="Delete a config by ID",
             responses={
                 404: {"description": "Config not found"},
             },
