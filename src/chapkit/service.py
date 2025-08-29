@@ -69,12 +69,6 @@ class ChapService[T: ChapConfig]:
 
             return cfg
 
-        async def delete_config(id: UUID) -> Response:
-            if not self._storage.del_config(id):
-                raise HTTPException(status_code=404, detail=f"Config {id} not found")
-
-            return Response(status_code=204)
-
         async def get_configs() -> list[TModelType]:
             return self._storage.get_configs()
 
@@ -90,6 +84,12 @@ class ChapService[T: ChapConfig]:
                 content=validated.model_dump(mode="json"),
                 headers={"Location": f"/configs/{validated.id}"},
             )
+
+        async def delete_config(id: UUID) -> Response:
+            if not self._storage.del_config(id):
+                raise HTTPException(status_code=404, detail=f"Config {id} not found")
+
+            return Response(status_code=204)
 
         app.add_api_route(
             path="/configs",
@@ -126,18 +126,6 @@ class ChapService[T: ChapConfig]:
         )
 
         app.add_api_route(
-            path="/configs/{id}",
-            endpoint=delete_config,
-            methods=["DELETE"],
-            tags=["configs"],
-            name="delete_config",
-            summary="Delete a config by ID",
-            responses={
-                404: {"description": "Config not found"},
-            },
-        )
-
-        app.add_api_route(
             path="/configs",
             endpoint=add_config,
             methods=["POST"],
@@ -149,6 +137,20 @@ class ChapService[T: ChapConfig]:
             responses={
                 201: {"description": "Config created"},
                 422: {"description": "Validation error"},
+            },
+        )
+
+        app.add_api_route(
+            path="/configs/{id}",
+            endpoint=delete_config,
+            status_code=204,
+            methods=["DELETE"],
+            tags=["configs"],
+            name="delete_config",
+            summary="Delete a config by ID",
+            responses={
+                204: {"description": "Config deleted"},
+                404: {"description": "Config not found"},
             },
         )
 
