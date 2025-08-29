@@ -5,16 +5,18 @@ from fastapi.responses import JSONResponse, Response
 
 from chapkit.runner import ChapRunner
 from chapkit.storage import ChapStorage
-from chapkit.types import ChapConfig, HealthResponse, JobResponse, JobStatus, JobType
+from chapkit.types import ChapConfig, ChapServiceInfo, HealthResponse, JobResponse, JobStatus, JobType
 
 
 class ChapService[T: ChapConfig]:
     def __init__(
         self,
+        info: ChapServiceInfo,
         runner: ChapRunner[T],
         storage: ChapStorage[T],
         model_type: type[T],
     ) -> None:
+        self._info = info
         self._runner = runner
         self._storage = storage
         self._model_type = model_type
@@ -22,6 +24,7 @@ class ChapService[T: ChapConfig]:
     def create_fastapi(self):
         app = FastAPI()
         self._setup_health(app)
+        self._setup_info(app)
         self._setup_configs(app)
         self._setup_jobs(app)
         self._setup_train(app)
@@ -37,10 +40,23 @@ class ChapService[T: ChapConfig]:
                 path="/health",
                 endpoint=method,
                 methods=["GET"],
-                tags=["health"],
+                tags=["information"],
                 name="health",
                 response_model=HealthResponse,
             )
+
+    def _setup_info(self, app: FastAPI) -> None:
+        def endpoint() -> ChapServiceInfo:
+            return self._info
+
+        app.add_api_route(
+            path="/info",
+            endpoint=endpoint,
+            methods=["GET"],
+            tags=["information"],
+            name="info",
+            response_model=ChapServiceInfo,
+        )
 
     def _setup_configs(self, app: FastAPI) -> None:
         type TModelType = self._model_type  # type: ignore
