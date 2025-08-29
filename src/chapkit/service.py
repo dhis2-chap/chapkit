@@ -150,6 +150,10 @@ class ChapService[T: ChapConfig]:
             response_model=JobResponse,
             status_code=202,
             tags=["chap"],
+            responses={
+                202: {"description": "Job accepted"},
+                422: {"description": "Validation error"},
+            },
         )
 
     def _setup_predict(self, app: FastAPI) -> None:
@@ -163,4 +167,8 @@ class ChapService[T: ChapConfig]:
             response_model=JobResponse,
             status_code=202,
             tags=["chap"],
+            responses={
+                202: {"description": "Job accepted"},
+                422: {"description": "Validation error"},
+            },
         )
