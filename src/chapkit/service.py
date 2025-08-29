@@ -45,7 +45,7 @@ class ChapService[T: ChapConfig]:
     def _setup_configs(self, app: FastAPI) -> None:
         type TModelType = self._model_type  # type: ignore
 
-        async def get_config(id: UUID) -> TModelType | None:
+        async def get_config(id: UUID) -> TModelType:
             cfg = self._storage.get_config(id)
 
             if cfg is None:
@@ -65,7 +65,7 @@ class ChapService[T: ChapConfig]:
         async def get_schema() -> dict:
             return self._model_type.model_json_schema()
 
-        async def add_config(cfg: TModelType = Body(...)) -> JSONResponse:  # type: ignore[valid-type]
+        async def add_config(cfg: TModelType = Body(...)) -> JSONResponse:
             validated = self._model_type.model_validate(cfg)
             self._storage.add_config(validated)
 
