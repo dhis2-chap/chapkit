@@ -1,11 +1,13 @@
+from typing import Generic
+
 from fastapi import APIRouter
 
 from chapkit.api.type import ChapApi
 from chapkit.runner import ChapRunner
-from chapkit.type import ChapServiceInfo, TChapConfig
+from chapkit.type import TChapConfig
 
 
-class InfoApi(ChapApi[TChapConfig]):
+class InfoApi(ChapApi[TChapConfig], Generic[TChapConfig]):
     def __init__(
         self,
         runner: ChapRunner[TChapConfig],
@@ -20,7 +22,6 @@ class InfoApi(ChapApi[TChapConfig]):
             endpoint=self._runner.on_info,
             methods=["GET"],
             name="info",
-            response_model=ChapServiceInfo,
         )
 
         return router
