@@ -78,6 +78,19 @@ class ChapService(Generic[TChapConfig]):
                 headers={"Location": f"/configs/{validated.id}"},
             )
 
+        async def update_config(id: UUID, cfg: dict = Body(...)):
+            validated = Model.model_validate(cfg)
+
+            if id != validated.id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Config ID in path ({id}) does not match ID in body ({validated.id})",
+                )
+
+            self._storage.add_config(validated)
+
+            return validated
+
         async def delete_config(id: UUID):
             if not self._storage.del_config(id):
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
@@ -126,6 +139,21 @@ class ChapService(Generic[TChapConfig]):
             summary="Create (or replace) a config",
             responses={
                 201: {"description": "Config created"},
+                422: {"description": "Validation error"},
+            },
+        )
+
+        router.add_api_route(
+            path="/configs/{id}",
+            endpoint=update_config,
+            methods=["PUT"],
+            response_model=Model,
+            tags=["configs"],
+            name="update_config",
+            summary="Update a config by ID",
+            responses={
+                200: {"description": "Config updated"},
+                400: {"description": "ID mismatch"},
                 422: {"description": "Validation error"},
             },
         )
