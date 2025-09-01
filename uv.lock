@@ -40,33 +40,33 @@ version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
-    { name = "fastapi-cli" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pydantic" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "fastapi-cli" },
     { name = "pytest" },
     { name = "ruff" },
-    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.116.1" },
-    { name = "fastapi-cli", specifier = ">=0.0.10" },
     { name = "numpy", specifier = ">=2.3.2" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "pydantic", specifier = ">=2.11.7" },
+    { name = "uvicorn", specifier = ">=0.35.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "fastapi-cli", specifier = ">=0.0.10" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff", specifier = ">=0.12.11" },
-    { name = "uvicorn", specifier = ">=0.35.0" },
 ]
 
 [[package]]
