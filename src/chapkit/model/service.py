@@ -6,7 +6,7 @@ import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from chapkit.model.runner import ChapModelRunner
-from chapkit.model.type import ChapModelConfig, ChapModelServiceInfo
+from chapkit.model.type import ChapModelConfig
 from chapkit.service import ChapService
 from chapkit.storage import ChapStorage
 from chapkit.type import JobResponse
@@ -25,23 +25,16 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
 
     def _setup_routes(self, router: APIRouter) -> None:
         super()._setup_routes(router)
+
         self._setup_train(router)
         self._setup_predict(router)
 
-    def _setup_info(self, router: APIRouter) -> None:
-        router.add_api_route(
-            path="/info",
-            endpoint=self._runner.on_info,
-            methods=["GET"],
-            tags=["information"],
-            name="info",
-            response_model=ChapModelServiceInfo,
-        )
-
     def _resolve_cfg(self, id: UUID) -> TModelConfig:
         cfg = self._storage.get_config(id)
+
         if cfg is None:
             raise HTTPException(status_code=404, detail=f"Config {id} not found")
+
         return cfg
 
     @staticmethod
