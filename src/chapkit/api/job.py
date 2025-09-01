@@ -17,7 +17,6 @@ class JobApi(ChapApi[TChapConfig]):
 
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["jobs"])
-        self._setup_routes(router)
 
         return router
 
