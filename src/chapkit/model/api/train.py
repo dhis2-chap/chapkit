@@ -1,4 +1,3 @@
-# chapkit/model/api/train.py
 from typing import Any, Generic
 from uuid import UUID
 

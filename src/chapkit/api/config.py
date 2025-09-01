@@ -1,4 +1,3 @@
-# chapkit/api/config.py
 from uuid import UUID
 
 from fastapi import APIRouter, Body, HTTPException

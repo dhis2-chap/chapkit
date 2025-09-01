@@ -1,4 +1,3 @@
-# chapkit/service.py
 from typing import Generic
 from uuid import UUID
 

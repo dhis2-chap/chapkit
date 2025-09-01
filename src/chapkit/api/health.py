@@ -1,4 +1,3 @@
-# chapkit/api/info.py
 from fastapi import APIRouter
 
 from chapkit.api.type import ChapApi
