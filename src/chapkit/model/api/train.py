@@ -23,17 +23,7 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
 
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["chap"])
-        self._setup_routes(router)
-        return router
 
-    def _setup_routes(self, router: APIRouter) -> None:
-        self._setup_train(router)
-
-    @staticmethod
-    def _df_from_json(rows: list[dict[str, Any]]) -> pd.DataFrame:
-        return pd.DataFrame.from_records(rows)
-
-    def _setup_train(self, router: APIRouter) -> None:
         def endpoint(
             config: UUID = Query(..., description="Config ID"),
             rows: list[dict[str, Any]] = Body(
@@ -63,3 +53,9 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 422: {"description": "Validation error"},
             },
         )
+
+        return router
+
+    @staticmethod
+    def _df_from_json(rows: list[dict[str, Any]]) -> pd.DataFrame:
+        return pd.DataFrame.from_records(rows)
