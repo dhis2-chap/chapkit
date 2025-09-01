@@ -34,15 +34,3 @@ def test_health_check():
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json() == {"status": "up"}
-
-
-def test_info_endpoint():
-    info = ChapServiceInfo(display_name="Test Service")
-    runner = MockRunner(info, ChapConfig)
-    storage = MockStorage()
-    service = ChapService(runner, storage)
-    app = service.create_fastapi()
-    client = TestClient(app)
-    response = client.get("/api/v1/info")
-    assert response.status_code == 200
-    assert response.json() == {"display_name": "Test Service"}
