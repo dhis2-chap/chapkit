@@ -18,7 +18,6 @@ class ChapService(Generic[TChapConfig]):
     ) -> None:
         self._runner = runner
         self._storage = storage
-        # Concrete Pydantic model class (subclass of ChapConfig)
         self._model_type = self._runner.config_type
 
     def create_fastapi(self) -> FastAPI:
@@ -26,6 +25,7 @@ class ChapService(Generic[TChapConfig]):
         router = APIRouter(prefix="/api/v1")
         self._setup_routes(router)
         app.include_router(router)
+
         return app
 
     def _setup_routes(self, router: APIRouter) -> None:
@@ -59,8 +59,10 @@ class ChapService(Generic[TChapConfig]):
 
         async def get_config(id: UUID):
             cfg = self._storage.get_config(id)
+
             if cfg is None:
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
+
             return cfg
 
         async def get_configs():
@@ -72,6 +74,7 @@ class ChapService(Generic[TChapConfig]):
         async def add_config(cfg: dict = Body(...)):
             validated = Model.model_validate(cfg)
             self._storage.add_config(validated)
+
             return JSONResponse(
                 status_code=201,
                 content=validated.model_dump(mode="json"),
@@ -94,6 +97,7 @@ class ChapService(Generic[TChapConfig]):
         async def delete_config(id: UUID):
             if not self._storage.del_config(id):
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
+
             return Response(status_code=204)
 
         router.add_api_route(
