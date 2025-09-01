@@ -22,8 +22,10 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
         super().__init__(runner, storage)
         self._runner = runner  # narrowed type
 
-    def create_router(self) -> APIRouter:
-        router = super().create_router()
-        router.include_router(TrainApi(self._runner, self).create_router())
-        router.include_router(PredictApi(self._runner, self).create_router())
+    def create_api_routers(self) -> APIRouter:
+        router = super().create_api_routers()
+
+        self._include_api(router, TrainApi(self._runner, self))
+        self._include_api(router, PredictApi(self._runner, self))
+
         return router
