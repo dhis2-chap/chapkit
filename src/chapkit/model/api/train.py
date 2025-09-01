@@ -4,13 +4,13 @@ from typing import Any, Generic
 from uuid import UUID
 
 import pandas as pd
-from fastapi import APIRouter, Body, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Query
 
 from chapkit.api.type import ChapApi
 from chapkit.model.runner import ChapModelRunner
 from chapkit.model.type import TChapModelConfig
 from chapkit.service import ChapService
-from chapkit.type import JobResponse
+from chapkit.type import JobResponse, JobStatus, JobType
 
 
 class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
@@ -26,6 +26,7 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
         router = APIRouter(tags=["chap"])
 
         async def endpoint(
+            background_tasks: BackgroundTasks,
             config: UUID = Query(..., description="Config ID"),
             rows: list[dict[str, Any]] = Body(
                 ...,
@@ -39,12 +40,15 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
             cfg = self._service._resolve_cfg(config)
             df = self._df_from_json(rows)
 
-            if inspect.iscoroutinefunction(self._runner.on_train):
-                response = await self._runner.on_train(cfg, df)
-            else:
-                response = await asyncio.to_thread(self._runner.on_train, cfg, df)
+            async def task():
+                if inspect.iscoroutinefunction(self._runner.on_train):
+                    return await self._runner.on_train(cfg, df)
 
-            return response
+                await asyncio.to_thread(self._runner.on_train, cfg, df)
+
+            background_tasks.add_task(task)
+
+            return JobResponse(status=JobStatus.completed, type=JobType.train)
 
         router.add_api_route(
             path="/train",
