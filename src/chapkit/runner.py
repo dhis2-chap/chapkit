@@ -9,10 +9,10 @@ class ChapRunner(Generic[TChapConfig], ABC):
         self._info = info
         self._config_type: type[TChapConfig] = config_type
 
-    def on_health(self) -> HealthResponse:
+    async def on_health(self) -> HealthResponse:
         return HealthResponse(status=HealthStatus.up)
 
-    def on_info(self) -> ChapServiceInfo:
+    async def on_info(self) -> ChapServiceInfo:
         return self._info
 
     @property
