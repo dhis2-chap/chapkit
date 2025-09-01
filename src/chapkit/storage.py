@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 from uuid import UUID
 
-from chapkit.types import ChapConfig
+from chapkit.type import ChapConfig
 
 
 @runtime_checkable

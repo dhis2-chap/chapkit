@@ -1,30 +1,18 @@
-from chapkit import (
-    AssessedStatus,
-    ChapConfig,
-    ChapRunnerBase,
-    ChapService,
-    ChapServiceInfo,
-    HealthResponse,
-    HealthStatus,
-    JsonChapStorage,
-)
+from chapkit import HealthResponse, HealthStatus, JsonChapStorage
+from chapkit.model import AssessedStatus, ChapModelConfig, ChapModelRunnerBase, ChapModelService, ChapModelServiceInfo
 
 
-class MyConfig(ChapConfig):
+class MyConfig(ChapModelConfig):
     x: int
     y: int
 
 
-class MyRunner(ChapRunnerBase[MyConfig]):
+class MyRunner(ChapModelRunnerBase[MyConfig]):
     def on_health(self) -> HealthResponse:
         return HealthResponse(status=HealthStatus.up)
 
 
-storage = JsonChapStorage("target/storage.json", MyConfig)
-storage.add_config(MyConfig(id="06a0757d-3bea-4d74-b424-228fe7c1b2c2", name="default", x=10, y=20))
-storage.add_config(MyConfig(id="aad4616c-e975-4cd8-b230-074eef580459", name="test", x=1, y=2))
-
-info = ChapServiceInfo(
+info = ChapModelServiceInfo(
     author="Knut Rand",
     author_note=(
         "This model might need configuration of hyperparameters in order to work properly. "
@@ -48,9 +36,14 @@ info = ChapServiceInfo(
     ),
 )
 
-app = ChapService(
-    info=info,
-    runner=MyRunner(),
+runner = MyRunner(info, MyConfig)
+
+storage = JsonChapStorage("target/storage.json", MyConfig)
+storage.add_config(MyConfig(id="06a0757d-3bea-4d74-b424-228fe7c1b2c2", name="default", x=10, y=20))
+storage.add_config(MyConfig(id="aad4616c-e975-4cd8-b230-074eef580459", name="test", x=1, y=2))
+
+
+app = ChapModelService(
+    runner=runner,
     storage=storage,
-    model_type=MyConfig,
 ).create_fastapi()

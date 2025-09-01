@@ -1,17 +1,20 @@
-from typing import Protocol, runtime_checkable
+from abc import ABC
+from typing import Generic
 
-from chapkit.types import ChapConfig, HealthResponse, HealthStatus
-
-
-@runtime_checkable
-class ChapRunner[T: ChapConfig](Protocol):
-    def on_health(self) -> HealthResponse: ...
-
-    # def on_info(self, info: ChapServiceInfo) -> ChapServiceInfo: ...
-    # def on_train(self, cfg: T) -> JobResponse: ...
-    # def on_predict(self, cfg: T) -> JobResponse: ...
+from chapkit.type import ChapServiceInfo, HealthResponse, HealthStatus, TChapConfig
 
 
-class ChapRunnerBase[T: ChapConfig](ChapRunner[T]):
+class ChapRunner(Generic[TChapConfig], ABC):
+    def __init__(self, info: ChapServiceInfo, config_type: type[TChapConfig]) -> None:
+        self._info = info
+        self._config_type: type[TChapConfig] = config_type
+
     def on_health(self) -> HealthResponse:
         return HealthResponse(status=HealthStatus.up)
+
+    def on_info(self) -> ChapServiceInfo:
+        return self._info
+
+    @property
+    def config_type(self) -> type[TChapConfig]:
+        return self._config_type

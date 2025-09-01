@@ -1,25 +1,9 @@
 from enum import Enum
 from typing import TypeVar
-from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl
+from pydantic import ConfigDict, EmailStr, HttpUrl
 
-TChapModelConfig = TypeVar("T", bound="ChapConfig")
-
-
-class HealthStatus(str, Enum):
-    up = "up"
-    down = "down"
-
-
-class HealthResponse(BaseModel):
-    status: HealthStatus
-    model_config = ConfigDict(extra="allow")
-
-
-class ChapConfig(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
-    name: str
+from chapkit.type import ChapConfig, ChapServiceInfo
 
 
 class AssessedStatus(str, Enum):
@@ -30,33 +14,22 @@ class AssessedStatus(str, Enum):
     green = "green"  # Green: Validated, ready for use
 
 
-class ChapServiceInfo(BaseModel):
+class ChapModelConfig(ChapConfig):
+    pass
+
+
+TChapModelConfig = TypeVar("TChapModelConfig", bound=ChapModelConfig)
+
+
+class ChapModelServiceInfo(ChapServiceInfo):
     author: str
     author_note: str
     author_assessed_status: AssessedStatus
     contact_email: EmailStr
     description: str
-    display_name: str
     organization: str
     organization_logo_url: HttpUrl
     citation_info: str
 
     # required-only, no extras sneaking in:
     model_config = ConfigDict(extra="forbid")
-
-
-class JobStatus(str, Enum):
-    pending = "pending"
-    running = "running"
-    completed = "completed"
-    failed = "failed"
-
-
-class JobType(str, Enum):
-    train = "train"
-    predict = "predict"
-
-
-class JobResponse(BaseModel):
-    status: JobStatus = JobStatus.pending
-    type: JobType

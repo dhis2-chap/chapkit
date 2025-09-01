@@ -8,6 +8,8 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi-cli>=0.0.8",
     "fastapi[standard]>=0.116.1",
+    "numpy>=2.3.2",
+    "pandas>=2.3.2",
     "pydantic>=2.11.7",
 ]
 

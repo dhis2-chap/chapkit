@@ -1,3 +1,5 @@
+# chapkit/service.py
+from typing import Generic
 from uuid import UUID
 
 from fastapi import Body, FastAPI, HTTPException
@@ -5,53 +7,42 @@ from fastapi.responses import JSONResponse, Response
 
 from chapkit.runner import ChapRunner
 from chapkit.storage import ChapStorage
-from chapkit.types import ChapConfig, ChapServiceInfo, HealthResponse, JobResponse, JobStatus, JobType
+from chapkit.type import ChapServiceInfo, HealthResponse, TChapConfig
 
 
-class ChapService[T: ChapConfig]:
+class ChapService(Generic[TChapConfig]):
     def __init__(
         self,
-        info: ChapServiceInfo,
-        runner: ChapRunner[T],
-        storage: ChapStorage[T],
-        model_type: type[T],
+        runner: ChapRunner[TChapConfig],
+        storage: ChapStorage[TChapConfig],
     ) -> None:
-        self._info = info
         self._runner = runner
         self._storage = storage
-        self._model_type = model_type
+        # Concrete Pydantic model class (subclass of ChapConfig)
+        self._model_type = self._runner.config_type
 
-    def create_fastapi(self):
+    def create_fastapi(self) -> FastAPI:
         app = FastAPI()
         self._setup_health(app)
         self._setup_info(app)
         self._setup_configs(app)
         self._setup_jobs(app)
-        self._setup_train(app)
-        self._setup_predict(app)
-
         return app
 
     def _setup_health(self, app: FastAPI) -> None:
-        method = getattr(self._runner, "on_health", None)
-
-        if method:
-            app.add_api_route(
-                path="/health",
-                endpoint=method,
-                methods=["GET"],
-                tags=["information"],
-                name="health",
-                response_model=HealthResponse,
-            )
+        app.add_api_route(
+            path="/health",
+            endpoint=self._runner.on_health,
+            methods=["GET"],
+            tags=["information"],
+            name="health",
+            response_model=HealthResponse,
+        )
 
     def _setup_info(self, app: FastAPI) -> None:
-        def endpoint() -> ChapServiceInfo:
-            return self._info
-
         app.add_api_route(
             path="/info",
-            endpoint=endpoint,
+            endpoint=self._runner.on_info,
             methods=["GET"],
             tags=["information"],
             name="info",
@@ -59,43 +50,39 @@ class ChapService[T: ChapConfig]:
         )
 
     def _setup_configs(self, app: FastAPI) -> None:
-        type TModelType = self._model_type  # type: ignore
+        Model = self._model_type  # concrete Pydantic class
 
-        async def get_config(id: UUID) -> TModelType:
+        async def get_config(id: UUID):
             cfg = self._storage.get_config(id)
-
             if cfg is None:
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
-
             return cfg
 
-        async def get_configs() -> list[TModelType]:
+        async def get_configs():
             return self._storage.get_configs()
 
-        async def get_schema() -> dict:
-            return self._model_type.model_json_schema()
+        async def get_schema():
+            return Model.model_json_schema()
 
-        async def add_config(cfg: TModelType = Body(...)) -> JSONResponse:
-            validated = self._model_type.model_validate(cfg)
+        async def add_config(cfg: dict = Body(...)):
+            validated = Model.model_validate(cfg)
             self._storage.add_config(validated)
-
             return JSONResponse(
                 status_code=201,
                 content=validated.model_dump(mode="json"),
                 headers={"Location": f"/configs/{validated.id}"},
             )
 
-        async def delete_config(id: UUID) -> Response:
+        async def delete_config(id: UUID):
             if not self._storage.del_config(id):
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
-
             return Response(status_code=204)
 
         app.add_api_route(
             path="/configs",
             endpoint=get_configs,
             methods=["GET"],
-            response_model=list[TModelType],
+            response_model=list[Model],  # OK to pass the actual class here
             tags=["configs"],
             name="list_configs",
             summary="List all configs",
@@ -116,20 +103,18 @@ class ChapService[T: ChapConfig]:
             path="/configs/{id}",
             endpoint=get_config,
             methods=["GET"],
-            response_model=TModelType,
+            response_model=Model,
             tags=["configs"],
             name="get_config",
             summary="Get a config by ID",
-            responses={
-                404: {"description": "Config not found"},
-            },
+            responses={404: {"description": "Config not found"}},
         )
 
         app.add_api_route(
             path="/configs",
             endpoint=add_config,
             methods=["POST"],
-            response_model=TModelType,
+            response_model=Model,
             status_code=201,
             tags=["configs"],
             name="create_config",
@@ -156,37 +141,3 @@ class ChapService[T: ChapConfig]:
 
     def _setup_jobs(self, app: FastAPI) -> None:
         pass
-
-    def _setup_train(self, app: FastAPI) -> None:
-        def endpoint(config: UUID) -> JobResponse:
-            return JobResponse(status=JobStatus.pending, type=JobType.train)
-
-        app.add_api_route(
-            path="/train",
-            endpoint=endpoint,
-            methods=["POST"],
-            response_model=JobResponse,
-            status_code=202,
-            tags=["chap"],
-            responses={
-                202: {"description": "Job accepted"},
-                422: {"description": "Validation error"},
-            },
-        )
-
-    def _setup_predict(self, app: FastAPI) -> None:
-        def endpoint(config: UUID) -> JobResponse:
-            return JobResponse(status=JobStatus.pending, type=JobType.predict)
-
-        app.add_api_route(
-            path="/predict",
-            endpoint=endpoint,
-            methods=["POST"],
-            response_model=JobResponse,
-            status_code=202,
-            tags=["chap"],
-            responses={
-                202: {"description": "Job accepted"},
-                422: {"description": "Validation error"},
-            },
-        )
