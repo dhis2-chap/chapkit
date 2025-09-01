@@ -1,9 +1,5 @@
-from abc import ABC, abstractmethod
-
-from chapkit.type import JobResponse
+from abc import ABC
 
 
 class Scheduler(ABC):
-    @abstractmethod
-    def schedule(self) -> JobResponse:
-        pass
+    pass

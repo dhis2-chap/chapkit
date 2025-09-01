@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import TypeVar
+from typing import Any, TypeVar
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -42,6 +42,14 @@ class JobType(str, Enum):
     predict = "predict"
 
 
+class Job[T: ChapConfig](BaseModel):
+    id: UUID
+    type: JobType
+    config: T
+    data: Any
+
+
 class JobResponse(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
     status: JobStatus = JobStatus.pending
     type: JobType

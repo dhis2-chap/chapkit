@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 from typing import Any, Generic
 from uuid import UUID
 
@@ -23,7 +25,7 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["chap"])
 
-        def endpoint(
+        async def endpoint(
             config: UUID = Query(..., description="Config ID"),
             rows: list[dict[str, Any]] = Body(
                 ...,
@@ -36,7 +38,13 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
         ) -> JobResponse:
             cfg = self._service._resolve_cfg(config)
             df = self._df_from_json(rows)
-            return self._runner.on_predict(cfg, df)
+
+            if inspect.iscoroutinefunction(self._runner.on_train):
+                response = await self._runner.on_predict(cfg, df)
+            else:
+                response = await asyncio.to_thread(self._runner.on_predict, cfg, df)
+
+            return response
 
         router.add_api_route(
             path="/predict",
