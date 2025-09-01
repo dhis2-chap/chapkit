@@ -1,7 +1,8 @@
 # chapkit/service.py
 from typing import Generic
+from uuid import UUID
 
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, HTTPException
 
 from chapkit.api.config import ConfigApi
 from chapkit.api.health import HealthApi
@@ -21,20 +22,25 @@ class ChapService(Generic[TChapConfig]):
         self._runner = runner
         self._storage = storage
         self._model_type = self._runner.config_type
-        self._health_api = HealthApi(self._runner)
-        self._info_api = InfoApi(self._runner)
-        self._config_api = ConfigApi(self._storage, self._model_type)
-        self._job_api = JobApi(self._runner, self._storage)
 
     def create_fastapi(self) -> FastAPI:
         app = FastAPI()
-        router = APIRouter(prefix="/api/v1")
-
-        router.include_router(self._health_api.create_router())
-        router.include_router(self._info_api.create_router())
-        router.include_router(self._config_api.create_router())
-        router.include_router(self._job_api.create_router())
-
+        router = self.create_router()
         app.include_router(router)
-
         return app
+
+    def create_router(self) -> APIRouter:
+        router = APIRouter(prefix="/api/v1")
+        router.include_router(HealthApi(self._runner).create_router())
+        router.include_router(InfoApi(self._runner).create_router())
+        router.include_router(ConfigApi(self._storage, self._model_type).create_router())
+        router.include_router(JobApi(self._runner, self._storage).create_router())
+        return router
+
+    def _resolve_cfg(self, id: UUID) -> TChapConfig:
+        cfg = self._storage.get_config(id)
+
+        if cfg is None:
+            raise HTTPException(status_code=404, detail=f"Config {id} not found")
+
+        return cfg
