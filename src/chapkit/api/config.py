@@ -20,10 +20,7 @@ class ConfigApi(ChapApi[TChapConfig]):
 
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["configs"])
-        self._setup_routes(router)
-        return router
 
-    def _setup_routes(self, router: APIRouter) -> None:
         Model = self._model_type  # concrete Pydantic class
 
         async def get_config(id: UUID):
@@ -138,3 +135,5 @@ class ConfigApi(ChapApi[TChapConfig]):
                 404: {"description": "Config not found"},
             },
         )
+
+        return router
