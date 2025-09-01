@@ -3,7 +3,7 @@ from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 import pandas as pd
-from fastapi import Body, FastAPI, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query
 
 from chapkit.model.runner import ChapModelRunner
 from chapkit.model.type import ChapModelConfig, ChapModelServiceInfo
@@ -23,14 +23,13 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
         super().__init__(runner, storage)
         self._runner = runner  # narrowed type
 
-    def create_fastapi(self) -> FastAPI:
-        app = super().create_fastapi()
-        self._setup_train(app)
-        self._setup_predict(app)
-        return app
+    def _setup_routes(self, router: APIRouter) -> None:
+        super()._setup_routes(router)
+        self._setup_train(router)
+        self._setup_predict(router)
 
-    def _setup_info(self, app: FastAPI) -> None:
-        app.add_api_route(
+    def _setup_info(self, router: APIRouter) -> None:
+        router.add_api_route(
             path="/info",
             endpoint=self._runner.on_info,
             methods=["GET"],
@@ -49,7 +48,7 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
     def _df_from_json(rows: list[dict[str, Any]]) -> pd.DataFrame:
         return pd.DataFrame.from_records(rows)
 
-    def _setup_train(self, app: FastAPI) -> None:
+    def _setup_train(self, router: APIRouter) -> None:
         def endpoint(
             config: UUID = Query(..., description="Config ID"),
             rows: list[dict[str, Any]] = Body(
@@ -65,7 +64,7 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
             df = self._df_from_json(rows)
             return self._runner.on_train(cfg, df)
 
-        app.add_api_route(
+        router.add_api_route(
             path="/train",
             endpoint=endpoint,
             methods=["POST"],
@@ -80,7 +79,7 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
             },
         )
 
-    def _setup_predict(self, app: FastAPI) -> None:
+    def _setup_predict(self, router: APIRouter) -> None:
         def endpoint(
             config: UUID = Query(..., description="Config ID"),
             rows: list[dict[str, Any]] = Body(
@@ -96,7 +95,7 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
             df = self._df_from_json(rows)
             return self._runner.on_predict(cfg, df)
 
-        app.add_api_route(
+        router.add_api_route(
             path="/predict",
             endpoint=endpoint,
             methods=["POST"],

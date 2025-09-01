@@ -2,7 +2,7 @@
 from typing import Generic
 from uuid import UUID
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import APIRouter, Body, FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 
 from chapkit.runner import ChapRunner
@@ -23,14 +23,19 @@ class ChapService(Generic[TChapConfig]):
 
     def create_fastapi(self) -> FastAPI:
         app = FastAPI()
-        self._setup_health(app)
-        self._setup_info(app)
-        self._setup_configs(app)
-        self._setup_jobs(app)
+        router = APIRouter(prefix="/api/v1")
+        self._setup_routes(router)
+        app.include_router(router)
         return app
 
-    def _setup_health(self, app: FastAPI) -> None:
-        app.add_api_route(
+    def _setup_routes(self, router: APIRouter) -> None:
+        self._setup_health(router)
+        self._setup_info(router)
+        self._setup_configs(router)
+        self._setup_jobs(router)
+
+    def _setup_health(self, router: APIRouter) -> None:
+        router.add_api_route(
             path="/health",
             endpoint=self._runner.on_health,
             methods=["GET"],
@@ -39,8 +44,8 @@ class ChapService(Generic[TChapConfig]):
             response_model=HealthResponse,
         )
 
-    def _setup_info(self, app: FastAPI) -> None:
-        app.add_api_route(
+    def _setup_info(self, router: APIRouter) -> None:
+        router.add_api_route(
             path="/info",
             endpoint=self._runner.on_info,
             methods=["GET"],
@@ -49,7 +54,7 @@ class ChapService(Generic[TChapConfig]):
             response_model=ChapServiceInfo,
         )
 
-    def _setup_configs(self, app: FastAPI) -> None:
+    def _setup_configs(self, router: APIRouter) -> None:
         Model = self._model_type  # concrete Pydantic class
 
         async def get_config(id: UUID):
@@ -78,7 +83,7 @@ class ChapService(Generic[TChapConfig]):
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
             return Response(status_code=204)
 
-        app.add_api_route(
+        router.add_api_route(
             path="/configs",
             endpoint=get_configs,
             methods=["GET"],
@@ -88,7 +93,7 @@ class ChapService(Generic[TChapConfig]):
             summary="List all configs",
         )
 
-        app.add_api_route(
+        router.add_api_route(
             path="/configs/schema",
             endpoint=get_schema,
             methods=["GET"],
@@ -99,7 +104,7 @@ class ChapService(Generic[TChapConfig]):
             summary="Get JSON Schema for the current config model",
         )
 
-        app.add_api_route(
+        router.add_api_route(
             path="/configs/{id}",
             endpoint=get_config,
             methods=["GET"],
@@ -110,7 +115,7 @@ class ChapService(Generic[TChapConfig]):
             responses={404: {"description": "Config not found"}},
         )
 
-        app.add_api_route(
+        router.add_api_route(
             path="/configs",
             endpoint=add_config,
             methods=["POST"],
@@ -125,7 +130,7 @@ class ChapService(Generic[TChapConfig]):
             },
         )
 
-        app.add_api_route(
+        router.add_api_route(
             path="/configs/{id}",
             endpoint=delete_config,
             status_code=204,
@@ -139,5 +144,5 @@ class ChapService(Generic[TChapConfig]):
             },
         )
 
-    def _setup_jobs(self, app: FastAPI) -> None:
+    def _setup_jobs(self, router: APIRouter) -> None:
         pass
