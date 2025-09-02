@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache/
+.dist/
+.build/
+.venv/
+.env
+.env.*
+target/*.tmp
+tests/
