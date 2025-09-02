@@ -1,7 +1,7 @@
 import asyncio
 import inspect
 from typing import Any, Generic
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pandas as pd
 from fastapi import APIRouter, BackgroundTasks, Body, Query
@@ -40,15 +40,16 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
             cfg = self._service._resolve_cfg(config)
             df = self._df_from_json(rows)
 
-            async def task():
+            async def task(id: UUID) -> None:
                 if inspect.iscoroutinefunction(self._runner.on_predict):
                     return await self._runner.on_predict(cfg, df)
 
                 await asyncio.to_thread(self._runner.on_predict, cfg, df)
 
-            background_tasks.add_task(task)
+            id = uuid4()
+            background_tasks.add_task(task, id)
 
-            return JobResponse(status=JobStatus.completed, type=JobType.predict)
+            return JobResponse(id=id, status=JobStatus.completed, type=JobType.predict)
 
         router.add_api_route(
             path="/predict",

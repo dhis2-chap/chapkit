@@ -21,6 +21,12 @@ class HealthApi(ChapApi[TChapConfig]):
             methods=["GET"],
             name="health",
             response_model=HealthResponse,
+            responses={
+                200: {
+                    "description": "Service health status",
+                    "content": {"application/json": {"example": {"status": "up"}}},
+                }
+            },
         )
 
         return router
