@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from chapkit.api.type import ChapApi
 from chapkit.runner import ChapRunner
-from chapkit.type import TChapConfig
+from chapkit.types import TChapConfig
 
 
 class InfoApi(ChapApi[TChapConfig], Generic[TChapConfig]):

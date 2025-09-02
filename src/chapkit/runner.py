@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Generic
 
-from chapkit.type import ChapServiceInfo, HealthResponse, HealthStatus, TChapConfig
+from chapkit.types import ChapServiceInfo, HealthResponse, HealthStatus, TChapConfig
 
 
 class ChapRunner(Generic[TChapConfig], ABC):

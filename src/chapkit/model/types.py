@@ -3,7 +3,7 @@ from typing import TypeVar
 
 from pydantic import ConfigDict, EmailStr, HttpUrl
 
-from chapkit.type import ChapConfig, ChapServiceInfo
+from chapkit.types import ChapConfig, ChapServiceInfo
 
 
 class AssessedStatus(str, Enum):

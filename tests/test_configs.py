@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from chapkit.runner import ChapRunner
 from chapkit.service import ChapService
 from chapkit.storage import JsonChapStorage
-from chapkit.type import ChapConfig, ChapServiceInfo
+from chapkit.types import ChapConfig, ChapServiceInfo
 
 
 class MockRunner(ChapRunner):

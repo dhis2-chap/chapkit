@@ -1,17 +1,15 @@
-import asyncio
-import inspect
 from typing import Any, Generic
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query
+from fastapi import APIRouter, Body, HTTPException, Query
 
 from chapkit.api.type import ChapApi
 from chapkit.model.runner import ChapModelRunner
-from chapkit.model.type import TChapModelConfig
+from chapkit.model.types import TChapModelConfig
 from chapkit.scheduler import Scheduler
 from chapkit.storage import ChapStorage
-from chapkit.type import JobRequest, JobResponse, JobStatus, JobType, TChapConfig
+from chapkit.types import JobResponse, JobStatus, JobType, PredictBody, PredictData, PredictParams, TChapConfig
 
 
 class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
@@ -29,32 +27,43 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
         router = APIRouter(tags=["chap"])
 
         async def endpoint(
-            background_tasks: BackgroundTasks,
             config: UUID = Query(..., description="Config ID"),
-            rows: list[dict[str, Any]] = Body(
+            model: UUID = Query(..., description="Trained Model ID"),
+            body: PredictBody = Body(
                 ...,
-                description="Data as JSON records: [{...}, {...}]",
-                example=[
-                    {"k1": "v1", "k2": 1.0},
-                    {"k1": "v2", "k2": 2.0},
-                ],
+                description="Prediction request body containing a DataFrame (orient='split') "
+                "and optional GeoJSON FeatureCollection.",
+                example={
+                    "df": {
+                        "columns": ["Name", "Age", "City"],
+                        "index": [0, 1],
+                        "data": [["Eva", 28, "Tromsø"], ["Frank", 50, "Kristiansand"]],
+                    },
+                    "geo": {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "geometry": {"type": "Point", "coordinates": [18.9553, 69.6496]},
+                                "properties": {"city": "Tromsø"},
+                            },
+                            {
+                                "type": "Feature",
+                                "geometry": {"type": "Point", "coordinates": [8.0000, 58.1467]},
+                                "properties": {"city": "Kristiansand"},
+                            },
+                        ],
+                    },
+                },
             ),
         ) -> JobResponse:
             cfg = self._resolve_cfg(config)
-            df = self._df_from_json(rows)
 
-            async def task(id: UUID) -> JobResponse:
-                jr = JobRequest(id=id, type=JobType.train, config=cfg, data=df)
+            params = PredictParams(config=cfg, data=PredictData(df=body.df, geo=body.geo))
 
-                if inspect.iscoroutinefunction(self._runner.on_predict):
-                    return await self._runner.on_predict(jr)
+            id = await self._scheduler.add_job(self._runner.on_predict, params)
 
-                return await asyncio.to_thread(self._runner.on_predict, jr)
-
-            id = uuid4()
-            background_tasks.add_task(task, id)
-
-            return JobResponse(id=id, status=JobStatus.completed, type=JobType.predict)
+            return JobResponse(id=id, type=JobType.predict, status=JobStatus.pending)
 
         router.add_api_route(
             path="/predict",
@@ -79,8 +88,6 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
 
     def _resolve_cfg(self, id: UUID) -> TChapConfig:
         cfg = self._storage.get_config(id)
-
         if cfg is None:
             raise HTTPException(status_code=404, detail=f"Config {id} not found")
-
         return cfg

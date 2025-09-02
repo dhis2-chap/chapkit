@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi-cli>=0.0.10",
     "fastapi[standard]>=0.116.1",
+    "geojson-pydantic>=2.0.0",
     "numpy>=2.3.2",
     "pandas>=2.3.2",
     "pydantic>=2.11.7",

@@ -1,18 +1,15 @@
-# train.py
-import asyncio
-import inspect
 from typing import Any, Generic
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from chapkit.api.type import ChapApi
 from chapkit.model.runner import ChapModelRunner
-from chapkit.model.type import TChapModelConfig
+from chapkit.model.types import TChapModelConfig
 from chapkit.scheduler import Scheduler
 from chapkit.storage import ChapStorage
-from chapkit.type import JobRequest, JobResponse, JobStatus, JobType, TChapConfig
+from chapkit.types import JobResponse, JobStatus, JobType, TChapConfig, TrainBody, TrainData, TrainParams
 
 
 class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
@@ -31,34 +28,41 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
 
         async def endpoint(
             config: UUID = Query(..., description="Config ID"),
-            rows: list[dict[str, Any]] = Body(
+            body: TrainBody = Body(
                 ...,
-                description="Data as JSON records: [{...}, {...}]",
-                example=[
-                    {"k1": "v1", "k2": 1.0},
-                    {"k1": "v2", "k2": 2.0},
-                ],
+                description="Training request body containing a DataFrame (orient='split') "
+                "and optional GeoJSON FeatureCollection.",
+                example={
+                    "df": {
+                        "columns": ["Name", "Age", "City"],
+                        "index": [0, 1, 2, 3],
+                        "data": [
+                            ["Alice", 25, "Oslo"],
+                            ["Bob", 30, "Bergen"],
+                            ["Charlie", 35, "Trondheim"],
+                            ["Diana", 40, "Stavanger"],
+                        ],
+                    },
+                    "geo": {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "geometry": {"type": "Point", "coordinates": [10.7461, 59.9127]},
+                                "properties": {"city": "Oslo"},
+                            }
+                        ],
+                    },
+                },
             ),
         ) -> JobResponse:
-            # Resolve config
             cfg = self._resolve_cfg(config)
-            df = self._df_from_json(rows)
 
-            # Create JobRequest
-            job_id = uuid4()
-            jr = JobRequest(id=job_id, type=JobType.train, config=cfg)
+            params = TrainParams(config=cfg, data=TrainData(df=body.df.to_pandas(), geo=body.geo))
 
-            # Wrap runner call so it works for sync/async methods
-            async def runner_task(job: JobRequest) -> Any:
-                if inspect.iscoroutinefunction(self._runner.on_train):
-                    return await self._runner.on_train(job)
-                return await asyncio.to_thread(self._runner.on_train, job)
+            id = await self._scheduler.add_job(self._runner.on_train, params)
 
-            # Schedule the job
-            await self._scheduler.add_job(jr, runner_task, jr, df)
-
-            # Return immediately with status=pending
-            return JobResponse(id=job_id, type=JobType.train, status=JobStatus.pending)
+            return JobResponse(id=id, type=JobType.train, status=JobStatus.pending)
 
         router.add_api_route(
             path="/train",

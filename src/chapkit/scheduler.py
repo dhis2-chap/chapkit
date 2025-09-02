@@ -5,14 +5,12 @@ import asyncio
 import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, TypeVar
-from uuid import UUID
+from typing import Any, Awaitable, Callable
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, PrivateAttr
 
-from chapkit.type import JobRecord, JobRequest, JobStatus
-
-T = TypeVar("T")
+from chapkit.types import JobRecord, JobRequest, JobStatus
 
 
 class Scheduler(BaseModel, ABC):
@@ -29,10 +27,8 @@ class Scheduler(BaseModel, ABC):
         target: Callable[..., Any] | Callable[..., Awaitable[Any]],
         /,
         *args: Any,
-        delay: float | None = None,
-        run_at: datetime | None = None,
         **kwargs: Any,
-    ) -> None: ...
+    ) -> UUID: ...
 
     @abstractmethod
     async def get_status(self, job_id: UUID) -> JobStatus: ...
@@ -62,44 +58,30 @@ class JobScheduler(Scheduler):
 
     async def add_job(
         self,
-        job: JobRequest[Any],
         target: Callable[..., Any] | Callable[..., Awaitable[Any]],
         /,
         *args: Any,
-        delay: float | None = None,
-        run_at: datetime | None = None,
         **kwargs: Any,
-    ) -> None:
+    ) -> UUID:
         """Register and schedule `target` (sync or async) for this job."""
-        # Create initial record using YOUR JobRecord model
         now = datetime.now(timezone.utc)
+        id = uuid4()
+
         record = JobRecord(
-            id=job.id,
-            type=job.type,
+            id=id,
             status=JobStatus.pending,
-            submitted_at=now,  # If your JobRecord uses str, Pydantic coerces to ISO.
+            submitted_at=now,  # ensure JobRecord uses datetime fields
         )
 
         async with self._lock:
-            if job.id in self._tasks:
-                raise RuntimeError(f"Job {job.id} already scheduled")
-            self._records[job.id] = record
-
-        # Compute effective delay
-        eff_delay = 0.0
-        if run_at is not None:
-            run_at_utc = run_at if run_at.tzinfo else run_at.replace(tzinfo=timezone.utc)
-            eff_delay = max(0.0, (run_at_utc - now).total_seconds())
-        elif delay:
-            eff_delay = max(0.0, delay)
+            if id in self._tasks:
+                raise RuntimeError(f"Job {id} already scheduled")
+            self._records[id] = record
 
         async def _runner() -> Any:
-            if eff_delay > 0:
-                await asyncio.sleep(eff_delay)
-
             # Mark running
             async with self._lock:
-                rec = self._records[job.id]
+                rec = self._records[id]
                 rec.status = JobStatus.running
                 rec.started_at = datetime.now(timezone.utc)
 
@@ -111,34 +93,34 @@ class JobScheduler(Scheduler):
                     result = await asyncio.to_thread(target, *args, **kwargs)
 
                 async with self._lock:
-                    rec = self._records[job.id]
+                    rec = self._records[id]
                     rec.status = JobStatus.completed
                     rec.finished_at = datetime.now(timezone.utc)
-                    self._results[job.id] = result
+                    self._results[id] = result
                 return result
 
             except asyncio.CancelledError:
                 async with self._lock:
-                    rec = self._records[job.id]
+                    rec = self._records[id]
                     rec.status = JobStatus.canceled
                     rec.finished_at = datetime.now(timezone.utc)
                 raise
 
             except Exception as e:
                 async with self._lock:
-                    rec = self._records[job.id]
+                    rec = self._records[id]
                     rec.status = JobStatus.failed
                     rec.finished_at = datetime.now(timezone.utc)
-                    # If your JobRecord has `error: str | None`
                     if hasattr(rec, "error"):
                         rec.error = f"{type(e).__name__}: {e}"
                 raise
 
-        task = asyncio.create_task(_runner(), name=f"{self.name}-job-{job.id}")
-        async with self._lock:
-            self._tasks[job.id] = task
+        task = asyncio.create_task(_runner(), name=f"{self.name}-job-{id}")
 
-    # -------------------------- Introspection API --------------------------
+        async with self._lock:
+            self._tasks[id] = task
+
+        return id
 
     async def get_status(self, job_id: UUID) -> JobStatus:
         async with self._lock:
@@ -164,11 +146,9 @@ class JobScheduler(Scheduler):
                 raise RuntimeError("Result not ready")
 
             if rec.status is JobStatus.completed:
-                # Note: result may legitimately be None if target returned None
                 return self._results.get(job_id)
 
             if rec.status is JobStatus.failed:
-                # Prefer your record's `error` if present
                 msg = getattr(rec, "error", None) or "Job failed"
                 raise RuntimeError(msg)
 
@@ -190,6 +170,7 @@ class JobScheduler(Scheduler):
             return False
 
         task.cancel()
+
         try:
             await task
         except asyncio.CancelledError:
@@ -207,6 +188,7 @@ class JobScheduler(Scheduler):
 
         if task and not task.done():
             task.cancel()
+
             try:
                 await task
             except asyncio.CancelledError:

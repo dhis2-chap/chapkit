@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from chapkit.model.api.predict import PredictApi
 from chapkit.model.api.train import TrainApi
 from chapkit.model.runner import ChapModelRunner
-from chapkit.model.type import ChapModelConfig
+from chapkit.model.types import ChapModelConfig
 from chapkit.scheduler import Scheduler
 from chapkit.service import ChapService
 from chapkit.storage import ChapStorage

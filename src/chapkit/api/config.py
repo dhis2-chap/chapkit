@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse, Response
 
 from chapkit.api.type import ChapApi
 from chapkit.storage import ChapStorage
-from chapkit.type import TChapConfig
+from chapkit.types import TChapConfig
 
 
 class ConfigApi(ChapApi[TChapConfig]):

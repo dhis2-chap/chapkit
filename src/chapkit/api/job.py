@@ -11,7 +11,7 @@ from chapkit.api.type import ChapApi
 from chapkit.runner import ChapRunner
 from chapkit.scheduler import Scheduler
 from chapkit.storage import ChapStorage
-from chapkit.type import JobRecord, JobStatus, TChapConfig
+from chapkit.types import JobRecord, JobStatus, TChapConfig
 
 
 class JobApi(ChapApi[TChapConfig]):

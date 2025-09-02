@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Generic
+from uuid import UUID, uuid4
 
-import pandas as pd
-
-from chapkit.model.type import ChapModelServiceInfo, TChapModelConfig
+from chapkit.model.types import ChapModelServiceInfo, TChapModelConfig
 from chapkit.runner import ChapRunner
-from chapkit.type import HealthResponse, HealthStatus, JobRequest, JobResponse, JobStatus, JobType
+from chapkit.types import HealthResponse, HealthStatus, PredictParams, TrainParams
 
 
 class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], ABC):
@@ -13,10 +12,10 @@ class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], A
     def on_health(self) -> HealthResponse: ...
 
     @abstractmethod
-    async def on_train(self, job: JobRequest) -> JobResponse: ...
+    async def on_train(self, params: TrainParams) -> UUID: ...
 
     @abstractmethod
-    async def on_predict(self, job: JobRequest) -> JobResponse: ...
+    async def on_predict(self, params: PredictParams) -> UUID: ...
 
 
 class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelConfig], ABC):
@@ -26,8 +25,12 @@ class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelC
     def on_info(self) -> ChapModelServiceInfo:
         return self._info
 
-    async def on_train(self, job: JobRequest, data: pd.DataFrame) -> JobResponse:
-        return JobResponse(id=job.id, status=JobStatus.completed, type=JobType.train)
+    async def on_train(self, params: TrainParams) -> UUID:
+        print("Training with params:", params)
 
-    async def on_predict(self, job: JobRequest) -> JobResponse:
-        return JobResponse(id=job.id, status=JobStatus.completed, type=JobType.predict)
+        return uuid4()
+
+    async def on_predict(self, params: PredictParams) -> UUID:
+        print("Predicting with params:", params)
+
+        return uuid4()

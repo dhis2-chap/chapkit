@@ -3,7 +3,7 @@ from typing import Generic
 
 from fastapi import APIRouter
 
-from chapkit.type import TChapConfig
+from chapkit.types import TChapConfig
 
 
 class ChapApi(Generic[TChapConfig], ABC):
