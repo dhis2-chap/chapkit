@@ -1,17 +1,21 @@
 from typing import Generic
 from uuid import UUID
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from chapkit.api.config import ConfigApi
 from chapkit.api.health import HealthApi
 from chapkit.api.info import InfoApi
 from chapkit.api.job import JobApi
-from chapkit.api.type import ChapApi
+from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
 from chapkit.scheduler import JobScheduler, Scheduler
 from chapkit.storage import ChapStorage
 from chapkit.types import TChapConfig
+
+templates = Jinja2Templates(directory="templates")
 
 
 class ChapService(Generic[TChapConfig]):
@@ -29,6 +33,10 @@ class ChapService(Generic[TChapConfig]):
     def create_fastapi(self, app: FastAPI | None = None) -> FastAPI:
         if app is None:
             app = FastAPI()
+
+            @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+            async def index(request: Request):
+                return templates.TemplateResponse("index.html", {"request": request})
 
         router = self.create_api_routers()
         app.include_router(router)

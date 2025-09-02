@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, HTTPException, Query
 
-from chapkit.api.type import ChapApi
+from chapkit.api.types import ChapApi
 from chapkit.model.runner import ChapModelRunner
 from chapkit.model.types import TChapModelConfig
 from chapkit.scheduler import Scheduler

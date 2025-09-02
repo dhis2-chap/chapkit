@@ -31,7 +31,7 @@ class HealthResponse(BaseModel):
 
 class ChapServiceInfo(BaseModel):
     display_name: str
-    # Strict: no extras
+
     model_config = ConfigDict(extra="forbid")
 
 
@@ -41,7 +41,7 @@ class JobStatus(StrEnum):
     running = "running"
     completed = "completed"
     failed = "failed"
-    canceled = "canceled"  # <-- new; useful for DELETE /jobs/{id}
+    canceled = "canceled"
 
 
 class JobType(StrEnum):

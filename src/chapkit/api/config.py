@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse, Response
 
-from chapkit.api.type import ChapApi
+from chapkit.api.types import ChapApi
 from chapkit.storage import ChapStorage
 from chapkit.types import TChapConfig
 

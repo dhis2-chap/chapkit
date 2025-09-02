@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse, Response
 
-from chapkit.api.type import ChapApi
+from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
 from chapkit.scheduler import Scheduler
 from chapkit.storage import ChapStorage

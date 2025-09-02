@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from chapkit.api.type import ChapApi
+from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
 from chapkit.types import HealthResponse, TChapConfig
 
