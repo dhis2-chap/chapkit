@@ -1,3 +1,5 @@
+# simple demo of chapkit, will be moved out to its own repo sooon
+
 from chapkit import JsonChapStorage
 from chapkit.model import AssessedStatus, ChapModelConfig, ChapModelRunnerBase, ChapModelService, ChapModelServiceInfo
 
