@@ -1,7 +1,6 @@
-from typing import Any, Generic
+from typing import Generic
 from uuid import UUID
 
-import pandas as pd
 from fastapi import APIRouter, Body, HTTPException, Query
 
 from chapkit.api.type import ChapApi
@@ -9,7 +8,7 @@ from chapkit.model.runner import ChapModelRunner
 from chapkit.model.types import TChapModelConfig
 from chapkit.scheduler import Scheduler
 from chapkit.storage import ChapStorage
-from chapkit.types import JobResponse, JobStatus, JobType, PredictBody, PredictData, PredictParams, TChapConfig
+from chapkit.types import JobResponse, JobStatus, JobType, PredictBody, PredictData, PredictParams
 
 
 class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
@@ -57,7 +56,10 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 },
             ),
         ) -> JobResponse:
-            cfg = self._resolve_cfg(config)
+            cfg = self._storage.get_config(config)
+
+            if cfg is None:
+                raise HTTPException(status_code=404, detail=f"Config {config} not found")
 
             params = PredictParams(config=cfg, data=PredictData(df=body.df, geo=body.geo))
 
@@ -81,13 +83,3 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
         )
 
         return router
-
-    @staticmethod
-    def _df_from_json(rows: list[dict[str, Any]]) -> pd.DataFrame:
-        return pd.DataFrame.from_records(rows)
-
-    def _resolve_cfg(self, id: UUID) -> TChapConfig:
-        cfg = self._storage.get_config(id)
-        if cfg is None:
-            raise HTTPException(status_code=404, detail=f"Config {id} not found")
-        return cfg
