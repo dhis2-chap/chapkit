@@ -23,6 +23,9 @@ class MockStorage(ChapStorage):
     def del_config(self, id):
         return True
 
+    def update_config(self, id, cfg):
+        pass
+
 
 def test_health_check():
     info = ChapServiceInfo(display_name="Test Service")

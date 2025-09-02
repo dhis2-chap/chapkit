@@ -127,7 +127,7 @@ class TrainParams(BaseModel):
 
 
 class PredictData(BaseModel):
-    df: DataFrameSplit
+    df: pd.DataFrame
     geo: FeatureCollection | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
