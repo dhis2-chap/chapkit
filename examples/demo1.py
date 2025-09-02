@@ -1,4 +1,4 @@
-from chapkit import HealthResponse, HealthStatus, JsonChapStorage
+from chapkit import JsonChapStorage
 from chapkit.model import AssessedStatus, ChapModelConfig, ChapModelRunnerBase, ChapModelService, ChapModelServiceInfo
 
 
@@ -7,9 +7,7 @@ class MyConfig(ChapModelConfig):
     y: int
 
 
-class MyRunner(ChapModelRunnerBase[MyConfig]):
-    def on_health(self) -> HealthResponse:
-        return HealthResponse(status=HealthStatus.up)
+class MyRunner(ChapModelRunnerBase[MyConfig]): ...
 
 
 info = ChapModelServiceInfo(

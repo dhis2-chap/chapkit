@@ -7,6 +7,7 @@ from chapkit.model.api.predict import PredictApi
 from chapkit.model.api.train import TrainApi
 from chapkit.model.runner import ChapModelRunner
 from chapkit.model.type import ChapModelConfig
+from chapkit.scheduler import Scheduler
 from chapkit.service import ChapService
 from chapkit.storage import ChapStorage
 
@@ -18,14 +19,15 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
         self,
         runner: ChapModelRunner[TModelConfig],
         storage: ChapStorage[TModelConfig],
+        scheduler: Scheduler | None = None,
     ) -> None:
-        super().__init__(runner, storage)
-        self._runner = runner  # narrowed type
+        super().__init__(runner, storage, scheduler)
+        # self._runner = runner  # narrowed type
 
     def create_api_routers(self) -> APIRouter:
         router = super().create_api_routers()
 
-        self._include_api(router, TrainApi(self._runner, self))
-        self._include_api(router, PredictApi(self._runner, self))
+        self._include_api(router, TrainApi(self._runner, self._storage, self._scheduler))
+        self._include_api(router, PredictApi(self._runner, self._storage, self._scheduler))
 
         return router

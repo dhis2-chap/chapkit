@@ -9,6 +9,7 @@ from chapkit.api.info import InfoApi
 from chapkit.api.job import JobApi
 from chapkit.api.type import ChapApi
 from chapkit.runner import ChapRunner
+from chapkit.scheduler import JobScheduler, Scheduler
 from chapkit.storage import ChapStorage
 from chapkit.type import TChapConfig
 
@@ -18,10 +19,12 @@ class ChapService(Generic[TChapConfig]):
         self,
         runner: ChapRunner[TChapConfig],
         storage: ChapStorage[TChapConfig],
+        scheduler: Scheduler | None = None,
     ) -> None:
         self._runner = runner
         self._storage = storage
         self._model_type = self._runner.config_type
+        self._scheduler = scheduler or JobScheduler()
 
     def create_fastapi(self, app: FastAPI | None = None) -> FastAPI:
         if app is None:
@@ -38,7 +41,7 @@ class ChapService(Generic[TChapConfig]):
         self._include_api(router, HealthApi(self._runner))
         self._include_api(router, InfoApi(self._runner))
         self._include_api(router, ConfigApi(self._storage, self._model_type))
-        self._include_api(router, JobApi(self._runner, self._storage))
+        self._include_api(router, JobApi(self._runner, self._storage, self._scheduler))
 
         return router
 

@@ -5,33 +5,29 @@ import pandas as pd
 
 from chapkit.model.type import ChapModelServiceInfo, TChapModelConfig
 from chapkit.runner import ChapRunner
-from chapkit.type import Job, JobResponse, JobStatus, JobType
+from chapkit.type import HealthResponse, HealthStatus, JobRequest, JobResponse, JobStatus, JobType
 
 
 class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], ABC):
     @abstractmethod
-    async def on_train(self, cfg: TChapModelConfig, data: pd.DataFrame) -> JobResponse: ...
+    def on_health(self) -> HealthResponse: ...
 
     @abstractmethod
-    async def on_predict(self, cfg: TChapModelConfig, data: pd.DataFrame) -> JobResponse: ...
+    async def on_train(self, job: JobRequest) -> JobResponse: ...
+
+    @abstractmethod
+    async def on_predict(self, job: JobRequest) -> JobResponse: ...
 
 
 class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelConfig], ABC):
+    def on_health(self) -> HealthResponse:
+        return HealthResponse(status=HealthStatus.up)
+
     def on_info(self) -> ChapModelServiceInfo:
         return self._info
 
-    async def on_train(self, cfg: TChapModelConfig, data: pd.DataFrame) -> JobResponse:
-        response = JobResponse(status=JobStatus.completed, type=JobType.train)
+    async def on_train(self, job: JobRequest, data: pd.DataFrame) -> JobResponse:
+        return JobResponse(id=job.id, status=JobStatus.completed, type=JobType.train)
 
-        job = Job(id=response.id, status=JobStatus.completed, type=JobType.train, config=cfg, data=data)
-        print(job)
-
-        return response
-
-    async def on_predict(self, cfg: TChapModelConfig, data: pd.DataFrame) -> JobResponse:
-        response = JobResponse(status=JobStatus.completed, type=JobType.predict)
-
-        job = Job(id=response.id, status=JobStatus.completed, type=JobType.predict, config=cfg, data=data)
-        print(job)
-
-        return response
+    async def on_predict(self, job: JobRequest) -> JobResponse:
+        return JobResponse(id=job.id, status=JobStatus.completed, type=JobType.predict)
