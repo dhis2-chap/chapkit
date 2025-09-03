@@ -7,6 +7,7 @@ DOCKER_IMAGE := $(APP_NAME):$(DOCKER_TAG)
 
 help:
 	@echo "Available targets:"
+	@echo "  run           - Run the application (requires uvicorn)"
 	@echo "  clean         - Remove Python cache and build artifacts"
 	@echo "  test          - Run pytest suite"
 	@echo "  lint          - Run ruff linter"
@@ -14,6 +15,9 @@ help:
 	@echo "  docker-build  - Build Docker image ($(DOCKER_IMAGE))"
 	@echo "  docker-run    - Run container with port 8000 exposed"
 	@echo "  docker-shell  - Run shell inside built image"
+
+run:
+	uvicorn main:app --reload
 
 clean:
 	@echo "Cleaning build artifacts..."
