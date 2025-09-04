@@ -1,7 +1,9 @@
 # simple demo of chapkit, will be moved out to its own repo sooon
 
-from chapkit import JsonChapStorage
+from uuid import UUID
+
 from chapkit.model import AssessedStatus, ChapModelConfig, ChapModelRunnerBase, ChapModelService, ChapModelServiceInfo
+from chapkit.storage import SqlAlchemyChapStorage
 
 
 class MyConfig(ChapModelConfig):
@@ -38,10 +40,16 @@ info = ChapModelServiceInfo(
 
 runner = MyRunner(info, MyConfig)
 
-storage = JsonChapStorage("target/storage.json", MyConfig)
+storage = SqlAlchemyChapStorage(file="target/chapkit.db", model_type=MyConfig)
 storage.add_config(MyConfig(id="06a0757d-3bea-4d74-b424-228fe7c1b2c2", name="default", x=10, y=20))
 storage.add_config(MyConfig(id="aad4616c-e975-4cd8-b230-074eef580459", name="test", x=1, y=2))
 
+storage.add_model(
+    id=UUID("06a0757d-3bea-4d74-b424-228fe7c1b2c2"),
+    obj={"a": 1, "b": 2, "c": 3},
+)
+
+print(storage.get_model(UUID("06a0757d-3bea-4d74-b424-228fe7c1b2c2")))
 
 app = ChapModelService(
     runner=runner,
