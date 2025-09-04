@@ -23,8 +23,17 @@ class MockStorage(ChapStorage):
     def del_config(self, id):
         return True
 
-    def update_config(self, id, cfg):
+    def update_config(self, cfg):
+        return True
+
+    def add_model(self, id, obj):
         pass
+
+    def del_model(self, id):
+        return True
+
+    def get_model(self, id):
+        return None
 
 
 def test_info_endpoint():
