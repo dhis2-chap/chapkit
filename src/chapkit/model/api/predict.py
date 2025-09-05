@@ -26,7 +26,6 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
         router = APIRouter(tags=["chap"])
 
         async def endpoint(
-            config: UUID = Query(..., description="Config ID"),
             model: UUID = Query(..., description="Trained Model ID"),
             body: PredictBody = Body(
                 ...,
@@ -56,12 +55,15 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 },
             ),
         ) -> JobResponse:
-            cfg = self._storage.get_config(config)
-
+            cfg = self._storage.get_config_for_model(model)
             if cfg is None:
-                raise HTTPException(status_code=404, detail=f"Config {config} not found")
+                raise HTTPException(status_code=404, detail=f"Model {model} not found")
 
-            params = PredictParams(config=cfg, data=PredictData(df=body.df, geo=body.geo))
+            model_obj = self._storage.get_model(model)
+            if model_obj is None:
+                raise HTTPException(status_code=404, detail=f"Model {model} not found")
+
+            params = PredictParams(config=cfg, model=model_obj, data=PredictData(df=body.df, geo=body.geo))
 
             id = await self._scheduler.add_job(self._runner.on_predict, params)
 

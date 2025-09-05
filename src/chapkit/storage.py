@@ -6,11 +6,11 @@ from pathlib import Path
 from typing import Any, Iterator
 from uuid import UUID
 
-from sqlalchemy import LargeBinary, create_engine, event, select
+from sqlalchemy import ForeignKey, LargeBinary, create_engine, event, select
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
 from chapkit.types import ChapConfig, TChapConfig
 
@@ -29,11 +29,13 @@ class ChapStorage[T: ChapConfig](ABC):
     @abstractmethod
     def get_configs(self) -> list[T]: ...
     @abstractmethod
-    def add_model(self, id: UUID, obj: Any) -> None: ...
+    def add_model(self, id: UUID, cfg: T, obj: Any) -> None: ...
     @abstractmethod
     def del_model(self, id: UUID) -> bool: ...
     @abstractmethod
     def get_model(self, id: UUID) -> Any | None: ...
+    @abstractmethod
+    def get_config_for_model(self, model_id: UUID) -> T | None: ...
 
 
 # ---------- ORM base & rows ----------
@@ -45,12 +47,15 @@ class ConfigRow(Base):
     __tablename__ = "configs"
     id: Mapped[UUID] = mapped_column(primary_key=True)
     config: Mapped[dict] = mapped_column(JSON, nullable=False)
+    models: Mapped[list["ModelRow"]] = relationship(back_populates="config", cascade="all, delete-orphan")
 
 
 class ModelRow(Base):
     __tablename__ = "models"
     id: Mapped[UUID] = mapped_column(primary_key=True)
+    config_id: Mapped[UUID] = mapped_column(ForeignKey("configs.id", ondelete="CASCADE"), nullable=False)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    config: Mapped["ConfigRow"] = relationship(back_populates="models")
 
 
 # ---------- helper: engine factory ----------
@@ -158,16 +163,18 @@ class SqlAlchemyChapStorage(ChapStorage[T]):
 
     # --- Model API (pickled) ---
 
-    def add_model(self, id: UUID, obj: Any) -> None:
+    def add_model(self, id: UUID, cfg: T, obj: Any) -> None:
         blob = self._pickle(obj)
 
         with self._session() as s:
-            stmt = sqlite_insert(ModelRow).values(id=id, data=blob)
+            stmt = sqlite_insert(ModelRow).values(id=id, config_id=cfg.id, data=blob)
             stmt = stmt.on_conflict_do_update(
                 index_elements=[ModelRow.id],
-                set_={"data": stmt.excluded.data},
+                set_={
+                    "data": stmt.excluded.data,
+                    "config_id": stmt.excluded.config_id,
+                },
             )
-
             s.execute(stmt)
 
     def del_model(self, id: UUID) -> bool:
@@ -185,3 +192,10 @@ class SqlAlchemyChapStorage(ChapStorage[T]):
         with self._session() as s:
             row = s.get(ModelRow, id)
             return self._unpickle(row.data) if row else None
+
+    def get_config_for_model(self, model_id: UUID) -> T | None:
+        with self._session() as s:
+            row = s.get(ModelRow, model_id)
+            if not row:
+                return None
+            return self._cfg_from_dict(row.config.config)

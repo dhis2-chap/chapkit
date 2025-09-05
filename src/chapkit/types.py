@@ -135,6 +135,7 @@ class PredictData(BaseModel):
 
 class PredictParams(BaseModel):
     config: TChapConfig
+    model: Any | None = None
     data: TrainData
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")

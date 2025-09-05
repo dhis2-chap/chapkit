@@ -22,7 +22,7 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
         scheduler: Scheduler | None = None,
     ) -> None:
         super().__init__(runner, storage, scheduler)
-        # self._runner = runner  # narrowed type
+        self._runner: ChapModelRunner[TModelConfig] = runner
 
     def create_api_routers(self) -> APIRouter:
         router = super().create_api_routers()
