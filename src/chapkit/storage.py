@@ -2,11 +2,12 @@ import os
 import pickle
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, LargeBinary, create_engine, event, select
+from sqlalchemy import ForeignKey, LargeBinary, create_engine, event, func, select
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
@@ -40,19 +41,19 @@ class ChapStorage[T: ChapConfig](ABC):
 
 # ---------- ORM base & rows ----------
 class Base(DeclarativeBase):
-    pass
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
 class ConfigRow(Base):
     __tablename__ = "configs"
-    id: Mapped[UUID] = mapped_column(primary_key=True)
     config: Mapped[dict] = mapped_column(JSON, nullable=False)
     models: Mapped[list["ModelRow"]] = relationship(back_populates="config", cascade="all, delete-orphan")
 
 
 class ModelRow(Base):
     __tablename__ = "models"
-    id: Mapped[UUID] = mapped_column(primary_key=True)
     config_id: Mapped[UUID] = mapped_column(ForeignKey("configs.id", ondelete="CASCADE"), nullable=False)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     config: Mapped["ConfigRow"] = relationship(back_populates="models")
