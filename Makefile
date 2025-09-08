@@ -10,8 +10,7 @@ help:
 	@echo "  run           - Run the application (requires uvicorn)"
 	@echo "  clean         - Remove Python cache and build artifacts"
 	@echo "  test          - Run pytest suite"
-	@echo "  lint          - Run ruff linter"
-	@echo "  fmt           - Run ruff formatter"
+	@echo "  lint          - Run ruff linter/formatter"
 	@echo "  docker-build  - Build Docker image ($(DOCKER_IMAGE))"
 	@echo "  docker-run    - Run container with port 8000 exposed"
 	@echo "  docker-shell  - Run shell inside built image"
@@ -32,8 +31,6 @@ test:
 lint:
 	@echo "Linting code..."
 	uv run ruff check src tests
-
-fmt:
 	@echo "Formatting code..."
 	uv run ruff format src tests
 

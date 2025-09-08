@@ -26,7 +26,6 @@ class MockDatabase(ChapDatabase):
     def update_config(self, cfg):
         return True
 
-
     def add_artifact(self, config_id, artifact):
         pass
 

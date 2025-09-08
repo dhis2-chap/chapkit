@@ -62,7 +62,7 @@ class TestDatabase(unittest.TestCase):
         database.add_artifact(artifact_id2, config, artifact_data2)
 
         artifacts = database.get_artifacts_for_config(config.id)
-        
+
         self.assertEqual(len(artifacts), 2)
         artifact_ids = [artifact_id for artifact_id, _ in artifacts]
         self.assertIn(artifact_id1, artifact_ids)
@@ -71,7 +71,7 @@ class TestDatabase(unittest.TestCase):
     def test_get_artifacts_for_nonexistent_config(self):
         database = SqlAlchemyChapDatabase(ChapConfig, file=":memory:")
         nonexistent_config_id = uuid4()
-        
+
         artifacts = database.get_artifacts_for_config(nonexistent_config_id)
         self.assertEqual(len(artifacts), 0)
 
@@ -82,17 +82,17 @@ class TestDatabase(unittest.TestCase):
         artifact_data = {"weights": [1, 2, 3], "metadata": {"accuracy": 0.95}}
 
         database.add_config(config)
-        
+
         # Test add
         database.add_artifact(artifact_id, config, artifact_data)
         retrieved_artifact = database.get_artifact(artifact_id)
         self.assertEqual(retrieved_artifact, artifact_data)
-        
+
         # Test delete
         result = database.del_artifact(artifact_id)
         self.assertTrue(result)
         self.assertIsNone(database.get_artifact(artifact_id))
-        
+
         # Test delete nonexistent
         result = database.del_artifact(artifact_id)
         self.assertFalse(result)
