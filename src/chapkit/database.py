@@ -1,5 +1,4 @@
 import os
-import pickle
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from datetime import datetime
@@ -7,11 +6,12 @@ from pathlib import Path
 from typing import Any, Iterator
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, LargeBinary, create_engine, event, func, select
+from sqlalchemy import ForeignKey, create_engine, event, func, select
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
+from sqlalchemy.types import PickleType
 
 from chapkit.types import ChapConfig, TChapConfig
 
@@ -57,7 +57,7 @@ class ConfigRow(Base):
 class ArtifactRow(Base):
     __tablename__ = "artifacts"
     config_id: Mapped[UUID] = mapped_column(ForeignKey("configs.id", ondelete="CASCADE"), nullable=False)
-    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    data: Mapped[Any] = mapped_column(PickleType, nullable=False)
     config: Mapped["ConfigRow"] = relationship(back_populates="artifacts")
 
 
@@ -116,15 +116,6 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
     def _cfg_from_dict(self, data: dict) -> T:
         return self._model_type.model_validate(data)
 
-    # --- Pickle helpers (trusted data only) ---
-    @staticmethod
-    def _pickle(obj: Any) -> bytes:
-        return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
-
-    @staticmethod
-    def _unpickle(b: bytes) -> Any:
-        return pickle.loads(b)
-
     # --- Config API (SQLite upsert) ---
     def add_config(self, cfg: T) -> None:
         payload = self._cfg_to_dict(cfg)
@@ -167,10 +158,8 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
     # --- Artifact API (pickled) ---
 
     def add_artifact(self, id: UUID, cfg: T, obj: Any) -> None:
-        blob = self._pickle(obj)
-
         with self._session() as s:
-            stmt = sqlite_insert(ArtifactRow).values(id=id, config_id=cfg.id, data=blob)
+            stmt = sqlite_insert(ArtifactRow).values(id=id, config_id=cfg.id, data=obj)
             stmt = stmt.on_conflict_do_update(
                 index_elements=[ArtifactRow.id],
                 set_={
@@ -194,7 +183,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
     def get_artifact(self, id: UUID) -> Any | None:
         with self._session() as s:
             row = s.get(ArtifactRow, id)
-            return self._unpickle(row.data) if row else None
+            return row.data if row else None
 
     def get_config_for_artifact(self, artifact_id: UUID) -> T | None:
         with self._session() as s:
@@ -206,4 +195,4 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
     def get_artifacts_for_config(self, config_id: UUID) -> list[tuple[UUID, Any]]:
         with self._session() as s:
             rows = s.scalars(select(ArtifactRow).where(ArtifactRow.config_id == config_id)).all()
-            return [(row.id, self._unpickle(row.data)) for row in rows]
+            return [(row.id, row.data) for row in rows]
