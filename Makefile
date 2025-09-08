@@ -16,7 +16,7 @@ help:
 	@echo "  docker-shell  - Run shell inside built image"
 
 run:
-	uvicorn main:app --reload
+	uv run uvicorn main:app --reload
 
 clean:
 	@echo "Cleaning build artifacts..."
