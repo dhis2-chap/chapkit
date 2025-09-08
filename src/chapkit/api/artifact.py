@@ -52,6 +52,13 @@ class ArtifactApi(ChapApi[TChapConfig]):
 
             return {"id": artifact_id, "config_id": config.id, "config_name": config.name, "data": artifact}
 
+        async def delete_artifact(artifact_id: UUID) -> None:
+            """Delete a specific artifact by ID."""
+            artifact = self._database.get_artifact(artifact_id)
+            if artifact is None:
+                raise HTTPException(status_code=404, detail=f"Artifact {artifact_id} not found")
+            self._database.delete_artifact(artifact_id)
+
         router.add_api_route(
             path="/artifacts/config/{config_id}",
             endpoint=get_artifacts_for_config,
@@ -69,6 +76,16 @@ class ArtifactApi(ChapApi[TChapConfig]):
             response_model=dict,
             name="get_artifact",
             summary="Get an artifact by ID",
+            responses={404: {"description": "Artifact not found"}},
+        )
+
+        router.add_api_route(
+            path="/artifacts/{artifact_id}",
+            endpoint=delete_artifact,
+            methods=["DELETE"],
+            status_code=204,
+            name="delete_artifact",
+            summary="Delete an artifact by ID",
             responses={404: {"description": "Artifact not found"}},
         )
 
