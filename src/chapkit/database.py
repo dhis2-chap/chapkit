@@ -18,7 +18,7 @@ from chapkit.types import ChapConfig, TChapConfig
 T = TChapConfig
 
 
-class ChapStorage[T: ChapConfig](ABC):
+class ChapDatabase[T: ChapConfig](ABC):
     @abstractmethod
     def add_config(self, cfg: T) -> None: ...
     @abstractmethod
@@ -30,13 +30,15 @@ class ChapStorage[T: ChapConfig](ABC):
     @abstractmethod
     def get_configs(self) -> list[T]: ...
     @abstractmethod
-    def add_model(self, id: UUID, cfg: T, obj: Any) -> None: ...
+    def add_artifact(self, id: UUID, cfg: T, obj: Any) -> None: ...
     @abstractmethod
-    def del_model(self, id: UUID) -> bool: ...
+    def del_artifact(self, id: UUID) -> bool: ...
     @abstractmethod
-    def get_model(self, id: UUID) -> Any | None: ...
+    def get_artifact(self, id: UUID) -> Any | None: ...
     @abstractmethod
-    def get_config_for_model(self, model_id: UUID) -> T | None: ...
+    def get_config_for_artifact(self, artifact_id: UUID) -> T | None: ...
+    @abstractmethod
+    def get_artifacts_for_config(self, config_id: UUID) -> list[tuple[UUID, Any]]: ...
 
 
 # ---------- ORM base & rows ----------
@@ -49,14 +51,14 @@ class Base(DeclarativeBase):
 class ConfigRow(Base):
     __tablename__ = "configs"
     config: Mapped[dict] = mapped_column(JSON, nullable=False)
-    models: Mapped[list["ModelRow"]] = relationship(back_populates="config", cascade="all, delete-orphan")
+    artifacts: Mapped[list["ArtifactRow"]] = relationship(back_populates="config", cascade="all, delete-orphan")
 
 
-class ModelRow(Base):
-    __tablename__ = "models"
+class ArtifactRow(Base):
+    __tablename__ = "artifacts"
     config_id: Mapped[UUID] = mapped_column(ForeignKey("configs.id", ondelete="CASCADE"), nullable=False)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
-    config: Mapped["ConfigRow"] = relationship(back_populates="models")
+    config: Mapped["ConfigRow"] = relationship(back_populates="artifacts")
 
 
 # ---------- helper: engine factory ----------
@@ -82,8 +84,8 @@ def make_engine(db_path: Path) -> Engine:
     return engine
 
 
-# ---------- Storage (per-instance engine & session) ----------
-class SqlAlchemyChapStorage(ChapStorage[T]):
+# ---------- Database (per-instance engine & session) ----------
+class SqlAlchemyChapDatabase(ChapDatabase[T]):
     def __init__(self, model_type: type[T], file: str | Path = "target/chapkit.db") -> None:
         self._model_type = model_type
         self._db_path = Path(file)
@@ -162,15 +164,15 @@ class SqlAlchemyChapStorage(ChapStorage[T]):
             rows = s.scalars(select(ConfigRow)).all()
             return [self._cfg_from_dict(r.config) for r in rows]
 
-    # --- Model API (pickled) ---
+    # --- Artifact API (pickled) ---
 
-    def add_model(self, id: UUID, cfg: T, obj: Any) -> None:
+    def add_artifact(self, id: UUID, cfg: T, obj: Any) -> None:
         blob = self._pickle(obj)
 
         with self._session() as s:
-            stmt = sqlite_insert(ModelRow).values(id=id, config_id=cfg.id, data=blob)
+            stmt = sqlite_insert(ArtifactRow).values(id=id, config_id=cfg.id, data=blob)
             stmt = stmt.on_conflict_do_update(
-                index_elements=[ModelRow.id],
+                index_elements=[ArtifactRow.id],
                 set_={
                     "data": stmt.excluded.data,
                     "config_id": stmt.excluded.config_id,
@@ -178,9 +180,9 @@ class SqlAlchemyChapStorage(ChapStorage[T]):
             )
             s.execute(stmt)
 
-    def del_model(self, id: UUID) -> bool:
+    def del_artifact(self, id: UUID) -> bool:
         with self._session() as s:
-            row = s.get(ModelRow, id)
+            row = s.get(ArtifactRow, id)
 
             if row is None:
                 return False
@@ -189,14 +191,19 @@ class SqlAlchemyChapStorage(ChapStorage[T]):
 
             return True
 
-    def get_model(self, id: UUID) -> Any | None:
+    def get_artifact(self, id: UUID) -> Any | None:
         with self._session() as s:
-            row = s.get(ModelRow, id)
+            row = s.get(ArtifactRow, id)
             return self._unpickle(row.data) if row else None
 
-    def get_config_for_model(self, model_id: UUID) -> T | None:
+    def get_config_for_artifact(self, artifact_id: UUID) -> T | None:
         with self._session() as s:
-            row = s.get(ModelRow, model_id)
+            row = s.get(ArtifactRow, artifact_id)
             if not row:
                 return None
             return self._cfg_from_dict(row.config.config)
+
+    def get_artifacts_for_config(self, config_id: UUID) -> list[tuple[UUID, Any]]:
+        with self._session() as s:
+            rows = s.scalars(select(ArtifactRow).where(ArtifactRow.config_id == config_id)).all()
+            return [(row.id, self._unpickle(row.data)) for row in rows]

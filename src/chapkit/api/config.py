@@ -4,17 +4,17 @@ from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse, Response
 
 from chapkit.api.types import ChapApi
-from chapkit.storage import ChapStorage
+from chapkit.database import ChapDatabase
 from chapkit.types import TChapConfig
 
 
 class ConfigApi(ChapApi[TChapConfig]):
     def __init__(
         self,
-        storage: ChapStorage[TChapConfig],
+        database: ChapDatabase[TChapConfig],
         model_type: type[TChapConfig],
     ) -> None:
-        self._storage = storage
+        self._database = database
         self._model_type = model_type
 
     def create_router(self) -> APIRouter:
@@ -23,7 +23,7 @@ class ConfigApi(ChapApi[TChapConfig]):
         Model = self._model_type  # concrete Pydantic class
 
         async def get_config(id: UUID):
-            cfg = self._storage.get_config(id)
+            cfg = self._database.get_config(id)
 
             if cfg is None:
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
@@ -31,14 +31,14 @@ class ConfigApi(ChapApi[TChapConfig]):
             return cfg
 
         async def get_configs():
-            return self._storage.get_configs()
+            return self._database.get_configs()
 
         async def get_schema():
             return Model.model_json_schema()
 
         async def add_config(cfg: dict = Body(...)):
             validated = Model.model_validate(cfg)
-            self._storage.add_config(validated)
+            self._database.add_config(validated)
 
             return JSONResponse(
                 status_code=201,
@@ -55,12 +55,12 @@ class ConfigApi(ChapApi[TChapConfig]):
                     detail=f"Config ID in path ({id}) does not match ID in body ({validated.id})",
                 )
 
-            self._storage.add_config(validated)
+            self._database.add_config(validated)
 
             return validated
 
         async def delete_config(id: UUID):
-            if not self._storage.del_config(id):
+            if not self._database.del_config(id):
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
 
             return Response(status_code=204)

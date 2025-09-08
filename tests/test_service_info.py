@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from chapkit.runner import ChapRunner
 from chapkit.service import ChapService
-from chapkit.storage import ChapStorage
+from chapkit.database import ChapDatabase
 from chapkit.types import ChapConfig, ChapServiceInfo
 
 
@@ -10,7 +10,7 @@ class MockRunner(ChapRunner):
     pass
 
 
-class MockStorage(ChapStorage):
+class MockDatabase(ChapDatabase):
     def get_configs(self):
         return []
 
@@ -26,24 +26,28 @@ class MockStorage(ChapStorage):
     def update_config(self, cfg):
         return True
 
-    def add_model(self, id, cfg, obj):
+
+    def add_artifact(self, config_id, artifact):
         pass
 
-    def get_config_for_model(self, model_id):
+    def get_artifact(self, artifact_id):
         return None
 
-    def del_model(self, id):
+    def get_artifacts_for_config(self, config_id):
+        return []
+
+    def del_artifact(self, artifact_id):
         return True
 
-    def get_model(self, id):
+    def get_config_for_artifact(self, artifact_id):
         return None
 
 
 def test_info_endpoint():
     info = ChapServiceInfo(display_name="Test Service")
     runner = MockRunner(info, ChapConfig)
-    storage = MockStorage()
-    service = ChapService(runner, storage)
+    database = MockDatabase()
+    service = ChapService(runner, database)
     app = service.create_fastapi()
     client = TestClient(app)
     response = client.get("/api/v1/info")

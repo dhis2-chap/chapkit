@@ -3,7 +3,7 @@
 from uuid import UUID
 
 from chapkit.model import AssessedStatus, ChapModelConfig, ChapModelRunnerBase, ChapModelService, ChapModelServiceInfo
-from chapkit.storage import SqlAlchemyChapStorage
+from chapkit.database import SqlAlchemyChapDatabase
 
 
 class MyConfig(ChapModelConfig):
@@ -38,22 +38,22 @@ info = ChapModelServiceInfo(
     ),
 )
 
-storage = SqlAlchemyChapStorage(file="target/chapkit.db", model_type=MyConfig)
-runner = MyRunner(info, MyConfig, storage)
+database = SqlAlchemyChapDatabase(file="target/chapkit.db", model_type=MyConfig)
+runner = MyRunner(info, MyConfig, database)
 
 default_config = MyConfig(id="06a0757d-3bea-4d74-b424-228fe7c1b2c2", name="default", x=10, y=20)
-storage.add_config(default_config)
-storage.add_config(MyConfig(id="aad4616c-e975-4cd8-b230-074eef580459", name="test", x=1, y=2))
+database.add_config(default_config)
+database.add_config(MyConfig(id="aad4616c-e975-4cd8-b230-074eef580459", name="test", x=1, y=2))
 
-storage.add_model(
+database.add_artifact(
     id=UUID("06a0757d-3bea-4d74-b424-228fe7c1b2c2"),
     cfg=default_config,
     obj={"a": 1, "b": 2, "c": 3},
 )
 
-print(storage.get_model(UUID("06a0757d-3bea-4d74-b424-228fe7c1b2c2")))
+print(database.get_artifact(UUID("06a0757d-3bea-4d74-b424-228fe7c1b2c2")))
 
 app = ChapModelService(
     runner=runner,
-    storage=storage,
+    database=database,
 ).create_fastapi()

@@ -7,7 +7,7 @@ from chapkit.api.types import ChapApi
 from chapkit.model.runner import ChapModelRunner
 from chapkit.model.types import TChapModelConfig
 from chapkit.scheduler import Scheduler
-from chapkit.storage import ChapStorage
+from chapkit.database import ChapDatabase
 from chapkit.types import JobResponse, JobStatus, JobType, TrainBody, TrainData, TrainParams
 
 
@@ -15,11 +15,11 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
     def __init__(
         self,
         runner: ChapModelRunner[TChapModelConfig],
-        storage: ChapStorage[TChapModelConfig],
+        database: ChapDatabase[TChapModelConfig],
         scheduler: Scheduler,
     ) -> None:
         self._runner = runner
-        self._storage = storage
+        self._database = database
         self._scheduler = scheduler
 
     def create_router(self) -> APIRouter:
@@ -55,7 +55,7 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 },
             ),
         ) -> JobResponse:
-            cfg = self._storage.get_config(config)
+            cfg = self._database.get_config(config)
 
             if cfg is None:
                 raise HTTPException(status_code=404, detail=f"Config {config} not found")

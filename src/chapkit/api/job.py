@@ -10,19 +10,19 @@ from fastapi.responses import JSONResponse, Response
 from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
 from chapkit.scheduler import Scheduler
-from chapkit.storage import ChapStorage
-from chapkit.types import JobRecord, JobStatus, TChapConfig
+from chapkit.database import ChapDatabase
+from chapkit.types import JobRecord, JobResponse, JobStatus, TChapConfig
 
 
 class JobApi(ChapApi[TChapConfig]):
     def __init__(
         self,
         runner: ChapRunner[TChapConfig],
-        storage: ChapStorage[TChapConfig],
+        database: ChapDatabase[TChapConfig],
         scheduler: Scheduler,
     ) -> None:
         self._runner = runner
-        self._storage = storage
+        self._database = database
         self._scheduler = scheduler
 
     def create_router(self) -> APIRouter:
@@ -54,7 +54,7 @@ class JobApi(ChapApi[TChapConfig]):
                         content={"detail": msg},
                     )
                 raise HTTPException(status_code=400, detail=msg)
-            return result
+            return JobResponse(id=result, status=JobStatus.completed)
 
         async def delete_job(id: UUID) -> Response:
             try:
@@ -74,6 +74,7 @@ class JobApi(ChapApi[TChapConfig]):
         router.add_api_route(
             "/jobs/{id}/status",
             get_status,
+            response_model_exclude_none=True,
             methods=["GET"],
             response_model=dict,
             summary="Get job status only",
@@ -82,6 +83,7 @@ class JobApi(ChapApi[TChapConfig]):
         router.add_api_route(
             "/jobs/{id}/result",
             get_result,
+            response_model_exclude_none=True,
             methods=["GET"],
             summary="Get job result (200 on success, 409 if not ready)",
         )

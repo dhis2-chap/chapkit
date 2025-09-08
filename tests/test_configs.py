@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from chapkit.runner import ChapRunner
 from chapkit.service import ChapService
-from chapkit.storage import SqlAlchemyChapStorage
+from chapkit.database import SqlAlchemyChapDatabase
 from chapkit.types import ChapConfig, ChapServiceInfo
 
 
@@ -19,8 +19,8 @@ def client():
     with tempfile.TemporaryDirectory() as tmpdir:
         info = ChapServiceInfo(display_name="Test Service")
         runner = MockRunner(info, ChapConfig)
-        storage = SqlAlchemyChapStorage(ChapConfig, file=Path(tmpdir) / "test.db")
-        service = ChapService(runner, storage)
+        database = SqlAlchemyChapDatabase(ChapConfig, file=Path(tmpdir) / "test.db")
+        service = ChapService(runner, database)
         app = service.create_fastapi()
         yield TestClient(app)
 

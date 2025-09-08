@@ -64,7 +64,7 @@ class JobResponse(BaseModel):
     """What you return immediately after enqueueing a job."""
 
     id: UUID
-    type: JobType
+    type: JobType | None = None
     status: JobStatus = Field(description="Current status of the job")
 
 
@@ -135,7 +135,7 @@ class PredictData(BaseModel):
 
 class PredictParams(BaseModel):
     config: TChapConfig
-    model: Any | None = None
-    data: TrainData
+    artifact: Any | None = None
+    data: PredictData
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")

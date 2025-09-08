@@ -7,7 +7,7 @@ from chapkit.api.types import ChapApi
 from chapkit.model.runner import ChapModelRunner
 from chapkit.model.types import TChapModelConfig
 from chapkit.scheduler import Scheduler
-from chapkit.storage import ChapStorage
+from chapkit.database import ChapDatabase
 from chapkit.types import JobResponse, JobStatus, JobType, PredictBody, PredictData, PredictParams
 
 
@@ -15,18 +15,18 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
     def __init__(
         self,
         runner: ChapModelRunner[TChapModelConfig],
-        storage: ChapStorage[TChapModelConfig],
+        database: ChapDatabase[TChapModelConfig],
         scheduler: Scheduler,
     ) -> None:
         self._runner = runner
-        self._storage = storage
+        self._database = database
         self._scheduler = scheduler
 
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["chap"])
 
         async def endpoint(
-            model: UUID = Query(..., description="Trained Model ID"),
+            artifact: UUID = Query(..., description="Trained Artifact ID"),
             body: PredictBody = Body(
                 ...,
                 description="Prediction request body containing a DataFrame (orient='split') "
@@ -55,15 +55,17 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 },
             ),
         ) -> JobResponse:
-            cfg = self._storage.get_config_for_model(model)
+            cfg = self._database.get_config_for_artifact(artifact)
             if cfg is None:
-                raise HTTPException(status_code=404, detail=f"Model {model} not found")
+                raise HTTPException(status_code=404, detail=f"Artifact {artifact} not found")
 
-            model_obj = self._storage.get_model(model)
-            if model_obj is None:
-                raise HTTPException(status_code=404, detail=f"Model {model} not found")
+            artifact_obj = self._database.get_artifact(artifact)
+            if artifact_obj is None:
+                raise HTTPException(status_code=404, detail=f"Artifact {artifact} not found")
 
-            params = PredictParams(config=cfg, model=model_obj, data=PredictData(df=body.df, geo=body.geo))
+            params = PredictParams(
+                config=cfg, artifact=artifact_obj, data=PredictData(df=body.df.to_pandas(), geo=body.geo)
+            )
 
             id = await self._scheduler.add_job(self._runner.on_predict, params)
 

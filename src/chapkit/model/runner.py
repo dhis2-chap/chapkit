@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from chapkit.model.types import ChapModelServiceInfo, TChapModelConfig
 from chapkit.runner import ChapRunner
-from chapkit.storage import ChapStorage
+from chapkit.database import ChapDatabase
 from chapkit.types import HealthResponse, HealthStatus, PredictParams, TrainParams
 
 
@@ -13,10 +13,10 @@ class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], A
         self,
         info: ChapModelServiceInfo,
         config_type: type[TChapModelConfig],
-        storage: ChapStorage[TChapModelConfig],
+        database: ChapDatabase[TChapModelConfig],
     ) -> None:
         super().__init__(info, config_type)
-        self._storage = storage
+        self._database = database
 
     @abstractmethod
     def on_health(self) -> HealthResponse: ...
@@ -38,12 +38,16 @@ class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelC
     async def on_train(self, params: TrainParams) -> UUID:
         print("Training with params:", params)
 
-        model_id = uuid4()
-        self._storage.add_model(model_id, params.config, "model")
+        artifact_id = uuid4()
+        self._database.add_artifact(artifact_id, params.config, {"a": 1})
 
-        return model_id
+        return artifact_id
 
     async def on_predict(self, params: PredictParams) -> UUID:
         print("Predicting with params:", params)
         # a real implementation would use the model to make a prediction
-        return uuid4()
+
+        artifact_id = uuid4()
+        self._database.add_artifact(artifact_id, params.config, {"b": 2})
+
+        return artifact_id
