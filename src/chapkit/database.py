@@ -66,7 +66,8 @@ def make_engine(db_path: Path) -> Engine:
     engine = create_engine(
         f"sqlite:///{db_path}",
         echo=False,
-        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+        connect_args={"check_same_thread": False, "timeout": 30.0},
     )
 
     @event.listens_for(engine, "connect")
