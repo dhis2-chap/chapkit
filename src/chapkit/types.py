@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, TypeVar
@@ -39,14 +37,14 @@ class AssessedStatus(StrEnum):
 
 class ChapServiceInfo(BaseModel):
     display_name: str
-    author: str
-    author_note: str
-    author_assessed_status: AssessedStatus
-    contact_email: EmailStr
-    description: str
-    organization: str
-    organization_logo_url: HttpUrl
-    citation_info: str
+    author: str | None = None
+    author_note: str | None = None
+    author_assessed_status: AssessedStatus | None = None
+    contact_email: EmailStr | None = None
+    description: str | None = None
+    organization: str | None = None
+    organization_logo_url: HttpUrl | None = None
+    citation_info: str | None = None
 
     model_config = ConfigDict(extra="forbid")
 

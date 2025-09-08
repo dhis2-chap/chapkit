@@ -1,6 +1,3 @@
-# scheduler.py — Python 3.12+/3.13, Pydantic v2
-from __future__ import annotations
-
 import asyncio
 import inspect
 from abc import ABC, abstractmethod
