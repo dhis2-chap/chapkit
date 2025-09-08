@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Generic
 from uuid import UUID, uuid4
 
-from chapkit.model.types import ChapModelServiceInfo, TChapModelConfig
+from chapkit.model.types import TChapModelConfig
+from chapkit.types import ChapServiceInfo
 from chapkit.runner import ChapRunner
 from chapkit.database import ChapDatabase
 from chapkit.types import HealthResponse, HealthStatus, PredictParams, TrainParams
@@ -11,7 +12,7 @@ from chapkit.types import HealthResponse, HealthStatus, PredictParams, TrainPara
 class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], ABC):
     def __init__(
         self,
-        info: ChapModelServiceInfo,
+        info: ChapServiceInfo,
         config_type: type[TChapModelConfig],
         database: ChapDatabase[TChapModelConfig],
     ) -> None:
@@ -32,7 +33,7 @@ class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelC
     def on_health(self) -> HealthResponse:
         return HealthResponse(status=HealthStatus.up)
 
-    def on_info(self) -> ChapModelServiceInfo:
+    def on_info(self) -> ChapServiceInfo:
         return self._info
 
     async def on_train(self, params: TrainParams) -> UUID:

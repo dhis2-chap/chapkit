@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from chapkit.runner import ChapRunner
 from chapkit.service import ChapService
 from chapkit.database import ChapDatabase
-from chapkit.types import ChapConfig, ChapServiceInfo
+from chapkit.types import AssessedStatus, ChapConfig, ChapServiceInfo
 
 
 class MockRunner(ChapRunner):
@@ -43,7 +43,17 @@ class MockDatabase(ChapDatabase):
 
 
 def test_info_endpoint():
-    info = ChapServiceInfo(display_name="Test Service")
+    info = ChapServiceInfo(
+        display_name="Test Service",
+        author="Test Author",
+        author_note="Test Note",
+        author_assessed_status=AssessedStatus.gray,
+        contact_email="test@example.com",
+        description="Test Description",
+        organization="Test Organization",
+        organization_logo_url="https://example.com/logo.png",
+        citation_info="Test Citation",
+    )
     runner = MockRunner(info, ChapConfig)
     database = MockDatabase()
     service = ChapService(runner, database)
@@ -51,4 +61,14 @@ def test_info_endpoint():
     client = TestClient(app)
     response = client.get("/api/v1/info")
     assert response.status_code == 200
-    assert response.json() == {"display_name": "Test Service"}
+    assert response.json() == {
+        "display_name": "Test Service",
+        "author": "Test Author",
+        "author_note": "Test Note",
+        "author_assessed_status": "gray",
+        "contact_email": "test@example.com",
+        "description": "Test Description",
+        "organization": "Test Organization",
+        "organization_logo_url": "https://example.com/logo.png",
+        "citation_info": "Test Citation",
+    }

@@ -2,7 +2,8 @@
 
 from uuid import UUID
 
-from chapkit.model import AssessedStatus, ChapModelConfig, ChapModelRunnerBase, ChapModelService, ChapModelServiceInfo
+from chapkit.model import ChapModelConfig, ChapModelRunnerBase, ChapModelService
+from chapkit.types import AssessedStatus, ChapServiceInfo
 from chapkit.database import SqlAlchemyChapDatabase
 
 
@@ -14,7 +15,7 @@ class MyConfig(ChapModelConfig):
 class MyRunner(ChapModelRunnerBase[MyConfig]): ...
 
 
-info = ChapModelServiceInfo(
+info = ChapServiceInfo(
     author="Knut Rand",
     author_note=(
         "This model might need configuration of hyperparameters in order to work properly. "

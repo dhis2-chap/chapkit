@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pandas as pd
 from geojson_pydantic import FeatureCollection
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, HttpUrl
 
 
 class ChapConfig(BaseModel):
@@ -29,8 +29,24 @@ class HealthResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class AssessedStatus(StrEnum):
+    gray = "gray"  # Gray: Not intended for use, or deprecated/meant for legacy use only.
+    red = "red"  # Red: Highly experimental prototype - not at all validated and only meant for early experimentation
+    orange = "orange"  # Orange: Has seen promise on limited data, needs manual configuration and careful evaluation
+    yellow = "yellow"  # Yellow: Ready for more rigorous testing
+    green = "green"  # Green: Validated, ready for use
+
+
 class ChapServiceInfo(BaseModel):
     display_name: str
+    author: str
+    author_note: str
+    author_assessed_status: AssessedStatus
+    contact_email: EmailStr
+    description: str
+    organization: str
+    organization_logo_url: HttpUrl
+    citation_info: str
 
     model_config = ConfigDict(extra="forbid")
 
