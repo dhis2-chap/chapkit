@@ -30,7 +30,7 @@ test:
 
 lint:
 	@echo "Linting code..."
-	uv run ruff check src tests
+	uv run ruff check --fix src tests
 	@echo "Formatting code..."
 	uv run ruff format src tests
 

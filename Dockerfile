@@ -21,8 +21,6 @@ COPY --from=builder /app/.venv /app/.venv
 COPY main.py ./main.py
 COPY src ./src
 COPY templates ./templates
-RUN mkdir -p /app/target
-COPY target/storage.json /app/target/storage.json
 COPY README.md ./README.md
 
 # Non-root

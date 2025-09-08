@@ -3,7 +3,6 @@ from typing import Generic, TypeVar
 
 from fastapi import APIRouter
 
-from chapkit.api.artifact import ArtifactApi
 from chapkit.model.api.predict import PredictApi
 from chapkit.model.api.train import TrainApi
 from chapkit.model.runner import ChapModelRunner
@@ -30,6 +29,5 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
 
         self._include_api(router, TrainApi(self._runner, self._database, self._scheduler))
         self._include_api(router, PredictApi(self._runner, self._database, self._scheduler))
-        self._include_api(router, ArtifactApi(self._database))
 
         return router

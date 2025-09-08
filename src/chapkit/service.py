@@ -5,6 +5,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from chapkit.api.artifact import ArtifactApi
 from chapkit.api.config import ConfigApi
 from chapkit.api.health import HealthApi
 from chapkit.api.info import InfoApi
@@ -50,6 +51,7 @@ class ChapService(Generic[TChapConfig]):
         self._include_api(router, InfoApi(self._runner))
         self._include_api(router, ConfigApi(self._database, self._model_type))
         self._include_api(router, JobApi(self._runner, self._database, self._scheduler))
+        self._include_api(router, ArtifactApi(self._database))
 
         return router
 
