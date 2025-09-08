@@ -72,13 +72,22 @@ def make_engine(db_path: Path) -> Engine:
     @event.listens_for(engine, "connect")
     def _set_sqlite_pragmas(dbapi_connection, _record) -> None:
         cur = dbapi_connection.cursor()
+
+        # WAL (Write-Ahead Logging) improves concurrency, allowing reads and writes to occur simultaneously.
         cur.execute("PRAGMA journal_mode=WAL;")
+        # 'NORMAL' synchronous mode is a good balance of safety and performance with WAL.
         cur.execute("PRAGMA synchronous=NORMAL;")
-        cur.execute("PRAGMA temp_store=MEMORY;")
-        cur.execute("PRAGMA cache_size=-65536;")
-        cur.execute("PRAGMA busy_timeout=5000;")
+        # Enforce foreign key constraints, which is off by default in SQLite.
         cur.execute("PRAGMA foreign_keys=ON;")
-        cur.execute("PRAGMA mmap_size=67108864;")
+        # Set a busy timeout to avoid 'database is locked' errors during contention.
+        cur.execute("PRAGMA busy_timeout=30000;")  # 30 seconds
+        # Store temporary tables in memory for speed.
+        cur.execute("PRAGMA temp_store=MEMORY;")
+        # Increase the page cache size to reduce disk I/O. Value is in KiB.
+        cur.execute("PRAGMA cache_size=-64000;")  # 64MB
+        # Memory-map a portion of the database file for faster access.
+        cur.execute("PRAGMA mmap_size=134217728;")  # 128 MiB
+
         cur.close()
 
     return engine
