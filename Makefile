@@ -3,7 +3,7 @@ APP_NAME := chapkit
 DOCKER_TAG := latest
 DOCKER_IMAGE := $(APP_NAME):$(DOCKER_TAG)
 
-.PHONY: help clean test lint fmt docker-build docker-run docker-shell docker-push
+.PHONY: help run clean test lint
 
 help:
 	@echo "Available targets:"
@@ -11,9 +11,6 @@ help:
 	@echo "  clean         - Remove Python cache and build artifacts"
 	@echo "  test          - Run pytest suite"
 	@echo "  lint          - Run ruff linter/formatter"
-	@echo "  docker-build  - Build Docker image ($(DOCKER_IMAGE))"
-	@echo "  docker-run    - Run container with port 8000 exposed"
-	@echo "  docker-shell  - Run shell inside built image"
 
 run:
 	uv run uvicorn main:app --reload
@@ -33,15 +30,3 @@ lint:
 	uv run ruff check --fix src tests
 	@echo "Formatting code..."
 	uv run ruff format src tests
-
-docker-build:
-	@echo "Building Docker image: $(DOCKER_IMAGE)"
-	docker build -t $(DOCKER_IMAGE) .
-
-docker-run:
-	@echo "Running Docker container on http://localhost:8000"
-	docker run --rm -p 8000:8000 $(DOCKER_IMAGE)
-
-docker-shell:
-	@echo "Dropping into a shell inside the container..."
-	docker run --rm -it $(DOCKER_IMAGE) /bin/bash

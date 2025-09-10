@@ -13,10 +13,11 @@ class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], A
     def __init__(
         self,
         info: ChapServiceInfo,
-        config_type: type[TChapModelConfig],
         database: ChapDatabase[TChapModelConfig],
+        *,
+        config_type: type[TChapModelConfig],
     ) -> None:
-        super().__init__(info, config_type)
+        super().__init__(info, config_type=config_type)
         self._database = database
 
     @abstractmethod

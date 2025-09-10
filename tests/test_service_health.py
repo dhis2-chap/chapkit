@@ -7,7 +7,8 @@ from chapkit.types import AssessedStatus, ChapConfig, ChapServiceInfo
 
 
 class MockRunner(ChapRunner):
-    pass
+    def __init__(self, info, config_type):
+        super().__init__(info, config_type=config_type)
 
 
 class MockDatabase(ChapDatabase):
@@ -54,7 +55,7 @@ def test_health_check():
         organization_logo_url="https://example.com/logo.png",
         citation_info="Test Citation",
     )
-    runner = MockRunner(info, ChapConfig)
+    runner = MockRunner(info, config_type=ChapConfig)
     database = MockDatabase()
     service = ChapService(runner, database)
     app = service.create_fastapi()

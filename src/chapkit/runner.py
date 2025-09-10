@@ -5,7 +5,7 @@ from chapkit.types import ChapServiceInfo, HealthResponse, HealthStatus, TChapCo
 
 
 class ChapRunner(Generic[TChapConfig], ABC):
-    def __init__(self, info: ChapServiceInfo, config_type: type[TChapConfig]) -> None:
+    def __init__(self, info: ChapServiceInfo, *, config_type: type[TChapConfig]) -> None:
         self._info = info
         self._config_type: type[TChapConfig] = config_type
 

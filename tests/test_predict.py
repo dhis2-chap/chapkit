@@ -53,7 +53,7 @@ class MockDatabase(ChapDatabase):
 
 def test_predict_endpoint():
     database = MockDatabase()
-    runner = MockModelRunner(None, ChapConfig, database)
+    runner = MockModelRunner(None, database, config_type=ChapConfig)
     service = ChapModelService(runner, database)
     app = service.create_fastapi()
     client = TestClient(app)
