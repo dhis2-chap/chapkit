@@ -155,3 +155,10 @@ class PredictBody(BaseModel):
     geo: FeatureCollection | None = None
 
     model_config = ConfigDict(extra="allow")
+
+
+class ArtifactInfo(BaseModel):
+    id: UUID
+    config_id: UUID
+    config_name: str
+    data: Any | None = None

@@ -3,18 +3,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel
 
 from chapkit.api.types import ChapApi
 from chapkit.database import ChapDatabase
-from chapkit.types import TChapConfig
-
-
-class ArtifactInfo(BaseModel):
-    id: UUID
-    config_id: UUID
-    config_name: str
-    data: Any | None = None
+from chapkit.types import TChapConfig, ArtifactInfo
 
 
 class ArtifactApi(ChapApi[TChapConfig]):
