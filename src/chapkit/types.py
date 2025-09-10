@@ -112,22 +112,8 @@ class DataFrameSplit(BaseModel):
         return cls.model_validate(payload)
 
 
-class TrainBody(BaseModel):
-    df: DataFrameSplit
-    geo: FeatureCollection | None = None
-
-    model_config = ConfigDict(extra="allow")
-
-
-class PredictBody(BaseModel):
-    df: DataFrameSplit
-    geo: FeatureCollection | None = None
-
-    model_config = ConfigDict(extra="allow")
-
-
 class TrainData(BaseModel):
-    df: pd.DataFrame
+    data: pd.DataFrame
     geo: FeatureCollection | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
@@ -135,13 +121,21 @@ class TrainData(BaseModel):
 
 class TrainParams(BaseModel):
     config: TChapConfig
-    data: TrainData
+    body: TrainData
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
 
 
+class TrainBody(BaseModel):
+    data: DataFrameSplit
+    geo: FeatureCollection | None = None
+
+    model_config = ConfigDict(extra="allow")
+
+
 class PredictData(BaseModel):
-    df: pd.DataFrame
+    historic: pd.DataFrame
+    future: pd.DataFrame
     geo: FeatureCollection | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
@@ -150,6 +144,14 @@ class PredictData(BaseModel):
 class PredictParams(BaseModel):
     config: TChapConfig
     artifact: Any | None = None
-    data: PredictData
+    body: PredictData
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
+
+class PredictBody(BaseModel):
+    historic: DataFrameSplit
+    future: DataFrameSplit
+    geo: FeatureCollection | None = None
+
+    model_config = ConfigDict(extra="allow")

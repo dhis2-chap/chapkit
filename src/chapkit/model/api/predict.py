@@ -31,27 +31,36 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 ...,
                 description="Prediction request body containing a DataFrame (orient='split') "
                 "and optional GeoJSON FeatureCollection.",
-                example={
-                    "df": {
-                        "columns": ["Name", "Age", "City"],
-                        "index": [0, 1],
-                        "data": [["Eva", 28, "Tromsø"], ["Frank", 50, "Kristiansand"]],
-                    },
-                    "geo": {
-                        "type": "FeatureCollection",
-                        "features": [
-                            {
-                                "type": "Feature",
-                                "geometry": {"type": "Point", "coordinates": [18.9553, 69.6496]},
-                                "properties": {"city": "Tromsø"},
+                examples={
+                    "default": {
+                        "value": {
+                            "historic": {
+                                "columns": ["Name", "Age", "City"],
+                                "index": [0, 1],
+                                "data": [["Eva", 28, "Tromsø"], ["Frank", 50, "Kristiansand"]],
                             },
-                            {
-                                "type": "Feature",
-                                "geometry": {"type": "Point", "coordinates": [8.0000, 58.1467]},
-                                "properties": {"city": "Kristiansand"},
+                            "future": {
+                                "columns": ["Name", "Age", "City"],
+                                "index": [0, 1],
+                                "data": [["Eva", 28, "Tromsø"], ["Frank", 50, "Kristiansand"]],
                             },
-                        ],
-                    },
+                            "geo": {
+                                "type": "FeatureCollection",
+                                "features": [
+                                    {
+                                        "type": "Feature",
+                                        "geometry": {"type": "Point", "coordinates": [18.9553, 69.6496]},
+                                        "properties": {"city": "Tromsø"},
+                                    },
+                                    {
+                                        "type": "Feature",
+                                        "geometry": {"type": "Point", "coordinates": [8.0000, 58.1467]},
+                                        "properties": {"city": "Kristiansand"},
+                                    },
+                                ],
+                            },
+                        }
+                    }
                 },
             ),
         ) -> JobResponse:
@@ -64,7 +73,9 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 raise HTTPException(status_code=404, detail=f"Artifact {artifact} not found")
 
             params = PredictParams(
-                config=cfg, artifact=artifact_obj, data=PredictData(df=body.df.to_pandas(), geo=body.geo)
+                config=cfg,
+                artifact=artifact_obj,
+                body=PredictData(historic=body.historic.to_pandas(), future=body.future.to_pandas(), geo=body.geo),
             )
 
             id = await self._scheduler.add_job(self._runner.on_predict, params)

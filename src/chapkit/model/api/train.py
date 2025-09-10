@@ -31,27 +31,31 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
                 ...,
                 description="Training request body containing a DataFrame (orient='split') "
                 "and optional GeoJSON FeatureCollection.",
-                example={
-                    "df": {
-                        "columns": ["Name", "Age", "City"],
-                        "index": [0, 1, 2, 3],
-                        "data": [
-                            ["Alice", 25, "Oslo"],
-                            ["Bob", 30, "Bergen"],
-                            ["Charlie", 35, "Trondheim"],
-                            ["Diana", 40, "Stavanger"],
-                        ],
-                    },
-                    "geo": {
-                        "type": "FeatureCollection",
-                        "features": [
-                            {
-                                "type": "Feature",
-                                "geometry": {"type": "Point", "coordinates": [10.7461, 59.9127]},
-                                "properties": {"city": "Oslo"},
-                            }
-                        ],
-                    },
+                examples={
+                    "default": {
+                        "value": {
+                            "data": {
+                                "columns": ["Name", "Age", "City"],
+                                "index": [0, 1, 2, 3],
+                                "data": [
+                                    ["Alice", 25, "Oslo"],
+                                    ["Bob", 30, "Bergen"],
+                                    ["Charlie", 35, "Trondheim"],
+                                    ["Diana", 40, "Stavanger"],
+                                ],
+                            },
+                            "geo": {
+                                "type": "FeatureCollection",
+                                "features": [
+                                    {
+                                        "type": "Feature",
+                                        "geometry": {"type": "Point", "coordinates": [10.7461, 59.9127]},
+                                        "properties": {"city": "Oslo"},
+                                    }
+                                ],
+                            },
+                        }
+                    }
                 },
             ),
         ) -> JobResponse:
@@ -60,7 +64,7 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
             if cfg is None:
                 raise HTTPException(status_code=404, detail=f"Config {config} not found")
 
-            params = TrainParams(config=cfg, data=TrainData(df=body.df.to_pandas(), geo=body.geo))
+            params = TrainParams(config=cfg, body=TrainData(data=body.data.to_pandas(), geo=body.geo))
 
             id = await self._scheduler.add_job(self._runner.on_train, params)
 

@@ -9,4 +9,9 @@ from chapkit.types import (  # noqa: F401
     JobResponse,
     JobStatus,
     JobType,
+    TrainParams,
+    TrainData,
+    TrainBody,
+    PredictParams,
+    PredictData,
 )
