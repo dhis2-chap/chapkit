@@ -2,6 +2,7 @@ from uuid import UUID
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
 from chapkit.api.types import ChapApi
@@ -13,6 +14,7 @@ class ArtifactInfo(BaseModel):
     id: UUID
     config_id: UUID
     config_name: str
+    data: Any | None = None
 
 
 class ArtifactApi(ChapApi[TChapConfig]):
@@ -40,7 +42,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
                 for artifact_id, _ in artifacts
             ]
 
-        async def get_artifact(artifact_id: UUID) -> dict[str, Any]:
+        async def get_artifact(artifact_id: UUID) -> ArtifactInfo:
             """Get a specific artifact by ID."""
             artifact = self._database.get_artifact(artifact_id)
             if artifact is None:
@@ -50,7 +52,12 @@ class ArtifactApi(ChapApi[TChapConfig]):
             if config is None:
                 raise HTTPException(status_code=404, detail=f"Config for artifact {artifact_id} not found")
 
-            return {"id": artifact_id, "config_id": config.id, "config_name": config.name, "data": artifact}
+            try:
+                jsonable_data = jsonable_encoder(artifact)
+            except (TypeError, ValueError):
+                jsonable_data = None
+
+            return ArtifactInfo(id=artifact_id, config_id=config.id, config_name=config.name, data=jsonable_data)
 
         async def delete_artifact(artifact_id: UUID) -> None:
             """Delete a specific artifact by ID."""
@@ -73,7 +80,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
             path="/artifacts/{artifact_id}",
             endpoint=get_artifact,
             methods=["GET"],
-            response_model=dict,
+            response_model=ArtifactInfo,
             name="get_artifact",
             summary="Get an artifact by ID",
             responses={404: {"description": "Artifact not found"}},
