@@ -29,7 +29,7 @@ def client():
             citation_info="Test Citation",
         )
         runner = MockRunner(info, ChapConfig)
-        database = SqlAlchemyChapDatabase(file=Path(tmpdir) / "test.db", config_type=ChapConfig)
+        database = SqlAlchemyChapDatabase(Path(tmpdir) / "test.db", config_type=ChapConfig)
         service = ChapService(runner, database)
         app = service.create_fastapi()
         yield TestClient(app)
