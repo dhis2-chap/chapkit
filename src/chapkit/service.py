@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Generic
 from uuid import UUID
 
@@ -16,7 +17,9 @@ from chapkit.scheduler import JobScheduler, Scheduler
 from chapkit.database import ChapDatabase
 from chapkit.types import TChapConfig
 
-templates = Jinja2Templates(directory="templates")
+
+TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
+templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 
 class ChapService(Generic[TChapConfig]):
