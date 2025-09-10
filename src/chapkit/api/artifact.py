@@ -1,5 +1,4 @@
 from uuid import UUID
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
