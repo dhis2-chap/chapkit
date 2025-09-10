@@ -39,7 +39,7 @@ info = ChapServiceInfo(
     ),
 )
 
-database = SqlAlchemyChapDatabase(file="target/chapkit.db", model_type=MyConfig)
+database = SqlAlchemyChapDatabase(file="target/chapkit.db", config_type=MyConfig)
 runner = MyRunner(info, MyConfig, database)
 
 default_config = MyConfig(id="06a0757d-3bea-4d74-b424-228fe7c1b2c2", name="default", x=10, y=20)

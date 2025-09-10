@@ -96,8 +96,8 @@ def make_engine(db_path: Path) -> Engine:
 
 # ---------- Database (per-instance engine & session) ----------
 class SqlAlchemyChapDatabase(ChapDatabase[T]):
-    def __init__(self, model_type: type[T], file: str | Path = "target/chapkit.db") -> None:
-        self._model_type = model_type
+    def __init__(self, config_type: type[T], file: str | Path = "target/chapkit.db") -> None:
+        self._config_type = config_type
         self._db_path = Path(file)
         os.makedirs(self._db_path.parent, exist_ok=True)
 
@@ -124,7 +124,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
         return d
 
     def _cfg_from_dict(self, data: dict) -> T:
-        return self._model_type.model_validate(data)
+        return self._config_type.model_validate(data)
 
     # --- Config API (SQLite upsert) ---
     def add_config(self, cfg: T) -> None:
