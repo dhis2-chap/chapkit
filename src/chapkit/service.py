@@ -31,8 +31,8 @@ class ChapService(Generic[TChapConfig]):
     ) -> None:
         self._runner = runner
         self._database = database
-        self._config_type = self._runner.config_type
         self._scheduler = scheduler or JobScheduler()
+        self._config_type = self._runner.config_type
 
     def create_fastapi(self, app: FastAPI | None = None) -> FastAPI:
         if app is None:
