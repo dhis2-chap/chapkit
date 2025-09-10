@@ -12,15 +12,16 @@ class ConfigApi(ChapApi[TChapConfig]):
     def __init__(
         self,
         database: ChapDatabase[TChapConfig],
-        model_type: type[TChapConfig],
+        *,
+        config_type: type[TChapConfig],
     ) -> None:
         self._database = database
-        self._model_type = model_type
+        self._config_type = config_type
 
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["configs"])
 
-        Model = self._model_type  # concrete Pydantic class
+        Model = self._config_type  # concrete Pydantic class
 
         async def get_config(id: UUID):
             cfg = self._database.get_config(id)
