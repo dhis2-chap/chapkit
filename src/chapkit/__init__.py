@@ -14,4 +14,5 @@ from chapkit.types import (  # noqa: F401
     TrainBody,
     PredictParams,
     PredictData,
+    DataFrameSplit,
 )
