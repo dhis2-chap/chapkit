@@ -97,6 +97,23 @@ class TestDatabase(unittest.TestCase):
         result = database.del_artifact(artifact_id)
         self.assertFalse(result)
 
+    def test_get_artifact_row(self):
+        database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
+        config = ChapConfig(id=uuid4(), name="test")
+        artifact_id = uuid4()
+        artifact_data = "test artifact"
+
+        database.add_config(config)
+        database.add_artifact(artifact_id, config, artifact_data)
+
+        artifact_row = database.get_artifact_row(artifact_id)
+        self.assertIsNotNone(artifact_row)
+        self.assertEqual(artifact_row.id, artifact_id)
+        self.assertEqual(artifact_row.data, artifact_data)
+
+        non_existent_artifact_row = database.get_artifact_row(uuid4())
+        self.assertIsNone(non_existent_artifact_row)
+
 
 if __name__ == "__main__":
     unittest.main()

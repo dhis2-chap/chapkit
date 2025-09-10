@@ -159,6 +159,8 @@ class PredictBody(BaseModel):
 
 class ArtifactInfo(BaseModel):
     id: UUID
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     config_id: UUID
     config_name: str
     data: Any | None = None

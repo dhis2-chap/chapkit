@@ -50,6 +50,12 @@ class MockDatabase(ChapDatabase):
     def get_config_for_artifact(self, artifact_id):
         return ChapConfig(id=uuid4(), name="test_config")
 
+    def get_artifact_row(self, id):
+        return None
+
+    def get_artifact_rows_for_config(self, config_id):
+        return []
+
 
 def test_predict_endpoint():
     database = MockDatabase()

@@ -26,11 +26,17 @@ class ArtifactApi(ChapApi[TChapConfig]):
                 raise HTTPException(status_code=404, detail=f"Config {config_id} not found")
 
             # Get artifacts for this config
-            artifacts = self._database.get_artifacts_for_config(config_id)
+            artifact_rows = self._database.get_artifact_rows_for_config(config_id)
 
             return [
-                ArtifactInfo(id=artifact_id, config_id=config_id, config_name=config.name)
-                for artifact_id, _ in artifacts
+                ArtifactInfo(
+                    id=row.id,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                    config_id=config_id,
+                    config_name=config.name,
+                )
+                for row in artifact_rows
             ]
 
         async def get_artifact(artifact_id: UUID) -> ArtifactInfo:

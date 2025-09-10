@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -36,9 +38,13 @@ class ChapDatabase[T: ChapConfig](ABC):
     @abstractmethod
     def get_artifact(self, id: UUID) -> Any | None: ...
     @abstractmethod
+    def get_artifact_row(self, id: UUID) -> ArtifactRow | None: ...
+    @abstractmethod
     def get_config_for_artifact(self, artifact_id: UUID) -> T | None: ...
     @abstractmethod
     def get_artifacts_for_config(self, config_id: UUID) -> list[tuple[UUID, Any]]: ...
+    @abstractmethod
+    def get_artifact_rows_for_config(self, config_id: UUID) -> list[ArtifactRow]: ...
 
 
 # ---------- ORM base & rows ----------
@@ -106,7 +112,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
 
     @contextmanager
     def _session(self) -> Iterator[Session]:
-        with Session(self._engine) as s:
+        with Session(self._engine, expire_on_commit=False) as s:
             try:
                 yield s
                 s.commit()
@@ -195,6 +201,10 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
             row = s.get(ArtifactRow, id)
             return row.data if row else None
 
+    def get_artifact_row(self, id: UUID) -> ArtifactRow | None:
+        with self._session() as s:
+            return s.get(ArtifactRow, id)
+
     def get_config_for_artifact(self, artifact_id: UUID) -> T | None:
         with self._session() as s:
             row = s.get(ArtifactRow, artifact_id)
@@ -206,3 +216,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
         with self._session() as s:
             rows = s.scalars(select(ArtifactRow).where(ArtifactRow.config_id == config_id)).all()
             return [(row.id, row.data) for row in rows]
+
+    def get_artifact_rows_for_config(self, config_id: UUID) -> list[ArtifactRow]:
+        with self._session() as s:
+            return s.scalars(select(ArtifactRow).where(ArtifactRow.config_id == config_id)).all()

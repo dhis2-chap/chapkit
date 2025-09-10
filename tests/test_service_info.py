@@ -42,6 +42,12 @@ class MockDatabase(ChapDatabase):
     def get_config_for_artifact(self, artifact_id):
         return None
 
+    def get_artifact_row(self, id):
+        return None
+
+    def get_artifact_rows_for_config(self, config_id):
+        return []
+
 
 def test_info_endpoint():
     info = ChapServiceInfo(
