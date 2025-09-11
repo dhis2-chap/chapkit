@@ -50,6 +50,10 @@ class ArtifactApi(ChapApi[TChapConfig]):
                     if level < len(self._service.artifact_level_names)
                     else None
                 )
+                try:
+                    jsonable_data = jsonable_encoder(row.data)
+                except (TypeError, ValueError):
+                    jsonable_data = None
                 nodes[row.id] = ArtifactTree(
                     id=row.id,
                     created_at=row.created_at,
@@ -57,6 +61,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
                     config_id=config.id,
                     config_name=config.name,
                     artifact_level_name=level_name,
+                    data=jsonable_data,
                 )
 
             for row in artifact_rows:
@@ -93,6 +98,10 @@ class ArtifactApi(ChapApi[TChapConfig]):
                     if level < len(self._service.artifact_level_names)
                     else None
                 )
+                try:
+                    jsonable_data = jsonable_encoder(row.data)
+                except (TypeError, ValueError):
+                    jsonable_data = None
                 results.append(
                     ArtifactInfo(
                         id=row.id,
@@ -101,6 +110,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
                         config_id=config_id,
                         config_name=config.name,
                         artifact_level_name=level_name,
+                        data=jsonable_data,
                     )
                 )
             return results
