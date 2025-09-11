@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -7,13 +10,18 @@ from chapkit.api.types import ChapApi
 from chapkit.database import ChapDatabase
 from chapkit.types import TChapConfig, ArtifactInfo, ArtifactTree
 
+if TYPE_CHECKING:
+    from chapkit.service import ChapService
+
 
 class ArtifactApi(ChapApi[TChapConfig]):
     def __init__(
         self,
         database: ChapDatabase[TChapConfig],
+        service: "ChapService[TChapConfig]",
     ) -> None:
         self._database = database
+        self._service = service
 
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["artifacts"])
@@ -28,16 +36,28 @@ class ArtifactApi(ChapApi[TChapConfig]):
             # Get all artifacts for this config
             artifact_rows = self._database.get_artifact_rows_for_config(config_id)
 
-            nodes = {
-                row.id: ArtifactTree(
+            nodes = {}
+            for row in artifact_rows:
+                level = 0
+                parent_id = row.parent_id
+                while parent_id:
+                    level += 1
+                    parent = next((r for r in artifact_rows if r.id == parent_id), None)
+                    parent_id = parent.parent_id if parent else None
+
+                level_name = (
+                    self._service.artifact_level_names[level]
+                    if level < len(self._service.artifact_level_names)
+                    else None
+                )
+                nodes[row.id] = ArtifactTree(
                     id=row.id,
                     created_at=row.created_at,
                     updated_at=row.updated_at,
                     config_id=config.id,
                     config_name=config.name,
+                    artifact_level_name=level_name,
                 )
-                for row in artifact_rows
-            }
 
             for row in artifact_rows:
                 if row.parent_id:
@@ -59,16 +79,31 @@ class ArtifactApi(ChapApi[TChapConfig]):
             # Get artifacts for this config
             artifact_rows = self._database.get_artifact_rows_for_config(config_id)
 
-            return [
-                ArtifactInfo(
-                    id=row.id,
-                    created_at=row.created_at,
-                    updated_at=row.updated_at,
-                    config_id=config_id,
-                    config_name=config.name,
+            results = []
+            for row in artifact_rows:
+                level = 0
+                parent_id = row.parent_id
+                while parent_id:
+                    level += 1
+                    parent = next((r for r in artifact_rows if r.id == parent_id), None)
+                    parent_id = parent.parent_id if parent else None
+
+                level_name = (
+                    self._service.artifact_level_names[level]
+                    if level < len(self._service.artifact_level_names)
+                    else None
                 )
-                for row in artifact_rows
-            ]
+                results.append(
+                    ArtifactInfo(
+                        id=row.id,
+                        created_at=row.created_at,
+                        updated_at=row.updated_at,
+                        config_id=config_id,
+                        config_name=config.name,
+                        artifact_level_name=level_name,
+                    )
+                )
+            return results
 
         async def get_artifact(artifact_id: UUID) -> ArtifactInfo:
             """Get a specific artifact by ID."""
@@ -129,6 +164,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
             endpoint=delete_artifact,
             methods=["DELETE"],
             status_code=204,
+            response_model=None,
             name="delete_artifact",
             summary="Delete an artifact by ID",
             responses={404: {"description": "Artifact not found"}},

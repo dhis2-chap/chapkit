@@ -28,11 +28,13 @@ class ChapService(Generic[TChapConfig]):
         runner: ChapRunner[TChapConfig],
         database: ChapDatabase[TChapConfig],
         scheduler: Scheduler | None = None,
+        artifact_level_names: list[str] | None = None,
     ) -> None:
         self._runner = runner
         self._database = database
         self._scheduler = scheduler or JobScheduler()
         self._config_type = self._runner.config_type
+        self.artifact_level_names = artifact_level_names or []
 
     def create_fastapi(self, app: FastAPI | None = None) -> FastAPI:
         if app is None:
@@ -54,7 +56,7 @@ class ChapService(Generic[TChapConfig]):
         self._include_api(router, InfoApi(self._runner))
         self._include_api(router, ConfigApi(self._database, config_type=self._config_type))
         self._include_api(router, JobApi(self._runner, self._database, self._scheduler))
-        self._include_api(router, ArtifactApi(self._database))
+        self._include_api(router, ArtifactApi(self._database, self))
 
         return router
 

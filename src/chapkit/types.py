@@ -164,6 +164,7 @@ class ArtifactInfo(BaseModel):
     updated_at: datetime | None = None
     config_id: UUID
     config_name: str
+    artifact_level_name: str | None = None
     data: Any | None = None
 
 
