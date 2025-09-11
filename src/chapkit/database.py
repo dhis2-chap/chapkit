@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, create_engine, event, func, select
@@ -32,7 +32,7 @@ class ChapDatabase[T: ChapConfig](ABC):
     @abstractmethod
     def get_configs(self) -> list[T]: ...
     @abstractmethod
-    def add_artifact(self, id: UUID, cfg: T, obj: Any) -> None: ...
+    def add_artifact(self, id: UUID, cfg: T, obj: Any, parent_id: UUID | None = None) -> None: ...
     @abstractmethod
     def del_artifact(self, id: UUID) -> bool: ...
     @abstractmethod
@@ -45,6 +45,8 @@ class ChapDatabase[T: ChapConfig](ABC):
     def get_artifacts_for_config(self, config_id: UUID) -> list[tuple[UUID, Any]]: ...
     @abstractmethod
     def get_artifact_rows_for_config(self, config_id: UUID) -> list[ArtifactRow]: ...
+    @abstractmethod
+    def get_artifact_roots_for_config(self, config_id: UUID) -> list[ArtifactRow]: ...
 
 
 # ---------- ORM base & rows ----------
@@ -63,8 +65,20 @@ class ConfigRow(Base):
 class ArtifactRow(Base):
     __tablename__ = "artifacts"
     config_id: Mapped[UUID] = mapped_column(ForeignKey("configs.id", ondelete="CASCADE"), nullable=False)
+    parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=True)
     data: Mapped[Any] = mapped_column(PickleType, nullable=False)
     config: Mapped["ConfigRow"] = relationship(back_populates="artifacts")
+    children: Mapped[list["ArtifactRow"]] = relationship(
+        "ArtifactRow",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+    )
+    parent: Mapped[Optional["ArtifactRow"]] = relationship(
+        "ArtifactRow",
+        back_populates="children",
+        primaryjoin="ArtifactRow.parent_id == ArtifactRow.id",
+        remote_side="ArtifactRow.id",
+    )
 
 
 # ---------- helper: engine factory ----------
@@ -173,14 +187,15 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
 
     # --- Artifact API (pickled) ---
 
-    def add_artifact(self, id: UUID, cfg: T, obj: Any) -> None:
+    def add_artifact(self, id: UUID, cfg: T, obj: Any, parent_id: UUID | None = None) -> None:
         with self._session() as s:
-            stmt = sqlite_insert(ArtifactRow).values(id=id, config_id=cfg.id, data=obj)
+            stmt = sqlite_insert(ArtifactRow).values(id=id, config_id=cfg.id, data=obj, parent_id=parent_id)
             stmt = stmt.on_conflict_do_update(
                 index_elements=[ArtifactRow.id],
                 set_={
                     "data": stmt.excluded.data,
                     "config_id": stmt.excluded.config_id,
+                    "parent_id": stmt.excluded.parent_id,
                 },
             )
             s.execute(stmt)
@@ -220,3 +235,9 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
     def get_artifact_rows_for_config(self, config_id: UUID) -> list[ArtifactRow]:
         with self._session() as s:
             return s.scalars(select(ArtifactRow).where(ArtifactRow.config_id == config_id)).all()
+
+    def get_artifact_roots_for_config(self, config_id: UUID) -> list[ArtifactRow]:
+        with self._session() as s:
+            return s.scalars(
+                select(ArtifactRow).where(ArtifactRow.config_id == config_id).where(ArtifactRow.parent_id.is_(None))
+            ).all()

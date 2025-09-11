@@ -74,6 +74,7 @@ class PredictApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
 
             params = PredictParams(
                 config=cfg,
+                artifact_id=artifact,
                 artifact=artifact_obj,
                 body=PredictData(historic=body.historic.to_pandas(), future=body.future.to_pandas(), geo=body.geo),
             )

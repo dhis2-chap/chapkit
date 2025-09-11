@@ -143,6 +143,7 @@ class PredictData(BaseModel):
 
 class PredictParams(BaseModel):
     config: TChapConfig
+    artifact_id: UUID | None = None
     artifact: Any | None = None
     body: PredictData
 
@@ -164,3 +165,7 @@ class ArtifactInfo(BaseModel):
     config_id: UUID
     config_name: str
     data: Any | None = None
+
+
+class ArtifactTree(ArtifactInfo):
+    children: list["ArtifactTree"] = []

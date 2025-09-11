@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 
 from chapkit.api.types import ChapApi
 from chapkit.database import ChapDatabase
-from chapkit.types import TChapConfig, ArtifactInfo
+from chapkit.types import TChapConfig, ArtifactInfo, ArtifactTree
 
 
 class ArtifactApi(ChapApi[TChapConfig]):
@@ -17,6 +17,37 @@ class ArtifactApi(ChapApi[TChapConfig]):
 
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["artifacts"])
+
+        async def get_artifact_tree_for_config(config_id: UUID) -> list[ArtifactTree]:
+            """Get all artifacts linked to a specific config as a tree."""
+            # First check if config exists
+            config = self._database.get_config(config_id)
+            if config is None:
+                raise HTTPException(status_code=404, detail=f"Config {config_id} not found")
+
+            # Get all artifacts for this config
+            artifact_rows = self._database.get_artifact_rows_for_config(config_id)
+
+            nodes = {
+                row.id: ArtifactTree(
+                    id=row.id,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                    config_id=config.id,
+                    config_name=config.name,
+                )
+                for row in artifact_rows
+            }
+
+            for row in artifact_rows:
+                if row.parent_id:
+                    parent = nodes.get(row.parent_id)
+                    if parent:
+                        parent.children.append(nodes[row.id])
+
+            return [
+                node for node in nodes.values() if node.id in {row.id for row in artifact_rows if not row.parent_id}
+            ]
 
         async def get_artifacts_for_config(config_id: UUID) -> list[ArtifactInfo]:
             """Get all artifacts linked to a specific config."""
@@ -70,6 +101,16 @@ class ArtifactApi(ChapApi[TChapConfig]):
             response_model=list[ArtifactInfo],
             name="get_artifacts_for_config",
             summary="Get all artifacts linked to a config",
+            responses={404: {"description": "Config not found"}},
+        )
+
+        router.add_api_route(
+            path="/artifacts/tree",
+            endpoint=get_artifact_tree_for_config,
+            methods=["GET"],
+            response_model=list[ArtifactTree],
+            name="get_artifact_tree_for_config",
+            summary="Get all artifacts linked to a config as a tree",
             responses={404: {"description": "Config not found"}},
         )
 

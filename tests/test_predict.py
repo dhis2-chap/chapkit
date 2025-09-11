@@ -35,7 +35,7 @@ class MockDatabase(ChapDatabase):
     def update_config(self, cfg):
         return True
 
-    def add_artifact(self, config_id, artifact):
+    def add_artifact(self, id, cfg, obj, parent_id=None):
         pass
 
     def get_artifact(self, artifact_id):
@@ -54,6 +54,9 @@ class MockDatabase(ChapDatabase):
         return None
 
     def get_artifact_rows_for_config(self, config_id):
+        return []
+
+    def get_artifact_roots_for_config(self, config_id):
         return []
 
 
