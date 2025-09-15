@@ -72,7 +72,7 @@ class JobScheduler(Scheduler):
 
         async with self._lock:
             if id in self._tasks:
-                raise RuntimeError(f"Job {id} already scheduled")
+                raise RuntimeError(f"Job {id!r} already scheduled")
             self._records[id] = record
 
         async def _runner() -> Any:
@@ -109,7 +109,7 @@ class JobScheduler(Scheduler):
                     rec.status = JobStatus.failed
                     rec.finished_at = datetime.now(timezone.utc)
                     if hasattr(rec, "error"):
-                        rec.error = f"{type(e).__name__}: {e}"
+                        rec.error = f"{type(e).__name__}: {e!s}"
                 raise
 
         task = asyncio.create_task(_runner(), name=f"{self.name}-job-{id}")
