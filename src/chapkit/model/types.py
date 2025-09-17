@@ -27,7 +27,7 @@ OnPredictCallable = Callable[
         Any,
         pd.DataFrame,
         pd.DataFrame,
-        FeatureCollection,
+        FeatureCollection | None,
     ],
     Awaitable[pd.DataFrame],
 ]
