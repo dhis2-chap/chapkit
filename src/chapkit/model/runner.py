@@ -88,6 +88,7 @@ class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[T
             model=params.artifact,
             historic=params.body.historic,
             future=params.body.future,
+            geo=params.body.geo,
         )
 
         artifact_id = uuid4()

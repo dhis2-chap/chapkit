@@ -12,5 +12,22 @@ class ChapModelConfig(ChapConfig):
 
 TChapModelConfig = TypeVar("TChapModelConfig", bound=ChapModelConfig)
 
-OnTrainCallable = Callable[[TChapModelConfig, pd.DataFrame, FeatureCollection | None], Awaitable[Any]]
-OnPredictCallable = Callable[[TChapModelConfig, Any, pd.DataFrame, pd.DataFrame], Awaitable[pd.DataFrame]]
+OnTrainCallable = Callable[
+    [
+        TChapModelConfig,
+        pd.DataFrame,
+        FeatureCollection | None,
+    ],
+    Awaitable[Any],
+]
+
+OnPredictCallable = Callable[
+    [
+        TChapModelConfig,
+        Any,
+        pd.DataFrame,
+        pd.DataFrame,
+        FeatureCollection,
+    ],
+    Awaitable[pd.DataFrame],
+]
