@@ -2,8 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Generic
 from uuid import UUID, uuid4
 
-from chapkit.model.types import TChapModelConfig
-from chapkit.types import ChapServiceInfo
+
+from chapkit.model.types import OnPredictCallable, OnTrainCallable, TChapModelConfig
+from chapkit.types import ChapServiceInfo, DataFrameSplit
 from chapkit.runner import ChapRunner
 from chapkit.database import ChapDatabase
 from chapkit.types import HealthResponse, HealthStatus, PredictParams, TrainParams
@@ -51,5 +52,50 @@ class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelC
 
         artifact_id = uuid4()
         self._database.add_artifact(artifact_id, params.config, {"b": 2})
+
+        return artifact_id
+
+
+class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[TChapModelConfig]):
+    def __init__(
+        self,
+        info: ChapServiceInfo,
+        database: ChapDatabase[TChapModelConfig],
+        *,
+        config_type: type[TChapModelConfig],
+        on_train: OnTrainCallable,
+        on_predict: OnPredictCallable,
+    ):
+        self._on_train_func = on_train
+        self._on_predict_func = on_predict
+        super().__init__(info, database, config_type=config_type)
+
+    async def on_train(self, params: TrainParams) -> UUID:
+        model = await self._on_train_func(
+            config=params.config,
+            data=params.body.data,
+            geo=params.body.geo,
+        )
+
+        artifact_id = uuid4()
+        self._database.add_artifact(artifact_id, params.config, model)
+
+        return artifact_id
+
+    async def on_predict(self, params: PredictParams) -> UUID:
+        result = await self._on_predict_func(
+            config=params.config,
+            model=params.artifact,
+            historic=params.body.historic,
+            future=params.body.future,
+        )
+
+        artifact_id = uuid4()
+        self._database.add_artifact(
+            artifact_id,
+            params.config,
+            DataFrameSplit.from_pandas(result),
+            parent_id=params.artifact_id,
+        )
 
         return artifact_id
