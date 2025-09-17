@@ -22,7 +22,11 @@ build-backend = "uv_build"
 data = { data = "templates" }
 
 [dependency-groups]
-dev = ["pytest>=8.4.2", "ruff>=0.13.0"]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "ruff>=0.13.0",
+]
 
 [tool.ruff]
 target-version = "py312"

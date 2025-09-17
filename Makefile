@@ -19,9 +19,10 @@ clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf .pytest_cache
 	rm -rf dist build
+	rm -rf target
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 
-test:
+test: clean
 	@echo "Running tests..."
 	uv run pytest -q
 

@@ -8,6 +8,7 @@ from chapkit.types import ChapServiceInfo, DataFrameSplit
 from chapkit.runner import ChapRunner
 from chapkit.database import ChapDatabase
 from chapkit.types import HealthResponse, HealthStatus, PredictParams, TrainParams
+from chapkit.utils import make_awaitable
 
 
 class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], ABC):
@@ -66,8 +67,8 @@ class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[T
         on_train: OnTrainCallable,
         on_predict: OnPredictCallable,
     ):
-        self._on_train_func = on_train
-        self._on_predict_func = on_predict
+        self._on_train_func = make_awaitable(on_train)
+        self._on_predict_func = make_awaitable(on_predict)
         super().__init__(info, database, config_type=config_type)
 
     async def on_train(self, params: TrainParams) -> UUID:
