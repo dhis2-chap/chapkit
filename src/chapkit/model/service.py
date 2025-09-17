@@ -20,7 +20,7 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
         runner: ChapModelRunner[TModelConfig],
         database: ChapDatabase[TModelConfig],
         scheduler: Scheduler | None = None,
-        artifact_level_names: list[str] | None = None,
+        artifact_level_names: list[str] = ["train", "predict"],
     ) -> None:
         super().__init__(runner, database, scheduler, artifact_level_names)
         self._runner: ChapModelRunner[TModelConfig] = runner
