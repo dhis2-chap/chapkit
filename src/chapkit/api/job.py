@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
@@ -59,6 +59,20 @@ class JobApi(ChapApi[TChapConfig]):
             except KeyError:
                 raise HTTPException(status_code=404, detail="Job not found")
             return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+        async def get_jobs(status: JobStatus = None) -> List[JobRecord]:
+            jobs = await self._scheduler.get_all_records()
+            if status:
+                return [job for job in jobs if job.status == status]
+            return jobs
+
+        router.add_api_route(
+            "/jobs",
+            get_jobs,
+            methods=["GET"],
+            response_model=List[JobRecord],
+            summary="Get all jobs, optionally filtered by status",
+        )
 
         router.add_api_route(
             "/jobs/{id}",

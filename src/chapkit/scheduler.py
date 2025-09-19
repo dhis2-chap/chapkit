@@ -34,6 +34,9 @@ class Scheduler(BaseModel, ABC):
     async def get_record(self, job_id: UUID) -> JobRecord: ...
 
     @abstractmethod
+    async def get_all_records(self) -> list[JobRecord]: ...
+
+    @abstractmethod
     async def get_result(self, job_id: UUID) -> Any: ...
 
     @abstractmethod
@@ -132,6 +135,10 @@ class JobScheduler(Scheduler):
             if rec is None:
                 raise KeyError("Job not found")
             return rec
+
+    async def get_all_records(self) -> list[JobRecord]:
+        async with self._lock:
+            return list(self._records.values())
 
     async def get_result(self, job_id: UUID) -> Any:
         async with self._lock:
