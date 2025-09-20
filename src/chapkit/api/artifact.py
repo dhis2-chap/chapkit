@@ -117,8 +117,8 @@ class ArtifactApi(ChapApi[TChapConfig]):
 
         async def get_artifact(artifact_id: ULID) -> ArtifactInfo:
             """Get a specific artifact by ID."""
-            artifact = self._database.get_artifact(artifact_id)
-            if artifact is None:
+            artifact_row = self._database.get_artifact_row(artifact_id)
+            if artifact_row is None:
                 raise HTTPException(status_code=404, detail=f"Artifact {artifact_id} not found")
 
             config = self._database.get_config_for_artifact(artifact_id)
@@ -126,11 +126,18 @@ class ArtifactApi(ChapApi[TChapConfig]):
                 raise HTTPException(status_code=404, detail=f"Config for artifact {artifact_id} not found")
 
             try:
-                jsonable_data = jsonable_encoder(artifact)
+                jsonable_data = jsonable_encoder(artifact_row.data)
             except (TypeError, ValueError):
                 jsonable_data = None
 
-            return ArtifactInfo(id=artifact_id, config_id=config.id, config_name=config.name, data=jsonable_data)
+            return ArtifactInfo(
+                id=artifact_row.id,
+                created_at=artifact_row.created_at,
+                updated_at=artifact_row.updated_at,
+                config_id=config.id,
+                config_name=config.name,
+                data=jsonable_data,
+            )
 
         async def delete_artifact(artifact_id: ULID) -> None:
             """Delete a specific artifact by ID."""
