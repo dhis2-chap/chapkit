@@ -39,9 +39,6 @@ class Scheduler(BaseModel, ABC):
     async def get_all_records(self) -> list[JobRecord]: ...
 
     @abstractmethod
-    async def get_result(self, job_id: ULID) -> Any: ...
-
-    @abstractmethod
     async def cancel(self, job_id: ULID) -> bool: ...
 
     @abstractmethod
@@ -98,6 +95,7 @@ class JobScheduler(Scheduler):
                     rec = self._records[id]
                     rec.status = JobStatus.completed
                     rec.finished_at = datetime.now(timezone.utc)
+                    rec.artifact_id = result
                     self._results[id] = result
                 return result
 
@@ -141,27 +139,6 @@ class JobScheduler(Scheduler):
     async def get_all_records(self) -> list[JobRecord]:
         async with self._lock:
             return list(self._records.values())
-
-    async def get_result(self, job_id: ULID) -> Any:
-        async with self._lock:
-            rec = self._records.get(job_id)
-            if rec is None:
-                raise KeyError("Job not found")
-
-            if rec.status in (JobStatus.pending, JobStatus.running):
-                raise RuntimeError("Result not ready")
-
-            if rec.status is JobStatus.completed:
-                return self._results.get(job_id)
-
-            if rec.status is JobStatus.failed:
-                msg = getattr(rec, "error", None) or "Job failed"
-                raise RuntimeError(msg)
-
-            if rec.status is JobStatus.canceled:
-                raise RuntimeError("Job canceled")
-
-            raise RuntimeError("No result available")
 
     async def cancel(self, job_id: ULID) -> bool:
         """True if a running task was canceled; False if already done/missing."""

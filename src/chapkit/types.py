@@ -96,6 +96,7 @@ class JobRecord(BaseModel):
     started_at: datetime | None = Field(default=None)
     finished_at: datetime | None = Field(default=None)
     error: str | None = None
+    artifact_id: ULID | None = None
 
 
 class DataFrameSplit(BaseModel):

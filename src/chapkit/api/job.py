@@ -1,14 +1,14 @@
-from typing import Any, List
+from typing import List
 
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 from ulid import ULID
 
 from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
 from chapkit.scheduler import Scheduler
 from chapkit.database import ChapDatabase
-from chapkit.types import JobRecord, JobResponse, JobStatus, TChapConfig
+from chapkit.types import JobRecord, JobStatus, TChapConfig
 
 
 class JobApi(ChapApi[TChapConfig]):
@@ -30,28 +30,6 @@ class JobApi(ChapApi[TChapConfig]):
                 return await self._scheduler.get_record(id)
             except KeyError:
                 raise HTTPException(status_code=404, detail="Job not found")
-
-        async def get_status(id: ULID) -> dict[str, JobStatus]:
-            try:
-                st = await self._scheduler.get_status(id)
-                return {"status": st}
-            except KeyError:
-                raise HTTPException(status_code=404, detail="Job not found")
-
-        async def get_result(id: ULID) -> Any:
-            try:
-                result = await self._scheduler.get_result(id)
-            except KeyError:
-                raise HTTPException(status_code=404, detail="Job not found")
-            except RuntimeError as e:
-                msg = str(e)
-                if msg == "Result not ready":
-                    return JSONResponse(
-                        status_code=status.HTTP_409_CONFLICT,
-                        content={"detail": msg},
-                    )
-                raise HTTPException(status_code=400, detail=msg)
-            return JobResponse(id=result, status=JobStatus.completed)
 
         async def delete_job(id: ULID) -> Response:
             try:
@@ -80,23 +58,6 @@ class JobApi(ChapApi[TChapConfig]):
             methods=["GET"],
             response_model=JobRecord,
             summary="Get full job record",
-        )
-
-        router.add_api_route(
-            "/jobs/{id}/status",
-            get_status,
-            response_model_exclude_none=True,
-            methods=["GET"],
-            response_model=dict,
-            summary="Get job status only",
-        )
-
-        router.add_api_route(
-            "/jobs/{id}/result",
-            get_result,
-            response_model_exclude_none=True,
-            methods=["GET"],
-            summary="Get job result (200 on success, 409 if not ready)",
         )
 
         router.add_api_route(
