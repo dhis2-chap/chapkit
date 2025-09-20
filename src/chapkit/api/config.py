@@ -1,7 +1,6 @@
-from uuid import UUID
-
 from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import JSONResponse, Response
+from ulid import ULID
 
 from chapkit.api.types import ChapApi
 from chapkit.database import ChapDatabase
@@ -23,7 +22,7 @@ class ConfigApi(ChapApi[TChapConfig]):
 
         Model = self._config_type  # concrete Pydantic class
 
-        async def get_config(id: UUID):
+        async def get_config(id: ULID):
             cfg = self._database.get_config(id)
 
             if cfg is None:
@@ -47,7 +46,7 @@ class ConfigApi(ChapApi[TChapConfig]):
                 headers={"Location": f"/configs/{validated.id}"},
             )
 
-        async def update_config(id: UUID, cfg: dict = Body(...)):
+        async def update_config(id: ULID, cfg: dict = Body(...)):
             validated = Model.model_validate(cfg)
 
             if id != validated.id:
@@ -60,7 +59,7 @@ class ConfigApi(ChapApi[TChapConfig]):
 
             return validated
 
-        async def delete_config(id: UUID):
+        async def delete_config(id: ULID):
             if not self._database.del_config(id):
                 raise HTTPException(status_code=404, detail=f"Config {id} not found")
 

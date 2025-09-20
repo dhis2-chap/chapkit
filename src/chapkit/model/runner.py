@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Generic
-from uuid import UUID, uuid4
 
 
 from chapkit.model.types import OnPredictCallable, OnTrainCallable, TChapModelConfig
-from chapkit.types import ChapServiceInfo, DataFrameSplit
+from chapkit.types import ChapServiceInfo, DataFrameSplit, ULID
 from chapkit.runner import ChapRunner
 from chapkit.database import ChapDatabase
 from chapkit.types import HealthResponse, HealthStatus, PredictParams, TrainParams
@@ -26,10 +25,10 @@ class ChapModelRunner(ChapRunner[TChapModelConfig], Generic[TChapModelConfig], A
     def on_health(self) -> HealthResponse: ...
 
     @abstractmethod
-    async def on_train(self, params: TrainParams) -> UUID: ...
+    async def on_train(self, params: TrainParams) -> ULID: ...
 
     @abstractmethod
-    async def on_predict(self, params: PredictParams) -> UUID: ...
+    async def on_predict(self, params: PredictParams) -> ULID: ...
 
 
 class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelConfig], ABC):
@@ -39,19 +38,19 @@ class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelC
     def on_info(self) -> ChapServiceInfo:
         return self._info
 
-    async def on_train(self, params: TrainParams) -> UUID:
+    async def on_train(self, params: TrainParams) -> ULID:
         print("Training with params:", params)
 
-        artifact_id = uuid4()
+        artifact_id = ULID()
         self._database.add_artifact(artifact_id, params.config, {"a": 1})
 
         return artifact_id
 
-    async def on_predict(self, params: PredictParams) -> UUID:
+    async def on_predict(self, params: PredictParams) -> ULID:
         print("Predicting with params:", params)
         # a real implementation would use the model to make a prediction
 
-        artifact_id = uuid4()
+        artifact_id = ULID()
         self._database.add_artifact(artifact_id, params.config, {"b": 2})
 
         return artifact_id
@@ -71,19 +70,19 @@ class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[T
         self._on_predict_func = make_awaitable(on_predict)
         super().__init__(info, database, config_type=config_type)
 
-    async def on_train(self, params: TrainParams) -> UUID:
+    async def on_train(self, params: TrainParams) -> ULID:
         model = await self._on_train_func(
             config=params.config,
             data=params.body.data,
             geo=params.body.geo,
         )
 
-        artifact_id = uuid4()
+        artifact_id = ULID()
         self._database.add_artifact(artifact_id, params.config, model)
 
         return artifact_id
 
-    async def on_predict(self, params: PredictParams) -> UUID:
+    async def on_predict(self, params: PredictParams) -> ULID:
         result = await self._on_predict_func(
             config=params.config,
             model=params.artifact,
@@ -92,7 +91,7 @@ class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[T
             geo=params.body.geo,
         )
 
-        artifact_id = uuid4()
+        artifact_id = ULID()
         self._database.add_artifact(
             artifact_id,
             params.config,

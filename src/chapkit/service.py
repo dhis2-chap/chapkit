@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Generic
-from uuid import UUID
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
+from ulid import ULID
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -63,7 +63,7 @@ class ChapService(Generic[TChapConfig]):
     def _include_api(self, router: APIRouter, api: ChapApi) -> None:
         router.include_router(api.create_router())
 
-    def _resolve_cfg(self, id: UUID) -> TChapConfig:
+    def _resolve_cfg(self, id: ULID) -> TChapConfig:
         cfg = self._database.get_config(id)
 
         if cfg is None:

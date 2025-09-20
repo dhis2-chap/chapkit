@@ -80,19 +80,18 @@ def test_update_config(client):
     assert response.status_code == 200
     assert response.json() == updated_config_data
 
+    def test_update_config_id_mismatch(client):
+        # Add a config
+        config_data = {"name": "test-config"}
+        response = client.post("/api/v1/configs", json=config_data)
+        assert response.status_code == 201
+        config_id = response.json()["id"]
 
-def test_update_config_id_mismatch(client):
-    # Add a config
-    config_data = {"name": "test-config"}
-    response = client.post("/api/v1/configs", json=config_data)
-    assert response.status_code == 201
-    config_id = response.json()["id"]
-
-    # Try to update with a mismatched ID
-    mismatched_id = "b6d3a2e0-5a6e-4b5f-8e9b-1e2e3e4e5e6e"
-    updated_config_data = {"id": mismatched_id, "name": "new-name"}
-    response = client.put(f"/api/v1/configs/{config_id}", json=updated_config_data)
-    assert response.status_code == 400
+        # Try to update with a mismatched ID
+        mismatched_id = "01H8XGJWBWBAQ9J6X6ZJ6ZJ6ZJ"
+        updated_config_data = {"id": mismatched_id, "name": "new-name"}
+        response = client.put(f"/api/v1/configs/{config_id}", json=updated_config_data)
+        assert response.status_code == 400
 
 
 def test_delete_config(client):
@@ -109,12 +108,10 @@ def test_delete_config(client):
     response = client.get(f"/api/v1/configs/{config_id}")
     assert response.status_code == 404
 
+    def test_get_nonexistent_config(client):
+        response = client.get("/api/v1/configs/01H8XGJWBWBAQ9J6X6ZJ6ZJ6ZJ")
+        assert response.status_code == 404
 
-def test_get_nonexistent_config(client):
-    response = client.get("/api/v1/configs/b6d3a2e0-5a6e-4b5f-8e9b-1e2e3e4e5e6e")
-    assert response.status_code == 404
-
-
-def test_delete_nonexistent_config(client):
-    response = client.delete("/api/v1/configs/b6d3a2e0-5a6e-4b5f-8e9b-1e2e3e4e5e6e")
-    assert response.status_code == 404
+    def test_delete_nonexistent_config(client):
+        response = client.delete("/api/v1/configs/01H8XGJWBWBAQ9J6X6ZJ6ZJ6ZJ")
+        assert response.status_code == 404

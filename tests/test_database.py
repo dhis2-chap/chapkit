@@ -1,5 +1,6 @@
 import unittest
-from uuid import uuid4
+
+from ulid import ULID
 
 from chapkit.database import SqlAlchemyChapDatabase
 from chapkit.types import ChapConfig
@@ -8,8 +9,8 @@ from chapkit.types import ChapConfig
 class TestDatabase(unittest.TestCase):
     def test_cascade_delete(self):
         database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
-        config = ChapConfig(id=uuid4(), name="test")
-        artifact_id = uuid4()
+        config = ChapConfig(name="test")
+        artifact_id = ULID()
 
         database.add_config(config)
         database.add_artifact(artifact_id, config, "artifact")
@@ -22,8 +23,8 @@ class TestDatabase(unittest.TestCase):
 
     def test_get_config_for_artifact(self):
         database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
-        config = ChapConfig(id=uuid4(), name="test")
-        artifact_id = uuid4()
+        config = ChapConfig(name="test")
+        artifact_id = ULID()
 
         database.add_config(config)
         database.add_artifact(artifact_id, config, "artifact")
@@ -33,9 +34,9 @@ class TestDatabase(unittest.TestCase):
 
     def test_cascade_delete_multiple_artifacts(self):
         database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
-        config = ChapConfig(id=uuid4(), name="test")
-        artifact_id1 = uuid4()
-        artifact_id2 = uuid4()
+        config = ChapConfig(name="test")
+        artifact_id1 = ULID()
+        artifact_id2 = ULID()
 
         database.add_config(config)
         database.add_artifact(artifact_id1, config, "artifact1")
@@ -51,9 +52,9 @@ class TestDatabase(unittest.TestCase):
 
     def test_get_artifacts_for_config(self):
         database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
-        config = ChapConfig(id=uuid4(), name="test")
-        artifact_id1 = uuid4()
-        artifact_id2 = uuid4()
+        config = ChapConfig(name="test")
+        artifact_id1 = ULID()
+        artifact_id2 = ULID()
         artifact_data1 = {"type": "model", "version": "1.0"}
         artifact_data2 = {"type": "model", "version": "2.0"}
 
@@ -70,15 +71,15 @@ class TestDatabase(unittest.TestCase):
 
     def test_get_artifacts_for_nonexistent_config(self):
         database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
-        nonexistent_config_id = uuid4()
+        nonexistent_config_id = ULID()
 
         artifacts = database.get_artifacts_for_config(nonexistent_config_id)
         self.assertEqual(len(artifacts), 0)
 
     def test_artifact_crud_operations(self):
         database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
-        config = ChapConfig(id=uuid4(), name="test")
-        artifact_id = uuid4()
+        config = ChapConfig(name="test")
+        artifact_id = ULID()
         artifact_data = {"weights": [1, 2, 3], "metadata": {"accuracy": 0.95}}
 
         database.add_config(config)
@@ -99,8 +100,8 @@ class TestDatabase(unittest.TestCase):
 
     def test_get_artifact_row(self):
         database = SqlAlchemyChapDatabase(":memory:", config_type=ChapConfig)
-        config = ChapConfig(id=uuid4(), name="test")
-        artifact_id = uuid4()
+        config = ChapConfig(name="test")
+        artifact_id = ULID()
         artifact_data = "test artifact"
 
         database.add_config(config)
@@ -111,7 +112,7 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(artifact_row.id, artifact_id)
         self.assertEqual(artifact_row.data, artifact_data)
 
-        non_existent_artifact_row = database.get_artifact_row(uuid4())
+        non_existent_artifact_row = database.get_artifact_row(ULID())
         self.assertIsNone(non_existent_artifact_row)
 
 

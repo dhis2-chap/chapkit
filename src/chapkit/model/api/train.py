@@ -1,7 +1,7 @@
 from typing import Generic
-from uuid import UUID
 
 from fastapi import APIRouter, Body, HTTPException, Query
+from ulid import ULID
 
 from chapkit.api.types import ChapApi
 from chapkit.model.runner import ChapModelRunner
@@ -26,7 +26,7 @@ class TrainApi(ChapApi[TChapModelConfig], Generic[TChapModelConfig]):
         router = APIRouter(tags=["chap"])
 
         async def endpoint(
-            config: UUID = Query(..., description="Config ID"),
+            config: ULID = Query(..., description="Config ID"),
             body: TrainBody = Body(
                 ...,
                 description="Training request body containing a DataFrame (orient='split') "

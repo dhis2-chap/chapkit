@@ -1,8 +1,8 @@
 from typing import Any, List
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse, Response
+from ulid import ULID
 
 from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
@@ -25,20 +25,20 @@ class JobApi(ChapApi[TChapConfig]):
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["jobs"])
 
-        async def get_job(id: UUID) -> JobRecord:
+        async def get_job(id: ULID) -> JobRecord:
             try:
                 return await self._scheduler.get_record(id)
             except KeyError:
                 raise HTTPException(status_code=404, detail="Job not found")
 
-        async def get_status(id: UUID) -> dict[str, JobStatus]:
+        async def get_status(id: ULID) -> dict[str, JobStatus]:
             try:
                 st = await self._scheduler.get_status(id)
                 return {"status": st}
             except KeyError:
                 raise HTTPException(status_code=404, detail="Job not found")
 
-        async def get_result(id: UUID) -> Any:
+        async def get_result(id: ULID) -> Any:
             try:
                 result = await self._scheduler.get_result(id)
             except KeyError:
@@ -53,7 +53,7 @@ class JobApi(ChapApi[TChapConfig]):
                 raise HTTPException(status_code=400, detail=msg)
             return JobResponse(id=result, status=JobStatus.completed)
 
-        async def delete_job(id: UUID) -> Response:
+        async def delete_job(id: ULID) -> Response:
             try:
                 await self._scheduler.delete(id)
             except KeyError:

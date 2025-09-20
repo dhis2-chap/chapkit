@@ -1,15 +1,21 @@
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, TypeVar
-from uuid import UUID, uuid4
 
 import pandas as pd
 from geojson_pydantic import FeatureCollection
+import ulid
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, HttpUrl
+
+ULID = ulid.ULID
+
+
+def new_ulid() -> ULID:
+    return ULID()
 
 
 class ChapConfig(BaseModel):
-    id: UUID = Field(default_factory=uuid4)
+    id: ULID = Field(default_factory=new_ulid)
     name: str
 
 
@@ -66,7 +72,7 @@ class JobType(StrEnum):
 class JobRequest[T: ChapConfig](BaseModel):
     """What you submit to the scheduler/runner."""
 
-    id: UUID
+    id: ULID
     type: JobType
     config: T
 
@@ -77,13 +83,13 @@ class JobRequest[T: ChapConfig](BaseModel):
 class JobResponse(BaseModel):
     """What you return immediately after enqueueing a job."""
 
-    id: UUID
+    id: ULID
     type: JobType | None = None
     status: JobStatus = Field(description="Current status of the job")
 
 
 class JobRecord(BaseModel):
-    id: UUID
+    id: ULID
     type: JobType | None = None
     status: JobStatus = JobStatus.pending
     submitted_at: datetime | None = Field(default=None)
@@ -143,7 +149,7 @@ class PredictData(BaseModel):
 
 class PredictParams(BaseModel):
     config: TChapConfig
-    artifact_id: UUID | None = None
+    artifact_id: ULID | None = None
     artifact: Any | None = None
     body: PredictData
 
@@ -159,10 +165,10 @@ class PredictBody(BaseModel):
 
 
 class ArtifactInfo(BaseModel):
-    id: UUID
+    id: ULID
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    config_id: UUID
+    config_id: ULID
     config_name: str
     artifact_level_name: str | None = None
     data: Any | None = None

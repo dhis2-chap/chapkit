@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
+from ulid import ULID
 
 from chapkit.api.types import ChapApi
 from chapkit.database import ChapDatabase
@@ -26,7 +26,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["artifacts"])
 
-        async def get_artifact_tree_for_config(config_id: UUID) -> list[ArtifactTree]:
+        async def get_artifact_tree_for_config(config_id: ULID) -> list[ArtifactTree]:
             """Get all artifacts linked to a specific config as a tree."""
             # First check if config exists
             config = self._database.get_config(config_id)
@@ -74,7 +74,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
                 node for node in nodes.values() if node.id in {row.id for row in artifact_rows if not row.parent_id}
             ]
 
-        async def get_artifacts_for_config(config_id: UUID) -> list[ArtifactInfo]:
+        async def get_artifacts_for_config(config_id: ULID) -> list[ArtifactInfo]:
             """Get all artifacts linked to a specific config."""
             # First check if config exists
             config = self._database.get_config(config_id)
@@ -115,7 +115,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
                 )
             return results
 
-        async def get_artifact(artifact_id: UUID) -> ArtifactInfo:
+        async def get_artifact(artifact_id: ULID) -> ArtifactInfo:
             """Get a specific artifact by ID."""
             artifact = self._database.get_artifact(artifact_id)
             if artifact is None:
@@ -132,7 +132,7 @@ class ArtifactApi(ChapApi[TChapConfig]):
 
             return ArtifactInfo(id=artifact_id, config_id=config.id, config_name=config.name, data=jsonable_data)
 
-        async def delete_artifact(artifact_id: UUID) -> None:
+        async def delete_artifact(artifact_id: ULID) -> None:
             """Delete a specific artifact by ID."""
             artifact = self._database.get_artifact(artifact_id)
             if artifact is None:

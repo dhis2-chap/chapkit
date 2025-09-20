@@ -6,18 +6,38 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator, Optional
-from uuid import UUID
 
 from sqlalchemy import ForeignKey, create_engine, event, func, select
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
+from ulid import ULID
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
-from sqlalchemy.types import PickleType
+from sqlalchemy.types import PickleType, TypeDecorator, CHAR
 
 from chapkit.types import ChapConfig, TChapConfig
 
 T = TChapConfig
+
+
+class ULIDType(TypeDecorator):
+    """
+    Custom SQLAlchemy type for ULID.
+    It stores ULID as a CHAR(26) in the database.
+    """
+
+    impl = CHAR(26)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return str(value)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            return ULID.from_str(value)
+        return value
 
 
 class ChapDatabase[T: ChapConfig](ABC):
@@ -26,32 +46,32 @@ class ChapDatabase[T: ChapConfig](ABC):
     @abstractmethod
     def update_config(self, cfg: T) -> bool: ...
     @abstractmethod
-    def del_config(self, id: UUID) -> bool: ...
+    def del_config(self, id: ULID) -> bool: ...
     @abstractmethod
-    def get_config(self, id: UUID) -> T | None: ...
+    def get_config(self, id: ULID) -> T | None: ...
     @abstractmethod
     def get_configs(self) -> list[T]: ...
     @abstractmethod
-    def add_artifact(self, id: UUID, cfg: T, obj: Any, parent_id: UUID | None = None) -> None: ...
+    def add_artifact(self, id: ULID, cfg: T, obj: Any, parent_id: ULID | None = None) -> None: ...
     @abstractmethod
-    def del_artifact(self, id: UUID) -> bool: ...
+    def del_artifact(self, id: ULID) -> bool: ...
     @abstractmethod
-    def get_artifact(self, id: UUID) -> Any | None: ...
+    def get_artifact(self, id: ULID) -> Any | None: ...
     @abstractmethod
-    def get_artifact_row(self, id: UUID) -> ArtifactRow | None: ...
+    def get_artifact_row(self, id: ULID) -> ArtifactRow | None: ...
     @abstractmethod
-    def get_config_for_artifact(self, artifact_id: UUID) -> T | None: ...
+    def get_config_for_artifact(self, artifact_id: ULID) -> T | None: ...
     @abstractmethod
-    def get_artifacts_for_config(self, config_id: UUID) -> list[tuple[UUID, Any]]: ...
+    def get_artifacts_for_config(self, config_id: ULID) -> list[tuple[ULID, Any]]: ...
     @abstractmethod
-    def get_artifact_rows_for_config(self, config_id: UUID) -> list[ArtifactRow]: ...
+    def get_artifact_rows_for_config(self, config_id: ULID) -> list[ArtifactRow]: ...
     @abstractmethod
-    def get_artifact_roots_for_config(self, config_id: UUID) -> list[ArtifactRow]: ...
+    def get_artifact_roots_for_config(self, config_id: ULID) -> list[ArtifactRow]: ...
 
 
 # ---------- ORM base & rows ----------
 class Base(DeclarativeBase):
-    id: Mapped[UUID] = mapped_column(primary_key=True)
+    id: Mapped[ULID] = mapped_column(ULIDType, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
@@ -64,8 +84,8 @@ class ConfigRow(Base):
 
 class ArtifactRow(Base):
     __tablename__ = "artifacts"
-    config_id: Mapped[UUID] = mapped_column(ForeignKey("configs.id", ondelete="CASCADE"), nullable=False)
-    parent_id: Mapped[UUID | None] = mapped_column(ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=True)
+    config_id: Mapped[ULID] = mapped_column(ForeignKey("configs.id", ondelete="CASCADE"), nullable=False)
+    parent_id: Mapped[ULID | None] = mapped_column(ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=True)
     data: Mapped[Any] = mapped_column(PickleType, nullable=False)
     config: Mapped["ConfigRow"] = relationship(back_populates="artifacts")
     children: Mapped[list["ArtifactRow"]] = relationship(
@@ -138,7 +158,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
     def _cfg_to_dict(self, cfg: T) -> dict:
         d = cfg.model_dump(mode="python")
 
-        if isinstance(d.get("id"), UUID):
+        if isinstance(d.get("id"), ULID):
             d["id"] = str(d["id"])
 
         return d
@@ -165,7 +185,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
             row.config = self._cfg_to_dict(cfg)
             return True
 
-    def del_config(self, id: UUID) -> bool:
+    def del_config(self, id: ULID) -> bool:
         with self._session() as s:
             row = s.get(ConfigRow, id)
 
@@ -175,7 +195,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
 
             return True
 
-    def get_config(self, id: UUID) -> T | None:
+    def get_config(self, id: ULID) -> T | None:
         with self._session() as s:
             row = s.get(ConfigRow, id)
             return self._cfg_from_dict(row.config) if row else None
@@ -187,7 +207,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
 
     # --- Artifact API (pickled) ---
 
-    def add_artifact(self, id: UUID, cfg: T, obj: Any, parent_id: UUID | None = None) -> None:
+    def add_artifact(self, id: ULID, cfg: T, obj: Any, parent_id: ULID | None = None) -> None:
         with self._session() as s:
             stmt = sqlite_insert(ArtifactRow).values(id=id, config_id=cfg.id, data=obj, parent_id=parent_id)
             stmt = stmt.on_conflict_do_update(
@@ -200,7 +220,7 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
             )
             s.execute(stmt)
 
-    def del_artifact(self, id: UUID) -> bool:
+    def del_artifact(self, id: ULID) -> bool:
         with self._session() as s:
             row = s.get(ArtifactRow, id)
 
@@ -211,32 +231,32 @@ class SqlAlchemyChapDatabase(ChapDatabase[T]):
 
             return True
 
-    def get_artifact(self, id: UUID) -> Any | None:
+    def get_artifact(self, id: ULID) -> Any | None:
         with self._session() as s:
             row = s.get(ArtifactRow, id)
             return row.data if row else None
 
-    def get_artifact_row(self, id: UUID) -> ArtifactRow | None:
+    def get_artifact_row(self, id: ULID) -> ArtifactRow | None:
         with self._session() as s:
             return s.get(ArtifactRow, id)
 
-    def get_config_for_artifact(self, artifact_id: UUID) -> T | None:
+    def get_config_for_artifact(self, artifact_id: ULID) -> T | None:
         with self._session() as s:
             row = s.get(ArtifactRow, artifact_id)
             if not row:
                 return None
             return self._cfg_from_dict(row.config.config)
 
-    def get_artifacts_for_config(self, config_id: UUID) -> list[tuple[UUID, Any]]:
+    def get_artifacts_for_config(self, config_id: ULID) -> list[tuple[ULID, Any]]:
         with self._session() as s:
             rows = s.scalars(select(ArtifactRow).where(ArtifactRow.config_id == config_id)).all()
             return [(row.id, row.data) for row in rows]
 
-    def get_artifact_rows_for_config(self, config_id: UUID) -> list[ArtifactRow]:
+    def get_artifact_rows_for_config(self, config_id: ULID) -> list[ArtifactRow]:
         with self._session() as s:
             return s.scalars(select(ArtifactRow).where(ArtifactRow.config_id == config_id)).all()
 
-    def get_artifact_roots_for_config(self, config_id: UUID) -> list[ArtifactRow]:
+    def get_artifact_roots_for_config(self, config_id: ULID) -> list[ArtifactRow]:
         with self._session() as s:
             return s.scalars(
                 select(ArtifactRow).where(ArtifactRow.config_id == config_id).where(ArtifactRow.parent_id.is_(None))

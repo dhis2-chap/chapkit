@@ -3,11 +3,13 @@ import inspect
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
-from uuid import UUID, uuid4
 
+import ulid
 from pydantic import BaseModel, Field, PrivateAttr
 
 from chapkit.types import JobRecord, JobRequest, JobStatus
+
+ULID = ulid.ULID
 
 
 class Scheduler(BaseModel, ABC):
@@ -25,25 +27,25 @@ class Scheduler(BaseModel, ABC):
         /,
         *args: Any,
         **kwargs: Any,
-    ) -> UUID: ...
+    ) -> ULID: ...
 
     @abstractmethod
-    async def get_status(self, job_id: UUID) -> JobStatus: ...
+    async def get_status(self, job_id: ULID) -> JobStatus: ...
 
     @abstractmethod
-    async def get_record(self, job_id: UUID) -> JobRecord: ...
+    async def get_record(self, job_id: ULID) -> JobRecord: ...
 
     @abstractmethod
     async def get_all_records(self) -> list[JobRecord]: ...
 
     @abstractmethod
-    async def get_result(self, job_id: UUID) -> Any: ...
+    async def get_result(self, job_id: ULID) -> Any: ...
 
     @abstractmethod
-    async def cancel(self, job_id: UUID) -> bool: ...
+    async def cancel(self, job_id: ULID) -> bool: ...
 
     @abstractmethod
-    async def delete(self, job_id: UUID) -> None: ...
+    async def delete(self, job_id: ULID) -> None: ...
 
 
 class JobScheduler(Scheduler):
@@ -52,9 +54,9 @@ class JobScheduler(Scheduler):
     name: str = Field(default="chap")
 
     # Runtime-only state (kept out of serialization)
-    _records: dict[UUID, JobRecord] = PrivateAttr(default_factory=dict)
-    _results: dict[UUID, Any] = PrivateAttr(default_factory=dict)
-    _tasks: dict[UUID, asyncio.Task[Any]] = PrivateAttr(default_factory=dict)
+    _records: dict[ULID, JobRecord] = PrivateAttr(default_factory=dict)
+    _results: dict[ULID, Any] = PrivateAttr(default_factory=dict)
+    _tasks: dict[ULID, asyncio.Task[Any]] = PrivateAttr(default_factory=dict)
 
     async def add_job(
         self,
@@ -62,10 +64,10 @@ class JobScheduler(Scheduler):
         /,
         *args: Any,
         **kwargs: Any,
-    ) -> UUID:
+    ) -> ULID:
         """Register and schedule `target` (sync or async) for this job."""
         now = datetime.now(timezone.utc)
-        id = uuid4()
+        id = ULID()
 
         record = JobRecord(
             id=id,
@@ -122,14 +124,14 @@ class JobScheduler(Scheduler):
 
         return id
 
-    async def get_status(self, job_id: UUID) -> JobStatus:
+    async def get_status(self, job_id: ULID) -> JobStatus:
         async with self._lock:
             rec = self._records.get(job_id)
             if rec is None:
                 raise KeyError("Job not found")
             return rec.status
 
-    async def get_record(self, job_id: UUID) -> JobRecord:
+    async def get_record(self, job_id: ULID) -> JobRecord:
         async with self._lock:
             rec = self._records.get(job_id)
             if rec is None:
@@ -140,7 +142,7 @@ class JobScheduler(Scheduler):
         async with self._lock:
             return list(self._records.values())
 
-    async def get_result(self, job_id: UUID) -> Any:
+    async def get_result(self, job_id: ULID) -> Any:
         async with self._lock:
             rec = self._records.get(job_id)
             if rec is None:
@@ -161,7 +163,7 @@ class JobScheduler(Scheduler):
 
             raise RuntimeError("No result available")
 
-    async def cancel(self, job_id: UUID) -> bool:
+    async def cancel(self, job_id: ULID) -> bool:
         """True if a running task was canceled; False if already done/missing."""
         async with self._lock:
             task = self._tasks.get(job_id)
@@ -181,7 +183,7 @@ class JobScheduler(Scheduler):
             pass
         return True
 
-    async def delete(self, job_id: UUID) -> None:
+    async def delete(self, job_id: ULID) -> None:
         """Remove job record, task, and result; cancels if still running."""
         async with self._lock:
             rec = self._records.get(job_id)

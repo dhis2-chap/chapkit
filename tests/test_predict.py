@@ -1,4 +1,3 @@
-from uuid import uuid4
 import pandas as pd
 from fastapi.testclient import TestClient
 
@@ -48,7 +47,7 @@ class MockDatabase(ChapDatabase):
         return True
 
     def get_config_for_artifact(self, artifact_id):
-        return ChapConfig(id=uuid4(), name="test_config")
+        return ChapConfig(name="test_config")
 
     def get_artifact_row(self, id):
         return None
@@ -75,7 +74,7 @@ def test_predict_endpoint():
         "future": future_df.to_dict(orient="split"),
     }
 
-    response = client.post(f"/api/v1/predict?artifact={uuid4()}", json=payload)
+    response = client.post("/api/v1/predict?artifact=01H8XGJWBWBAQ9J6X6ZJ6ZJ6ZJ", json=payload)
 
     assert response.status_code == 202
     response_json = response.json()
