@@ -105,11 +105,17 @@ class DataFrameSplit(BaseModel):
     """
 
     columns: list[str] = Field(..., description="List of column names")
-    index: list[int] = Field(..., description="List of row indices")
+    index: list[int] | None = Field(
+        default=None,
+        description="Optional list of row indices; if None, a default RangeIndex is used",
+    )
     data: list[list[Any]] = Field(..., description="2D row-major data (each row is a list of values)")
 
     def to_pandas(self) -> pd.DataFrame:
         """Convert this validated structure into a pandas DataFrame."""
+        if self.index is None:
+            return pd.DataFrame(data=self.data, columns=self.columns)
+
         return pd.DataFrame(data=self.data, index=self.index, columns=self.columns)
 
     @classmethod
