@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@winterop.com" }]
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi[standard]>=0.116.2",
+    "fastapi[standard]>=0.117.1",
     "geojson-pydantic>=2.0.0",
     "pandas>=2.3.2",
     "pydantic>=2.11.9",
