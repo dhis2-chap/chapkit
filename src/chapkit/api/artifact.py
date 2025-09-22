@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
@@ -130,24 +128,12 @@ class ArtifactApi(ChapApi[TChapConfig]):
             except (TypeError, ValueError):
                 jsonable_data = None
 
-            level = 0
-            parent_id = artifact_row.parent_id
-            while parent_id:
-                level += 1
-                parent = self._database.get_artifact_row(parent_id)
-                parent_id = parent.parent_id if parent else None
-
-            level_name = (
-                self._service.artifact_level_names[level] if level < len(self._service.artifact_level_names) else None
-            )
-
             return ArtifactInfo(
                 id=artifact_row.id,
                 created_at=artifact_row.created_at,
                 updated_at=artifact_row.updated_at,
                 config_id=config.id,
                 config_name=config.name,
-                artifact_level_name=level_name,
                 data=jsonable_data,
             )
 
