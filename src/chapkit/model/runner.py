@@ -39,23 +39,6 @@ class ChapModelRunnerBase(ChapModelRunner[TChapModelConfig], Generic[TChapModelC
     def on_info(self) -> ChapServiceInfo:
         return self._info
 
-    async def on_train(self, params: TrainParams) -> ULID:
-        print("Training with params:", params)
-
-        artifact_id = ULID()
-        self._database.add_artifact(artifact_id, params.config, {"a": 1})
-
-        return artifact_id
-
-    async def on_predict(self, params: PredictParams) -> ULID:
-        print("Predicting with params:", params)
-        # a real implementation would use the model to make a prediction
-
-        artifact_id = ULID()
-        self._database.add_artifact(artifact_id, params.config, {"b": 2})
-
-        return artifact_id
-
 
 class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[TChapModelConfig]):
     def __init__(
@@ -86,7 +69,7 @@ class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[T
         return artifact_id
 
     async def on_predict(self, params: PredictParams) -> ULID:
-        with log_time("on_predict", step="_on_predict_func"):
+        with log_time("on_predict", step="on_predict_func"):
             result = await self._on_predict_func(
                 config=params.config,
                 model=params.artifact,
