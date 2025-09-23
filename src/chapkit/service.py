@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Generic
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
+import structlog
 from ulid import ULID
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -16,10 +17,35 @@ from chapkit.runner import ChapRunner
 from chapkit.scheduler import JobScheduler, Scheduler
 from chapkit.database import ChapDatabase
 from chapkit.types import TChapConfig
-
+import logging.config
+from chapkit.logging import LOGGING_CONFIG
+import logging
+import logging.config
 
 TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+
+logging.config.dictConfig(LOGGING_CONFIG)
+
+structlog_processors = [
+    structlog.stdlib.filter_by_level,
+    structlog.stdlib.add_logger_name,
+    structlog.stdlib.add_log_level,
+    structlog.stdlib.PositionalArgumentsFormatter(),
+    structlog.processors.TimeStamper(fmt="iso"),
+    structlog.processors.StackInfoRenderer(),
+    structlog.processors.format_exc_info,
+    structlog.processors.UnicodeDecoder(),
+    structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+]
+
+structlog.configure(
+    processors=structlog_processors,
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
 
 
 class ChapService(Generic[TChapConfig]):
@@ -39,6 +65,7 @@ class ChapService(Generic[TChapConfig]):
     def create_fastapi(self, app: FastAPI | None = None) -> FastAPI:
         if app is None:
             app = FastAPI()
+            app.logger = structlog.get_logger("fastapi")
 
             @app.get("/", response_class=HTMLResponse, include_in_schema=False)
             async def index(request: Request):
