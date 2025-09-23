@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+import time
 import structlog
 
 # Processors for logs from standard library loggers like uvicorn.
@@ -47,3 +49,15 @@ LOGGING_CONFIG = {
         },
     },
 }
+
+
+@contextmanager
+def log_time(event: str, **kwargs):
+    start = time.perf_counter()
+    log = structlog.get_logger()
+
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+        log.info(event, elapsed_seconds=elapsed, **kwargs)

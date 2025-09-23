@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Generic
 
 
+from chapkit.logging import log_time
 from chapkit.model.types import OnPredictCallable, OnTrainCallable, TChapModelConfig
 from chapkit.types import ChapServiceInfo, DataFrameSplit, ULID
 from chapkit.runner import ChapRunner
@@ -71,32 +72,36 @@ class FunctionalChapModelRunner(ChapModelRunnerBase[TChapModelConfig], Generic[T
         super().__init__(info, database, config_type=config_type)
 
     async def on_train(self, params: TrainParams) -> ULID:
-        model = await self._on_train_func(
-            config=params.config,
-            data=params.body.data,
-            geo=params.body.geo,
-        )
+        with log_time("on_train", step="on_train_func"):
+            model = await self._on_train_func(
+                config=params.config,
+                data=params.body.data,
+                geo=params.body.geo,
+            )
 
-        artifact_id = ULID()
-        self._database.add_artifact(artifact_id, params.config, model)
+        with log_time("on_train", step="save_artifact"):
+            artifact_id = ULID()
+            self._database.add_artifact(artifact_id, params.config, model)
 
         return artifact_id
 
     async def on_predict(self, params: PredictParams) -> ULID:
-        result = await self._on_predict_func(
-            config=params.config,
-            model=params.artifact,
-            historic=params.body.historic,
-            future=params.body.future,
-            geo=params.body.geo,
-        )
+        with log_time("on_predict", step="_on_predict_func"):
+            result = await self._on_predict_func(
+                config=params.config,
+                model=params.artifact,
+                historic=params.body.historic,
+                future=params.body.future,
+                geo=params.body.geo,
+            )
 
-        artifact_id = ULID()
-        self._database.add_artifact(
-            artifact_id,
-            params.config,
-            DataFrameSplit.from_pandas(result),
-            parent_id=params.artifact_id,
-        )
+        with log_time("on_predict", step="save_artifact"):
+            artifact_id = ULID()
+            self._database.add_artifact(
+                artifact_id,
+                params.config,
+                DataFrameSplit.from_pandas(result),
+                parent_id=params.artifact_id,
+            )
 
         return artifact_id
