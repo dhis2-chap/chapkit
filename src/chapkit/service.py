@@ -3,6 +3,7 @@ from typing import Generic
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 import structlog
+import os
 from ulid import ULID
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -22,7 +23,9 @@ from chapkit.logging import configure_logging, BindRequestContextMiddleware
 TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
-configure_logging()
+
+use_json = os.environ.get("LOGGING_JSON", "").lower() in {"1", "true", "yes", "on"}
+configure_logging(use_json=use_json)
 
 
 class ChapService(Generic[TChapConfig]):
