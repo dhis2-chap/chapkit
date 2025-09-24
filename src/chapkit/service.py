@@ -17,35 +17,12 @@ from chapkit.runner import ChapRunner
 from chapkit.scheduler import JobScheduler, Scheduler
 from chapkit.database import ChapDatabase
 from chapkit.types import TChapConfig
-import logging.config
-from chapkit.logging import LOGGING_CONFIG
-import logging
-import logging.config
+from chapkit.logging import configure_logging
 
 TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
-logging.config.dictConfig(LOGGING_CONFIG)
-
-structlog_processors = [
-    structlog.stdlib.filter_by_level,
-    structlog.stdlib.add_logger_name,
-    structlog.stdlib.add_log_level,
-    structlog.stdlib.PositionalArgumentsFormatter(),
-    structlog.processors.TimeStamper(fmt="iso"),
-    structlog.processors.StackInfoRenderer(),
-    structlog.processors.format_exc_info,
-    structlog.processors.UnicodeDecoder(),
-    structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-]
-
-structlog.configure(
-    processors=structlog_processors,
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-    wrapper_class=structlog.stdlib.BoundLogger,
-    cache_logger_on_first_use=True,
-)
+configure_logging()
 
 
 class ChapService(Generic[TChapConfig]):
