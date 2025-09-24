@@ -17,7 +17,7 @@ from chapkit.runner import ChapRunner
 from chapkit.scheduler import JobScheduler, Scheduler
 from chapkit.database import ChapDatabase
 from chapkit.types import TChapConfig
-from chapkit.logging import configure_logging
+from chapkit.logging import configure_logging, BindRequestContextMiddleware
 
 TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
@@ -42,6 +42,7 @@ class ChapService(Generic[TChapConfig]):
     def create_fastapi(self, app: FastAPI | None = None) -> FastAPI:
         if app is None:
             app = FastAPI()
+            app.add_middleware(BindRequestContextMiddleware)
             app.logger = structlog.get_logger("fastapi")
 
             @app.get("/", response_class=HTMLResponse, include_in_schema=False)
