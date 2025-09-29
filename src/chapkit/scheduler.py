@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 import ulid
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
-from chapkit.types import JobRecord, JobRequest, JobStatus
+from chapkit.types import JobRecord, JobStatus
 
 ULID = ulid.ULID
 
@@ -15,14 +15,11 @@ ULID = ulid.ULID
 class JobScheduler(BaseModel, ABC):
     """Abstract scheduler that uses your existing Job* models."""
 
-    model_config = {"arbitrary_types_allowed": True}
-
-    _lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @abstractmethod
     async def add_job(
         self,
-        job: JobRequest[Any],
         target: Callable[..., Any] | Callable[..., Awaitable[Any]],
         /,
         *args: Any,
@@ -54,6 +51,7 @@ class AIOJobScheduler(JobScheduler):
     _records: dict[ULID, JobRecord] = PrivateAttr(default_factory=dict)
     _results: dict[ULID, Any] = PrivateAttr(default_factory=dict)
     _tasks: dict[ULID, asyncio.Task[Any]] = PrivateAttr(default_factory=dict)
+    _lock: asyncio.Lock = PrivateAttr(default_factory=asyncio.Lock)
 
     async def add_job(
         self,
