@@ -25,6 +25,12 @@ class JobApi(ChapApi[TChapConfig]):
     def create_router(self) -> APIRouter:
         router = APIRouter(tags=["jobs"])
 
+        async def get_jobs(status: JobStatus = None) -> List[JobRecord]:
+            jobs = await self._scheduler.get_all_records()
+            if status:
+                return [job for job in jobs if job.status == status]
+            return jobs
+
         async def get_job(id: ULID) -> JobRecord:
             try:
                 return await self._scheduler.get_record(id)
@@ -37,12 +43,6 @@ class JobApi(ChapApi[TChapConfig]):
             except KeyError:
                 raise HTTPException(status_code=404, detail="Job not found")
             return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-        async def get_jobs(status: JobStatus = None) -> List[JobRecord]:
-            jobs = await self._scheduler.get_all_records()
-            if status:
-                return [job for job in jobs if job.status == status]
-            return jobs
 
         router.add_api_route(
             "/jobs",
