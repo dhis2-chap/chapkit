@@ -15,7 +15,7 @@ from chapkit.api.info import InfoApi
 from chapkit.api.job import JobApi
 from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
-from chapkit.scheduler import JobScheduler, Scheduler
+from chapkit.scheduler import AIOJobScheduler, JobScheduler
 from chapkit.database import ChapDatabase
 from chapkit.types import TChapConfig
 from chapkit.logging import configure_logging, BindRequestContextMiddleware
@@ -33,12 +33,12 @@ class ChapService(Generic[TChapConfig]):
         self,
         runner: ChapRunner[TChapConfig],
         database: ChapDatabase[TChapConfig],
-        scheduler: Scheduler | None = None,
+        scheduler: JobScheduler | None = None,
         artifact_level_names: list[str] | None = None,
     ) -> None:
         self._runner = runner
         self._database = database
-        self._scheduler = scheduler or JobScheduler()
+        self._scheduler = scheduler or AIOJobScheduler()
         self._config_type = self._runner.config_type
         self.artifact_level_names = artifact_level_names or []
 

@@ -7,7 +7,7 @@ from chapkit.model.api.predict import PredictApi
 from chapkit.model.api.train import TrainApi
 from chapkit.model.runner import ChapModelRunner
 from chapkit.model.types import ChapModelConfig
-from chapkit.scheduler import Scheduler
+from chapkit.scheduler import JobScheduler
 from chapkit.service import ChapService
 from chapkit.database import ChapDatabase
 
@@ -19,7 +19,7 @@ class ChapModelService(ChapService[TModelConfig], Generic[TModelConfig]):
         self,
         runner: ChapModelRunner[TModelConfig],
         database: ChapDatabase[TModelConfig],
-        scheduler: Scheduler | None = None,
+        scheduler: JobScheduler | None = None,
         artifact_level_names: list[str] = ["train", "predict"],
     ) -> None:
         super().__init__(runner, database, scheduler, artifact_level_names)

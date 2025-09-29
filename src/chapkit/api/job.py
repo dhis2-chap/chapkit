@@ -6,7 +6,7 @@ from ulid import ULID
 
 from chapkit.api.types import ChapApi
 from chapkit.runner import ChapRunner
-from chapkit.scheduler import Scheduler
+from chapkit.scheduler import JobScheduler
 from chapkit.database import ChapDatabase
 from chapkit.types import JobRecord, JobStatus, TChapConfig
 
@@ -16,7 +16,7 @@ class JobApi(ChapApi[TChapConfig]):
         self,
         runner: ChapRunner[TChapConfig],
         database: ChapDatabase[TChapConfig],
-        scheduler: Scheduler,
+        scheduler: JobScheduler,
     ) -> None:
         self._runner = runner
         self._database = database

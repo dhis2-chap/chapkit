@@ -12,7 +12,7 @@ from chapkit.types import JobRecord, JobRequest, JobStatus
 ULID = ulid.ULID
 
 
-class Scheduler(BaseModel, ABC):
+class JobScheduler(BaseModel, ABC):
     """Abstract scheduler that uses your existing Job* models."""
 
     model_config = {"arbitrary_types_allowed": True}
@@ -45,7 +45,7 @@ class Scheduler(BaseModel, ABC):
     async def delete(self, job_id: ULID) -> None: ...
 
 
-class JobScheduler(Scheduler):
+class AIOJobScheduler(JobScheduler):
     """In-memory asyncio scheduler with zero globals, using your Job* models."""
 
     name: str = Field(default="chap")
