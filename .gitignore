@@ -11,3 +11,4 @@ wheels/
 
 # Other
 target/
+.DS_Store

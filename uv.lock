@@ -40,6 +40,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "geojson-pydantic" },
+    { name = "numpy" },
     { name = "pandas" },
     { name = "pydantic" },
     { name = "python-dotenv" },
@@ -59,6 +60,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.118.0" },
     { name = "geojson-pydantic", specifier = ">=2.0.0" },
+    { name = "numpy", specifier = ">=2.3.2" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "pydantic", specifier = ">=2.11.9" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
