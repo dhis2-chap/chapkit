@@ -1,3 +1,6 @@
+# logging.py
+from __future__ import annotations
+
 import copy
 import logging
 import logging.config
@@ -25,11 +28,12 @@ stdlib_processors: list = [
 
 LOGGING_CONFIG: dict = {
     "version": 1,
+    # Critical to avoid duplicate handlers left around by gunicorn/uvicorn defaults
     "disable_existing_loggers": True,
     "formatters": {
         "default": {
             "()": "structlog.stdlib.ProcessorFormatter",
-            # Processor gets replaced (JSON vs Console) in configure_logging()
+            # This gets swapped to JSONRenderer if LOG_JSON=1 (see configure_logging)
             "processor": structlog.dev.ConsoleRenderer(colors=True),
             "foreign_pre_chain": stdlib_processors,
         },
@@ -41,18 +45,20 @@ LOGGING_CONFIG: dict = {
             "formatter": "default",
         },
     },
+    # IMPORTANT: propagate=False everywhere so each record renders once
     "loggers": {
         # Root (your app)
         "": {"handlers": ["default"], "level": "INFO", "propagate": False},
         # Uvicorn
         "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
         "uvicorn.error": {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "uvicorn.access": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.access": {"handlers": ["default"], "level": "WARNING", "propagate": False},
         "uvicorn.asgi": {"handlers": ["default"], "level": "INFO", "propagate": False},
         # Gunicorn
         "gunicorn": {"handlers": ["default"], "level": "INFO", "propagate": False},
         "gunicorn.error": {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "gunicorn.access": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        # Keep gunicorn.access quiet by default (Uvicorn will log access)
+        "gunicorn.access": {"handlers": ["default"], "level": "ERROR", "propagate": False},
     },
 }
 
@@ -71,7 +77,6 @@ def _base_structlog_processors(include_callsite: bool) -> list:
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
     ]
-
     if include_callsite:
         processors.append(
             structlog.processors.CallsiteParameterAdder(
@@ -82,10 +87,8 @@ def _base_structlog_processors(include_callsite: bool) -> list:
                 }
             )
         )
-
-    # must be last so ProcessorFormatter can render stdlib records
+    # Must be last so ProcessorFormatter can render stdlib records
     processors.append(structlog.stdlib.ProcessorFormatter.wrap_for_formatter)
-
     return processors
 
 
@@ -118,32 +121,28 @@ def configure_logging(
     if use_json is None:
         use_json = os.getenv("LOG_JSON", "0") == "1"
     lvl = _coerce_level(level or os.getenv("LOG_LEVEL", "INFO"))
-    uv_access = _coerce_level(uvicorn_access_level or os.getenv("LOG_UVICORN_ACCESS", _level_name(lvl)))
-    gu_access = _coerce_level(gunicorn_access_level or os.getenv("LOG_GUNICORN_ACCESS", _level_name(lvl)))
+
+    # Tune access noise: default uvicorn.access=WARNING, gunicorn.access=ERROR
+    uv_access = _coerce_level(uvicorn_access_level or os.getenv("LOG_UVICORN_ACCESS", "WARNING"))
+    gu_access = _coerce_level(gunicorn_access_level or os.getenv("LOG_GUNICORN_ACCESS", "ERROR"))
 
     # --- stdlib dictConfig
     config = copy.deepcopy(LOGGING_CONFIG)
 
-    # Root
+    # Root + uvicorn core/error levels
     config["handlers"]["default"]["level"] = _level_name(lvl)
     config["loggers"][""]["level"] = _level_name(lvl)
-
-    # Uvicorn core & error
-    for name in ("uvicorn", "uvicorn.error", "uvicorn.asgi"):
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.asgi", "gunicorn", "gunicorn.error"):
         if name in config["loggers"]:
             config["loggers"][name]["level"] = _level_name(lvl)
-    # Access levels may be tuned separately (often WARNING in prod)
+
+    # Access loggers set separately
     if "uvicorn.access" in config["loggers"]:
         config["loggers"]["uvicorn.access"]["level"] = _level_name(uv_access)
-
-    # Gunicorn error/core
-    for name in ("gunicorn", "gunicorn.error"):
-        if name in config["loggers"]:
-            config["loggers"][name]["level"] = _level_name(lvl)
     if "gunicorn.access" in config["loggers"]:
         config["loggers"]["gunicorn.access"]["level"] = _level_name(gu_access)
 
-    # Renderer
+    # Renderer selection
     renderer = structlog.processors.JSONRenderer() if use_json else structlog.dev.ConsoleRenderer(colors=colors)
     config["formatters"]["default"]["processor"] = renderer
 
@@ -153,6 +152,7 @@ def configure_logging(
     processors = list(structlog_processors or _base_structlog_processors(include_callsite))
     wrapper_class = structlog.stdlib.BoundLogger
     if use_filtering_bound_logger:
+        # Remove filter_by_level (handled by wrapper)
         processors = [p for p in processors if p is not structlog.stdlib.filter_by_level]
         wrapper_class = structlog.make_filtering_bound_logger(lvl)
 
