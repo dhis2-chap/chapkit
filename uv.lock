@@ -123,7 +123,7 @@ requires-dist = [
     { name = "geojson-pydantic", specifier = ">=2.1.0" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
-    { name = "servicekit", editable = "../servicekit" },
+    { name = "servicekit", git = "https://github.com/winterop-com/servicekit.git" },
 ]
 
 [package.metadata.requires-dev]
@@ -1526,7 +1526,7 @@ wheels = [
 [[package]]
 name = "servicekit"
 version = "0.1.0"
-source = { editable = "../servicekit" }
+source = { git = "https://github.com/winterop-com/servicekit.git#7fd1a60dfd01cbda622ed64880672d06a9cbfde5" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
@@ -1543,39 +1543,6 @@ dependencies = [
     { name = "python-ulid" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "structlog" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiosqlite", specifier = ">=0.21.0" },
-    { name = "alembic", specifier = ">=1.17.0" },
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.119.0" },
-    { name = "gunicorn", specifier = ">=23.0.0" },
-    { name = "opentelemetry-api", specifier = ">=1.37.0" },
-    { name = "opentelemetry-exporter-prometheus", specifier = ">=0.58b0" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.58b0" },
-    { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.58b0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.37.0" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "pandas-stubs", specifier = ">=2.3.2.250926" },
-    { name = "pydantic", specifier = ">=2.12.0" },
-    { name = "python-ulid", specifier = ">=3.1.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.43" },
-    { name = "structlog", specifier = ">=24.4.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "coverage", extras = ["toml"], specifier = ">=7.6.0" },
-    { name = "mkdocs", specifier = ">=1.6.0" },
-    { name = "mkdocs-material", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.26.0" },
-    { name = "mypy", specifier = ">=1.18.2" },
-    { name = "pyright", specifier = ">=1.1.406" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=1.2.0" },
-    { name = "pytest-cov", specifier = ">=5.0.0" },
-    { name = "ruff", specifier = ">=0.14.0" },
 ]
 
 [[package]]

@@ -138,4 +138,4 @@ reportMissingTypeArgument = false
 reportMissingTypeStubs = false
 
 [tool.uv.sources]
-servicekit = { path = "/Users/morten/dev/servicekit", editable = true }
+servicekit = { git = "https://github.com/winterop-com/servicekit.git" }
