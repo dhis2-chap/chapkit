@@ -341,8 +341,7 @@ class ServiceBuilder(BaseServiceBuilder):
     ) -> DependencyFactory:
         async def _dependency(session: AsyncSession = Depends(get_session)) -> ArtifactManager:
             artifact_repo = ArtifactRepository(session)
-            config_repo = ConfigRepository(session) if include_config else None
-            return ArtifactManager(artifact_repo, hierarchy=hierarchy, config_repo=config_repo)
+            return ArtifactManager(artifact_repo, hierarchy=hierarchy)
 
         return _dependency
 

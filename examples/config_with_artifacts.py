@@ -167,7 +167,7 @@ async def main() -> None:
             artifact_repo = ArtifactRepository(session)
 
             config_manager = ConfigManager[ExperimentConfig](config_repo, ExperimentConfig)
-            artifact_manager = ArtifactManager(artifact_repo, hierarchy=PIPELINE_HIERARCHY, config_repo=config_repo)
+            artifact_manager = ArtifactManager(artifact_repo, hierarchy=PIPELINE_HIERARCHY)
 
             await config_manager.delete_all()
             await artifact_manager.delete_all()

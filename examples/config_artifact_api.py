@@ -156,7 +156,7 @@ async def seed_demo_data(app: FastAPI) -> None:
         artifact_repo = ArtifactRepository(session)
 
         config_manager = ConfigManager[ExperimentConfig](config_repo, ExperimentConfig)
-        artifact_manager = ArtifactManager(artifact_repo, hierarchy=PIPELINE_HIERARCHY, config_repo=config_repo)
+        artifact_manager = ArtifactManager(artifact_repo, hierarchy=PIPELINE_HIERARCHY)
 
         await artifact_manager.delete_all()
         await config_manager.delete_all()

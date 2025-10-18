@@ -31,7 +31,6 @@ async def test_get_artifact_manager() -> None:
 
     assert isinstance(manager, ArtifactManager)
     assert manager.repository is not None
-    assert manager.config_repo is not None
 
 
 @pytest.mark.asyncio
