@@ -101,7 +101,7 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                 config_manager: ConfigManager[BaseConfig] = Depends(get_config_manager),
             ) -> ConfigOut[BaseConfig] | None:
                 artifact_id = self._parse_ulid(entity_id)
-                config = await config_manager.get_config_for_artifact(artifact_id, artifact_manager.repo)
+                config = await config_manager.get_config_for_artifact(artifact_id, artifact_manager.repository)
                 return config
 
             self.register_entity_operation(
