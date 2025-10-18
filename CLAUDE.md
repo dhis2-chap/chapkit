@@ -59,9 +59,9 @@ class AuthManager:
 
 ## Project Overview
 
-`chapkit` is a collection of domain-specific modules for ML and data services, built on top of the [servicekit](https://github.com/winterop-com/servicekit) framework. It provides config management, artifact storage, and ML workflows.
+`chapkit` is a collection of ML-specific modules built on top of the [servicekit](https://github.com/winterop-com/servicekit) framework. It provides config management and ML workflows, using servicekit's artifact and task infrastructure.
 
-**Primary Modules:** Config (key-value with JSON), Artifact (hierarchical trees), ML (train/predict operations with artifact-based model storage)
+**Primary Modules:** Config (key-value with JSON), ML (train/predict operations with artifact-based model storage)
 
 ## Architecture
 
@@ -73,35 +73,33 @@ chapkit/
 │   ├── repository.py    # ConfigRepository with artifact linking
 │   ├── manager.py       # ConfigManager
 │   └── router.py        # ConfigRouter with artifact operations
-├── artifact/            # Hierarchical artifact storage
-│   ├── models.py        # Artifact ORM model
-│   ├── schemas.py       # ArtifactIn, ArtifactOut, ArtifactTreeNode, ArtifactHierarchy
-│   ├── repository.py    # ArtifactRepository
-│   ├── manager.py       # ArtifactManager
-│   └── router.py        # ArtifactRouter
 ├── ml/                  # ML train/predict workflows
 │   ├── manager.py       # MLManager
 │   ├── router.py        # MLRouter
-│   ├── runner.py        # FunctionalModelRunner, ClassModelRunner
+│   ├── runner.py        # FunctionalModelRunner, BaseModelRunner, ShellModelRunner
 │   └── schemas.py       # TrainRequest, PredictRequest, etc.
 └── api/                 # Application orchestration
     ├── service_builder.py   # ServiceBuilder, MLServiceBuilder
-    └── dependencies.py      # get_config_manager, get_artifact_manager, etc.
+    └── dependencies.py      # get_config_manager, get_ml_manager
 ```
 
 **Dependencies:**
-- **servicekit** - Core framework (Database, Repository, Manager, Router, FastAPI utilities)
-- Modules import from servicekit for base classes
-- ServiceBuilder orchestrates all modules into a complete FastAPI application
+- **servicekit** - Core framework (Database, Repository, Manager, Router, Artifact, Task, FastAPI utilities)
+- Chapkit extends servicekit's BaseServiceBuilder with ML-specific features
+- ML module uses servicekit.artifact for model storage
+- Config module links to servicekit.artifact for experiment tracking
 
 **Layer Rules:**
-- Modules import from servicekit but not from each other (except artifact/config linking)
+- Config and ML modules import from servicekit (including artifact/task)
 - api/ imports from both servicekit and chapkit modules
+- No cross-module imports within chapkit (except config→artifact linking)
 
 ## Quick Start
 
 ```python
-from chapkit import BaseConfig, ArtifactHierarchy
+from servicekit.artifact import ArtifactHierarchy
+
+from chapkit import BaseConfig
 from chapkit.api import ServiceBuilder, ServiceInfo
 
 class MyConfig(BaseConfig):
@@ -128,18 +126,18 @@ app = (
 - `.with_health()` - Health check endpoint (from servicekit)
 - `.with_system()` - System info endpoint (from servicekit)
 - `.with_config(schema)` - Config CRUD endpoints at `/api/v1/configs`
-- `.with_artifacts(hierarchy)` - Artifact CRUD at `/api/v1/artifacts`
+- `.with_artifacts(hierarchy)` - Artifact CRUD at `/api/v1/artifacts` (uses servicekit.artifact)
 - `.with_jobs()` - Job scheduler at `/api/v1/jobs` (from servicekit)
-- `.with_ml(runner)` - ML train/predict at `/api/v1/ml`
+- `.with_ml(runner)` - ML train/predict at `/api/v1/ml` (requires config, artifacts, jobs)
 - `.build()` - Returns FastAPI app
 
-**MLServiceBuilder**: Specialized builder that bundles health, config, artifacts, jobs, ml
+**MLServiceBuilder**: Specialized builder that pre-configures health, config, artifacts, jobs, and ML
 
 ## Common Endpoints
 
 **Config Service:** CRUD operations, artifact linking (`/$link-artifact`, `/$unlink-artifact`, `/$artifacts`)
-**Artifact Service:** CRUD + tree operations (`/$tree`, `/$expand`)
-**ML Service:** Train (`/$train`) and predict (`/$predict`) operations
+**Artifact Service:** CRUD + tree operations (`/$tree`, `/$expand`) - provided by servicekit
+**ML Service:** Train (`/$train`) and predict (`/$predict`) operations - chapkit-specific
 
 **Operation prefix:** `$` indicates operations (computed/derived data) vs resource access
 

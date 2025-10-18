@@ -1,5 +1,5 @@
 site_name: Chapkit
-site_description: ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows
+site_description: ML service modules built on servicekit - config management and ML workflows
 site_url: https://dhis2-chap.github.io/chapkit
 repo_url: https://github.com/dhis2-chap/chapkit
 repo_name: dhis2-chap/chapkit
