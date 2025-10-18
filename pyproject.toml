@@ -1,34 +1,59 @@
 [project]
 name = "chapkit"
-version = "0.0.1"
-description = "Add your description here"
+version = "0.1.0"
+description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@winterop.com" }]
+license = { text = "AGPL-3.0-or-later" }
 requires-python = ">=3.13"
+keywords = [
+  "ml",
+  "machine-learning",
+  "data-science",
+  "artifacts",
+  "tasks",
+  "config",
+  "servicekit",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Framework :: FastAPI",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
-    "fastapi[standard]>=0.118.0",
-    "geojson-pydantic>=2.0.0",
-    "pandas>=2.3.3",
-    "pydantic>=2.11.10",
-    "python-dotenv>=1.1.1",
-    "python-ulid>=3.1.0",
-    "sqlalchemy>=2.0.43",
-    "structlog>=25.4.0",
+  "pandas>=2.3.3",
+  "scikit-learn>=1.7.2",
+  "geojson-pydantic>=2.1.0",
+  "servicekit",
 ]
 
-[build-system]
-requires = ["uv_build>=0.8.14,<0.9.0"]
-build-backend = "uv_build"
-
-[tool.uv.build-backend]
-data = { data = "templates" }
+[project.urls]
+Homepage = "https://github.com/winterop-com/chapkit"
+Repository = "https://github.com/winterop-com/chapkit"
+Issues = "https://github.com/winterop-com/chapkit/issues"
+Documentation = "https://github.com/winterop-com/chapkit#readme"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2",
-    "pytest-asyncio>=1.2.0",
-    "ruff>=0.13.3",
+  "coverage[toml]>=7.6.0",
+  "mypy>=1.18.2",
+  "pandas-stubs>=2.2.3.250101",
+  "pytest>=8.4.2",
+  "pytest-cov>=5.0.0",
+  "pytest-asyncio>=1.2.0",
+  "ruff>=0.14.0",
+  "pyright>=1.1.406",
+  "scikit-learn>=1.7.2",
 ]
+
+[build-system]
+requires = ["uv_build>=0.9.0,<0.10.0"]
+build-backend = "uv_build"
 
 [tool.ruff]
 target-version = "py313"
@@ -36,6 +61,18 @@ line-length = 120
 
 [tool.ruff.lint]
 fixable = ["ALL"]
+select = ["E", "W", "F", "I", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D"]
+"alembic/**/*.py" = ["D"]
+"**/__init__.py" = ["D104"]
+"src/**/*.py" = ["D102", "D105", "D107"]
+"examples/**/*.py" = []
 
 [tool.ruff.format]
 quote-style = "double"
@@ -43,3 +80,59 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+norecursedirs = ["examples", ".git", ".venv", "__pycache__"]
+filterwarnings = [
+  "ignore:Pydantic serializer warnings:UserWarning",
+  "ignore:Remove.*format_exc_info.*:UserWarning",
+]
+
+[tool.coverage.run]
+branch = true
+dynamic_context = "test_function"
+relative_files = true
+source = ["chapkit"]
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:"]
+precision = 2
+show_missing = true
+skip_covered = true
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+disallow_any_unimported = true
+no_implicit_optional = true
+warn_unused_ignores = true
+strict_equality = true
+mypy_path = ["src", "typings"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pyright]
+include = ["src", "tests", "examples", "alembic"]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+diagnosticMode = "workspace"
+useLibraryCodeForTypes = true
+reportPrivateUsage = false
+reportUnusedFunction = false
+reportUnusedTypeParameters = true
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownParameterType = false
+reportUnknownVariableType = false
+reportMissingTypeArgument = false
+reportMissingTypeStubs = false
+
+[tool.uv.sources]
+servicekit = { git = "https://github.com/winterop-com/servicekit.git" }

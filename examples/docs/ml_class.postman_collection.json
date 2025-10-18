@@ -1,0 +1,734 @@
+{
+    "info": {
+        "_postman_id": "01K79YAHJ7BR4E87VVTG8FNBZ2",
+        "name": "Chapkit ML Class - Weather Prediction",
+        "description": "Weather-based prediction ML service using class-based model runner with feature preprocessing and StandardScaler.\n\n**Features:**\n- Model: LinearRegression with StandardScaler preprocessing\n- Features: rainfall, mean_temperature, humidity (3 features)\n- Target: disease_cases\n- Runner: WeatherModelRunner (class-based with lifecycle hooks)\n- Assessment: Green (validated for production)\n- Special: Feature normalization with shared scaler state\n\n**Quick Start:**\n```bash\nfastapi dev examples/ml_class.py\n```\n\nService available at: http://127.0.0.1:8000",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "chapkit-ml-class"
+    },
+    "item": [
+        {
+            "name": "1. Service Health & Info",
+            "item": [
+                {
+                    "name": "Check Service Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/health",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["health"]
+                        },
+                        "description": "Check the health status of the service."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "View System Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/system",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["system"]
+                        },
+                        "description": "Get platform and system information (Python version, OS, hostname, timezone)."
+                    },
+                    "response": [
+                        {
+                            "name": "System Info",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/system",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["system"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"current_time\": \"2025-10-11T17:30:00Z\",\n  \"timezone\": \"CEST\",\n  \"python_version\": \"3.13.8\",\n  \"platform\": \"macOS-26.0.1-arm64-arm-64bit-Mach-O\",\n  \"hostname\": \"mlaptop.local\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "View Service Metadata",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/info",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "info"]
+                        },
+                        "description": "Get ML service metadata including author, version, assessment status, and description."
+                    },
+                    "response": [
+                        {
+                            "name": "Service Metadata",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/info",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "info"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"display_name\": \"Weather-Based Prediction Service\",\n  \"version\": \"1.0.0\",\n  \"summary\": \"Class-based ML service with preprocessing\",\n  \"description\": \"Train and predict disease cases using normalized weather features with StandardScaler\",\n  \"author\": \"Data Science Team\",\n  \"author_note\": \"Improved feature normalization for better prediction accuracy\",\n  \"author_assessed_status\": \"green\",\n  \"contact_email\": \"datascience@example.com\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Config Schema",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/configs/$schema",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "configs", "$schema"]
+                        },
+                        "description": "Get the Pydantic JSON schema for WeatherConfig with min_samples and normalize_features options."
+                    },
+                    "response": [
+                        {
+                            "name": "Config Schema",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/configs/$schema",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "configs", "$schema"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"min_samples\": {\n      \"type\": \"integer\",\n      \"default\": 5,\n      \"title\": \"Min Samples\"\n    },\n    \"normalize_features\": {\n      \"type\": \"boolean\",\n      \"default\": true,\n      \"title\": \"Normalize Features\"\n    }\n  },\n  \"title\": \"WeatherConfig\"\n}"
+                        }
+                    ]
+                }
+            ],
+            "description": "Service health checks and metadata."
+        },
+        {
+            "name": "2. Configuration Management",
+            "item": [
+                {
+                    "name": "Create Config (With Normalization)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('config_id', response.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"weather_model_normalized\",\n  \"data\": {\n    \"min_samples\": 5,\n    \"normalize_features\": true\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/configs",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "configs"]
+                        },
+                        "description": "Create configuration with feature normalization enabled (recommended for production)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Config (Without Normalization)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"weather_model_raw\",\n  \"data\": {\n    \"min_samples\": 3,\n    \"normalize_features\": false\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/configs",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "configs"]
+                        },
+                        "description": "Create configuration without feature normalization (for comparison experiments)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List All Configs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/configs",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "configs"]
+                        },
+                        "description": "List all configurations."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Config by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/configs/{{config_id}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "configs", "{{config_id}}"]
+                        },
+                        "description": "Retrieve a specific configuration."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Configuration management with normalization options."
+        },
+        {
+            "name": "3. Model Training (3 Features)",
+            "item": [
+                {
+                    "name": "Train Model with Preprocessing",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('train_job_id', response.job_id);",
+                                    "    pm.collectionVariables.set('model_artifact_id', response.model_artifact_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"config_id\": \"{{config_id}}\",\n  \"data\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\", \"humidity\", \"disease_cases\"],\n    \"data\": [\n      [100.5, 25.3, 65.2, 12],\n      [85.2, 27.1, 58.9, 8],\n      [120.8, 24.5, 72.1, 15],\n      [95.3, 26.2, 61.5, 10],\n      [110.0, 26.0, 68.3, 13],\n      [75.5, 28.0, 55.7, 6],\n      [130.2, 23.8, 75.9, 18],\n      [88.9, 27.5, 60.2, 9]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/ml/$train",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "ml", "$train"]
+                        },
+                        "description": "Train model with 3 features: rainfall, mean_temperature, humidity. StandardScaler applied if normalize_features=true."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Train Minimal Dataset (5 samples)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"config_id\": \"{{config_id}}\",\n  \"data\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\", \"humidity\", \"disease_cases\"],\n    \"data\": [\n      [100, 25, 65, 10],\n      [120, 24, 72, 15],\n      [80, 27, 58, 5],\n      [110, 26, 68, 12],\n      [90, 28, 60, 8]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/ml/$train",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "ml", "$train"]
+                        },
+                        "description": "Train with minimal dataset (5 samples - meets min_samples requirement)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Poll Training Job",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs/{{train_job_id}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs", "{{train_job_id}}"]
+                        },
+                        "description": "Poll training job status."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Model Artifact (With Preprocessing State)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{model_artifact_id}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{model_artifact_id}}"
+                            ]
+                        },
+                        "description": "Retrieve trained model artifact. Note: includes scaler and feature_names for preprocessing consistency."
+                    },
+                    "response": [
+                        {
+                            "name": "Model with Preprocessing",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/artifacts/01JAABC789GHI345",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "artifacts",
+                                        "01JAABC789GHI345"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01JAABC789GHI345\",\n  \"level\": 0,\n  \"data\": {\n    \"model_type\": \"sklearn.linear_model.LinearRegression\",\n    \"scaler\": \"StandardScaler\",\n    \"feature_names\": [\"rainfall\", \"mean_temperature\", \"humidity\"],\n    \"config\": {\n      \"min_samples\": 5,\n      \"normalize_features\": true\n    },\n    \"trained_at\": \"2025-10-11T17:31:05Z\"\n  },\n  \"created_at\": \"2025-10-11T17:31:00Z\"\n}"
+                        }
+                    ]
+                }
+            ],
+            "description": "Training with feature preprocessing and lifecycle hooks."
+        },
+        {
+            "name": "4. Predictions (Auto-Preprocessing)",
+            "item": [
+                {
+                    "name": "Make Predictions",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"model_artifact_id\": \"{{model_artifact_id}}\",\n  \"historic\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\", \"humidity\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\", \"humidity\"],\n    \"data\": [\n      [110.0, 26.0, 67.0],\n      [90.0, 28.0, 58.0],\n      [125.0, 24.0, 74.0],\n      [80.0, 29.0, 52.0]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/ml/$predict",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "ml", "$predict"]
+                        },
+                        "description": "Make predictions with automatic preprocessing (same scaler applied as during training)."
+                    },
+                    "response": [],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('predict_job_id', response.job_id);",
+                                    "    pm.collectionVariables.set('prediction_artifact_id', response.prediction_artifact_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Poll Prediction Job",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs/{{predict_job_id}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs", "{{predict_job_id}}"]
+                        },
+                        "description": "Poll prediction job status."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Predictions",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{prediction_artifact_id}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{prediction_artifact_id}}"
+                            ]
+                        },
+                        "description": "Retrieve single prediction artifact. Returns **one object** (not array). The data.predictions.data field contains the DataFrame rows (e.g., 2 rows = [[row1], [row2]]). For hierarchy view with children and config, use /$tree endpoint instead."
+                    },
+                    "response": [
+                        {
+                            "name": "Prediction Results",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/artifacts/01JAABC999MNO901",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "artifacts",
+                                        "01JAABC999MNO901"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01JAABC999MNO901\",\n  \"parent_id\": \"01JAABC789GHI345\",\n  \"level\": 1,\n  \"data\": {\n    \"predictions\": {\n      \"columns\": [\"rainfall\", \"mean_temperature\", \"humidity\", \"sample_0\"],\n      \"data\": [\n        [110.0, 26.0, 67.0, 13.5],\n        [90.0, 28.0, 58.0, 8.2],\n        [125.0, 24.0, 74.0, 17.3],\n        [80.0, 29.0, 52.0, 5.9]\n      ]\n    }\n  }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Artifact Tree (With Hierarchy)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{model_artifact_id}}/$tree",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{model_artifact_id}}",
+                                "$tree"
+                            ]
+                        },
+                        "description": "Get full artifact tree from root model. Shows the complete hierarchy: trained model (level 0) with all predictions (level 1) as children. Includes hierarchy metadata, level labels, config, and children array."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Predictions with automatic preprocessing."
+        },
+        {
+            "name": "5. Validation & Experiments",
+            "item": [
+                {
+                    "name": "Train with Insufficient Data (Should Fail)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"config_id\": \"{{config_id}}\",\n  \"data\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\", \"humidity\", \"disease_cases\"],\n    \"data\": [\n      [100, 25, 65, 10],\n      [120, 24, 72, 15]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/ml/$train",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "ml", "$train"]
+                        },
+                        "description": "Test min_samples validation - will fail with default config (requires 5 samples)."
+                    },
+                    "response": [
+                        {
+                            "name": "Validation Error",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"config_id\": \"{{config_id}}\",\n  \"data\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\", \"humidity\", \"disease_cases\"],\n    \"data\": [\n      [100, 25, 65, 10],\n      [120, 24, 72, 15]\n    ]\n  }\n}"
+                                },
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/ml/$train",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "ml", "$train"]
+                                }
+                            },
+                            "status": "Bad Request",
+                            "code": 400,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"type\": \"urn:chapkit:error:validation-failed\",\n  \"title\": \"Validation Error\",\n  \"status\": 400,\n  \"detail\": \"Insufficient training data: 2 < 5\"\n}"
+                        }
+                    ],
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Save job_id for checking failure",
+                                    "const response = pm.response.json();",
+                                    "pm.collectionVariables.set('failed_job_id', response.job_id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Check Failed Job (Verify Error)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Job should have failed status', function () {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.status).to.equal('failed');",
+                                    "});",
+                                    "",
+                                    "pm.test('Error message contains validation details', function () {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.error).to.include('Insufficient training data');",
+                                    "    pm.expect(response.error).to.include('2 < 5');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs/{{failed_job_id}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs", "{{failed_job_id}}"]
+                        },
+                        "description": "Verify that the training job failed with insufficient data error message."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Validation tests and comparison experiments."
+        },
+        {
+            "name": "6. Job & Artifact Management",
+            "item": [
+                {
+                    "name": "List All Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs"]
+                        },
+                        "description": "List all jobs with optional status filtering."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List All Artifacts",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "artifacts"]
+                        },
+                        "description": "List all artifacts (models and predictions)."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Resource management."
+        },
+        {
+            "name": "7. Artifact Hierarchy Endpoints",
+            "item": [
+                {
+                    "name": "Get Model Artifact Tree (Root)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{model_artifact_id}}/$tree",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{model_artifact_id}}",
+                                "$tree"
+                            ]
+                        },
+                        "description": "Get model artifact tree showing full hierarchy. Includes: children array (predictions), config object (linked training config), level_label ('trained_model'), and hierarchy name ('weather_ml_pipeline')."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Model Artifact (Basic)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{model_artifact_id}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{model_artifact_id}}"
+                            ]
+                        },
+                        "description": "Get basic model artifact data without hierarchy. Returns: id, data, parent_id, level, created_at, updated_at. Does NOT include: children, config, level_label, hierarchy."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Model Artifact (Expanded - With Metadata)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{model_artifact_id}}/$expand",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{model_artifact_id}}",
+                                "$expand"
+                            ]
+                        },
+                        "description": "Get single artifact with hierarchy metadata (level_label, hierarchy) but without children array. Returns lighter response than /$tree - useful when you only need one node's metadata without loading the entire tree. Response includes: id, data, parent_id, level, level_label, hierarchy, created_at, updated_at. The children field is always null."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Artifact endpoints showing difference between basic GET and /$tree operation."
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://127.0.0.1:8000",
+            "type": "string"
+        },
+        {
+            "key": "config_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "train_job_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "model_artifact_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "predict_job_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "prediction_artifact_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

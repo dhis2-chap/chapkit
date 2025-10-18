@@ -1,0 +1,958 @@
+{
+    "info": {
+        "_postman_id": "01TASK000000000000000POST1",
+        "name": "Chapkit Task Execution - Python & Shell",
+        "description": "Task execution service demonstrating Python function registration, task parameters, dependency injection, enable/disable controls, and orphaned task validation.\n\n**Features:**\n- Python Functions: Register sync and async functions as executable tasks\n- Parameters: Pass JSON parameters as kwargs to Python functions\n- Dependency Injection: Automatic type-based injection (AsyncSession, Database, ArtifactManager, JobScheduler)\n- Task Types: Both \"shell\" and \"python\" tasks supported\n- Enable/Disable: Control task execution with enabled flag\n- Orphaned Tasks: Automatic validation and disabling on startup\n- Task Registry: Type-safe function registration\n\n**Quick Start:**\n```bash\nfastapi dev examples/python_task_execution_api.py\n```\n\nService available at: http://127.0.0.1:8000",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "chapkit-task-execution"
+    },
+    "item": [
+        {
+            "name": "1. Service Health",
+            "item": [
+                {
+                    "name": "Check Service Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/health",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["health"]
+                        },
+                        "description": "Check the health status of the service and database connection."
+                    },
+                    "response": [
+                        {
+                            "name": "Healthy",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/health",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["health"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"status\": \"healthy\",\n  \"checks\": {\n    \"database\": \"healthy\"\n  }\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "2. List & Filter Tasks",
+            "item": [
+                {
+                    "name": "List All Tasks",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks"]
+                        },
+                        "description": "List all task templates (both enabled and disabled, Python and shell)."
+                    },
+                    "response": [
+                        {
+                            "name": "Task List",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/tasks",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "tasks"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "[\n  {\n    \"id\": \"01JCSEED0000000000000PYTH1\",\n    \"command\": \"calculate_sum\",\n    \"task_type\": \"python\",\n    \"parameters\": {\"a\": 10, \"b\": 32},\n    \"enabled\": true,\n    \"created_at\": \"2025-10-17T10:00:00Z\",\n    \"updated_at\": \"2025-10-17T10:00:00Z\"\n  },\n  {\n    \"id\": \"01JCSEED0000000000000PYTH2\",\n    \"command\": \"process_data\",\n    \"task_type\": \"python\",\n    \"parameters\": {\"input_text\": \"Hello World\", \"uppercase\": true},\n    \"enabled\": true,\n    \"created_at\": \"2025-10-17T10:00:00Z\",\n    \"updated_at\": \"2025-10-17T10:00:00Z\"\n  }\n]"
+                        }
+                    ]
+                },
+                {
+                    "name": "List Only Enabled Tasks",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks?enabled=true",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks"],
+                            "query": [
+                                {
+                                    "key": "enabled",
+                                    "value": "true",
+                                    "description": "Filter by enabled status"
+                                }
+                            ]
+                        },
+                        "description": "List only tasks that are enabled for execution."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List Only Disabled Tasks",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks?enabled=false",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks"],
+                            "query": [
+                                {
+                                    "key": "enabled",
+                                    "value": "false",
+                                    "description": "Filter by disabled status"
+                                }
+                            ]
+                        },
+                        "description": "List only tasks that are disabled (cannot be executed)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Specific Task",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/{{taskId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "{{taskId}}"]
+                        },
+                        "description": "Get a specific task by ID."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "3. Execute Python Tasks",
+            "item": [
+                {
+                    "name": "Execute Async Python Task (calculate_sum)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "// Save job_id for polling",
+                                    "const response = pm.response.json();",
+                                    "pm.environment.set('jobId', response.job_id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH1/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH1", "$execute"]
+                        },
+                        "description": "Execute async Python function with parameters {a: 10, b: 32}. Returns job_id for polling."
+                    },
+                    "response": [
+                        {
+                            "name": "Job Submitted",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH1/$execute",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH1", "$execute"]
+                                }
+                            },
+                            "status": "Accepted",
+                            "code": 202,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"job_id\": \"01K79YAHJ7BR4E87VVTG8FNBMA\",\n  \"message\": \"Task submitted for execution. Job ID: 01K79YAHJ7BR4E87VVTG8FNBMA\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Execute Sync Python Task (process_data)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const response = pm.response.json();",
+                                    "pm.environment.set('jobId', response.job_id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH2/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH2", "$execute"]
+                        },
+                        "description": "Execute sync Python function with parameters {input_text: 'Hello World', uppercase: true}."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Execute Slow Computation",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const response = pm.response.json();",
+                                    "pm.environment.set('jobId', response.job_id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH3/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH3", "$execute"]
+                        },
+                        "description": "Execute sync function with 1 second sleep to demonstrate blocking operations."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Execute Failing Task (Error Demo)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const response = pm.response.json();",
+                                    "pm.environment.set('jobId', response.job_id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH4/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH4", "$execute"]
+                        },
+                        "description": "Execute task that raises ValueError to demonstrate error handling."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Execute Dependency Injection Task (query_task_count)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const response = pm.response.json();",
+                                    "pm.environment.set('jobId', response.job_id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH7/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH7", "$execute"]
+                        },
+                        "description": "Execute task with dependency injection. AsyncSession is automatically injected by the framework (no user parameters needed). Task queries the database using the injected session."
+                    },
+                    "response": [
+                        {
+                            "name": "Job Submitted",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH7/$execute",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH7", "$execute"]
+                                }
+                            },
+                            "status": "Accepted",
+                            "code": 202,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"job_id\": \"01K79YAHJ7BR4E87VVTG8FNBME\",\n  \"message\": \"Task submitted for execution. Job ID: 01K79YAHJ7BR4E87VVTG8FNBME\"\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "4. Execute Shell Task",
+            "item": [
+                {
+                    "name": "Execute Shell Task (echo)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const response = pm.response.json();",
+                                    "pm.environment.set('jobId', response.job_id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH5/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH5", "$execute"]
+                        },
+                        "description": "Execute shell command to demonstrate different artifact structure (stdout/stderr vs result/error)."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "5. Job Monitoring",
+            "item": [
+                {
+                    "name": "Poll Job Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs", "{{jobId}}"]
+                        },
+                        "description": "Poll job status until completed. Check artifact_id when status is 'completed'."
+                    },
+                    "response": [
+                        {
+                            "name": "Pending",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "jobs", "{{jobId}}"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01K79YAHJ7BR4E87VVTG8FNBMA\",\n  \"status\": \"pending\",\n  \"artifact_id\": null,\n  \"created_at\": \"2025-10-17T10:01:00Z\",\n  \"updated_at\": \"2025-10-17T10:01:00Z\"\n}"
+                        },
+                        {
+                            "name": "Completed",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "jobs", "{{jobId}}"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01K79YAHJ7BR4E87VVTG8FNBMA\",\n  \"status\": \"completed\",\n  \"artifact_id\": \"01K79YAHJ7BR4E87VVTG8FNBMB\",\n  \"created_at\": \"2025-10-17T10:01:00Z\",\n  \"updated_at\": \"2025-10-17T10:01:02Z\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Stream Job Progress (SSE)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs/{{jobId}}/$stream",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs", "{{jobId}}", "$stream"]
+                        },
+                        "description": "Stream job status updates via Server-Sent Events (SSE). Use curl for better SSE support."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "List All Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs"]
+                        },
+                        "description": "List all jobs (task executions)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Filter Jobs by Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs?status_filter=completed",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "jobs"],
+                            "query": [
+                                {
+                                    "key": "status_filter",
+                                    "value": "completed",
+                                    "description": "pending, running, completed, failed, or canceled"
+                                }
+                            ]
+                        },
+                        "description": "Filter jobs by status (pending, running, completed, failed, canceled)."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "6. Get Task Results",
+            "item": [
+                {
+                    "name": "Get Python Task Results",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{artifactId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "artifacts", "{{artifactId}}"]
+                        },
+                        "description": "Get Python task execution results. Structure: task snapshot + result/error."
+                    },
+                    "response": [
+                        {
+                            "name": "Success Result",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/artifacts/{{artifactId}}",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "artifacts", "{{artifactId}}"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01K79YAHJ7BR4E87VVTG8FNBMB\",\n  \"parent_id\": null,\n  \"level\": 0,\n  \"data\": {\n    \"task\": {\n      \"id\": \"01JCSEED0000000000000PYTH1\",\n      \"command\": \"calculate_sum\",\n      \"task_type\": \"python\",\n      \"parameters\": {\"a\": 10, \"b\": 32},\n      \"created_at\": \"2025-10-17T10:00:00Z\",\n      \"updated_at\": \"2025-10-17T10:00:00Z\"\n    },\n    \"result\": {\n      \"result\": 42,\n      \"operation\": \"sum\"\n    },\n    \"error\": null\n  },\n  \"created_at\": \"2025-10-17T10:01:02Z\",\n  \"updated_at\": \"2025-10-17T10:01:02Z\"\n}"
+                        },
+                        {
+                            "name": "Error Result",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/artifacts/{{artifactId}}",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "artifacts", "{{artifactId}}"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01K79YAHJ7BR4E87VVTG8FNBMC\",\n  \"parent_id\": null,\n  \"level\": 0,\n  \"data\": {\n    \"task\": {...},\n    \"result\": null,\n    \"error\": {\n      \"type\": \"ValueError\",\n      \"message\": \"This task was designed to fail\",\n      \"traceback\": \"Traceback (most recent call last):\\n  File \\\"...\\\", line 48, in failing_task\\n    raise ValueError(\\\"This task was designed to fail\\\")\\nValueError: This task was designed to fail\"\n    }\n  },\n  \"created_at\": \"2025-10-17T10:05:00Z\",\n  \"updated_at\": \"2025-10-17T10:05:00Z\"\n}"
+                        },
+                        {
+                            "name": "Dependency Injection Result",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/artifacts/{{artifactId}}",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "artifacts", "{{artifactId}}"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01K79YAHJ7BR4E87VVTG8FNBME\",\n  \"parent_id\": null,\n  \"level\": 0,\n  \"data\": {\n    \"task\": {\n      \"id\": \"01JCSEED0000000000000PYTH7\",\n      \"command\": \"query_task_count\",\n      \"task_type\": \"python\",\n      \"parameters\": {},\n      \"created_at\": \"2025-10-17T10:00:00Z\",\n      \"updated_at\": \"2025-10-17T10:00:00Z\"\n    },\n    \"result\": {\n      \"total_tasks\": 8,\n      \"timestamp\": \"2025-10-17T10:07:15.123456Z\",\n      \"injected_session\": true\n    },\n    \"error\": null\n  },\n  \"created_at\": \"2025-10-17T10:07:15Z\",\n  \"updated_at\": \"2025-10-17T10:07:15Z\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Shell Task Results",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{artifactId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "artifacts", "{{artifactId}}"]
+                        },
+                        "description": "Get shell task execution results. Structure: task snapshot + stdout/stderr/exit_code."
+                    },
+                    "response": [
+                        {
+                            "name": "Shell Result",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/artifacts/{{artifactId}}",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "artifacts", "{{artifactId}}"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01K79YAHJ7BR4E87VVTG8FNBMD\",\n  \"parent_id\": null,\n  \"level\": 0,\n  \"data\": {\n    \"task\": {\n      \"id\": \"01JCSEED0000000000000PYTH5\",\n      \"command\": \"echo \\\"This is a shell task\\\"\",\n      \"created_at\": \"2025-10-17T10:00:00Z\",\n      \"updated_at\": \"2025-10-17T10:00:00Z\"\n    },\n    \"stdout\": \"This is a shell task\\n\",\n    \"stderr\": \"\",\n    \"exit_code\": 0\n  },\n  \"created_at\": \"2025-10-17T10:06:00Z\",\n  \"updated_at\": \"2025-10-17T10:06:01Z\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List All Artifacts",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "artifacts"]
+                        },
+                        "description": "List all artifacts (task execution results)."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "7. Create Tasks",
+            "item": [
+                {
+                    "name": "Create Python Task with Parameters",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const response = pm.response.json();",
+                                    "pm.environment.set('taskId', response.id);"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"calculate_sum\",\n  \"task_type\": \"python\",\n  \"parameters\": {\"a\": 25, \"b\": 17},\n  \"enabled\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks"]
+                        },
+                        "description": "Create a Python task with custom parameters."
+                    },
+                    "response": [
+                        {
+                            "name": "Task Created",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"command\": \"calculate_sum\",\n  \"task_type\": \"python\",\n  \"parameters\": {\"a\": 25, \"b\": 17},\n  \"enabled\": true\n}"
+                                },
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/tasks",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "tasks"]
+                                }
+                            },
+                            "status": "Created",
+                            "code": 201,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01K79YAHJ7BR4E87VVTG8FNBMC\",\n  \"command\": \"calculate_sum\",\n  \"task_type\": \"python\",\n  \"parameters\": {\"a\": 25, \"b\": 17},\n  \"enabled\": true,\n  \"created_at\": \"2025-10-17T10:10:00Z\",\n  \"updated_at\": \"2025-10-17T10:10:00Z\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Create Shell Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"date\",\n  \"task_type\": \"shell\",\n  \"enabled\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks"]
+                        },
+                        "description": "Create a shell task (parameters not used for shell tasks)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Disabled Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"process_data\",\n  \"task_type\": \"python\",\n  \"parameters\": {\"input_text\": \"test\", \"uppercase\": false},\n  \"enabled\": false\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks"]
+                        },
+                        "description": "Create a task that is disabled and cannot be executed."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "8. Update Tasks",
+            "item": [
+                {
+                    "name": "Enable a Disabled Task",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"process_data\",\n  \"task_type\": \"python\",\n  \"parameters\": {\"input_text\": \"Disabled\", \"uppercase\": false},\n  \"enabled\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH6",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH6"]
+                        },
+                        "description": "Change enabled flag from false to true."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Disable an Enabled Task",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"calculate_sum\",\n  \"task_type\": \"python\",\n  \"parameters\": {\"a\": 10, \"b\": 32},\n  \"enabled\": false\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/{{taskId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "{{taskId}}"]
+                        },
+                        "description": "Disable a task to prevent execution while preserving history."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Update Task Parameters",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"calculate_sum\",\n  \"task_type\": \"python\",\n  \"parameters\": {\"a\": 100, \"b\": 200},\n  \"enabled\": true\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/{{taskId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "{{taskId}}"]
+                        },
+                        "description": "Update parameters for Python task. Previous execution results remain unchanged."
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "9. Error Cases",
+            "item": [
+                {
+                    "name": "Try to Execute Disabled Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH6/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH6", "$execute"]
+                        },
+                        "description": "Attempt to execute a disabled task (will fail with 400)."
+                    },
+                    "response": [
+                        {
+                            "name": "Cannot Execute Disabled",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH6/$execute",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH6", "$execute"]
+                                }
+                            },
+                            "status": "Bad Request",
+                            "code": 400,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"detail\": \"Cannot execute disabled task 01JCSEED0000000000000PYTH6\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Try to Execute Orphaned Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH8/$execute",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH8", "$execute"]
+                        },
+                        "description": "Attempt to execute orphaned task (auto-disabled on startup because function 'nonexistent_function' is not registered)."
+                    },
+                    "response": [
+                        {
+                            "name": "Cannot Execute Disabled",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/tasks/01JCSEED0000000000000PYTH8/$execute",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "tasks", "01JCSEED0000000000000PYTH8", "$execute"]
+                                }
+                            },
+                            "status": "Bad Request",
+                            "code": 400,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"detail\": \"Cannot execute disabled task 01JCSEED0000000000000PYTH8\"\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "10. Delete Task",
+            "item": [
+                {
+                    "name": "Delete Task",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/{{taskId}}",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "v1", "tasks", "{{taskId}}"]
+                        },
+                        "description": "Delete a task template. Execution artifacts are preserved."
+                    },
+                    "response": [
+                        {
+                            "name": "Deleted",
+                            "originalRequest": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{baseUrl}}/api/v1/tasks/{{taskId}}",
+                                    "host": ["{{baseUrl}}"],
+                                    "path": ["api", "v1", "tasks", "{{taskId}}"]
+                                }
+                            },
+                            "status": "No Content",
+                            "code": 204,
+                            "_postman_previewlanguage": null,
+                            "header": [],
+                            "cookie": [],
+                            "body": null
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://127.0.0.1:8000",
+            "type": "string"
+        },
+        {
+            "key": "taskId",
+            "value": "01JCSEED0000000000000PYTH1",
+            "type": "string"
+        },
+        {
+            "key": "jobId",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "artifactId",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

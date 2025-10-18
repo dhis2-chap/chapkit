@@ -1,8 +1,165 @@
-# chapkit
+# Chapkit
 
-[![Tests](https://github.com/dhis2-chap/chapkit/actions/workflows/test.yml/badge.svg)](https://github.com/dhis2-chap/chapkit/actions/workflows/test.yml)
-[![Lint](https://github.com/dhis2-chap/chapkit/actions/workflows/lint.yml/badge.svg)](https://github.com/dhis2-chap/chapkit/actions/workflows/lint.yml)
+> ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows
 
-### Examples can be found here
+Chapkit provides domain-specific modules for building ML and data services, built on top of the servicekit framework.
 
-https://github.com/dhis2-chap/chapkit_minimalist_example
+## Features
+
+- **Config Module**: Key-value configuration with JSON data and Pydantic validation
+- **Artifact Module**: Hierarchical artifact trees for storing ML models, datasets, and results
+- **Task Module**: Execute shell commands and Python functions with dependency injection
+- **ML Module**: Train/predict workflows with artifact-based model storage
+
+## Installation
+
+```bash
+pip install chapkit
+```
+
+Chapkit automatically installs servicekit as a dependency.
+
+## Quick Start
+
+```python
+from chapkit.api import ServiceBuilder, ServiceInfo
+from chapkit import ArtifactHierarchy, BaseConfig
+
+class MyConfig(BaseConfig):
+    model_name: str
+    threshold: float
+
+app = (
+    ServiceBuilder(info=ServiceInfo(display_name="ML Service"))
+    .with_health()
+    .with_config(MyConfig)
+    .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "model"}))
+    .with_tasks()
+    .build()
+)
+```
+
+## Modules
+
+### Config
+
+Key-value configuration storage with Pydantic schema validation:
+
+```python
+from chapkit import BaseConfig, ConfigManager
+
+class AppConfig(BaseConfig):
+    api_url: str
+    timeout: int = 30
+
+# Automatic validation and CRUD endpoints
+app.with_config(AppConfig)
+```
+
+### Artifacts
+
+Hierarchical storage for ML models, datasets, and results:
+
+```python
+from chapkit import ArtifactHierarchy, ArtifactManager
+
+hierarchy = ArtifactHierarchy(
+    name="ml_pipeline",
+    level_labels={0: "experiment", 1: "model", 2: "evaluation"}
+)
+
+# Store pandas DataFrames, models, any Python object
+artifact = await artifact_manager.save(
+    ArtifactIn(data=trained_model, parent_id=experiment_id)
+)
+```
+
+### Tasks
+
+Execute shell commands and Python functions with dependency injection:
+
+```python
+from chapkit import TaskRegistry
+from sqlalchemy.ext.asyncio import AsyncSession
+
+@TaskRegistry.register("process_data")
+async def process_data(
+    input_file: str,              # From task.parameters
+    session: AsyncSession,         # Injected by framework
+) -> dict:
+    # Process data using database
+    return {"status": "success"}
+
+# Create and execute
+task = TaskIn(
+    command="process_data",
+    task_type="python",
+    parameters={"input_file": "data.csv"}
+)
+```
+
+### ML
+
+Train and predict workflows with model storage:
+
+```python
+from chapkit import FunctionalModelRunner
+
+@FunctionalModelRunner.train
+async def train_model(config: MyConfig) -> dict:
+    model = train_sklearn_model(config)
+    return {"model": model, "accuracy": 0.95}
+
+@FunctionalModelRunner.predict
+async def predict(model: dict, data: pd.DataFrame) -> dict:
+    predictions = model["model"].predict(data)
+    return {"predictions": predictions.tolist()}
+
+app.with_ml(FunctionalModelRunner)
+```
+
+## Architecture
+
+```
+chapkit/
+├── config/           # Configuration module
+├── artifact/         # Artifact storage module
+├── task/             # Task execution module
+├── ml/               # ML train/predict module
+└── api/              # ServiceBuilder orchestration
+```
+
+## Examples
+
+See the `examples/` directory:
+
+- `quickstart.py` - Complete ML service
+- `config_artifact_api.py` - Config with artifact linking
+- `python_task_execution_api.py` - Python task execution with DI
+- `ml_basic.py`, `ml_class.py` - ML workflow patterns
+- `readonly_task_api.py` - Secure read-only task API
+
+## Documentation
+
+See `docs/` for comprehensive guides:
+
+- Task execution guide (shell + Python)
+- ML workflow guide
+- Artifact storage guide
+- Config management guide
+
+## Testing
+
+```bash
+make test      # Run tests
+make lint      # Run linter
+make coverage  # Test coverage
+```
+
+## License
+
+AGPL-3.0-or-later
+
+## Related Projects
+
+- **servicekit** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.)
