@@ -6,15 +6,15 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://dhis2-chap.github.io/chapkit/)
 
-> ML and data service modules built on servicekit - config, artifacts, and ML workflows
+> ML service modules built on servicekit - config management and ML workflows
 
-Chapkit provides domain-specific modules for building ML and data services, built on top of the servicekit framework.
+Chapkit provides ML-specific modules for building machine learning services, built on top of servicekit's artifact and task infrastructure.
 
 ## Features
 
 - **Config Module**: Key-value configuration with JSON data and Pydantic validation
-- **Artifact Module**: Hierarchical artifact trees for storing ML models, datasets, and results
-- **ML Module**: Train/predict workflows with artifact-based model storage
+- **ML Module**: Train/predict workflows with artifact-based model storage and timing metadata
+- **Config-Artifact Linking**: Connect configurations to artifact hierarchies for experiment tracking
 
 ## Installation
 
@@ -27,8 +27,9 @@ Chapkit automatically installs servicekit as a dependency.
 ## Quick Start
 
 ```python
+from servicekit.artifact import ArtifactHierarchy
+from chapkit import BaseConfig
 from chapkit.api import ServiceBuilder, ServiceInfo
-from chapkit import ArtifactHierarchy, BaseConfig
 
 class MyConfig(BaseConfig):
     model_name: str
@@ -63,10 +64,10 @@ app.with_config(AppConfig)
 
 ### Artifacts
 
-Hierarchical storage for ML models, datasets, and results:
+Chapkit uses servicekit's artifact system for hierarchical storage:
 
 ```python
-from chapkit import ArtifactHierarchy, ArtifactManager
+from servicekit.artifact import ArtifactHierarchy, ArtifactManager, ArtifactIn
 
 hierarchy = ArtifactHierarchy(
     name="ml_pipeline",
@@ -81,10 +82,10 @@ artifact = await artifact_manager.save(
 
 ### ML
 
-Train and predict workflows with model storage:
+Train and predict workflows with automatic model storage:
 
 ```python
-from chapkit import FunctionalModelRunner
+from chapkit.ml import FunctionalModelRunner
 
 @FunctionalModelRunner.train
 async def train_model(config: MyConfig) -> dict:
@@ -104,10 +105,12 @@ app.with_ml(FunctionalModelRunner)
 ```
 chapkit/
 ├── config/           # Configuration module
-├── artifact/         # Artifact storage module
-├── ml/               # ML train/predict module
-└── api/              # ServiceBuilder orchestration
+├── ml/               # ML train/predict workflows
+└── api/              # ServiceBuilder with ML integration
+    └── service_builder.py  # .with_config(), .with_ml()
 ```
+
+Chapkit extends servicekit's `BaseServiceBuilder` with ML-specific features and uses servicekit's artifact and task modules.
 
 ## Examples
 
