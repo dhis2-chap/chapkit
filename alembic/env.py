@@ -3,8 +3,8 @@
 import asyncio
 from logging.config import fileConfig
 
-# Import the Base metadata from chapkit models
-from chapkit.core.models import Base
+# Import the Base metadata from servicekit
+from servicekit import Base
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config

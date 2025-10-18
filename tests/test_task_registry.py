@@ -1,23 +1,25 @@
 """Tests for TaskRegistry functionality."""
 
+from collections.abc import Generator
+
 import pytest
 
 from chapkit import TaskRegistry
 
 
 @pytest.fixture(autouse=True)
-def clear_registry():
+def clear_registry() -> Generator[None, None, None]:
     """Clear registry before and after each test."""
     TaskRegistry.clear()
     yield
     TaskRegistry.clear()
 
 
-def test_register_decorator():
+def test_register_decorator() -> None:
     """Test registering a function using the decorator."""
 
     @TaskRegistry.register("test_func")
-    def test_func():
+    def test_func() -> str:
         return "test"
 
     assert "test_func" in TaskRegistry.list_all()
@@ -25,10 +27,10 @@ def test_register_decorator():
     assert func() == "test"
 
 
-def test_register_function_imperative():
+def test_register_function_imperative() -> None:
     """Test registering a function imperatively."""
 
-    def my_func():
+    def my_func() -> str:
         return "my result"
 
     TaskRegistry.register_function("my_func", my_func)
@@ -38,11 +40,11 @@ def test_register_function_imperative():
     assert func() == "my result"
 
 
-def test_register_async_function():
+def test_register_async_function() -> None:
     """Test registering an async function."""
 
     @TaskRegistry.register("async_func")
-    async def async_func():
+    async def async_func() -> str:
         return "async result"
 
     assert "async_func" in TaskRegistry.list_all()
@@ -50,27 +52,27 @@ def test_register_async_function():
     assert callable(func)
 
 
-def test_duplicate_registration_decorator():
+def test_duplicate_registration_decorator() -> None:
     """Test that duplicate registration raises ValueError."""
 
     @TaskRegistry.register("dup_func")
-    def func1():
+    def func1() -> str:
         return "first"
 
     with pytest.raises(ValueError, match="Task 'dup_func' already registered"):
 
         @TaskRegistry.register("dup_func")
-        def func2():
+        def func2() -> str:
             return "second"
 
 
-def test_duplicate_registration_imperative():
+def test_duplicate_registration_imperative() -> None:
     """Test that duplicate imperative registration raises ValueError."""
 
-    def func1():
+    def func1() -> str:
         return "first"
 
-    def func2():
+    def func2() -> str:
         return "second"
 
     TaskRegistry.register_function("dup_func", func1)
@@ -79,45 +81,45 @@ def test_duplicate_registration_imperative():
         TaskRegistry.register_function("dup_func", func2)
 
 
-def test_get_missing_function():
+def test_get_missing_function() -> None:
     """Test that getting a missing function raises KeyError."""
     with pytest.raises(KeyError, match="Task 'missing' not found in registry"):
         TaskRegistry.get("missing")
 
 
-def test_list_all_empty():
+def test_list_all_empty() -> None:
     """Test listing all tasks when registry is empty."""
     assert TaskRegistry.list_all() == []
 
 
-def test_list_all_multiple():
+def test_list_all_multiple() -> None:
     """Test listing all registered tasks."""
 
     @TaskRegistry.register("func_a")
-    def func_a():
+    def func_a() -> None:
         pass
 
     @TaskRegistry.register("func_c")
-    def func_c():
+    def func_c() -> None:
         pass
 
     @TaskRegistry.register("func_b")
-    def func_b():
+    def func_b() -> None:
         pass
 
     tasks = TaskRegistry.list_all()
     assert tasks == ["func_a", "func_b", "func_c"]  # Should be sorted
 
 
-def test_clear():
+def test_clear() -> None:
     """Test clearing the registry."""
 
     @TaskRegistry.register("func1")
-    def func1():
+    def func1() -> None:
         pass
 
     @TaskRegistry.register("func2")
-    def func2():
+    def func2() -> None:
         pass
 
     assert len(TaskRegistry.list_all()) == 2
@@ -127,7 +129,7 @@ def test_clear():
     assert TaskRegistry.list_all() == []
 
 
-def test_register_with_parameters():
+def test_register_with_parameters() -> None:
     """Test registering function that accepts parameters."""
 
     @TaskRegistry.register("add_numbers")
@@ -139,7 +141,7 @@ def test_register_with_parameters():
     assert func(a=10, b=20) == 30
 
 
-def test_register_with_default_parameters():
+def test_register_with_default_parameters() -> None:
     """Test registering function with default parameters."""
 
     @TaskRegistry.register("greet")

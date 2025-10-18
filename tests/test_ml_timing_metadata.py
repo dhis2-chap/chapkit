@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+from collections.abc import AsyncIterator
 
 import pandas as pd
 import pytest
@@ -64,7 +65,7 @@ async def dict_wrapped_train(
 
 
 @pytest.fixture
-async def ml_manager():
+async def ml_manager() -> AsyncIterator[MLManager]:
     """Create ML manager for testing."""
     database = SqliteDatabaseBuilder().in_memory().build()
     await database.init()
@@ -78,7 +79,7 @@ async def ml_manager():
 
 
 @pytest.fixture
-async def setup_data(ml_manager: MLManager):
+async def setup_data(ml_manager: MLManager) -> tuple[ULID, pd.DataFrame, pd.DataFrame]:
     """Set up test data for ML operations."""
     # Create config
     async with ml_manager.database.session() as session:
@@ -98,7 +99,7 @@ async def setup_data(ml_manager: MLManager):
 
 async def test_training_timing_metadata_captured(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
-):
+) -> None:
     """Test that training timing metadata is captured correctly."""
     config_id, train_df, _ = setup_data
 
@@ -149,7 +150,7 @@ async def test_training_timing_metadata_captured(
 
 async def test_prediction_timing_metadata_captured(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
-):
+) -> None:
     """Test that prediction timing metadata is captured correctly."""
     config_id, train_df, predict_df = setup_data
 
@@ -208,7 +209,9 @@ async def test_prediction_timing_metadata_captured(
     assert abs(duration - calculated_duration) < 0.01
 
 
-async def test_timing_metadata_iso_format(ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]):
+async def test_timing_metadata_iso_format(
+    ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
+) -> None:
     """Test that timestamps are in ISO format."""
     config_id, train_df, _ = setup_data
 
@@ -240,7 +243,7 @@ async def test_timing_metadata_iso_format(ml_manager: MLManager, setup_data: tup
 
 async def test_timing_duration_rounded_to_two_decimals(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
-):
+) -> None:
     """Test that duration is rounded to 2 decimal places."""
     config_id, train_df, _ = setup_data
 
@@ -266,7 +269,9 @@ async def test_timing_duration_rounded_to_two_decimals(
         assert decimal_places <= 2
 
 
-async def test_original_metadata_preserved(ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]):
+async def test_original_metadata_preserved(
+    ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
+) -> None:
     """Test that original metadata fields are still present."""
     config_id, train_df, predict_df = setup_data
 
@@ -315,7 +320,7 @@ async def test_original_metadata_preserved(ml_manager: MLManager, setup_data: tu
 
 async def test_model_type_captured_in_training_artifact(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
-):
+) -> None:
     """Test that model_type field is captured in training artifact."""
     config_id, train_df, _ = setup_data
 
@@ -343,7 +348,7 @@ async def test_model_type_captured_in_training_artifact(
 
 async def test_model_size_bytes_captured_in_training_artifact(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
-):
+) -> None:
     """Test that model_size_bytes field is captured in training artifact."""
     config_id, train_df, _ = setup_data
 
@@ -370,7 +375,7 @@ async def test_model_size_bytes_captured_in_training_artifact(
 
 async def test_model_metrics_are_optional_fields(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
-):
+) -> None:
     """Test that model_type and model_size_bytes are optional and can handle None."""
     from chapkit.ml.schemas import TrainedModelArtifactData
 
@@ -404,7 +409,9 @@ async def test_model_metrics_are_optional_fields(
     assert artifact_data_minimal.model_size_bytes is None
 
 
-async def test_model_type_extracts_from_dict_wrapped_models(setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]):
+async def test_model_type_extracts_from_dict_wrapped_models(
+    setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame],
+) -> None:
     """Test that model_type extracts inner model type from dict-wrapped models."""
     # Create manager with dict-wrapped training function
     database = SqliteDatabaseBuilder().in_memory().build()
@@ -446,7 +453,7 @@ async def test_model_type_extracts_from_dict_wrapped_models(setup_data: tuple[UL
     assert "dict" not in model_type
 
 
-async def test_model_size_bytes_varies_with_complexity():
+async def test_model_size_bytes_varies_with_complexity() -> None:
     """Test that model_size_bytes varies with model complexity."""
     database = SqliteDatabaseBuilder().in_memory().build()
     await database.init()
@@ -508,7 +515,7 @@ async def test_model_size_bytes_varies_with_complexity():
 
 async def test_model_metrics_present_alongside_timing_metadata(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
-):
+) -> None:
     """Test that model metrics and timing metadata coexist in artifact."""
     config_id, train_df, _ = setup_data
 
