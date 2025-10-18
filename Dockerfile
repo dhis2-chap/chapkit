@@ -24,13 +24,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends git && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Build chapkit wheel
-RUN uv build
-
-# Create venv and install chapkit wheel (includes gunicorn, pandas, sklearn)
+# Install all dependencies including servicekit from git
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv && \
-    uv pip install dist/*.whl
+    uv sync --frozen --no-dev
 
 # Cleanup Python cache files
 RUN find /app/.venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
