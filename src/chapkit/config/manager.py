@@ -19,25 +19,25 @@ class ConfigManager[DataT: BaseConfig](BaseManager[Config, ConfigIn[DataT], Conf
     def __init__(self, repo: ConfigRepository, data_cls: type[DataT]) -> None:
         """Initialize config manager with repository and data class."""
         super().__init__(repo, Config, ConfigOut)
-        self.repo: ConfigRepository = repo
+        self.repository: ConfigRepository = repo
         self.data_cls = data_cls
 
     async def find_by_name(self, name: str) -> ConfigOut[DataT] | None:
         """Find a config by its unique name."""
-        config = await self.repo.find_by_name(name)
+        config = await self.repository.find_by_name(name)
         if config:
             return self._to_output_schema(config)
         return None
 
     async def link_artifact(self, config_id: ULID, artifact_id: ULID) -> None:
         """Link a config to a root artifact."""
-        await self.repo.link_artifact(config_id, artifact_id)
-        await self.repo.commit()
+        await self.repository.link_artifact(config_id, artifact_id)
+        await self.repository.commit()
 
     async def unlink_artifact(self, artifact_id: ULID) -> None:
         """Unlink an artifact from its config."""
-        await self.repo.unlink_artifact(artifact_id)
-        await self.repo.commit()
+        await self.repository.unlink_artifact(artifact_id)
+        await self.repository.commit()
 
     async def get_config_for_artifact(
         self, artifact_id: ULID, artifact_repo: ArtifactRepository
@@ -47,7 +47,7 @@ class ConfigManager[DataT: BaseConfig](BaseManager[Config, ConfigIn[DataT], Conf
         if root is None:
             return None
 
-        config = await self.repo.find_by_root_artifact_id(root.id)
+        config = await self.repository.find_by_root_artifact_id(root.id)
         if config is None:
             return None
 
@@ -55,7 +55,7 @@ class ConfigManager[DataT: BaseConfig](BaseManager[Config, ConfigIn[DataT], Conf
 
     async def get_linked_artifacts(self, config_id: ULID) -> list[ArtifactOut]:
         """Get all root artifacts linked to a config."""
-        artifacts = await self.repo.find_artifacts_for_config(config_id)
+        artifacts = await self.repository.find_artifacts_for_config(config_id)
         return [ArtifactOut.model_validate(artifact, from_attributes=True) for artifact in artifacts]
 
     def _to_output_schema(self, entity: Config) -> ConfigOut[DataT]:

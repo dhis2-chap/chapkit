@@ -42,14 +42,14 @@ class TaskManager(BaseManager[Task, TaskIn, TaskOut, ULID]):
     ) -> None:
         """Initialize task manager with repository, scheduler, database, and artifact manager."""
         super().__init__(repo, Task, TaskOut)
-        self.repo: TaskRepository = repo
+        self.repository: TaskRepository = repo
         self.scheduler = scheduler
         self.database = database
         self.artifact_manager = artifact_manager
 
     async def find_all(self, *, enabled: bool | None = None) -> list[TaskOut]:
         """Find all tasks, optionally filtered by enabled status."""
-        tasks = await self.repo.find_all(enabled=enabled)
+        tasks = await self.repository.find_all(enabled=enabled)
         return [self._to_output_schema(task) for task in tasks]
 
     def _is_injectable_type(self, param_type: type | None) -> bool:
@@ -149,7 +149,7 @@ class TaskManager(BaseManager[Task, TaskIn, TaskOut, ULID]):
                 "Task execution requires artifacts. Use ServiceBuilder.with_artifacts() before with_tasks()."
             )
 
-        task = await self.repo.find_by_id(task_id)
+        task = await self.repository.find_by_id(task_id)
         if task is None:
             raise ValueError(f"Task {task_id} not found")
 

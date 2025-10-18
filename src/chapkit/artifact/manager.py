@@ -26,7 +26,7 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
     ) -> None:
         """Initialize artifact manager with repository, hierarchy, and optional config repo."""
         super().__init__(repo, Artifact, ArtifactOut)
-        self.repo: ArtifactRepository = repo
+        self.repository: ArtifactRepository = repo
         self.hierarchy = hierarchy
         self.config_repo = config_repo
 
@@ -34,12 +34,12 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
 
     async def find_subtree(self, start_id: ULID) -> list[ArtifactTreeNode]:
         """Find all artifacts in the subtree rooted at the given ID."""
-        artifacts = await self.repo.find_subtree(start_id)
+        artifacts = await self.repository.find_subtree(start_id)
         return [self._to_tree_node(artifact) for artifact in artifacts]
 
     async def expand_artifact(self, artifact_id: ULID) -> ArtifactTreeNode | None:
         """Expand a single artifact with hierarchy metadata but without children."""
-        artifact = await self.repo.find_by_id(artifact_id)
+        artifact = await self.repository.find_by_id(artifact_id)
         if artifact is None:
             return None
 
@@ -128,14 +128,14 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
         """Compute the level of an artifact based on its parent."""
         if parent_id is None:
             return 0
-        parent = await self.repo.find_by_id(parent_id)
+        parent = await self.repository.find_by_id(parent_id)
         if parent is None:
             return 0  # pragma: no cover
         return parent.level + 1
 
     async def _recalculate_descendants(self, entity: Artifact) -> None:
         """Recalculate levels for all descendants of an artifact."""
-        subtree = await self.repo.find_subtree(entity.id)
+        subtree = await self.repository.find_subtree(entity.id)
         by_parent: dict[ULID | None, list[Artifact]] = {}
         for node in subtree:
             by_parent.setdefault(node.parent_id, []).append(node)

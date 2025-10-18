@@ -75,11 +75,11 @@ class UserManager(BaseManager[User, UserIn, UserOut, ULID]):
     def __init__(self, repo: UserRepository) -> None:
         """Initialize user manager with repository."""
         super().__init__(repo, User, UserOut)
-        self.repo: UserRepository = repo
+        self.repository: UserRepository = repo
 
     async def find_by_username(self, username: str) -> UserOut | None:
         """Find a user by username."""
-        user = await self.repo.find_by_username(username)
+        user = await self.repository.find_by_username(username)
         if user:
             return self._to_output_schema(user)
         return None
