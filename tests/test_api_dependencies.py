@@ -1,6 +1,6 @@
 """Tests for API dependency injection functions."""
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from chapkit.api.dependencies import get_artifact_manager, get_config_manager, get_ml_manager, get_task_manager
 from chapkit.artifact import ArtifactManager
 from chapkit.config import ConfigManager
-from chapkit.ml import MLManager
 from chapkit.task import TaskManager
 
 
