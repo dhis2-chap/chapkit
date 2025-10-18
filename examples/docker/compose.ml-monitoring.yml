@@ -1,0 +1,71 @@
+services:
+    api:
+        build:
+            context: ../..
+            dockerfile: Dockerfile
+        ports:
+            - "8000:8000"
+        environment:
+            EXAMPLE_MODULE: "examples.ml_basic:app"
+            LOG_FORMAT: json
+            LOG_LEVEL: INFO
+        volumes:
+            - ml-data:/app/data
+        restart: unless-stopped
+        networks:
+            - chapkit-ml-monitoring
+
+    prometheus:
+        image: prom/prometheus:latest
+        ports:
+            - "9090:9090"
+        command:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+        volumes:
+            - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - prometheus-data:/prometheus
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 5s
+        networks:
+            - chapkit-ml-monitoring
+        depends_on:
+            api:
+                condition: service_healthy
+
+    grafana:
+        image: grafana/grafana:latest
+        ports:
+            - "3000:3000"
+        environment:
+            - GF_SECURITY_ADMIN_USER=admin
+            - GF_SECURITY_ADMIN_PASSWORD=admin
+            - GF_USERS_ALLOW_SIGN_UP=false
+        volumes:
+            - grafana-data:/var/lib/grafana
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        networks:
+            - chapkit-ml-monitoring
+        depends_on:
+            prometheus:
+                condition: service_healthy
+
+networks:
+    chapkit-ml-monitoring:
+        driver: bridge
+
+volumes:
+    ml-data:
+    grafana-data:
+    prometheus-data:

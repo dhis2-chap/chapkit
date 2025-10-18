@@ -1,0 +1,58 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+*.egg-info
+build/
+dist/
+wheels/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Linting and type checking
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Documentation builds
+docs/_build/
+site/
+
+# Other
+.env
+.env.local
+*.log
+target/
+
+# Old chapkit directory
+old/
