@@ -24,9 +24,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends git && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install all dependencies including servicekit from git
+# Install all dependencies including servicekit from git, and chapkit itself
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev && \
+    uv pip install --no-deps .
 
 # Cleanup Python cache files
 RUN find /app/.venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
@@ -94,27 +95,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 ENTRYPOINT ["/usr/bin/tini","--"]
 
-CMD ["sh","-c", "\
-    effective_cpus() { \
-        base=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1); \
-        if read -r quota period < /sys/fs/cgroup/cpu.max 2>/dev/null; then \
-        if [ \"$quota\" != \"max\" ]; then \
-            echo $(( (quota + period - 1) / period )); return; \
-        fi; \
-        fi; \
-        echo \"$base\"; \
-    }; \
-    : ${FORWARDED_ALLOW_IPS:='*'}; \
-    CPUS=$(effective_cpus); \
-    : ${WORKERS:=$(( CPUS * 2 + 1 ))}; \
-    exec gunicorn -k uvicorn.workers.UvicornWorker ${EXAMPLE_MODULE} \
-        --bind 0.0.0.0:${PORT} \
-        --workers ${WORKERS} \
-        --timeout ${TIMEOUT} \
-        --graceful-timeout ${GRACEFUL_TIMEOUT} \
-        --keep-alive ${KEEPALIVE} \
-        --forwarded-allow-ips=${FORWARDED_ALLOW_IPS} \
-        --max-requests ${MAX_REQUESTS} \
-        --max-requests-jitter ${MAX_REQUESTS_JITTER} \
-        --worker-tmp-dir /dev/shm \
-\"]
+CMD ["sh","-c", "effective_cpus() { base=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1); if read -r quota period < /sys/fs/cgroup/cpu.max 2>/dev/null; then if [ $quota != max ]; then echo $(( (quota + period - 1) / period )); return; fi; fi; echo $base; }; CPUS=$(effective_cpus); WORKERS=${WORKERS:-$(( CPUS * 2 + 1 ))}; FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-*}; exec gunicorn -k uvicorn.workers.UvicornWorker ${EXAMPLE_MODULE} --bind 0.0.0.0:${PORT} --workers ${WORKERS} --timeout ${TIMEOUT} --graceful-timeout ${GRACEFUL_TIMEOUT} --keep-alive ${KEEPALIVE} --forwarded-allow-ips=${FORWARDED_ALLOW_IPS} --max-requests ${MAX_REQUESTS} --max-requests-jitter ${MAX_REQUESTS_JITTER} --worker-tmp-dir /dev/shm"]
