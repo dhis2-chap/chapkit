@@ -9,13 +9,15 @@ from fastapi import FastAPI
 from pydantic import EmailStr
 from servicekit import Database
 from servicekit.api.routers.health import HealthState
-from ulid import ULID
-
-from chapkit import (
+from servicekit.artifact import (
     ArtifactHierarchy,
     ArtifactIn,
     ArtifactManager,
     ArtifactRepository,
+)
+from ulid import ULID
+
+from chapkit import (
     BaseConfig,
     ConfigIn,
     ConfigManager,

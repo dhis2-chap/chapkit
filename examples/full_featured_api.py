@@ -6,7 +6,6 @@ This example demonstrates EVERY feature available in chapkit:
 - Config management (typed validation)
 - Artifacts (hierarchical storage)
 - Config-artifact linking
-- Task execution (with artifacts)
 - Job scheduling (async execution)
 - Structured logging
 - Custom routers
@@ -24,20 +23,19 @@ from pydantic import BaseModel, Field
 from servicekit import Database
 from servicekit.api import Router
 from servicekit.api.routers.health import HealthState
-from ulid import ULID
-
-from chapkit import (
+from servicekit.artifact import (
     ArtifactHierarchy,
     ArtifactIn,
     ArtifactManager,
     ArtifactRepository,
+)
+from ulid import ULID
+
+from chapkit import (
     BaseConfig,
     ConfigIn,
     ConfigManager,
     ConfigRepository,
-    TaskIn,
-    TaskManager,
-    TaskRepository,
 )
 from chapkit.api import ServiceBuilder, ServiceInfo
 from chapkit.api.dependencies import get_config_manager
@@ -173,26 +171,6 @@ async def startup_hook(app: FastAPI) -> None:
             )
             print("  ✓ Seeded example artifact: baseline_experiment")
 
-        # Seed example tasks
-        task_repo = TaskRepository(session)
-        task_manager = TaskManager(task_repo, scheduler=None, database=None, artifact_manager=None)
-
-        existing_tasks = await task_manager.find_all()
-        if len(existing_tasks) == 0:
-            await task_manager.save(
-                TaskIn(
-                    id=ULID.from_str("01JCSEED00TASKEXAMP1E00001"),
-                    command="python -c \"print('Training model...')\"",
-                )
-            )
-            await task_manager.save(
-                TaskIn(
-                    id=ULID.from_str("01JCSEED00TASKEXAMP1E00002"),
-                    command="python -c \"import sys; print(f'Python {sys.version}')\"",
-                )
-            )
-            print("  ✓ Seeded example tasks")
-
     print("✅ Startup complete!\n")
 
 
@@ -237,7 +215,6 @@ app = (
     )
     # Execution
     .with_jobs(max_concurrency=5)  # Job scheduler
-    .with_tasks()  # Task execution (requires artifacts)
     # Extensibility
     .include_router(CustomStatsRouter.create(prefix="/api/v1/stats", tags=["statistics"]))
     # Lifecycle

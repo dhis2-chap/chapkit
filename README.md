@@ -6,7 +6,7 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://dhis2-chap.github.io/chapkit/)
 
-> ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows
+> ML and data service modules built on servicekit - config, artifacts, and ML workflows
 
 Chapkit provides domain-specific modules for building ML and data services, built on top of the servicekit framework.
 
@@ -14,7 +14,6 @@ Chapkit provides domain-specific modules for building ML and data services, buil
 
 - **Config Module**: Key-value configuration with JSON data and Pydantic validation
 - **Artifact Module**: Hierarchical artifact trees for storing ML models, datasets, and results
-- **Task Module**: Execute shell commands and Python functions with dependency injection
 - **ML Module**: Train/predict workflows with artifact-based model storage
 
 ## Installation
@@ -40,7 +39,7 @@ app = (
     .with_health()
     .with_config(MyConfig)
     .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "model"}))
-    .with_tasks()
+    .with_jobs()
     .build()
 )
 ```
@@ -80,30 +79,6 @@ artifact = await artifact_manager.save(
 )
 ```
 
-### Tasks
-
-Execute shell commands and Python functions with dependency injection:
-
-```python
-from chapkit import TaskRegistry
-from sqlalchemy.ext.asyncio import AsyncSession
-
-@TaskRegistry.register("process_data")
-async def process_data(
-    input_file: str,              # From task.parameters
-    session: AsyncSession,         # Injected by framework
-) -> dict:
-    # Process data using database
-    return {"status": "success"}
-
-# Create and execute
-task = TaskIn(
-    command="process_data",
-    task_type="python",
-    parameters={"input_file": "data.csv"}
-)
-```
-
 ### ML
 
 Train and predict workflows with model storage:
@@ -130,7 +105,6 @@ app.with_ml(FunctionalModelRunner)
 chapkit/
 ├── config/           # Configuration module
 ├── artifact/         # Artifact storage module
-├── task/             # Task execution module
 ├── ml/               # ML train/predict module
 └── api/              # ServiceBuilder orchestration
 ```
@@ -141,18 +115,13 @@ See the `examples/` directory:
 
 - `quickstart.py` - Complete ML service
 - `config_artifact_api.py` - Config with artifact linking
-- `python_task_execution_api.py` - Python task execution with DI
 - `ml_basic.py`, `ml_class.py` - ML workflow patterns
-- `readonly_task_api.py` - Secure read-only task API
 
 ## Documentation
 
 See `docs/` for comprehensive guides:
 
-- Task execution guide (shell + Python)
 - ML workflow guide
-- Artifact storage guide
-- Config management guide
 
 ## Testing
 

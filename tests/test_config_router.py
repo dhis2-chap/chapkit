@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, Mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from servicekit.artifact import ArtifactOut
 from ulid import ULID
 
-from chapkit.artifact import ArtifactOut
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigOut, ConfigRouter
 
 

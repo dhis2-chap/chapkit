@@ -7,8 +7,7 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from servicekit.api.crud import CrudPermissions, CrudRouter
-
-from chapkit.artifact.schemas import ArtifactOut
+from servicekit.artifact.schemas import ArtifactOut
 
 from .manager import ConfigManager
 from .schemas import BaseConfig, ConfigIn, ConfigOut, LinkArtifactRequest, UnlinkArtifactRequest

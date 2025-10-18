@@ -7,19 +7,21 @@ from typing import Iterable
 
 import pandas as pd
 from servicekit import SqliteDatabaseBuilder
-from ulid import ULID
-
-from chapkit import (
+from servicekit.artifact import (
     ArtifactHierarchy,
     ArtifactIn,
     ArtifactManager,
     ArtifactRepository,
+    PandasDataFrame,
+)
+from ulid import ULID
+
+from chapkit import (
     BaseConfig,
     ConfigIn,
     ConfigManager,
     ConfigOut,
     ConfigRepository,
-    PandasDataFrame,
 )
 
 ML_CONFIG_ID = ULID.from_str("01K72P60ZNX2PJ6QJWZK7RMCRV")

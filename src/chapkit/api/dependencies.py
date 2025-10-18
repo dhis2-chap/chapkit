@@ -3,13 +3,12 @@
 from typing import Annotated
 
 from fastapi import Depends
-from servicekit.api.dependencies import get_database, get_scheduler, get_session
+from servicekit.api.dependencies import get_session
+from servicekit.artifact import ArtifactManager, ArtifactRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chapkit.artifact import ArtifactManager, ArtifactRepository
 from chapkit.config import BaseConfig, ConfigManager, ConfigRepository
 from chapkit.ml import MLManager
-from chapkit.task import TaskManager, TaskRepository
 
 
 async def get_config_manager(session: Annotated[AsyncSession, Depends(get_session)]) -> ConfigManager[BaseConfig]:
@@ -21,35 +20,7 @@ async def get_config_manager(session: Annotated[AsyncSession, Depends(get_sessio
 async def get_artifact_manager(session: Annotated[AsyncSession, Depends(get_session)]) -> ArtifactManager:
     """Get an artifact manager instance for dependency injection."""
     artifact_repo = ArtifactRepository(session)
-    config_repo = ConfigRepository(session)
-    return ArtifactManager(artifact_repo, config_repo=config_repo)
-
-
-async def get_task_manager(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    artifact_manager: Annotated[ArtifactManager, Depends(get_artifact_manager)],
-) -> TaskManager:
-    """Get a task manager instance for dependency injection."""
-    from servicekit import Database
-    from servicekit.scheduler import JobScheduler
-
-    repo = TaskRepository(session)
-
-    # Get scheduler if available
-    scheduler: JobScheduler | None
-    try:
-        scheduler = get_scheduler()
-    except RuntimeError:
-        scheduler = None
-
-    # Get database if available
-    database: Database | None
-    try:
-        database = get_database()
-    except RuntimeError:
-        database = None
-
-    return TaskManager(repo, scheduler, database, artifact_manager)
+    return ArtifactManager(artifact_repo)
 
 
 async def get_ml_manager() -> MLManager:

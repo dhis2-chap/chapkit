@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
+from servicekit.artifact.models import Artifact
 from servicekit.repository import BaseRepository
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID
-
-from chapkit.artifact.models import Artifact
 
 from .models import Config, ConfigArtifact
 
@@ -43,7 +42,7 @@ class ConfigRepository(BaseRepository[Config, ULID]):
 
     async def delete_by_id(self, id: ULID) -> None:
         """Delete a config and cascade delete all linked artifact trees."""
-        from chapkit.artifact.repository import ArtifactRepository
+        from servicekit.artifact.repository import ArtifactRepository
 
         linked_artifacts = await self.find_artifacts_for_config(id)
 

@@ -1,4 +1,4 @@
-"""Service builder with module integration (config, artifact, task)."""
+"""Service builder with module integration (config, artifact, ml)."""
 
 from __future__ import annotations
 
@@ -11,9 +11,7 @@ from pydantic import EmailStr, HttpUrl
 from servicekit.api.crud import CrudPermissions
 from servicekit.api.dependencies import get_database, get_scheduler, get_session
 from servicekit.api.service_builder import BaseServiceBuilder, ServiceInfo
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from chapkit.artifact import (
+from servicekit.artifact import (
     ArtifactHierarchy,
     ArtifactIn,
     ArtifactManager,
@@ -21,21 +19,14 @@ from chapkit.artifact import (
     ArtifactRepository,
     ArtifactRouter,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigOut, ConfigRepository, ConfigRouter
 from chapkit.ml import MLManager, MLRouter, ModelRunnerProtocol
-from chapkit.task import (
-    TaskIn,
-    TaskManager,
-    TaskOut,
-    TaskRepository,
-    TaskRouter,
-    validate_and_disable_orphaned_tasks,
-)
 
 from .dependencies import get_artifact_manager as default_get_artifact_manager
 from .dependencies import get_config_manager as default_get_config_manager
 from .dependencies import get_ml_manager as default_get_ml_manager
-from .dependencies import get_task_manager as default_get_task_manager
 
 # Type alias for dependency factory functions
 type DependencyFactory = Callable[..., Coroutine[Any, Any, Any]]
@@ -85,16 +76,6 @@ class _ArtifactOptions:
 
 
 @dataclass(slots=True)
-class _TaskOptions:
-    """Internal task options for ServiceBuilder."""
-
-    prefix: str = "/api/v1/tasks"
-    tags: List[str] = field(default_factory=lambda: ["Tasks"])
-    permissions: CrudPermissions = field(default_factory=CrudPermissions)
-    validate_on_startup: bool = True
-
-
-@dataclass(slots=True)
 class _MLOptions:
     """Internal ML options for ServiceBuilder."""
 
@@ -104,14 +85,13 @@ class _MLOptions:
 
 
 class ServiceBuilder(BaseServiceBuilder):
-    """Service builder with integrated module support (config, artifact, task)."""
+    """Service builder with integrated module support (config, artifact, ml)."""
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize service builder with module-specific state."""
         super().__init__(**kwargs)
         self._config_options: _ConfigOptions | None = None
         self._artifact_options: _ArtifactOptions | None = None
-        self._task_options: _TaskOptions | None = None
         self._ml_options: _MLOptions | None = None
 
     # --------------------------------------------------------------------- Module-specific fluent methods
@@ -172,34 +152,6 @@ class ServiceBuilder(BaseServiceBuilder):
         )
         return self
 
-    def with_tasks(
-        self,
-        *,
-        prefix: str = "/api/v1/tasks",
-        tags: List[str] | None = None,
-        permissions: CrudPermissions | None = None,
-        validate_on_startup: bool = True,
-        allow_create: bool | None = None,
-        allow_read: bool | None = None,
-        allow_update: bool | None = None,
-        allow_delete: bool | None = None,
-    ) -> Self:
-        """Enable task execution endpoints with script runner."""
-        base = permissions or CrudPermissions()
-        perms = CrudPermissions(
-            create=allow_create if allow_create is not None else base.create,
-            read=allow_read if allow_read is not None else base.read,
-            update=allow_update if allow_update is not None else base.update,
-            delete=allow_delete if allow_delete is not None else base.delete,
-        )
-        self._task_options = _TaskOptions(
-            prefix=prefix,
-            tags=list(tags) if tags else ["Tasks"],
-            permissions=perms,
-            validate_on_startup=validate_on_startup,
-        )
-        return self
-
     def with_ml(
         self,
         runner: ModelRunnerProtocol,
@@ -223,11 +175,6 @@ class ServiceBuilder(BaseServiceBuilder):
             raise ValueError(
                 "Artifact config-linking requires a config schema. "
                 "Call `with_config(...)` before enabling config linking in artifacts."
-            )
-
-        if self._task_options and not self._artifact_options:
-            raise ValueError(
-                "Task execution requires artifacts to store results. Call `with_artifacts(...)` before `with_tasks()`."
             )
 
         if self._ml_options:
@@ -287,29 +234,6 @@ class ServiceBuilder(BaseServiceBuilder):
             app.include_router(artifact_router)
             app.dependency_overrides[default_get_artifact_manager] = artifact_dep
 
-        if self._task_options:
-            task_options = self._task_options
-            task_dep = self._build_task_dependency()
-            task_router = TaskRouter.create(
-                prefix=task_options.prefix,
-                tags=task_options.tags,
-                manager_factory=task_dep,
-                entity_in_type=TaskIn,
-                entity_out_type=TaskOut,
-                permissions=task_options.permissions,
-            )
-            app.include_router(task_router)
-            app.dependency_overrides[default_get_task_manager] = task_dep
-
-            # Register validation startup hook if enabled
-            if task_options.validate_on_startup:
-
-                async def _validate_tasks_on_startup(app_instance: FastAPI) -> None:
-                    """Validate and disable orphaned Python tasks on startup."""
-                    await validate_and_disable_orphaned_tasks(app_instance)
-
-                self._startup_hooks.append(_validate_tasks_on_startup)
-
         if self._ml_options:
             ml_options = self._ml_options
             ml_dep = self._build_ml_dependency()
@@ -342,25 +266,6 @@ class ServiceBuilder(BaseServiceBuilder):
         async def _dependency(session: AsyncSession = Depends(get_session)) -> ArtifactManager:
             artifact_repo = ArtifactRepository(session)
             return ArtifactManager(artifact_repo, hierarchy=hierarchy)
-
-        return _dependency
-
-    @staticmethod
-    def _build_task_dependency() -> DependencyFactory:
-        async def _dependency(
-            session: AsyncSession = Depends(get_session),
-            artifact_manager: ArtifactManager = Depends(default_get_artifact_manager),
-        ) -> TaskManager:
-            repo = TaskRepository(session)
-            try:
-                scheduler = get_scheduler()
-            except RuntimeError:
-                scheduler = None
-            try:
-                database = get_database()
-            except RuntimeError:
-                database = None
-            return TaskManager(repo, scheduler, database, artifact_manager)
 
         return _dependency
 

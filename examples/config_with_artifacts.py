@@ -6,13 +6,15 @@ import asyncio
 from typing import Any, NotRequired, TypedDict, cast
 
 from servicekit import SqliteDatabaseBuilder
-from ulid import ULID
-
-from chapkit import (
+from servicekit.artifact import (
     ArtifactHierarchy,
     ArtifactIn,
     ArtifactManager,
     ArtifactRepository,
+)
+from ulid import ULID
+
+from chapkit import (
     BaseConfig,
     ConfigIn,
     ConfigManager,

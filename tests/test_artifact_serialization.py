@@ -7,9 +7,8 @@ import json
 from datetime import datetime
 
 import pytest
+from servicekit.artifact import ArtifactOut
 from ulid import ULID
-
-from chapkit import ArtifactOut
 
 
 class CustomNonSerializable:

@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 from conftest import DemoConfig
+from servicekit import SqliteDatabaseBuilder
+from servicekit.artifact import Artifact, ArtifactRepository
 from ulid import ULID
 
 from chapkit import (
-    Artifact,
-    ArtifactRepository,
     Config,
     ConfigIn,
     ConfigManager,
     ConfigOut,
     ConfigRepository,
-    SqliteDatabaseBuilder,
 )
 
 

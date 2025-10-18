@@ -32,7 +32,6 @@ theme:
 nav:
   - Home: index.md
   - Guides:
-      - Task Execution: guides/task-execution.md
       - ML Workflows: guides/ml-workflows.md
 
 markdown_extensions:

@@ -8,11 +8,11 @@ import pandas as pd
 import pytest
 from geojson_pydantic import FeatureCollection
 from servicekit import SqliteDatabaseBuilder
+from servicekit.artifact import ArtifactManager, ArtifactRepository
+from servicekit.artifact.schemas import PandasDataFrame
 from servicekit.scheduler import AIOJobScheduler
 from ulid import ULID
 
-from chapkit.artifact import ArtifactManager, ArtifactRepository
-from chapkit.artifact.schemas import PandasDataFrame
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
 from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, TrainRequest
 

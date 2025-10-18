@@ -59,9 +59,9 @@ class AuthManager:
 
 ## Project Overview
 
-`chapkit` is a collection of domain-specific modules for ML and data services, built on top of the [servicekit](https://github.com/winterop-com/servicekit) framework. It provides config management, artifact storage, task execution, and ML workflows.
+`chapkit` is a collection of domain-specific modules for ML and data services, built on top of the [servicekit](https://github.com/winterop-com/servicekit) framework. It provides config management, artifact storage, and ML workflows.
 
-**Primary Modules:** Config (key-value with JSON), Artifact (hierarchical trees), Task (script execution with output capture), ML (train/predict operations with artifact-based model storage)
+**Primary Modules:** Config (key-value with JSON), Artifact (hierarchical trees), ML (train/predict operations with artifact-based model storage)
 
 ## Architecture
 
@@ -79,13 +79,6 @@ chapkit/
 │   ├── repository.py    # ArtifactRepository
 │   ├── manager.py       # ArtifactManager
 │   └── router.py        # ArtifactRouter
-├── task/                # Task execution system
-│   ├── models.py        # Task ORM model
-│   ├── schemas.py       # TaskIn, TaskOut
-│   ├── repository.py    # TaskRepository
-│   ├── manager.py       # TaskManager with Python/shell execution
-│   ├── router.py        # TaskRouter
-│   └── registry.py      # TaskRegistry for Python functions
 ├── ml/                  # ML train/predict workflows
 │   ├── manager.py       # MLManager
 │   ├── router.py        # MLRouter
@@ -120,6 +113,7 @@ app = (
     .with_health()
     .with_config(MyConfig)
     .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "model"}))
+    .with_jobs()
     .build()
 )
 ```
@@ -136,56 +130,15 @@ app = (
 - `.with_config(schema)` - Config CRUD endpoints at `/api/v1/configs`
 - `.with_artifacts(hierarchy)` - Artifact CRUD at `/api/v1/artifacts`
 - `.with_jobs()` - Job scheduler at `/api/v1/jobs` (from servicekit)
-- `.with_tasks(validate_on_startup=True)` - Task execution at `/api/v1/tasks`
 - `.with_ml(runner)` - ML train/predict at `/api/v1/ml`
 - `.build()` - Returns FastAPI app
 
 **MLServiceBuilder**: Specialized builder that bundles health, config, artifacts, jobs, ml
 
-## Task Execution System
-
-Chapkit provides a task execution system supporting both shell commands and Python functions with type-based dependency injection.
-
-**Task Types:**
-- **Shell tasks**: Execute commands via asyncio subprocess, capture stdout/stderr/exit_code
-- **Python tasks**: Execute registered functions via TaskRegistry, capture result/error with traceback
-
-**Python Task Registration:**
-```python
-from chapkit import TaskRegistry
-from sqlalchemy.ext.asyncio import AsyncSession
-
-@TaskRegistry.register("my_task")
-async def my_task(name: str, session: AsyncSession) -> dict:
-    """Task with user parameters and dependency injection."""
-    # name comes from task.parameters (user-provided)
-    # session is injected by framework (type-based)
-    return {"status": "success", "name": name}
-```
-
-**Type-Based Dependency Injection:**
-
-Framework types are automatically injected based on function parameter type hints:
-- `AsyncSession` - SQLAlchemy async database session
-- `Database` - servicekit Database instance
-- `ArtifactManager` - chapkit Artifact management service
-- `JobScheduler` - servicekit Job scheduling service
-
-**Key Features:**
-- Enable/disable controls for tasks
-- Automatic orphaned task validation (enabled by default, auto-disables tasks with missing functions on startup)
-- Support both sync and async Python functions
-- Mix user parameters with framework injections
-- Optional type support (`AsyncSession | None`)
-- Artifact-based execution results for both shell and Python tasks
-
-See `examples/python_task_execution_api.py` for working examples.
-
 ## Common Endpoints
 
 **Config Service:** CRUD operations, artifact linking (`/$link-artifact`, `/$unlink-artifact`, `/$artifacts`)
 **Artifact Service:** CRUD + tree operations (`/$tree`, `/$expand`)
-**Task Service:** CRUD, execute (`/$execute`), enable/disable controls
 **ML Service:** Train (`/$train`) and predict (`/$predict`) operations
 
 **Operation prefix:** `$` indicates operations (computed/derived data) vs resource access

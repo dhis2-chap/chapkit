@@ -13,9 +13,10 @@ Run with: fastapi dev examples/ml_shell.py
 import sys
 from pathlib import Path
 
+from servicekit.artifact import ArtifactHierarchy
+
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
-from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
 
 # Get absolute path to scripts directory
