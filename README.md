@@ -162,4 +162,4 @@ AGPL-3.0-or-later
 
 ## Related Projects
 
-- **servicekit** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.)
+- **[servicekit](https://github.com/winterop-com/servicekit)** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.) ([docs](https://winterop-com.github.io/servicekit))

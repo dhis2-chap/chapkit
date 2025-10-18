@@ -33,10 +33,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/winterop-com/chapkit"
-Repository = "https://github.com/winterop-com/chapkit"
-Issues = "https://github.com/winterop-com/chapkit/issues"
-Documentation = "https://github.com/winterop-com/chapkit#readme"
+Homepage = "https://github.com/dhis2-chap/chapkit"
+Repository = "https://github.com/dhis2-chap/chapkit"
+Issues = "https://github.com/dhis2-chap/chapkit/issues"
+Documentation = "https://dhis2-chap.github.io/chapkit"
 
 [dependency-groups]
 dev = [

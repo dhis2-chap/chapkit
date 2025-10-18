@@ -1,8 +1,8 @@
 site_name: Chapkit
 site_description: ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows
-site_url: https://winterop-com.github.io/chapkit
-repo_url: https://github.com/winterop-com/chapkit
-repo_name: winterop-com/chapkit
+site_url: https://dhis2-chap.github.io/chapkit
+repo_url: https://github.com/dhis2-chap/chapkit
+repo_name: dhis2-chap/chapkit
 
 theme:
   name: material
@@ -63,7 +63,7 @@ markdown_extensions:
   - pymdownx.keys
   - pymdownx.magiclink:
       repo_url_shorthand: true
-      user: winterop-com
+      user: dhis2-chap
       repo: chapkit
   - pymdownx.mark
   - pymdownx.smartsymbols
@@ -96,6 +96,6 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/winterop-com/chapkit
+      link: https://github.com/dhis2-chap/chapkit
   version:
     provider: mike
