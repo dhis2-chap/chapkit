@@ -6,7 +6,7 @@ services:
         ports:
             - "8000:8000"
         environment:
-            EXAMPLE_MODULE: "examples.ml_basic:app"
+            EXAMPLE_MODULE: "examples.full_featured_api:app"
             LOG_FORMAT: json
             LOG_LEVEL: INFO
 

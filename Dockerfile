@@ -84,7 +84,7 @@ ENV LOG_FORMAT=json
 ENV LOG_LEVEL=INFO
 
 # Default example to run (can be overridden)
-ENV EXAMPLE_MODULE=examples.ml_basic:app
+ENV EXAMPLE_MODULE=examples.full_featured_api:app
 
 USER ${USER}
 EXPOSE 8000
