@@ -87,18 +87,24 @@ Train and predict workflows with automatic model storage:
 
 ```python
 from chapkit.ml import FunctionalModelRunner
+import pandas as pd
 
-@FunctionalModelRunner.train
-async def train_model(config: MyConfig) -> dict:
-    model = train_sklearn_model(config)
-    return {"model": model, "accuracy": 0.95}
+async def train_model(config: MyConfig, data: pd.DataFrame, geo=None):
+    """Train your model - returns trained model object."""
+    from sklearn.linear_model import LinearRegression
+    model = LinearRegression()
+    model.fit(data[["feature1", "feature2"]], data["target"])
+    return model
 
-@FunctionalModelRunner.predict
-async def predict(model: dict, data: pd.DataFrame) -> dict:
-    predictions = model["model"].predict(data)
-    return {"predictions": predictions.tolist()}
+async def predict(config: MyConfig, model, historic: pd.DataFrame, future: pd.DataFrame, geo=None):
+    """Make predictions - returns DataFrame with predictions."""
+    predictions = model.predict(future[["feature1", "feature2"]])
+    future["predictions"] = predictions
+    return future
 
-app.with_ml(FunctionalModelRunner)
+# Wrap functions in runner
+runner = FunctionalModelRunner(on_train=train_model, on_predict=predict)
+app.with_ml(runner=runner)
 ```
 
 ## Architecture
