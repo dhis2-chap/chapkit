@@ -86,7 +86,7 @@ docker-run:
 		echo "Error: EXAMPLE not specified. Usage: make docker-run EXAMPLE=config_api"; \
 		exit 1; \
 	fi
-	@docker run -it --rm -p 8000:8000 \
+	@docker run --rm -p 8000:8000 \
 		-e EXAMPLE_MODULE=examples.$(EXAMPLE):app \
 		chapkit-examples
 
