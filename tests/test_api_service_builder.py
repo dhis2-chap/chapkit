@@ -7,12 +7,11 @@ from collections.abc import AsyncGenerator
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from servicekit import Database, SqliteDatabaseBuilder
+from servicekit.api.routers.health import HealthState
 
 from chapkit import ArtifactHierarchy, BaseConfig
-from servicekit import SqliteDatabaseBuilder
 from chapkit.api import ServiceBuilder, ServiceInfo
-from servicekit import Database
-from servicekit.api.routers.health import HealthState
 
 
 class ExampleConfig(BaseConfig):

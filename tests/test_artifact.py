@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from servicekit import SqliteDatabaseBuilder
 from ulid import ULID
 
 from chapkit import (
@@ -11,7 +12,6 @@ from chapkit import (
     ArtifactRepository,
     PandasDataFrame,
 )
-from servicekit import SqliteDatabaseBuilder
 
 
 class TestArtifactRepository:

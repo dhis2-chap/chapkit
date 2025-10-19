@@ -6,11 +6,10 @@ import pandas as pd
 import pytest
 from geojson_pydantic import FeatureCollection
 from pydantic import Field
-
-from chapkit import BaseConfig
-from chapkit.api import ServiceBuilder
 from servicekit.api.service_builder import ServiceInfo
-from chapkit import ArtifactHierarchy
+
+from chapkit import ArtifactHierarchy, BaseConfig
+from chapkit.api import ServiceBuilder
 from chapkit.ml import ModelRunnerProtocol
 
 
