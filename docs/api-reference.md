@@ -124,22 +124,6 @@ Chapkit job scheduler with artifact tracking for ML/task workflows.
 
 FastAPI-specific components built on servicekit.
 
-### Service Builder
-
-Service builder class for composing chapkit applications.
-
-#### ServiceBuilder
-
-::: chapkit.api.service_builder.ServiceBuilder
-
-#### MLServiceBuilder
-
-::: chapkit.api.service_builder.MLServiceBuilder
-
-#### ServiceInfo
-
-::: chapkit.api.service_builder.ServiceInfo
-
 ### Dependencies
 
 FastAPI dependency injection functions.
