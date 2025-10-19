@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from conftest import DemoConfig
 from servicekit import SqliteDatabaseBuilder
 from servicekit.artifact import Artifact, ArtifactRepository
 from ulid import ULID
@@ -14,6 +13,8 @@ from chapkit import (
     ConfigOut,
     ConfigRepository,
 )
+
+from .conftest import DemoConfig
 
 
 async def test_config_manager_deserializes_dict_payloads() -> None:

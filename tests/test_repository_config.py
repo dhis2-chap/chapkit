@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import pytest
-from conftest import DemoConfig
 from servicekit import SqliteDatabaseBuilder
 from servicekit.artifact import Artifact, ArtifactRepository
 from ulid import ULID
 
 from chapkit import Config, ConfigRepository
+
+from .conftest import DemoConfig
 
 
 async def test_config_repository_find_by_name_round_trip() -> None:
