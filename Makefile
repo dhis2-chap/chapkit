@@ -96,6 +96,10 @@ clean:
 	@find . -type d -name "__pycache__" -delete
 	@find . -type d -name ".pytest_cache" -delete
 	@find . -type d -name ".ruff_cache" -delete
+	@find . -type d -name ".mypy_cache" -delete
+	@rm -rf .coverage htmlcov coverage.xml
+	@rm -rf .pyright
+	@rm -rf dist build *.egg-info
 
 # ==============================================================================
 # Default
