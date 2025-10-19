@@ -4,11 +4,12 @@ Docker Compose examples for deploying Chapkit ML services with full observabilit
 
 ## Available Examples
 
-### 1. Basic ML Service (`compose.ml-basic.yml`)
+### 1. Functional ML Service (`compose.functional.yml`)
 
-**Use case:** Simple disease prediction ML service using Linear Regression.
+**Use case:** Simple disease prediction ML service using functional runner with Linear Regression.
 
 **Features:**
+- Functional runner pattern (simple function-based ML)
 - Disease prediction using weather data
 - REST API for training and prediction
 - Health checks and metrics
@@ -16,7 +17,7 @@ Docker Compose examples for deploying Chapkit ML services with full observabilit
 **Start:**
 ```bash
 cd examples/docker
-docker compose -f compose.ml-basic.yml up
+docker compose -f compose.functional.yml up
 ```
 
 **Test:**
@@ -35,9 +36,9 @@ curl -X POST http://localhost:8000/api/v1/ml/predict \
   -d @../../tests/fixtures/predict_request.json
 ```
 
-### 2. Full-Featured ML Service (`compose.ml-full.yml`)
+### 2. Class-Based ML Service (`compose.class.yml`)
 
-**Use case:** Production ML service with preprocessing, feature engineering, and persistence.
+**Use case:** ML service with class-based runner, preprocessing, feature engineering, and persistence.
 
 **Features:**
 - Class-based ML runner with lifecycle hooks
@@ -48,10 +49,25 @@ curl -X POST http://localhost:8000/api/v1/ml/predict \
 **Start:**
 ```bash
 cd examples/docker
-docker compose -f compose.ml-full.yml up
+docker compose -f compose.class.yml up
 ```
 
-### 3. ML with Monitoring (`compose.ml-monitoring.yml`)
+### 3. Shell-Based ML Service (`compose.shell.yml`)
+
+**Use case:** ML service that delegates to external shell scripts/commands.
+
+**Features:**
+- Shell-based ML runner for external model execution
+- Integration with existing ML scripts
+- Artifact storage for models and predictions
+
+**Start:**
+```bash
+cd examples/docker
+docker compose -f compose.shell.yml up
+```
+
+### 4. ML with Monitoring (`compose.monitoring.yml`)
 
 **Use case:** Complete ML service with Prometheus metrics and Grafana dashboards.
 
@@ -64,7 +80,7 @@ docker compose -f compose.ml-full.yml up
 **Start:**
 ```bash
 cd examples/docker
-docker compose -f compose.ml-monitoring.yml up
+docker compose -f compose.monitoring.yml up
 ```
 
 **Access:**
@@ -72,20 +88,20 @@ docker compose -f compose.ml-monitoring.yml up
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000 (admin/admin)
 
-## Quick Start - ML Basic Example
+## Quick Start - Functional ML Example
 
 ```bash
 # 1. Navigate to docker examples
 cd examples/docker
 
 # 2. Start the ML service
-docker compose -f compose.ml-basic.yml up -d
+docker compose -f compose.functional.yml up -d
 
 # 3. Check health
 curl http://localhost:8000/health
 
 # 4. View logs
-docker compose -f compose.ml-basic.yml logs -f
+docker compose -f compose.functional.yml logs -f
 
 # 5. Train a model
 curl -X POST http://localhost:8000/api/v1/ml/train \
@@ -173,10 +189,10 @@ volumes:
 
 ```bash
 # Stop and remove containers
-docker compose -f compose.ml-basic.yml down
+docker compose -f compose.functional.yml down
 
 # Stop and remove with volumes (clears all ML artifacts)
-docker compose -f compose.ml-basic.yml down -v
+docker compose -f compose.functional.yml down -v
 ```
 
 ## Production Deployment
@@ -229,13 +245,14 @@ deploy:
 **Problem:** Prediction latency is high
 
 **Solution:**
-- Use `ml_basic` instead of `ml_class` for simpler models
+- Use functional runner (`compose.functional.yml`) for simpler models
 - Increase worker count
 - Cache models in memory
 
 ## Next Steps
 
-- See `../ml_basic.py` for simple functional ML example
-- See `../ml_class.py` for class-based ML runner
+- See `../ml_basic.py` for functional ML runner example
+- See `../ml_class.py` for class-based ML runner example
+- See `../ml_shell.py` for shell-based ML runner example
 - See `../ml_pipeline.py` for complete ML workflow
 - Check Servicekit docs for auth and monitoring patterns
