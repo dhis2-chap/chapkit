@@ -10,7 +10,6 @@ from servicekit.api.middleware import (
 from servicekit.api.routers import HealthRouter, HealthState, HealthStatus, JobRouter, SystemInfo, SystemRouter
 from servicekit.api.service_builder import ServiceInfo
 from servicekit.api.utilities import build_location_url, run_app
-from servicekit.artifact import ArtifactRouter
 from servicekit.logging import (
     add_request_context,
     clear_request_context,
@@ -19,6 +18,7 @@ from servicekit.logging import (
     reset_request_context,
 )
 
+from chapkit.artifact import ArtifactRouter
 from chapkit.config import ConfigRouter
 
 from .dependencies import get_artifact_manager, get_config_manager

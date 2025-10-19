@@ -15,12 +15,12 @@ from typing import Any
 import pandas as pd
 import structlog
 from geojson_pydantic import FeatureCollection
-from servicekit.artifact import ArtifactHierarchy
 from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import BaseModelRunner
 
 log = structlog.get_logger()

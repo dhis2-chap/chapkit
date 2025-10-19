@@ -1,5 +1,19 @@
 """Chapkit - ML/data service modules built on servicekit."""
 
+# Scheduler feature
+# Artifact feature
+from .artifact import (
+    Artifact,
+    ArtifactHierarchy,
+    ArtifactIn,
+    ArtifactManager,
+    ArtifactOut,
+    ArtifactRepository,
+    ArtifactRouter,
+    ArtifactTreeNode,
+    PandasDataFrame,
+)
+
 # Config feature
 from .config import (
     BaseConfig,
@@ -23,8 +37,34 @@ from .ml import (
     TrainRequest,
     TrainResponse,
 )
+from .scheduler import ChapkitJobRecord, ChapkitJobScheduler
+
+# Task feature
+from .task import (
+    Task,
+    TaskIn,
+    TaskManager,
+    TaskOut,
+    TaskRegistry,
+    TaskRepository,
+    TaskRouter,
+    validate_and_disable_orphaned_tasks,
+)
 
 __all__ = [
+    # Scheduler
+    "ChapkitJobRecord",
+    "ChapkitJobScheduler",
+    # Artifact
+    "Artifact",
+    "ArtifactHierarchy",
+    "ArtifactIn",
+    "ArtifactManager",
+    "ArtifactOut",
+    "ArtifactRepository",
+    "ArtifactRouter",
+    "ArtifactTreeNode",
+    "PandasDataFrame",
     # Config
     "BaseConfig",
     "Config",
@@ -43,4 +83,13 @@ __all__ = [
     "TrainedModelArtifactData",
     "TrainRequest",
     "TrainResponse",
+    # Task
+    "Task",
+    "TaskIn",
+    "TaskManager",
+    "TaskOut",
+    "TaskRegistry",
+    "TaskRepository",
+    "TaskRouter",
+    "validate_and_disable_orphaned_tasks",
 ]

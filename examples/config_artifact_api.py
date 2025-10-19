@@ -9,12 +9,6 @@ from fastapi import FastAPI
 from pydantic import EmailStr
 from servicekit import Database
 from servicekit.api.routers.health import HealthState
-from servicekit.artifact import (
-    ArtifactHierarchy,
-    ArtifactIn,
-    ArtifactManager,
-    ArtifactRepository,
-)
 from ulid import ULID
 
 from chapkit import (
@@ -24,6 +18,12 @@ from chapkit import (
     ConfigRepository,
 )
 from chapkit.api import ServiceBuilder, ServiceInfo
+from chapkit.artifact import (
+    ArtifactHierarchy,
+    ArtifactIn,
+    ArtifactManager,
+    ArtifactRepository,
+)
 
 
 class ArtifactSeed(TypedDict):

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from servicekit.artifact.repository import ArtifactRepository
-from servicekit.artifact.schemas import ArtifactOut
 from servicekit.manager import BaseManager
 from ulid import ULID
+
+from chapkit.artifact.repository import ArtifactRepository
+from chapkit.artifact.schemas import ArtifactOut
 
 from .models import Config
 from .repository import ConfigRepository

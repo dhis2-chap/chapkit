@@ -4,9 +4,9 @@ from typing import Annotated
 
 from fastapi import Depends
 from servicekit.api.dependencies import get_session
-from servicekit.artifact import ArtifactManager, ArtifactRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from chapkit.artifact import ArtifactManager, ArtifactRepository
 from chapkit.config import BaseConfig, ConfigManager, ConfigRepository
 from chapkit.ml import MLManager
 

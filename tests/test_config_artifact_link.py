@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 from servicekit import SqliteDatabaseBuilder
-from servicekit.artifact import Artifact, ArtifactRepository
 
 from chapkit import Config, ConfigManager, ConfigRepository
+from chapkit.artifact import Artifact, ArtifactRepository
 
 from .conftest import DemoConfig
 

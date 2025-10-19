@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Callable, Coroutine, List, Self
@@ -9,9 +11,11 @@ from typing import Any, Callable, Coroutine, List, Self
 from fastapi import Depends, FastAPI
 from pydantic import EmailStr, HttpUrl
 from servicekit.api.crud import CrudPermissions
-from servicekit.api.dependencies import get_database, get_scheduler, get_session
-from servicekit.api.service_builder import BaseServiceBuilder, ServiceInfo
-from servicekit.artifact import (
+from servicekit.api.dependencies import get_database, get_scheduler, get_session, set_scheduler
+from servicekit.api.service_builder import BaseServiceBuilder, LifespanFactory, ServiceInfo
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from chapkit.artifact import (
     ArtifactHierarchy,
     ArtifactIn,
     ArtifactManager,
@@ -19,10 +23,9 @@ from servicekit.artifact import (
     ArtifactRepository,
     ArtifactRouter,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigOut, ConfigRepository, ConfigRouter
 from chapkit.ml import MLManager, MLRouter, ModelRunnerProtocol
+from chapkit.scheduler import ChapkitJobScheduler
 
 from .dependencies import get_artifact_manager as default_get_artifact_manager
 from .dependencies import get_config_manager as default_get_config_manager
@@ -280,11 +283,35 @@ class ServiceBuilder(BaseServiceBuilder):
                 raise RuntimeError("Config schema not configured")
 
             runner: ModelRunnerProtocol = ml_runner
-            scheduler = get_scheduler()
+            scheduler_base = get_scheduler()
+            # ChapkitJobScheduler extends AIOJobScheduler which extends JobScheduler
+            if not isinstance(scheduler_base, ChapkitJobScheduler):
+                raise RuntimeError("Scheduler must be ChapkitJobScheduler for ML operations")
+            scheduler: ChapkitJobScheduler = scheduler_base
             database = get_database()
             return MLManager(runner, scheduler, database, config_schema)
 
         return _dependency
+
+    def _build_lifespan(self) -> LifespanFactory:
+        """Build lifespan context manager with ChapkitJobScheduler instead of AIOJobScheduler."""
+        # Get parent lifespan factory
+        parent_lifespan = super()._build_lifespan()
+
+        @asynccontextmanager
+        async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+            """Override scheduler creation to use ChapkitJobScheduler."""
+            # Call parent lifespan which handles database and most setup
+            async with parent_lifespan(app):
+                # Replace AIOJobScheduler with ChapkitJobScheduler if jobs are enabled
+                if self._job_options is not None:
+                    scheduler = ChapkitJobScheduler(max_concurrency=self._job_options.max_concurrency)
+                    set_scheduler(scheduler)
+                    app.state.scheduler = scheduler
+
+                yield
+
+        return lifespan
 
 
 class MLServiceBuilder(ServiceBuilder):

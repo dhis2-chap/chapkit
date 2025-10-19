@@ -23,12 +23,6 @@ from pydantic import BaseModel, Field
 from servicekit import Database
 from servicekit.api import Router
 from servicekit.api.routers.health import HealthState
-from servicekit.artifact import (
-    ArtifactHierarchy,
-    ArtifactIn,
-    ArtifactManager,
-    ArtifactRepository,
-)
 from ulid import ULID
 
 from chapkit import (
@@ -39,6 +33,12 @@ from chapkit import (
 )
 from chapkit.api import ServiceBuilder, ServiceInfo
 from chapkit.api.dependencies import get_config_manager
+from chapkit.artifact import (
+    ArtifactHierarchy,
+    ArtifactIn,
+    ArtifactManager,
+    ArtifactRepository,
+)
 
 # ==================== Configuration Schema ====================
 

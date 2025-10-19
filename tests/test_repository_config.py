@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 from servicekit import SqliteDatabaseBuilder
-from servicekit.artifact import Artifact, ArtifactRepository
 from ulid import ULID
 
 from chapkit import Config, ConfigRepository
+from chapkit.artifact import Artifact, ArtifactRepository
 
 from .conftest import DemoConfig
 

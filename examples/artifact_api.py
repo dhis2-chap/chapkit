@@ -6,11 +6,11 @@ from typing import TypedDict
 
 from fastapi import FastAPI
 from servicekit import Database
-from servicekit.artifact import ArtifactHierarchy, ArtifactIn, ArtifactManager, ArtifactRepository
 from ulid import ULID
 
 from chapkit import BaseConfig
 from chapkit.api import ServiceBuilder, ServiceInfo
+from chapkit.artifact import ArtifactHierarchy, ArtifactIn, ArtifactManager, ArtifactRepository
 
 
 class MockLinearModel:

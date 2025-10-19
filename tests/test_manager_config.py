@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from servicekit import SqliteDatabaseBuilder
-from servicekit.artifact import Artifact, ArtifactRepository
 from ulid import ULID
 
 from chapkit import (
@@ -13,6 +12,7 @@ from chapkit import (
     ConfigOut,
     ConfigRepository,
 )
+from chapkit.artifact import Artifact, ArtifactRepository
 
 from .conftest import DemoConfig
 

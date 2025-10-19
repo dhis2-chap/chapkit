@@ -6,12 +6,12 @@ import datetime
 import pickle
 
 from servicekit import Database
-from servicekit.artifact import ArtifactIn, ArtifactManager, ArtifactRepository
-from servicekit.scheduler import JobScheduler
 from ulid import ULID
 
+from chapkit.artifact import ArtifactIn, ArtifactManager, ArtifactRepository
 from chapkit.config import ConfigManager, ConfigRepository
 from chapkit.config.schemas import BaseConfig
+from chapkit.scheduler import ChapkitJobScheduler
 
 from .schemas import (
     ModelRunnerProtocol,
@@ -56,7 +56,7 @@ class MLManager:
     def __init__(
         self,
         runner: ModelRunnerProtocol,
-        scheduler: JobScheduler,
+        scheduler: ChapkitJobScheduler,
         database: Database,
         config_schema: type[BaseConfig],
     ) -> None:
@@ -212,7 +212,7 @@ class MLManager:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
 
-            from servicekit.artifact.schemas import PandasDataFrame
+            from chapkit.artifact.schemas import PandasDataFrame
 
             # Create and validate artifact data with Pydantic
             artifact_data_model = PredictionArtifactData(
