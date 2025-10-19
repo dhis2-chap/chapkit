@@ -101,7 +101,8 @@ class ArtifactManagerStub(Manager[ArtifactIn, ArtifactOut, ULID]):
 
     def __init__(self, *, trees: dict[ULID, ArtifactTreeNode] | None = None) -> None:
         self._trees = trees or {}
-        self.repo = None  # Will be set if needed for config lookups
+        self.repository = None  # Will be set if needed for config lookups
+        self.repo = self.repository  # Alias for backwards compatibility
 
     async def build_tree(self, id: ULID) -> ArtifactTreeNode | None:
         return self._trees.get(id)

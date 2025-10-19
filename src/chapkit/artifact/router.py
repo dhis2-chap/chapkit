@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import Depends, HTTPException, status
 from servicekit.api.crud import CrudPermissions, CrudRouter
 
+from ..config.schemas import BaseConfig, ConfigOut
 from .manager import ArtifactManager
 from .schemas import ArtifactIn, ArtifactOut, ArtifactTreeNode
 
@@ -27,7 +28,7 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
         **kwargs: Any,
     ) -> None:
         """Initialize artifact router with entity types and manager factory."""
-        # Store enable_config_access for potential future use
+        # Store enable_config_access to conditionally register config endpoint
         self.enable_config_access = enable_config_access
 
         super().__init__(
@@ -89,3 +90,37 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
             summary="Build artifact tree",
             description="Build hierarchical tree structure rooted at the given artifact",
         )
+
+        # Conditionally register config access endpoint
+        if self.enable_config_access:
+            from ..api.dependencies import get_config_manager
+            from ..config.manager import ConfigManager
+
+            async def get_config(
+                entity_id: str,
+                artifact_manager: ArtifactManager = Depends(manager_factory),
+                config_manager: ConfigManager[BaseConfig] = Depends(get_config_manager),
+            ) -> ConfigOut[BaseConfig]:
+                """Get the config linked to this artifact."""
+                ulid_id = self._parse_ulid(entity_id)
+
+                # Get config by traversing to root artifact
+                config = await config_manager.get_config_for_artifact(
+                    artifact_id=ulid_id, artifact_repo=artifact_manager.repository
+                )
+
+                if config is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"No config linked to artifact {entity_id}",
+                    )
+
+                return config
+
+            self.register_entity_operation(
+                "config",
+                get_config,
+                response_model=ConfigOut[BaseConfig],
+                summary="Get artifact config",
+                description="Get configuration linked to this artifact by traversing to root",
+            )

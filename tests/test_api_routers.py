@@ -289,7 +289,6 @@ def test_config_router_get_linked_artifacts(config_app: tuple[TestClient, Config
     assert artifacts[0]["data"] == {"name": "test-artifact"}
 
 
-@pytest.mark.skip(reason="Config access endpoint not yet implemented in ArtifactRouter")
 def test_artifact_router_get_config_returns_config() -> None:
     """Test retrieving config for an artifact."""
     now = datetime.now(tz=timezone.utc)
