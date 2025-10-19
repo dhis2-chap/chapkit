@@ -9,9 +9,6 @@ services:
             EXAMPLE_MODULE: "examples.ml_shell:app"
             LOG_FORMAT: json
             LOG_LEVEL: INFO
-        volumes:
-            - ml-data:/app/data
-            - ml-artifacts:/app/artifacts
         restart: unless-stopped
         networks:
             - chapkit-ml
@@ -19,7 +16,3 @@ services:
 networks:
     chapkit-ml:
         driver: bridge
-
-volumes:
-    ml-data:
-    ml-artifacts:

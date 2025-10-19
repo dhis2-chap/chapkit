@@ -9,8 +9,6 @@ services:
             EXAMPLE_MODULE: "examples.ml_basic:app"
             LOG_FORMAT: json
             LOG_LEVEL: INFO
-        volumes:
-            - ml-data:/app/data
         restart: unless-stopped
         networks:
             - chapkit-ml
@@ -18,6 +16,3 @@ services:
 networks:
     chapkit-ml:
         driver: bridge
-
-volumes:
-    ml-data:
