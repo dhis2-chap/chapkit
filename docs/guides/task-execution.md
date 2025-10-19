@@ -10,7 +10,7 @@ Servicekit provides a task execution system for running Python functions and she
 from chapkit.task import TaskRegistry, TaskManager, TaskIn, TaskRepository, TaskRouter
 from servicekit.api import BaseServiceBuilder, ServiceInfo
 from servicekit import Database
-from servicekit.artifact import ArtifactManager
+from chapkit.artifact import ArtifactManager
 from fastapi import Depends
 
 # Register Python task

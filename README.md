@@ -6,12 +6,14 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://dhis2-chap.github.io/chapkit/)
 
-> ML service modules built on servicekit - config management and ML workflows
+> ML service modules built on servicekit - config, artifact, task, and ML workflows
 
-Chapkit provides ML-specific modules for building machine learning services, built on top of servicekit's artifact and task infrastructure.
+Chapkit provides domain-specific modules for building machine learning services on top of servicekit's core framework. Includes artifact storage, task execution, configuration management, and ML train/predict workflows.
 
 ## Features
 
+- **Artifact Module**: Hierarchical storage for models, data, and experiment tracking with parent-child relationships
+- **Task Module**: Reusable command templates for shell and Python task execution with parameter injection
 - **Config Module**: Key-value configuration with JSON data and Pydantic validation
 - **ML Module**: Train/predict workflows with artifact-based model storage and timing metadata
 - **Config-Artifact Linking**: Connect configurations to artifact hierarchies for experiment tracking
@@ -27,8 +29,7 @@ Chapkit automatically installs servicekit as a dependency.
 ## Quick Start
 
 ```python
-from servicekit.artifact import ArtifactHierarchy
-from chapkit import BaseConfig
+from chapkit import ArtifactHierarchy, BaseConfig
 from chapkit.api import ServiceBuilder, ServiceInfo
 
 class MyConfig(BaseConfig):
@@ -64,10 +65,10 @@ app.with_config(AppConfig)
 
 ### Artifacts
 
-Chapkit uses servicekit's artifact system for hierarchical storage:
+Hierarchical storage for models, data, and experiment tracking:
 
 ```python
-from servicekit.artifact import ArtifactHierarchy, ArtifactManager, ArtifactIn
+from chapkit import ArtifactHierarchy, ArtifactManager, ArtifactIn
 
 hierarchy = ArtifactHierarchy(
     name="ml_pipeline",

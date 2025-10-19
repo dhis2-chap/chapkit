@@ -7,7 +7,7 @@ Chapkit provides a complete ML workflow system for training models and making pr
 ### Functional Approach (Recommended for Simple Models)
 
 ```python
-from servicekit.artifact import ArtifactHierarchy
+from chapkit.artifact import ArtifactHierarchy
 
 from chapkit import BaseConfig
 from chapkit.api import MLServiceBuilder, MLServiceInfo
@@ -274,7 +274,7 @@ with open(args.model, "wb") as f:
 Bundles health, config, artifacts, jobs, and ML in one builder.
 
 ```python
-from servicekit.artifact import ArtifactHierarchy
+from chapkit.artifact import ArtifactHierarchy
 
 from chapkit.api import MLServiceBuilder, MLServiceInfo, AssessedStatus
 
@@ -486,7 +486,7 @@ All tabular data uses the `PandasDataFrame` schema:
 
 **Python Usage:**
 ```python
-from servicekit.artifact.schemas import PandasDataFrame
+from chapkit.artifact.schemas import PandasDataFrame
 
 # Create from DataFrame
 df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
