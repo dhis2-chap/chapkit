@@ -102,13 +102,17 @@ Train/predict workflows with artifact-based model storage and timing metadata.
 
 Protocol and implementations for ML model training and prediction.
 
-#### ModelRunnerProtocol
+#### BaseModelRunner
 
-::: chapkit.ml.model_runner.ModelRunnerProtocol
+::: chapkit.ml.runner.BaseModelRunner
 
 #### FunctionalModelRunner
 
-::: chapkit.ml.model_runner.FunctionalModelRunner
+::: chapkit.ml.runner.FunctionalModelRunner
+
+#### ShellModelRunner
+
+::: chapkit.ml.runner.ShellModelRunner
 
 ## Scheduler
 

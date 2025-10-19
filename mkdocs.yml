@@ -32,7 +32,10 @@ theme:
 nav:
   - Home: index.md
   - Guides:
+      - Artifact Storage: guides/artifact-storage.md
+      - Task Execution: guides/task-execution.md
       - ML Workflows: guides/ml-workflows.md
+  - API Reference: api-reference.md
 
 markdown_extensions:
   - admonition
