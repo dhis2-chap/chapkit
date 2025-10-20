@@ -1,0 +1,16 @@
+[project]
+name = "chapkit-demo-task-execution"
+version = "0.1.0"
+description = "Task execution demo with Python functions, shell commands, and dependency injection"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
+
+[tool.uv.sources]
+chapkit = { path = "../..", editable = true }
