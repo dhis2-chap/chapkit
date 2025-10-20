@@ -1,0 +1,393 @@
+{
+	"info": {
+		"_postman_id": "chapkit-config-artifact-linking",
+		"name": "Chapkit - Config & Artifact Linking",
+		"description": "Config-artifact linking with hierarchies and ML experiment tracking.\n\n## Features\n- Config CRUD with ExperimentConfig schema\n- Artifact hierarchies (train → predict → result)\n- Config-artifact linking\n- Auto-seeded experiments with stable ULIDs\n- Custom health check (flaky service simulation)\n- RFC 9457 error responses\n\n## Quick Start\n1. Start service: `cd examples/config_artifact && uv run python main.py`\n2. Run `Check Service Health` to verify\n3. Service auto-seeds two experiments (alpha, beta) with artifact trees\n\n## Seeded Experiments (Stable ULIDs)\n- experiment_alpha config: `01K72PWT05GEXK1S24AVKAZ9VE`\n  - root artifact (train): `01K72PWT05GEXK1S24AVKAZ9VF`\n- experiment_beta config: `01K72PWT05GEXK1S24AVKAZ9VK`\n  - root artifact (train): `01K72PWT05GEXK1S24AVKAZ9VM`\n\n## Hierarchy\n- Level 0: train (root nodes)\n- Level 1: predict (children of train)\n- Level 2: result (children of predict)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health & System Info",
+			"item": [
+				{
+					"name": "Check Service Health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Service status is present\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Check service health. Includes custom flaky_service check that randomly returns healthy/degraded/unhealthy."
+					},
+					"response": []
+				},
+				{
+					"name": "Get System Info",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"System info has hierarchy and configs\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('hierarchy');",
+									"    pm.expect(jsonData).to.have.property('configs');",
+									"    pm.expect(jsonData.configs).to.include('experiment_alpha');",
+									"    pm.expect(jsonData.configs).to.include('experiment_beta');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/system",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "system"]
+						},
+						"description": "Get service information including hierarchy metadata and seeded config names."
+					},
+					"response": []
+				}
+			],
+			"description": "Health checks and service information endpoints."
+		},
+		{
+			"name": "2. Config Management",
+			"item": [
+				{
+					"name": "List All Configs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Configs include experiments\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    const names = jsonData.map(c => c.name);",
+									"    pm.expect(names).to.include('experiment_alpha');",
+									"    pm.expect(names).to.include('experiment_beta');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						},
+						"description": "List all experiment configurations."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Config by ID (Alpha)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Config is experiment_alpha\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.name).to.eql('experiment_alpha');",
+									"    pm.expect(jsonData.data.model).to.eql('xgboost');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/{{alpha_config_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "{{alpha_config_id}}"]
+						},
+						"description": "Get experiment_alpha configuration by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Config Artifacts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Returns artifact IDs linked to config\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"    pm.expect(jsonData.length).to.be.at.least(1);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/{{alpha_config_id}}/artifacts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "{{alpha_config_id}}", "artifacts"]
+						},
+						"description": "Get all artifacts linked to experiment_alpha config."
+					},
+					"response": []
+				}
+			],
+			"description": "Config CRUD and config-artifact linking operations."
+		},
+		{
+			"name": "3. Artifact Management",
+			"item": [
+				{
+					"name": "List All Artifacts",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Artifacts include seeded data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"    pm.expect(jsonData.length).to.be.at.least(6);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts"]
+						},
+						"description": "List all artifacts across all hierarchies."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Artifact by ID (Alpha Train)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Artifact is alpha train node\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data.stage).to.eql('train');",
+									"    pm.expect(jsonData.data.dataset).to.eql('alpha_train.parquet');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/{{alpha_train_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "{{alpha_train_id}}"]
+						},
+						"description": "Get alpha experiment's train artifact by ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Artifact Tree (Alpha)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Tree has root and children\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('children');",
+									"    pm.expect(jsonData.children.length).to.be.at.least(1);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/{{alpha_train_id}}/tree",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "{{alpha_train_id}}", "tree"]
+						},
+						"description": "Get full artifact tree starting from alpha train node."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Artifact Config",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Config is linked to artifact\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.name).to.eql('experiment_alpha');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/{{alpha_train_id}}/config",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "{{alpha_train_id}}", "config"]
+						},
+						"description": "Get config linked to alpha train artifact (inherits from root)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Roots by Level",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Returns root artifacts\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"    pm.expect(jsonData.length).to.eql(2);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/$roots?level=0",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "$roots"],
+							"query": [
+								{
+									"key": "level",
+									"value": "0"
+								}
+							]
+						},
+						"description": "Get all root artifacts at level 0 (train nodes)."
+					},
+					"response": []
+				}
+			],
+			"description": "Artifact CRUD, tree operations, and hierarchy queries."
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://127.0.0.1:8000",
+			"type": "string"
+		},
+		{
+			"key": "alpha_config_id",
+			"value": "01K72PWT05GEXK1S24AVKAZ9VE",
+			"type": "string"
+		},
+		{
+			"key": "beta_config_id",
+			"value": "01K72PWT05GEXK1S24AVKAZ9VK",
+			"type": "string"
+		},
+		{
+			"key": "alpha_train_id",
+			"value": "01K72PWT05GEXK1S24AVKAZ9VF",
+			"type": "string"
+		},
+		{
+			"key": "beta_train_id",
+			"value": "01K72PWT05GEXK1S24AVKAZ9VM",
+			"type": "string"
+		}
+	]
+}
