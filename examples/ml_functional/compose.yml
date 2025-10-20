@@ -2,7 +2,7 @@ services:
     api:
         build:
             context: ../..
-            dockerfile: examples/ml_basic/Dockerfile
+            dockerfile: examples/ml_functional/Dockerfile
         ports:
             - "8000:8000"
         environment:
@@ -22,7 +22,7 @@ services:
             retries: 3
             start_period: 40s
         networks:
-            - chapkit-ml-basic
+            - chapkit-ml-functional
 
     prometheus:
         image: prom/prometheus:latest
@@ -44,7 +44,7 @@ services:
             retries: 3
             start_period: 5s
         networks:
-            - chapkit-ml-basic
+            - chapkit-ml-functional
         depends_on:
             api:
                 condition: service_healthy
@@ -73,13 +73,13 @@ services:
             retries: 3
             start_period: 10s
         networks:
-            - chapkit-ml-basic
+            - chapkit-ml-functional
         depends_on:
             prometheus:
                 condition: service_healthy
 
 networks:
-    chapkit-ml-basic:
+    chapkit-ml-functional:
         driver: bridge
 
 volumes:

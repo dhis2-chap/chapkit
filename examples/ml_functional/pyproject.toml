@@ -1,7 +1,7 @@
 [project]
-name = "chapkit-demo-ml-basic"
+name = "chapkit-demo-ml-functional"
 version = "0.1.0"
-description = "Basic ML workflow with disease prediction using Linear Regression"
+description = "Functional ML workflow with disease prediction using Linear Regression"
 requires-python = ">=3.13"
 dependencies = [
     "chapkit",

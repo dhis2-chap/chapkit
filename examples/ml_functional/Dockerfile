@@ -1,4 +1,4 @@
-# ML Basic Demo Dockerfile
+# ML Functional Demo Dockerfile
 FROM ghcr.io/astral-sh/uv:0.9-python3.13-bookworm-slim AS builder
 
 WORKDIR /app
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install /chapkit/dist/*.whl
 
 # Copy demo files
-COPY examples/ml_basic/main.py ./
+COPY examples/ml_functional/main.py ./
 
 # Cleanup Python cache files
 RUN find /app/.venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
@@ -33,8 +33,8 @@ RUN find /app/.venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
 FROM python:3.13-slim AS runtime
 
 # OCI labels for container metadata
-LABEL org.opencontainers.image.title="Chapkit ML Basic Demo"
-LABEL org.opencontainers.image.description="Disease prediction ML service using Linear Regression with monitoring"
+LABEL org.opencontainers.image.title="Chapkit ML Functional Demo"
+LABEL org.opencontainers.image.description="Disease prediction ML service using FunctionalModelRunner with Linear Regression and monitoring"
 LABEL org.opencontainers.image.vendor="Chapkit"
 LABEL org.opencontainers.image.source="https://github.com/dhis2-chap/chapkit"
 
