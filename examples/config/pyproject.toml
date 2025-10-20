@@ -1,0 +1,16 @@
+[project]
+name = "chapkit-demo-config"
+version = "0.1.0"
+description = "Config management API demo with typed configuration and seeding"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
+
+[tool.uv.sources]
+chapkit = { path = "../..", editable = true }
