@@ -124,8 +124,6 @@ class CustomStatsRouter(Router):
 
 async def startup_hook(app: FastAPI) -> None:
     """Startup hook to seed example data."""
-    print("🚀 Service starting up...")
-
     database: Database | None = getattr(app.state, "database", None)
     if database is None:
         return
@@ -151,7 +149,6 @@ async def startup_hook(app: FastAPI) -> None:
                     ),
                 )
             )
-            print("  ✓ Seeded example config: production_pipeline")
 
         # Seed example artifact
         artifact_repo = ArtifactRepository(session)
@@ -170,16 +167,12 @@ async def startup_hook(app: FastAPI) -> None:
                     parent_id=None,
                 )
             )
-            print("  ✓ Seeded example artifact: baseline_experiment")
-
-    print("✅ Startup complete!\n")
 
 
 async def shutdown_hook(app: FastAPI) -> None:
     """Shutdown hook for cleanup."""
-    print("👋 Service shutting down...")
     # Perform cleanup if needed
-    print("✅ Shutdown complete!")
+    pass
 
 
 # ==================== Service Configuration ====================
@@ -206,7 +199,6 @@ app = (
         include_database_check=True,
     )
     .with_system()
-    .with_logging()  # Structured logging with request tracing
     .with_monitoring()  # Prometheus metrics + OpenTelemetry
     .with_landing_page()  # Interactive homepage
     # Data management

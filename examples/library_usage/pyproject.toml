@@ -1,0 +1,16 @@
+[project]
+name = "chapkit-demo-library-usage"
+version = "0.1.0"
+description = "Demonstrates chapkit as a library with custom models and CrudRouter"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
+
+[tool.uv.sources]
+chapkit = { path = "../..", editable = true }

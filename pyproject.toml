@@ -29,7 +29,7 @@ dependencies = [
   "pandas>=2.3.3",
   "scikit-learn>=1.7.2",
   "geojson-pydantic>=2.1.0",
-  "servicekit",
+  "servicekit>=0.2.0",
 ]
 
 [project.urls]

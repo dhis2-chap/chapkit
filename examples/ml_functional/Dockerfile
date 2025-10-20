@@ -1,33 +1,31 @@
 # ML Functional Demo Dockerfile
 FROM ghcr.io/astral-sh/uv:0.9-python3.13-bookworm-slim AS builder
 
-WORKDIR /app
+WORKDIR /workspace
 
 ARG USER=chapkit UID=10001
 RUN useradd -u ${UID} -m -s /bin/bash ${USER}
+
+# Install git for fetching dependencies from git repositories
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
 # UV configuration for better build performance
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# Copy and build parent chapkit project
-COPY pyproject.toml uv.lock README.md /chapkit/
-COPY src /chapkit/src/
-WORKDIR /chapkit
-RUN uv build
+# Copy entire project structure to maintain relative paths for editable installs
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src/
+COPY examples/ml_functional ./examples/ml_functional/
 
-# Install chapkit wheel in app directory
-WORKDIR /app
+# Install from example directory (which references parent via ../../)
+WORKDIR /workspace/examples/ml_functional
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv && \
-    uv pip install /chapkit/dist/*.whl
-
-# Copy demo files
-COPY examples/ml_functional/main.py ./
+    uv sync --frozen --no-dev
 
 # Cleanup Python cache files
-RUN find /app/.venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
-    find /app/.venv -type f -name '*.py[co]' -delete || true
+RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
+    find .venv -type f -name '*.py[co]' -delete || true
 
 # ---- runtime ----
 FROM python:3.13-slim AS runtime
@@ -38,8 +36,6 @@ LABEL org.opencontainers.image.description="Disease prediction ML service using 
 LABEL org.opencontainers.image.vendor="Chapkit"
 LABEL org.opencontainers.image.source="https://github.com/dhis2-chap/chapkit"
 
-WORKDIR /app
-
 ARG USER=chapkit UID=10001
 RUN useradd -u ${UID} -m -s /bin/bash ${USER}
 
@@ -49,12 +45,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends ca-certificates tini && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy venv and application from builder
-COPY --from=builder --chown=${USER}:${USER} /app/.venv /app/.venv
-COPY --from=builder --chown=${USER}:${USER} /app/main.py /app/main.py
+# Copy entire structure to preserve paths for editable chapkit install
+COPY --from=builder --chown=${USER}:${USER} /workspace /workspace
 
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH=/app/.venv/bin:${PATH}
+WORKDIR /workspace/examples/ml_functional
+
+# Set up environment to use the venv from example directory
+ENV VIRTUAL_ENV=/workspace/examples/ml_functional/.venv
+ENV PATH=/workspace/examples/ml_functional/.venv/bin:${PATH}
+ENV PYTHONPATH=/workspace
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONFAULTHANDLER=1

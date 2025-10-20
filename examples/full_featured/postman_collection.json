@@ -1,0 +1,210 @@
+{
+	"info": {
+		"_postman_id": "chapkit-full-featured",
+		"name": "Chapkit - Complete Feature Showcase",
+		"description": "Comprehensive example demonstrating ALL chapkit features in one service.\n\n## Features\n- Health checks (custom + database)\n- System info endpoints\n- Config management (MLPipelineConfig)\n- Artifact hierarchies (4-level ML pipeline)\n- Config-artifact linking\n- Job scheduling\n- Structured logging\n- Prometheus metrics + OpenTelemetry\n- Custom routers (/api/v1/stats)\n- Startup/shutdown hooks\n- Landing page\n\n## Quick Start\n1. Start service: `cd examples/full_featured && uv run python main.py`\n2. Run `Check Service Health` to verify\n3. Visit http://localhost:8000 for landing page\n4. Auto-seeded with production config and baseline experiment artifact\n\n## Monitoring\n- Prometheus: http://localhost:9090 (with docker compose)\n- Grafana: http://localhost:3000 (admin/admin)\n- Metrics: http://localhost:8000/metrics",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health & System",
+			"item": [
+				{
+					"name": "Check Service Health (with custom checks)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Includes custom 'external_service' health check (randomly returns healthy/degraded/unhealthy)"
+					}
+				},
+				{
+					"name": "Get System Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/system",
+							"host": ["{{baseUrl}}"],
+							"path": ["system"]
+						}
+					}
+				},
+				{
+					"name": "Get Prometheus Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/metrics",
+							"host": ["{{baseUrl}}"],
+							"path": ["metrics"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Config Management",
+			"item": [
+				{
+					"name": "List All Configs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						}
+					}
+				},
+				{
+					"name": "Get Production Config",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/01JCSEED00C0NF1GEXAMP1E001",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "01JCSEED00C0NF1GEXAMP1E001"]
+						},
+						"description": "Get the auto-seeded production_pipeline config"
+					}
+				},
+				{
+					"name": "Create ML Pipeline Config",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"experiment_v2\",\n  \"data\": {\n    \"model_type\": \"random_forest\",\n    \"learning_rate\": 0.01,\n    \"max_epochs\": 200,\n    \"batch_size\": 128,\n    \"early_stopping\": true,\n    \"random_seed\": 42\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Artifacts",
+			"item": [
+				{
+					"name": "List All Artifacts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts"]
+						}
+					}
+				},
+				{
+					"name": "Get Baseline Experiment Artifact",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/01JCSEED00ART1FACTEXMP1001",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "01JCSEED00ART1FACTEXMP1001"]
+						}
+					}
+				},
+				{
+					"name": "Get Artifact Tree",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/01JCSEED00ART1FACTEXMP1001/$tree",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "01JCSEED00ART1FACTEXMP1001", "$tree"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Config-Artifact Linking",
+			"item": [
+				{
+					"name": "Link Artifact to Config",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/01JCSEED00C0NF1GEXAMP1E001/$link-artifact/01JCSEED00ART1FACTEXMP1001",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "01JCSEED00C0NF1GEXAMP1E001", "$link-artifact", "01JCSEED00ART1FACTEXMP1001"]
+						}
+					}
+				},
+				{
+					"name": "Get Config's Artifacts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/01JCSEED00C0NF1GEXAMP1E001/$artifacts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "01JCSEED00C0NF1GEXAMP1E001", "$artifacts"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "5. Custom Stats Router",
+			"item": [
+				{
+					"name": "Get Service Statistics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/stats",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "stats"]
+						},
+						"description": "Custom router showing total configs, artifacts, tasks, and service version"
+					}
+				}
+			]
+		},
+		{
+			"name": "6. Job Scheduler",
+			"item": [
+				{
+					"name": "List All Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "jobs"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}

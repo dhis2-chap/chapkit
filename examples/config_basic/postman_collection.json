@@ -1,0 +1,404 @@
+{
+	"info": {
+		"_postman_id": "chapkit-config-management",
+		"name": "Chapkit - Config Management",
+		"description": "Environment configuration CRUD operations with typed configuration and seeding.\n\n## Features\n- Configuration management (Create, Read, Update, Delete)\n- Typed EnvironmentConfig schema\n- Pagination support\n- Schema introspection\n- Auto-seeded environment configs with stable ULIDs\n- RFC 9457 error responses\n\n## Quick Start\n1. Start service: `cd examples/config && uv run python main.py`\n2. Run `Check Service Health` to verify\n3. Service auto-seeds three environment configs (production, staging, local) with stable IDs\n4. Run requests directly - no need to capture IDs!\n\n## Seeded Configs (Stable ULIDs)\n- Production: `01K72P5N5KCRM6MD3BRE4P07N8`\n- Staging: `01K72P5N5KCRM6MD3BRE4P07N9`\n- Local: `01K72P5N5KCRM6MD3BRE4P07NA`\n\n## Collection Variables\n- `production_id`: Pre-configured with production config ULID\n- `config_id`: Can be set to any config ID for testing",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health & System Info",
+			"item": [
+				{
+					"name": "Check Service Health",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Service is healthy\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql(\"healthy\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						},
+						"description": "Check if the service is running and healthy. This endpoint does not require authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get System Info",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"System info has expected fields\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('display_name');",
+									"    pm.expect(jsonData).to.have.property('version');",
+									"    pm.expect(jsonData).to.have.property('author');",
+									"    pm.expect(jsonData).to.have.property('config_schema');",
+									"    pm.expect(jsonData).to.have.property('seeded_configs');",
+									"});",
+									"",
+									"pm.test(\"Seeded configs include production, staging, local\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.seeded_configs).to.include('production');",
+									"    pm.expect(jsonData.seeded_configs).to.include('staging');",
+									"    pm.expect(jsonData.seeded_configs).to.include('local');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/system",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "system"]
+						},
+						"description": "Get service information including config schema and seeded configs."
+					},
+					"response": []
+				}
+			],
+			"description": "Health checks and service information endpoints."
+		},
+		{
+			"name": "2. Config Management (CRUD)",
+			"item": [
+				{
+					"name": "Create Config",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Config created with ID\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.collectionVariables.set('config_id', jsonData.id);",
+									"});",
+									"",
+									"pm.test(\"Config has correct properties\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    pm.expect(jsonData.data).to.have.property('debug');",
+									"    pm.expect(jsonData.data).to.have.property('api_host');",
+									"    pm.expect(jsonData.data).to.have.property('api_port');",
+									"    pm.expect(jsonData.data).to.have.property('max_connections');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"testing\",\n  \"data\": {\n    \"debug\": true,\n    \"api_host\": \"127.0.0.1\",\n    \"api_port\": 8002,\n    \"max_connections\": 50\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						},
+						"description": "Create a new environment configuration. The config ID will be automatically captured in the `config_id` variable for use in subsequent requests."
+					},
+					"response": []
+				},
+				{
+					"name": "List All Configs",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response is an array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});",
+									"",
+									"pm.test(\"Configs include seeded data\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.length).to.be.at.least(3);",
+									"    const names = jsonData.map(c => c.name);",
+									"    pm.expect(names).to.include('production');",
+									"    pm.expect(names).to.include('staging');",
+									"    pm.expect(names).to.include('local');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						},
+						"description": "List all configurations without pagination. Returns an array of config objects."
+					},
+					"response": []
+				},
+				{
+					"name": "List Configs (Paginated)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response has pagination fields\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('items');",
+									"    pm.expect(jsonData).to.have.property('total');",
+									"    pm.expect(jsonData).to.have.property('page');",
+									"    pm.expect(jsonData).to.have.property('size');",
+									"    pm.expect(jsonData).to.have.property('pages');",
+									"});",
+									"",
+									"pm.test(\"Items is an array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.items).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs?page=1&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "size",
+									"value": "10"
+								}
+							]
+						},
+						"description": "List configs with pagination. Returns a PaginatedResponse with items, total, page, size, and pages."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Config by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Config has expected fields\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('name');",
+									"    pm.expect(jsonData).to.have.property('data');",
+									"    pm.expect(jsonData.name).to.eql('production');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/{{production_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "{{production_id}}"]
+						},
+						"description": "Get a specific config by ID. Uses the pre-configured `{{production_id}}` variable."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Config",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Config was updated\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.data.max_connections).to.eql(3000);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"production\",\n  \"data\": {\n    \"debug\": false,\n    \"api_host\": \"0.0.0.0\",\n    \"api_port\": 8080,\n    \"max_connections\": 3000\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/{{production_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "{{production_id}}"]
+						},
+						"description": "Update an existing config. All fields must be provided (PUT request)."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Config",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 204\", function () {",
+									"    pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/{{config_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "{{config_id}}"]
+						},
+						"description": "Delete a config by ID. Returns 204 No Content on success."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Config Schema",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Schema is JSON Schema format\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('$defs');",
+									"    pm.expect(jsonData).to.have.property('properties');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs/$schema",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs", "$schema"]
+						},
+						"description": "Get the Pydantic JSON schema for the EnvironmentConfig model. Useful for understanding the data structure and validation rules."
+					},
+					"response": []
+				}
+			],
+			"description": "Complete CRUD operations for configuration management."
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://127.0.0.1:8000",
+			"type": "string"
+		},
+		{
+			"key": "production_id",
+			"value": "01K72P5N5KCRM6MD3BRE4P07N8",
+			"type": "string"
+		},
+		{
+			"key": "staging_id",
+			"value": "01K72P5N5KCRM6MD3BRE4P07N9",
+			"type": "string"
+		},
+		{
+			"key": "local_id",
+			"value": "01K72P5N5KCRM6MD3BRE4P07NA",
+			"type": "string"
+		},
+		{
+			"key": "config_id",
+			"value": "01K72P5N5KCRM6MD3BRE4P07N8",
+			"type": "string"
+		}
+	]
+}

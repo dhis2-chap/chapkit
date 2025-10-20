@@ -1,0 +1,147 @@
+{
+	"info": {
+		"_postman_id": "chapkit-task-execution",
+		"name": "Chapkit - Task Execution",
+		"description": "Task execution system demonstrating Python functions and shell commands with dependency injection.\n\n## Features\n- Execute Python functions as tasks\n- Execute shell commands\n- Dependency injection (Database, ArtifactManager)\n- Auto-seeded demo tasks\n- Job scheduling integration\n\n## Quick Start\n1. Start service: `cd examples/task_execution && uv run python main.py`\n2. Run `Check Service Health` to verify\n3. Service auto-seeds 4 example tasks\n4. Execute tasks via API\n\n## Seeded Tasks\n- greet_user - Simple Python function\n- process_data - Python with dependency injection\n- python --version - Shell command\n- echo 'Task system ready!' - Shell command",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health & System",
+			"item": [
+				{
+					"name": "Check Service Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						}
+					}
+				},
+				{
+					"name": "Get System Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/system",
+							"host": ["{{baseUrl}}"],
+							"path": ["system"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Task Management",
+			"item": [
+				{
+					"name": "List All Tasks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tasks"]
+						}
+					}
+				},
+				{
+					"name": "Create Python Function Task",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tasks"]
+						}
+					}
+				},
+				{
+					"name": "Create Shell Command Task",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"command\": \"echo 'Hello from task!'\",\n  \"enabled\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tasks"]
+						}
+					}
+				},
+				{
+					"name": "Execute Task (Set task_id variable first)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/tasks/{{task_id}}/$execute",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "tasks", "{{task_id}}", "$execute"]
+						},
+						"description": "Execute a task by ID. Get task_id from List All Tasks response."
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Job Status",
+			"item": [
+				{
+					"name": "List All Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "jobs"]
+						}
+					}
+				},
+				{
+					"name": "Get Job Status (Set job_id variable first)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/jobs/{{job_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "jobs", "{{job_id}}"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "task_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "job_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

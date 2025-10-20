@@ -1,0 +1,134 @@
+{
+	"info": {
+		"_postman_id": "chapkit-artifact-api",
+		"name": "Chapkit - Artifact API (Read-Only)",
+		"description": "Read-only artifact API demonstrating hierarchical artifact storage with non-JSON payloads.\n\n## Features\n- Read-only artifact access (GET operations only)\n- Three-level hierarchy: experiment → stage → artifact\n- Non-JSON payload support (MockLinearModel)\n- Auto-seeded ML experiment pipelines\n- Tree operations ($tree, $expand)\n\n## Quick Start\n1. Start service: `cd examples/artifact && uv run python main.py`\n2. Run `Check Service Health` to verify\n3. Service auto-seeds two experiment pipelines (alpha, beta)\n4. Explore the artifact hierarchy\n\n## Seeded Experiments\n- experiment_alpha: `01K72P5N5KCRM6MD3BRE4P07NB`\n- experiment_beta: `01K72P5N5KCRM6MD3BRE4P07NK`",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health & System",
+			"item": [
+				{
+					"name": "Check Service Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						}
+					}
+				},
+				{
+					"name": "Get System Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/system",
+							"host": ["{{baseUrl}}"],
+							"path": ["system"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Artifacts - Read",
+			"item": [
+				{
+					"name": "List All Artifacts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts"]
+						}
+					}
+				},
+				{
+					"name": "Get Artifact by ID (Alpha Experiment)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/01K72P5N5KCRM6MD3BRE4P07NB",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "01K72P5N5KCRM6MD3BRE4P07NB"]
+						}
+					}
+				},
+				{
+					"name": "Get Artifact Tree (Alpha)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/01K72P5N5KCRM6MD3BRE4P07NB/$tree",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "01K72P5N5KCRM6MD3BRE4P07NB", "$tree"]
+						},
+						"description": "Get full artifact tree with hierarchy visualization"
+					}
+				},
+				{
+					"name": "Get Artifact with Expanded Children",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/artifacts/01K72P5N5KCRM6MD3BRE4P07NB/$expand",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "artifacts", "01K72P5N5KCRM6MD3BRE4P07NB", "$expand"]
+						},
+						"description": "Get artifact with all children expanded"
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Config Management",
+			"item": [
+				{
+					"name": "List All Configs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						}
+					}
+				},
+				{
+					"name": "Create Pipeline Config",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"test_pipeline\",\n  \"data\": {\n    \"owner\": \"data_science_team\",\n    \"stage\": \"development\",\n    \"notification_channel\": \"#ml-alerts\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}

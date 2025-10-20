@@ -1,4 +1,4 @@
-# Task Execution Demo Dockerfile
+# Library Usage Demo Dockerfile
 FROM ghcr.io/astral-sh/uv:0.9-python3.13-bookworm-slim AS builder
 
 WORKDIR /workspace
@@ -16,10 +16,10 @@ ENV UV_LINK_MODE=copy
 # Copy entire project structure to maintain relative paths for editable installs
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src/
-COPY examples/task_execution ./examples/task_execution/
+COPY examples/library_usage ./examples/library_usage/
 
 # Install from example directory (which references parent via ../../)
-WORKDIR /workspace/examples/task_execution
+WORKDIR /workspace/examples/library_usage
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -31,8 +31,8 @@ RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
 FROM python:3.13-slim AS runtime
 
 # OCI labels for container metadata
-LABEL org.opencontainers.image.title="Chapkit Task Execution Demo"
-LABEL org.opencontainers.image.description="Task execution demo with Python functions, shell commands, and dependency injection"
+LABEL org.opencontainers.image.title="Chapkit Library Usage Demo"
+LABEL org.opencontainers.image.description="Custom models and CrudRouter demonstration with User management"
 LABEL org.opencontainers.image.vendor="Chapkit"
 LABEL org.opencontainers.image.source="https://github.com/dhis2-chap/chapkit"
 
@@ -48,11 +48,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Copy entire structure to preserve paths for editable chapkit install
 COPY --from=builder --chown=${USER}:${USER} /workspace /workspace
 
-WORKDIR /workspace/examples/task_execution
+WORKDIR /workspace/examples/library_usage
 
 # Set up environment to use the venv from example directory
-ENV VIRTUAL_ENV=/workspace/examples/task_execution/.venv
-ENV PATH=/workspace/examples/task_execution/.venv/bin:${PATH}
+ENV VIRTUAL_ENV=/workspace/examples/library_usage/.venv
+ENV PATH=/workspace/examples/library_usage/.venv/bin:${PATH}
 ENV PYTHONPATH=/workspace
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1

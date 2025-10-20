@@ -1,0 +1,143 @@
+{
+	"info": {
+		"_postman_id": "chapkit-library-usage",
+		"name": "Chapkit - Library Usage with Custom Models",
+		"description": "Demonstrates chapkit as a library with custom User model and CrudRouter.\n\n## Features\n- Custom User model extending Entity\n- UserRepository with custom query methods\n- UserManager with business logic\n- Auto-generated CRUD endpoints via CrudRouter\n- Config management integration\n\n## Quick Start\n1. Start service: `cd examples/library_usage && uv run python main.py`\n2. Run `Check Service Health` to verify\n3. Service auto-seeds admin user and production config\n4. Test User CRUD operations\n\n## Seeded Data\n- Admin user (username: admin, email: admin@example.com)\n- Production config (max_users: 1000)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health & System",
+			"item": [
+				{
+					"name": "Check Service Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["health"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. User Management",
+			"item": [
+				{
+					"name": "List All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users"]
+						}
+					}
+				},
+				{
+					"name": "Create User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"user_id\", jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"john@example.com\",\n  \"full_name\": \"John Doe\",\n  \"preferences\": {\n    \"theme\": \"light\",\n    \"notifications\": true,\n    \"language\": \"en\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users"]
+						}
+					}
+				},
+				{
+					"name": "Get User by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/{{user_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"john.doe@example.com\",\n  \"full_name\": \"John R. Doe\",\n  \"preferences\": {\n    \"theme\": \"dark\",\n    \"notifications\": false,\n    \"language\": \"en\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/{{user_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users", "{{user_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete User",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/users/{{user_id}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "users", "{{user_id}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Config Management",
+			"item": [
+				{
+					"name": "List All Configs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/configs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "configs"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

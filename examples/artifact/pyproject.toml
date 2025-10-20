@@ -1,0 +1,16 @@
+[project]
+name = "chapkit-demo-artifact"
+version = "0.1.0"
+description = "Read-only artifact API with hierarchies and non-JSON payloads demonstration"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
+
+[tool.uv.sources]
+chapkit = { path = "../..", editable = true }

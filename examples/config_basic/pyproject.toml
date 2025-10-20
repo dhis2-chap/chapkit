@@ -1,0 +1,16 @@
+[project]
+name = "chapkit-demo-config-basic"
+version = "0.1.0"
+description = "Basic config CRUD example with environment settings and seeding"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
+
+[tool.uv.sources]
+chapkit = { path = "../..", editable = true }

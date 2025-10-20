@@ -1,0 +1,12 @@
+[project]
+name = "chapkit-demo-ml-pipeline"
+version = "0.1.0"
+description = "ML pipeline demonstration with config, artifact hierarchies, and pandas DataFrames"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+    "pandas>=2.2.3",
+]
+
+[tool.uv.sources]
+chapkit = { path = "../..", editable = true }
