@@ -16,7 +16,7 @@ from typing import Any, cast
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.ml_basic import app
+from examples.ml_functional.main import app
 
 
 @pytest.fixture(scope="module")

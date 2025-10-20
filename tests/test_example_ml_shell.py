@@ -7,7 +7,7 @@ from typing import Any, cast
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.ml_shell import app
+from examples.ml_shell.main import app
 
 
 @pytest.fixture(scope="module")

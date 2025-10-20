@@ -25,8 +25,9 @@ class ChapkitJobRecord(JobRecord):
 class ChapkitJobScheduler(AIOJobScheduler):
     """Chapkit job scheduler with automatic artifact tracking for jobs that return ULIDs."""
 
-    # Override with compatible type - dict is invariant, but we handle both types correctly
-    _records: dict[ULID, JobRecord] = PrivateAttr(default_factory=dict)
+    # Override with ChapkitJobRecord type to support artifact_id tracking
+    # dict is invariant, but we always use ChapkitJobRecord in this subclass
+    _records: dict[ULID, ChapkitJobRecord] = PrivateAttr(default_factory=dict)  # type: ignore[assignment]
 
     async def add_job(
         self,
@@ -89,9 +90,7 @@ class ChapkitJobScheduler(AIOJobScheduler):
         async with self._lock:
             if job_id not in self._records:
                 raise KeyError(f"Job {job_id} not found")
-            rec = self._records[job_id]
-            # Records are created as ChapkitJobRecord, cast is safe
-            return rec  # type: ignore[return-value]
+            return self._records[job_id]
 
     async def list_records(
         self, *, status_filter: JobStatus | None = None, reverse: bool = False
@@ -103,8 +102,7 @@ class ChapkitJobScheduler(AIOJobScheduler):
                 records = [r for r in records if r.status == status_filter]
             if reverse:
                 records = list(reversed(records))
-            # Records are created as ChapkitJobRecord, cast is safe
-            return records  # type: ignore[return-value]
+            return records
 
     async def _run_with_state(
         self,

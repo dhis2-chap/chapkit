@@ -11,7 +11,7 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.library_usage_api import app
+from examples.library_usage.main import app
 
 
 @pytest.fixture(scope="module")
