@@ -214,7 +214,7 @@ def test_artifact_with_non_json_payload(client: TestClient) -> None:
     artifact_data = data["data"]
     assert isinstance(artifact_data, dict)
     assert artifact_data["_type"] == "MockLinearModel"
-    assert artifact_data["_module"] == "examples.artifact_api"
+    assert artifact_data["_module"] == "examples.artifact.main"
     assert "MockLinearModel" in artifact_data["_repr"]
     assert "coefficients" in artifact_data["_repr"]
     assert "intercept" in artifact_data["_repr"]
