@@ -39,7 +39,7 @@ lint:
 	@$(UV) run ruff format .
 	@$(UV) run ruff check . --fix
 	@echo ">>> Running type checker"
-	@$(UV) run mypy --exclude 'examples/old' src tests examples alembic
+	@$(UV) run mypy --exclude 'examples/old' --explicit-package-bases src tests examples alembic
 	@$(UV) run pyright
 
 test:
