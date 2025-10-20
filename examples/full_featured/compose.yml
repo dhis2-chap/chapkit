@@ -1,0 +1,87 @@
+services:
+    api:
+        build:
+            context: ../..
+            dockerfile: examples/full_featured/Dockerfile
+        ports:
+            - "8000:8000"
+        environment:
+            LOG_FORMAT: json
+            LOG_LEVEL: INFO
+        restart: unless-stopped
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "python",
+                    "-c",
+                    "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()",
+                ]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        networks:
+            - chapkit-full-featured
+
+    prometheus:
+        image: prom/prometheus:latest
+        ports:
+            - "9090:9090"
+        command:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+            - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+            - "--web.console.templates=/usr/share/prometheus/consoles"
+        volumes:
+            - ./prometheus:/etc/prometheus:ro
+            - prometheus-data:/prometheus
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 5s
+        networks:
+            - chapkit-full-featured
+        depends_on:
+            api:
+                condition: service_healthy
+
+    grafana:
+        image: grafana/grafana:latest
+        ports:
+            - "3000:3000"
+        environment:
+            - GF_SECURITY_ADMIN_USER=admin
+            - GF_SECURITY_ADMIN_PASSWORD=admin
+            - GF_USERS_ALLOW_SIGN_UP=false
+            - GF_SERVER_ROOT_URL=http://localhost:3000
+            - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+            - GF_INSTALL_PLUGINS=
+            - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=
+        volumes:
+            - ./grafana/provisioning:/etc/grafana/provisioning:ro
+            - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+            - grafana-data:/var/lib/grafana
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 10s
+        networks:
+            - chapkit-full-featured
+        depends_on:
+            prometheus:
+                condition: service_healthy
+
+networks:
+    chapkit-full-featured:
+        driver: bridge
+
+volumes:
+    grafana-data:
+    prometheus-data:
