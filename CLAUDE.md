@@ -173,9 +173,9 @@ make upgrade                    # Apply migrations (auto-applied on init)
 
 **IMPORTANT: Always use full descriptive names, never abbreviations**
 
-- ✅ `self.repository` (not `self.repo`)
-- ✅ `config_repository` (not `config_repo`)
-- ✅ `artifact_repository` (not `artifact_repo`)
+- `self.repository` (not `self.repo`)
+- `config_repository` (not `config_repo`)
+- `artifact_repository` (not `artifact_repo`)
 
 This applies to:
 - Class attributes
