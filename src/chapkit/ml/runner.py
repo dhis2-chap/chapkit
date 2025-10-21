@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import yaml
 import pickle
 import tempfile
 from abc import ABC, abstractmethod
@@ -11,6 +10,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Generic, TypeVar
 
 import pandas as pd
+import yaml
 from geojson_pydantic import FeatureCollection
 from servicekit.logging import get_logger
 
@@ -118,9 +118,9 @@ class ShellModelRunner(BaseModelRunner):
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_train_"))
 
         try:
-            # Write config to JSON file
-            config_file = temp_dir / "config.yaml"
-            config_file.write_text(yaml.dumps(config.model_dump(), indent=2))
+            # Write config to YAML file
+            config_file = temp_dir / "config.yml"
+            config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
 
             # Write training data to CSV
             data_file = temp_dir / "data.csv"
@@ -190,9 +190,9 @@ class ShellModelRunner(BaseModelRunner):
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
         try:
-            # Write config to JSON file
-            config_file = temp_dir / "config.yaml"
-            config_file.write_text(yaml.dumps(config.model_dump(), indent=2))
+            # Write config to YAML file
+            config_file = temp_dir / "config.yml"
+            config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
 
             # Write model to file
             model_file = temp_dir / f"model.{self.model_format}"

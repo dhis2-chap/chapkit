@@ -2,28 +2,28 @@
 """External training script for ML model training via ShellModelRunner.
 
 This script demonstrates language-agnostic ML training by:
-- Reading config from JSON
+- Reading config from YAML
 - Loading training data from CSV
 - Training a model
 - Saving the model to disk
 
 Usage:
-    python train_model.py --config config.json --data data.csv --model model.pickle
+    python train_model.py --config config.yml --data data.csv --model model.pickle
 """
 
 import argparse
-import json
 import pickle
 import sys
 
 import pandas as pd
+import yaml
 from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 
 
 def main() -> None:
     """Main training function."""
     parser = argparse.ArgumentParser(description="Train ML model from external script")
-    parser.add_argument("--config", required=True, help="Path to config JSON file")
+    parser.add_argument("--config", required=True, help="Path to config YAML file")
     parser.add_argument("--data", required=True, help="Path to training data CSV")
     parser.add_argument("--model", required=True, help="Path to save trained model")
     parser.add_argument("--geo", default="", help="Path to GeoJSON file (optional)")
@@ -33,7 +33,7 @@ def main() -> None:
     try:
         # Load config
         with open(args.config) as f:
-            config = json.load(f)
+            config = yaml.safe_load(f)
 
         print(f"Training with config: {config}", file=sys.stderr)
 

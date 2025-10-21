@@ -2,28 +2,28 @@
 """External prediction script for ML model inference via ShellModelRunner.
 
 This script demonstrates language-agnostic ML prediction by:
-- Reading config from JSON
+- Reading config from YAML
 - Loading trained model from disk
 - Loading future data from CSV
 - Making predictions
 - Saving predictions to CSV
 
 Usage:
-    python predict_model.py --config config.json --model model.pickle --future future.csv --output predictions.csv
+    python predict_model.py --config config.yml --model model.pickle --future future.csv --output predictions.csv
 """
 
 import argparse
-import json
 import pickle
 import sys
 
 import pandas as pd
+import yaml
 
 
 def main() -> None:
     """Main prediction function."""
     parser = argparse.ArgumentParser(description="Make predictions using trained model")
-    parser.add_argument("--config", required=True, help="Path to config JSON file")
+    parser.add_argument("--config", required=True, help="Path to config YAML file")
     parser.add_argument("--model", required=True, help="Path to trained model file")
     parser.add_argument("--historic", required=True, help="Path to historic data CSV")
     parser.add_argument("--future", required=True, help="Path to future data CSV")
@@ -35,7 +35,7 @@ def main() -> None:
     try:
         # Load config
         with open(args.config) as f:
-            config = json.load(f)
+            config = yaml.safe_load(f)
 
         print(f"Predicting with config: {config}", file=sys.stderr)
 

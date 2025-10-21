@@ -69,13 +69,13 @@ async def test_shell_runner_train_with_real_script() -> None:
     # Create a temp script that trains a simple model
     script = """
 import sys
-import json
 import pickle
 import pandas as pd
+import yaml
 
 # Read config
 with open(sys.argv[1]) as f:
-    config = json.load(f)
+    config = yaml.safe_load(f)
 
 # Read data
 data = pd.read_csv(sys.argv[2])
