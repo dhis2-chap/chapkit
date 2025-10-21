@@ -11,7 +11,7 @@ from .artifact import (
     ArtifactRepository,
     ArtifactRouter,
     ArtifactTreeNode,
-    PandasDataFrame,
+    DataFrame,
 )
 
 # Config feature
@@ -64,7 +64,7 @@ __all__ = [
     "ArtifactRepository",
     "ArtifactRouter",
     "ArtifactTreeNode",
-    "PandasDataFrame",
+    "DataFrame",
     # Config
     "BaseConfig",
     "Config",

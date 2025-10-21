@@ -4,7 +4,7 @@ from .manager import ArtifactManager
 from .models import Artifact
 from .repository import ArtifactRepository
 from .router import ArtifactRouter
-from .schemas import ArtifactHierarchy, ArtifactIn, ArtifactOut, ArtifactTreeNode, PandasDataFrame
+from .schemas import ArtifactHierarchy, ArtifactIn, ArtifactOut, ArtifactTreeNode, DataFrame
 
 __all__ = [
     "Artifact",
@@ -12,7 +12,7 @@ __all__ = [
     "ArtifactIn",
     "ArtifactOut",
     "ArtifactTreeNode",
-    "PandasDataFrame",
+    "DataFrame",
     "ArtifactRepository",
     "ArtifactManager",
     "ArtifactRouter",

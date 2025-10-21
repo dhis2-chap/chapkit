@@ -9,7 +9,7 @@ from geojson_pydantic import FeatureCollection
 from pydantic import BaseModel, Field
 from ulid import ULID
 
-from chapkit.artifact.schemas import PandasDataFrame
+from chapkit.artifact.schemas import DataFrame
 from chapkit.config.schemas import BaseConfig
 
 
@@ -17,7 +17,7 @@ class TrainRequest(BaseModel):
     """Request schema for training a model."""
 
     config_id: ULID = Field(description="ID of the config to use for training")
-    data: PandasDataFrame = Field(description="Training data as pandas DataFrame")
+    data: DataFrame = Field(description="Training data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
 
 
@@ -33,8 +33,8 @@ class PredictRequest(BaseModel):
     """Request schema for making predictions."""
 
     model_artifact_id: ULID = Field(description="ID of the artifact containing the trained model")
-    historic: PandasDataFrame = Field(description="Historic data as pandas DataFrame")
-    future: PandasDataFrame = Field(description="Future/prediction data as pandas DataFrame")
+    historic: DataFrame = Field(description="Historic data as DataFrame")
+    future: DataFrame = Field(description="Future/prediction data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
 
 
@@ -70,7 +70,7 @@ class PredictionArtifactData(BaseModel):
     started_at: str = Field(description="ISO format timestamp when operation started")
     completed_at: str = Field(description="ISO format timestamp when operation completed")
     duration_seconds: float = Field(description="Operation duration in seconds (rounded to 2 decimals)")
-    predictions: PandasDataFrame = Field(description="Prediction results as structured DataFrame")
+    predictions: DataFrame = Field(description="Prediction results as structured DataFrame")
 
 
 class ModelRunnerProtocol(Protocol):
