@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import yaml
 import pickle
 import tempfile
 from abc import ABC, abstractmethod
@@ -119,8 +119,8 @@ class ShellModelRunner(BaseModelRunner):
 
         try:
             # Write config to JSON file
-            config_file = temp_dir / "config.json"
-            config_file.write_text(json.dumps(config.model_dump(), indent=2))
+            config_file = temp_dir / "config.yaml"
+            config_file.write_text(yaml.dumps(config.model_dump(), indent=2))
 
             # Write training data to CSV
             data_file = temp_dir / "data.csv"
@@ -191,8 +191,8 @@ class ShellModelRunner(BaseModelRunner):
 
         try:
             # Write config to JSON file
-            config_file = temp_dir / "config.json"
-            config_file.write_text(json.dumps(config.model_dump(), indent=2))
+            config_file = temp_dir / "config.yaml"
+            config_file.write_text(yaml.dumps(config.model_dump(), indent=2))
 
             # Write model to file
             model_file = temp_dir / f"model.{self.model_format}"
