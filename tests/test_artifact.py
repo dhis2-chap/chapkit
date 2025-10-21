@@ -733,4 +733,4 @@ def test_dataframe_round_trip() -> None:
 def test_dataframe_requires_dataframe() -> None:
     """DataFrame.from_pandas should validate input type."""
     with pytest.raises(TypeError):
-        DataFrame.from_pandas({"not": "dataframe"})
+        DataFrame.from_pandas({"not": "dataframe"})  # pyright: ignore[reportArgumentType]
