@@ -212,7 +212,7 @@ class MLManager:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
 
-            from chapkit.artifact.schemas import DataFrame
+            from servicekit.data import DataFrame
 
             # Create and validate artifact data with Pydantic
             artifact_data_model = PredictionArtifactData(

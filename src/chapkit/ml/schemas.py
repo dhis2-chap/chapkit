@@ -7,9 +7,9 @@ from typing import Any, Literal, Protocol
 import pandas as pd
 from geojson_pydantic import FeatureCollection
 from pydantic import BaseModel, Field
+from servicekit.data import DataFrame
 from ulid import ULID
 
-from chapkit.artifact.schemas import DataFrame
 from chapkit.config.schemas import BaseConfig
 
 

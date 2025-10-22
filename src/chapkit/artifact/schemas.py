@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any, ClassVar, Mapping, Self
 
 from pydantic import BaseModel, Field
-from servicekit.data import DataFrame  # noqa: F401  # pyright: ignore[reportUnusedImport]
 from servicekit.schemas import EntityIn, EntityOut
 from servicekit.types import JsonSafe
 from ulid import ULID
