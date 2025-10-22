@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar, Mapping, Self
 
-import pandas as pd
 from pydantic import BaseModel, Field
 from servicekit.schemas import EntityIn, EntityOut
 from servicekit.types import JsonSafe
@@ -66,21 +65,3 @@ class ArtifactHierarchy(BaseModel):
             self.depth_key: level,
             self.label_key: self.label_for(level),
         }
-
-
-class PandasDataFrame(BaseModel):
-    """Pydantic schema for serializing pandas DataFrames."""
-
-    columns: list[str]
-    data: list[list[Any]]
-
-    @classmethod
-    def from_dataframe(cls, df: pd.DataFrame) -> Self:
-        """Create schema from pandas DataFrame."""
-        if not isinstance(df, pd.DataFrame):  # pyright: ignore[reportUnnecessaryIsInstance]
-            raise TypeError(f"Expected a pandas DataFrame, but got {type(df)}")
-        return cls(columns=df.columns.tolist(), data=df.values.tolist())
-
-    def to_dataframe(self) -> pd.DataFrame:
-        """Convert schema back to pandas DataFrame."""
-        return pd.DataFrame(self.data, columns=self.columns)

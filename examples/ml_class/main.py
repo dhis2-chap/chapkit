@@ -38,7 +38,7 @@ class WeatherModelRunner(BaseModelRunner):
         """Initialize runner with shared state."""
         self.feature_names: list[str] = ["rainfall", "mean_temperature", "humidity"]
         self.target_name: str = "disease_cases"
-        self.scaler: StandardScaler | None = None  # type: ignore[no-any-unimported]
+        self.scaler: StandardScaler | None = None
         self.initialized: bool = False
 
     async def on_init(self) -> None:

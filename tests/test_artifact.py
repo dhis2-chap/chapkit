@@ -1,6 +1,7 @@
 import pandas as pd
 import pytest
 from servicekit import SqliteDatabaseBuilder
+from servicekit.data import DataFrame
 from ulid import ULID
 
 from chapkit import (
@@ -10,7 +11,6 @@ from chapkit import (
     ArtifactManager,
     ArtifactOut,
     ArtifactRepository,
-    PandasDataFrame,
 )
 
 
@@ -718,19 +718,19 @@ class TestBaseManagerLifecycle:
         await db.dispose()
 
 
-def test_pandas_dataframe_round_trip() -> None:
-    """PandasDataFrame should round-trip DataFrame data."""
+def test_dataframe_round_trip() -> None:
+    """DataFrame should round-trip DataFrame data."""
     df = pd.DataFrame({"col1": [1, 2], "col2": ["a", "b"]})
-    wrapper = PandasDataFrame.from_dataframe(df)
+    wrapper = DataFrame.from_pandas(df)
 
     assert wrapper.columns == ["col1", "col2"]
     assert wrapper.data == [[1, "a"], [2, "b"]]
 
-    reconstructed = wrapper.to_dataframe()
+    reconstructed = wrapper.to_pandas()
     pd.testing.assert_frame_equal(reconstructed, df)
 
 
-def test_pandas_dataframe_requires_dataframe() -> None:
-    """PandasDataFrame.from_dataframe should validate input type."""
+def test_dataframe_requires_dataframe() -> None:
+    """DataFrame.from_pandas should validate input type."""
     with pytest.raises(TypeError):
-        PandasDataFrame.from_dataframe({"not": "dataframe"})  # type: ignore[arg-type]
+        DataFrame.from_pandas({"not": "dataframe"})  # pyright: ignore[reportArgumentType]

@@ -61,7 +61,7 @@ async def validate_and_disable_orphaned_tasks(app: FastAPI) -> int:
                 task_in = TaskIn(
                     id=task.id,
                     command=task.command,
-                    task_type=task_type_value,  # type: ignore[arg-type]
+                    task_type=task_type_value,
                     parameters=task.parameters,
                     enabled=False,
                 )

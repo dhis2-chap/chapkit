@@ -8,10 +8,10 @@ import pandas as pd
 import pytest
 from geojson_pydantic import FeatureCollection
 from servicekit import SqliteDatabaseBuilder
+from servicekit.data import DataFrame
 from ulid import ULID
 
 from chapkit.artifact import ArtifactManager, ArtifactRepository
-from chapkit.artifact.schemas import PandasDataFrame
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
 from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, TrainRequest
 from chapkit.scheduler import ChapkitJobScheduler
@@ -106,7 +106,7 @@ async def test_training_timing_metadata_captured(
     # Submit training job
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
 
     response = await ml_manager.execute_train(train_request)
@@ -157,7 +157,7 @@ async def test_prediction_timing_metadata_captured(
     # Train model first
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     train_response = await ml_manager.execute_train(train_request)
 
@@ -167,8 +167,8 @@ async def test_prediction_timing_metadata_captured(
     # Submit prediction job
     predict_request = PredictRequest(
         model_artifact_id=ULID.from_str(train_response.model_artifact_id),
-        historic=PandasDataFrame.from_dataframe(pd.DataFrame({"feature1": [], "feature2": []})),
-        future=PandasDataFrame.from_dataframe(predict_df),
+        historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
+        future=DataFrame.from_pandas(predict_df),
     )
     predict_response = await ml_manager.execute_predict(predict_request)
 
@@ -217,7 +217,7 @@ async def test_timing_metadata_iso_format(
 
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -249,7 +249,7 @@ async def test_timing_duration_rounded_to_two_decimals(
 
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -278,7 +278,7 @@ async def test_original_metadata_preserved(
     # Train model
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     train_response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -298,8 +298,8 @@ async def test_original_metadata_preserved(
     # Predict
     predict_request = PredictRequest(
         model_artifact_id=ULID.from_str(train_response.model_artifact_id),
-        historic=PandasDataFrame.from_dataframe(pd.DataFrame({"feature1": [], "feature2": []})),
-        future=PandasDataFrame.from_dataframe(predict_df),
+        historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
+        future=DataFrame.from_pandas(predict_df),
     )
     predict_response = await ml_manager.execute_predict(predict_request)
     await asyncio.sleep(0.5)
@@ -326,7 +326,7 @@ async def test_model_type_captured_in_training_artifact(
 
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -354,7 +354,7 @@ async def test_model_size_bytes_captured_in_training_artifact(
 
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -433,7 +433,7 @@ async def test_model_type_extracts_from_dict_wrapped_models(
     # Train model
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response = await manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -474,7 +474,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
 
     train_request1 = TrainRequest(
         config_id=config.id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response1 = await manager1.execute_train(train_request1)
     await asyncio.sleep(0.5)
@@ -486,7 +486,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
 
     train_request2 = TrainRequest(
         config_id=config.id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response2 = await manager2.execute_train(train_request2)
     await asyncio.sleep(0.5)
@@ -521,7 +521,7 @@ async def test_model_metrics_present_alongside_timing_metadata(
 
     train_request = TrainRequest(
         config_id=config_id,
-        data=PandasDataFrame.from_dataframe(train_df),
+        data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)

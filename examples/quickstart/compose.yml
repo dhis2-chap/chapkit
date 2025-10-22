@@ -2,7 +2,7 @@ services:
     api:
         build:
             context: ../..
-            dockerfile: examples/config_artifact/Dockerfile
+            dockerfile: examples/quickstart/Dockerfile
         ports:
             - "8000:8000"
         environment:
@@ -22,3 +22,9 @@ services:
             timeout: 10s
             retries: 3
             start_period: 40s
+        networks:
+            - chapkit-quickstart
+
+networks:
+    chapkit-quickstart:
+        driver: bridge

@@ -113,8 +113,8 @@ class MLManager:
             if config is None:
                 raise ValueError(f"Config {request.config_id} not found")
 
-        # Convert PandasDataFrame to pandas
-        data_df = request.data.to_dataframe()
+        # Convert DataFrame to pandas
+        data_df = request.data.to_pandas()
 
         # Train model with timing
         training_started_at = datetime.datetime.now(datetime.UTC)
@@ -191,9 +191,9 @@ class MLManager:
             if config is None:
                 raise ValueError(f"Config {config_id} not found")
 
-        # Convert PandasDataFrames to pandas
-        historic_df = request.historic.to_dataframe()
-        future_df = request.future.to_dataframe()
+        # Convert DataFrames to pandas
+        historic_df = request.historic.to_pandas()
+        future_df = request.future.to_pandas()
 
         # Make predictions with timing
         prediction_started_at = datetime.datetime.now(datetime.UTC)
@@ -212,14 +212,14 @@ class MLManager:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
 
-            from chapkit.artifact.schemas import PandasDataFrame
+            from servicekit.data import DataFrame
 
             # Create and validate artifact data with Pydantic
             artifact_data_model = PredictionArtifactData(
                 ml_type="prediction",
                 model_artifact_id=str(request.model_artifact_id),
                 config_id=str(config_id),
-                predictions=PandasDataFrame.from_dataframe(predictions_df),
+                predictions=DataFrame.from_pandas(predictions_df),
                 started_at=prediction_started_at.isoformat(),
                 completed_at=prediction_completed_at.isoformat(),
                 duration_seconds=round(prediction_duration, 2),

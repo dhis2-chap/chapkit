@@ -100,6 +100,7 @@ clean:
 	@rm -rf .coverage htmlcov coverage.xml
 	@rm -rf .pyright
 	@rm -rf dist build *.egg-info
+	@find examples -type f -name "uv.lock" -delete
 
 # ==============================================================================
 # Default

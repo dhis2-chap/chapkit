@@ -1,7 +1,7 @@
-# Artifact Demo Dockerfile
+# Quickstart Demo Dockerfile
 FROM ghcr.io/astral-sh/uv:0.9-python3.13-bookworm-slim AS builder
 
-WORKDIR /app
+WORKDIR /workspace
 
 ARG USER=chapkit UID=10001
 RUN useradd -u ${UID} -m -s /bin/bash ${USER}
@@ -13,15 +13,15 @@ RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 
-# Copy and sync parent chapkit project with git dependencies
-COPY pyproject.toml uv.lock README.md /chapkit/
-COPY src /chapkit/src/
-WORKDIR /chapkit
+# Copy entire project structure to maintain relative paths for editable installs
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src/
+COPY examples/quickstart ./examples/quickstart/
+
+# Install from example directory (which references parent via ../../)
+WORKDIR /workspace/examples/quickstart
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
-
-# Copy demo files
-COPY examples/artifact/main.py /chapkit/main.py
 
 # Cleanup Python cache files
 RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
@@ -31,12 +31,10 @@ RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
 FROM python:3.13-slim AS runtime
 
 # OCI labels for container metadata
-LABEL org.opencontainers.image.title="Chapkit Artifact Demo"
-LABEL org.opencontainers.image.description="Read-only artifact API with hierarchical storage and non-JSON payloads"
+LABEL org.opencontainers.image.title="Chapkit Quickstart Demo"
+LABEL org.opencontainers.image.description="Simple quickstart example for getting started"
 LABEL org.opencontainers.image.vendor="Chapkit"
 LABEL org.opencontainers.image.source="https://github.com/dhis2-chap/chapkit"
-
-WORKDIR /chapkit
 
 ARG USER=chapkit UID=10001
 RUN useradd -u ${UID} -m -s /bin/bash ${USER}
@@ -47,13 +45,15 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends ca-certificates tini && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy venv and application from builder (keeping at /chapkit to preserve paths)
-COPY --from=builder --chown=${USER}:${USER} /chapkit/.venv .venv
-COPY --from=builder --chown=${USER}:${USER} /chapkit/main.py main.py
-COPY --from=builder --chown=${USER}:${USER} /chapkit/src src
+# Copy entire structure to preserve paths for editable chapkit install
+COPY --from=builder --chown=${USER}:${USER} /workspace /workspace
 
-ENV VIRTUAL_ENV=/chapkit/.venv
-ENV PATH=/chapkit/.venv/bin:${PATH}
+WORKDIR /workspace/examples/quickstart
+
+# Set up environment to use the venv from example directory
+ENV VIRTUAL_ENV=/workspace/examples/quickstart/.venv
+ENV PATH=/workspace/examples/quickstart/.venv/bin:${PATH}
+ENV PYTHONPATH=/workspace
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONFAULTHANDLER=1

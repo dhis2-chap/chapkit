@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@winterop.com" }]
@@ -52,6 +52,7 @@ dev = [
   "mkdocs>=1.6.0",
   "mkdocs-material>=9.5.0",
   "mkdocstrings[python]>=0.26.0",
+  "types-pyyaml>=6.0.12.20250915",
 ]
 
 [build-system]
@@ -111,7 +112,6 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 check_untyped_defs = true
-disallow_any_unimported = true
 no_implicit_optional = true
 warn_unused_ignores = true
 strict_equality = true
@@ -120,6 +120,20 @@ mypy_path = ["src", "typings"]
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "servicekit.*"
+ignore_missing_imports = true
+disallow_any_unimported = false
+
+[[tool.mypy.overrides]]
+module = [
+    "chapkit.artifact.*",
+    "chapkit.config.*",
+    "chapkit.task.*",
+    "examples.*",
+]
+warn_return_any = false
 
 [tool.pyright]
 include = ["src", "tests", "examples", "alembic"]

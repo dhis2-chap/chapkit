@@ -4,7 +4,7 @@ This example demonstrates:
 - Using ShellModelRunner to execute external scripts
 - Command template variable substitution
 - Language-agnostic ML workflows (could use R, Julia, etc.)
-- File-based data interchange (CSV, JSON, pickle)
+- File-based data interchange (CSV, YAML, pickle)
 - Integration with existing scripts without modification
 """
 
@@ -23,14 +23,14 @@ SCRIPTS_DIR = Path(__file__).parent / "scripts"
 class DiseaseConfig(BaseConfig):
     """Configuration for disease prediction model."""
 
-    # Config fields can be accessed by external scripts via config.json
+    # Config fields can be accessed by external scripts via config.yml
     min_samples: int = 3
     model_type: str = "linear_regression"
 
 
 # Create shell-based runner with command templates
 # Variables will be substituted with actual file paths at runtime:
-#   {config_file} - JSON config
+#   {config_file} - YAML config
 #   {data_file} - Training data CSV
 #   {model_file} - Model pickle file
 #   {historic_file} - Historic data CSV

@@ -69,7 +69,7 @@ class TaskRouter(CrudRouter[TaskIn, TaskOut]):
             # Use TaskRepository's find_all with enabled filtering
             # Cast manager to access repository with enabled parameter
             task_manager = manager  # TaskManager with TaskRepository
-            return await task_manager.find_all(enabled=enabled)  # type: ignore[call-arg]
+            return await task_manager.find_all(enabled=enabled)  # pyright: ignore[reportCallIssue]
 
         self._annotate_manager(find_all, manager_annotation)
         find_all.__annotations__["return"] = list[entity_out_annotation] | PaginatedResponse[entity_out_annotation]

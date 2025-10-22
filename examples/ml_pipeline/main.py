@@ -7,6 +7,7 @@ from typing import Iterable
 
 import pandas as pd
 from servicekit import SqliteDatabaseBuilder
+from servicekit.data import DataFrame
 from ulid import ULID
 
 from chapkit import (
@@ -21,7 +22,6 @@ from chapkit.artifact import (
     ArtifactIn,
     ArtifactManager,
     ArtifactRepository,
-    PandasDataFrame,
 )
 
 ML_CONFIG_ID = ULID.from_str("01K72P60ZNX2PJ6QJWZK7RMCRV")
@@ -85,7 +85,7 @@ async def main() -> None:
                     "label": [0, 1, 1, 0],
                 }
             )
-            training_payload = PandasDataFrame.from_dataframe(training_df).model_dump()
+            training_payload = DataFrame.from_pandas(training_df).model_dump()
             root = await artifact_manager.save(
                 ArtifactIn(id=TRAIN_ROOT_ID, data={"stage": "train", "payload": training_payload})
             )
@@ -99,7 +99,7 @@ async def main() -> None:
 
             for idx, (run_name, probabilities) in enumerate(prediction_runs):
                 predictions_df = _make_prediction_frame(run_name, probabilities)
-                prediction_payload = PandasDataFrame.from_dataframe(predictions_df).model_dump()
+                prediction_payload = DataFrame.from_pandas(predictions_df).model_dump()
                 child = await artifact_manager.save(
                     ArtifactIn(
                         id=PREDICTION_ARTIFACT_IDS[idx],
@@ -119,8 +119,8 @@ async def main() -> None:
                 payload = node_data.get("payload")
                 if not isinstance(payload, dict):
                     return
-                df_schema = PandasDataFrame.model_validate(payload)
-                df = df_schema.to_dataframe()
+                df_schema = DataFrame.model_validate(payload)
+                df = df_schema.to_pandas()
                 print(f"\nPrediction artifact {node_id}:")
                 print(df.to_string(index=False))
 
@@ -129,7 +129,7 @@ async def main() -> None:
 
             root_payload = tree.data.get("payload") if isinstance(tree.data, dict) else None
             if isinstance(root_payload, dict):
-                train_df = PandasDataFrame.model_validate(root_payload).to_dataframe()
+                train_df = DataFrame.model_validate(root_payload).to_pandas()
                 print("\nTraining snapshot:")
                 print(train_df.to_string(index=False))
 

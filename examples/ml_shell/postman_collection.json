@@ -177,7 +177,7 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["api", "v1", "configs"]
                         },
-                        "description": "Create configuration accessible by external scripts via config.json."
+                        "description": "Create configuration accessible by external scripts via config.yml."
                     },
                     "response": []
                 },
@@ -249,7 +249,7 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["api", "v1", "ml", "$train"]
                         },
-                        "description": "Submit training job that executes examples/scripts/train_model.py\n\n**Workflow:**\n1. Create temp directory: /tmp/chapkit_ml_train_XXXXX/\n2. Write config.json with model config\n3. Write data.csv with training data\n4. Execute: python train_model.py --config config.json --data data.csv --model model.pickle\n5. Read model.pickle and store in artifact\n6. Cleanup temp directory"
+                        "description": "Submit training job that executes examples/scripts/train_model.py\n\n**Workflow:**\n1. Create temp directory: /tmp/chapkit_ml_train_XXXXX/\n2. Write config.yml with model config\n3. Write data.csv with training data\n4. Execute: python train_model.py --config config.yml --data data.csv --model model.pickle\n5. Read model.pickle and store in artifact\n6. Cleanup temp directory"
                     },
                     "response": []
                 },
@@ -355,7 +355,7 @@
                             "host": ["{{baseUrl}}"],
                             "path": ["api", "v1", "ml", "$predict"]
                         },
-                        "description": "Submit prediction job that executes examples/scripts/predict_model.py\n\n**Workflow:**\n1. Create temp directory: /tmp/chapkit_ml_predict_XXXXX/\n2. Write config.json, model.pickle, future.csv\n3. Execute: python predict_model.py --config config.json --model model.pickle --future future.csv --output predictions.csv\n4. Read predictions.csv and store in artifact\n5. Cleanup temp directory"
+                        "description": "Submit prediction job that executes examples/scripts/predict_model.py\n\n**Workflow:**\n1. Create temp directory: /tmp/chapkit_ml_predict_XXXXX/\n2. Write config.yml, model.pickle, future.csv\n3. Execute: python predict_model.py --config config.yml --model model.pickle --future future.csv --output predictions.csv\n4. Read predictions.csv and store in artifact\n5. Cleanup temp directory"
                     },
                     "response": []
                 },
@@ -447,7 +447,7 @@
         {
             "name": "5. External Script Interface",
             "item": [],
-            "description": "**Training Script Contract:**\n\n**Input files:**\n- {config_file} - JSON with config data\n- {data_file} - CSV with training data\n- {geo_file} - GeoJSON (optional)\n\n**Output files:**\n- {model_file} - Pickled model (must create)\n\n**Example:** examples/scripts/train_model.py\n\n**Prediction Script Contract:**\n\n**Input files:**\n- {config_file} - JSON with config data\n- {model_file} - Pickled model\n- {historic_file} - CSV with historic data (optional)\n- {future_file} - CSV with future data\n- {geo_file} - GeoJSON (optional)\n\n**Output files:**\n- {output_file} - CSV with predictions (must create)\n\n**Example:** examples/scripts/predict_model.py\n\n**Language Options:**\n- Python: sklearn, TensorFlow, PyTorch\n- R: caret, ranger, glm\n- Julia: MLJ.jl, GLM\n- CLI Tools: XGBoost, LightGBM\n- Containers: Docker, Singularity"
+            "description": "**Training Script Contract:**\n\n**Input files:**\n- {config_file} - YAML with config data\n- {data_file} - CSV with training data\n- {geo_file} - GeoJSON (optional)\n\n**Output files:**\n- {model_file} - Pickled model (must create)\n\n**Example:** examples/scripts/train_model.py\n\n**Prediction Script Contract:**\n\n**Input files:**\n- {config_file} - YAML with config data\n- {model_file} - Pickled model\n- {historic_file} - CSV with historic data (optional)\n- {future_file} - CSV with future data\n- {geo_file} - GeoJSON (optional)\n\n**Output files:**\n- {output_file} - CSV with predictions (must create)\n\n**Example:** examples/scripts/predict_model.py\n\n**Language Options:**\n- Python: sklearn, TensorFlow, PyTorch\n- R: caret, ranger, glm\n- Julia: MLJ.jl, GLM\n- CLI Tools: XGBoost, LightGBM\n- Containers: Docker, Singularity"
         },
         {
             "name": "6. Job & Artifact Management",

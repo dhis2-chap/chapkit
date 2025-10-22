@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code when working with code in this repository.
 
+## Overall guidelines
+
+- Be concise and to the point
+- Follow existing code style and patterns
+- Prioritize readability and maintainability
+- Use type annotations consistently
+- Write clear commit messages without Claude attribution
+- Don't use emojis anywhere (in commit messages, docstrings, comments, etc.)
+- Ask the user before creating branches or pull requests
+- Always run tests and linting after making changes
+
 ## Documentation Standards
 
 **IMPORTANT: All code must follow these documentation requirements:**
@@ -162,9 +173,9 @@ make upgrade                    # Apply migrations (auto-applied on init)
 
 **IMPORTANT: Always use full descriptive names, never abbreviations**
 
-- ✅ `self.repository` (not `self.repo`)
-- ✅ `config_repository` (not `config_repo`)
-- ✅ `artifact_repository` (not `artifact_repo`)
+- `self.repository` (not `self.repo`)
+- `config_repository` (not `config_repo`)
+- `artifact_repository` (not `artifact_repo`)
 
 This applies to:
 - Class attributes
