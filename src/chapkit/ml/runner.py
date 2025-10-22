@@ -233,7 +233,7 @@ class ShellModelRunner(BaseModelRunner):
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(temp_dir),
+                #cwd=str(temp_dir),
             )
 
             stdout_bytes, stderr_bytes = await process.communicate()
