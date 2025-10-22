@@ -21,7 +21,7 @@ COPY examples/ml_class ./examples/ml_class/
 # Install from example directory (which references parent via ../../)
 WORKDIR /workspace/examples/ml_class
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --no-dev
 
 # Cleanup Python cache files
 RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \

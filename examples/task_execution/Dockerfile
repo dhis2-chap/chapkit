@@ -21,7 +21,7 @@ COPY examples/task_execution ./examples/task_execution/
 # Install from example directory (which references parent via ../../)
 WORKDIR /workspace/examples/task_execution
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --no-dev
 
 # Cleanup Python cache files
 RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \

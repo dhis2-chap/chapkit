@@ -21,7 +21,7 @@ COPY examples/config_artifact ./examples/config_artifact/
 # Install from example directory (which references parent via ../../)
 WORKDIR /workspace/examples/config_artifact
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --no-dev
 
 # Cleanup Python cache files
 RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \

@@ -21,7 +21,7 @@ COPY examples/full_featured ./examples/full_featured/
 # Install from example directory (which references parent via ../../)
 WORKDIR /workspace/examples/full_featured
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --no-dev
 
 # Cleanup Python cache files
 RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
