@@ -1554,7 +1554,7 @@ wheels = [
 [[package]]
 name = "servicekit"
 version = "0.2.0"
-source = { git = "https://github.com/winterop-com/servicekit.git#3a4dd3893c4a4279e13d4973bb8602fa81a574a2" }
+source = { git = "https://github.com/winterop-com/servicekit.git#a9fcd2fb12e9b0e885930c1f858a9290d119613c" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
