@@ -8,6 +8,7 @@ services:
         environment:
             LOG_FORMAT: json
             LOG_LEVEL: INFO
+            WORKERS: 1
         restart: unless-stopped
         healthcheck:
             test:
