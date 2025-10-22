@@ -163,14 +163,17 @@ class ShellModelRunner(BaseModelRunner):
 
             logger.info("train_script_completed", stdout=stdout[:500], stderr=stderr[:500])
 
+            # nb: we don't required the model to be written at all by the model
+            # it is up to the model what it does. The model_file is simply some kind of ID the model can use
+            # to persist stuff between train and predict calls.
             # Load trained model from file
-            if not model_file.exists():
-                raise RuntimeError(f"Training script did not create model file at {model_file}")
+            #if not model_file.exists():
+            #    raise RuntimeError(f"Training script did not create model file at {model_file}")
 
-            with open(model_file, "rb") as f:
-                model = pickle.load(f)
+            #with open(model_file, "rb") as f:
+            #    model = pickle.load(f)
 
-            return model
+            #return model
 
         finally:
             # Cleanup temp files
