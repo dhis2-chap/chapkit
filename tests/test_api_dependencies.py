@@ -5,7 +5,7 @@ from servicekit import SqliteDatabaseBuilder
 
 from chapkit.api.dependencies import get_artifact_manager, get_config_manager, get_ml_manager
 from chapkit.artifact import ArtifactManager
-from chapkit.config import BaseConfig, ConfigManager
+from chapkit.config import ConfigManager
 
 
 async def test_get_config_manager() -> None:
@@ -35,6 +35,7 @@ async def test_get_artifact_manager() -> None:
 async def test_get_ml_manager_raises_without_override() -> None:
     """Test get_ml_manager raises RuntimeError when not configured."""
     with pytest.raises(
-        RuntimeError, match="ML manager dependency not configured. Use ServiceBuilder.with_ml\\(\\) to enable ML operations."
+        RuntimeError,
+        match="ML manager dependency not configured. Use ServiceBuilder.with_ml\\(\\) to enable ML operations.",
     ):
         await get_ml_manager()

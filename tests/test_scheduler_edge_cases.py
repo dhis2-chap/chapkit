@@ -28,7 +28,7 @@ async def test_add_job_with_sync_function() -> None:
 
 async def test_add_job_with_semaphore() -> None:
     """Test job submission with concurrency semaphore."""
-    scheduler = ChapkitJobScheduler(max_concurrent=2)
+    scheduler = ChapkitJobScheduler(max_concurrency=2)
 
     async def slow_task(duration: float) -> str:
         await asyncio.sleep(duration)
