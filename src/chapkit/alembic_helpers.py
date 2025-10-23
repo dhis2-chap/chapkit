@@ -16,6 +16,7 @@ def create_artifacts_table(op: Any) -> None:
         sa.Column("id", servicekit.types.ULIDType(length=26), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
+        sa.Column("tags", sa.JSON(), nullable=False, server_default="[]"),
         sa.ForeignKeyConstraint(["parent_id"], ["artifacts.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -39,6 +40,7 @@ def create_configs_table(op: Any) -> None:
         sa.Column("id", servicekit.types.ULIDType(length=26), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
+        sa.Column("tags", sa.JSON(), nullable=False, server_default="[]"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_configs_name"), "configs", ["name"], unique=False)
@@ -80,6 +82,7 @@ def create_tasks_table(op: Any) -> None:
         sa.Column("id", servicekit.types.ULIDType(length=26), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
+        sa.Column("tags", sa.JSON(), nullable=False, server_default="[]"),
         sa.PrimaryKeyConstraint("id"),
     )
 
