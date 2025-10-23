@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.2.0"
+version = "0.3.0"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@winterop.com" }]
@@ -128,10 +128,10 @@ disallow_any_unimported = false
 
 [[tool.mypy.overrides]]
 module = [
-    "chapkit.artifact.*",
-    "chapkit.config.*",
-    "chapkit.task.*",
-    "examples.*",
+  "chapkit.artifact.*",
+  "chapkit.config.*",
+  "chapkit.task.*",
+  "examples.*",
 ]
 warn_return_any = false
 
