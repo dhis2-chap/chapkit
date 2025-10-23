@@ -3,10 +3,11 @@
 import tempfile
 from pathlib import Path
 
+from servicekit import SqliteDatabaseBuilder
+
 from chapkit.artifact.models import Artifact
 from chapkit.config.models import Config
 from chapkit.task.models import Task
-from servicekit import SqliteDatabaseBuilder
 
 # Path to chapkit's alembic directory
 ALEMBIC_DIR = Path(__file__).parent.parent / "alembic"
@@ -21,7 +22,11 @@ class TestMigrations:
             db_path = Path(tmpdir) / "test.db"
 
             # Create database - this will run migrations
-            db = SqliteDatabaseBuilder.from_file(str(db_path)).with_migrations(enabled=True, alembic_dir=ALEMBIC_DIR).build()
+            db = (
+                SqliteDatabaseBuilder.from_file(str(db_path))
+                .with_migrations(enabled=True, alembic_dir=ALEMBIC_DIR)
+                .build()
+            )
             await db.init()
 
             try:
@@ -81,7 +86,11 @@ class TestMigrations:
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
-            db = SqliteDatabaseBuilder.from_file(str(db_path)).with_migrations(enabled=True, alembic_dir=ALEMBIC_DIR).build()
+            db = (
+                SqliteDatabaseBuilder.from_file(str(db_path))
+                .with_migrations(enabled=True, alembic_dir=ALEMBIC_DIR)
+                .build()
+            )
             await db.init()
 
             try:
@@ -102,13 +111,17 @@ class TestMigrations:
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test.db"
 
-            db = SqliteDatabaseBuilder.from_file(str(db_path)).with_migrations(enabled=True, alembic_dir=ALEMBIC_DIR).build()
+            db = (
+                SqliteDatabaseBuilder.from_file(str(db_path))
+                .with_migrations(enabled=True, alembic_dir=ALEMBIC_DIR)
+                .build()
+            )
             await db.init()
 
             try:
                 # Check that tags column exists in the schema
                 async with db.session() as session:
-                    from sqlalchemy import inspect, text
+                    from sqlalchemy import text
 
                     # Check configs table
                     result = await session.execute(text("PRAGMA table_info(configs)"))
