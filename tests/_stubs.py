@@ -95,6 +95,12 @@ class ConfigManagerStub(Manager[ConfigIn[ConfigDataT], ConfigOut[ConfigDataT], U
     async def count(self) -> int:
         return len(self._items_by_id)
 
+    async def get_stats(self) -> Any:
+        """Get collection statistics."""
+        from servicekit.schemas import CollectionStats
+
+        return CollectionStats(total=len(self._items_by_id))
+
 
 class ArtifactManagerStub(Manager[ArtifactIn, ArtifactOut, ULID]):
     """Artifact manager stub providing tree data for tests."""
@@ -139,6 +145,12 @@ class ArtifactManagerStub(Manager[ArtifactIn, ArtifactOut, ULID]):
 
     async def count(self) -> int:
         return len(self._trees)
+
+    async def get_stats(self) -> Any:
+        """Get collection statistics."""
+        from servicekit.schemas import CollectionStats
+
+        return CollectionStats(total=len(self._trees))
 
 
 def singleton_factory(instance: Any) -> Callable[[], Any]:
