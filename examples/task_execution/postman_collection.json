@@ -57,7 +57,7 @@
 						"header": [{"key": "Content-Type", "value": "application/json"}],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": true\n}"
+							"raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": true,\n  \"tags\": [\"python\", \"greet\"]\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/tasks",
@@ -73,7 +73,7 @@
 						"header": [{"key": "Content-Type", "value": "application/json"}],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"command\": \"echo 'Hello from task!'\",\n  \"enabled\": true\n}"
+							"raw": "{\n  \"command\": \"echo 'Hello from task!'\",\n  \"enabled\": true,\n  \"tags\": [\"shell\", \"test\"]\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/tasks",

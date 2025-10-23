@@ -171,7 +171,7 @@ async def test_service_builder_with_database_instance(
 def test_service_builder_with_database_invalid_type(service_info: ServiceInfo) -> None:
     """Test that with_database() rejects invalid types."""
     with pytest.raises(TypeError, match="Expected str, Database, or None"):
-        ServiceBuilder(info=service_info).with_database(123).build()  # pyright: ignore[reportArgumentType]
+        ServiceBuilder(info=service_info).with_database(123).build()  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
 
 
 def test_service_builder_custom_router_integration(service_info: ServiceInfo) -> None:

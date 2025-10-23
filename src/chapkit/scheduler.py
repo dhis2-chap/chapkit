@@ -27,7 +27,7 @@ class ChapkitJobScheduler(AIOJobScheduler):
 
     # Override with ChapkitJobRecord type to support artifact_id tracking
     # dict is invariant, but we always use ChapkitJobRecord in this subclass
-    _records: dict[ULID, ChapkitJobRecord] = PrivateAttr(default_factory=dict)  # pyright: ignore[reportIncompatibleVariableOverride]
+    _records: dict[ULID, ChapkitJobRecord] = PrivateAttr(default_factory=dict)  # type: ignore[assignment]  # pyright: ignore[reportIncompatibleVariableOverride]
 
     async def add_job(
         self,

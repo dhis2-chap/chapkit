@@ -131,7 +131,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"testing\",\n  \"data\": {\n    \"debug\": true,\n    \"api_host\": \"127.0.0.1\",\n    \"api_port\": 8002,\n    \"max_connections\": 50\n  }\n}"
+							"raw": "{\n  \"name\": \"testing\",\n  \"data\": {\n    \"debug\": true,\n    \"api_host\": \"127.0.0.1\",\n    \"api_port\": 8002,\n    \"max_connections\": 50\n  },\n  \"tags\": [\"testing\", \"dev\"]\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/configs",
@@ -299,7 +299,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"name\": \"production\",\n  \"data\": {\n    \"debug\": false,\n    \"api_host\": \"0.0.0.0\",\n    \"api_port\": 8080,\n    \"max_connections\": 3000\n  }\n}"
+							"raw": "{\n  \"name\": \"production\",\n  \"data\": {\n    \"debug\": false,\n    \"api_host\": \"0.0.0.0\",\n    \"api_port\": 8080,\n    \"max_connections\": 3000\n  },\n  \"tags\": [\"production\", \"critical\"]\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/v1/configs/{{production_id}}",
