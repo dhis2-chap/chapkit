@@ -113,7 +113,9 @@ app = (
         hierarchy=HIERARCHY,
         runner=runner,
     )
+{% if WITH_MONITORING %}
     .with_monitoring()
+{% endif %}
     .build()
 )
 

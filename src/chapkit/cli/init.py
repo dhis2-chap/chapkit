@@ -84,6 +84,7 @@ def init_command(
         "PROJECT_NAME": project_name,
         "PROJECT_SLUG": project_slug,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
+        "WITH_MONITORING": monitoring,
     }
 
     typer.echo("Generating project files...")
