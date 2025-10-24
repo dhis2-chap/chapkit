@@ -2,19 +2,50 @@
 
 Chapkit provides a CLI tool for quickly scaffolding new ML service projects with all necessary configuration files, Docker setup, and optional monitoring stack.
 
-## Quick Start
+## Installation
 
-Install chapkit and initialize a new project:
+### From PyPI (Recommended)
+
+Once chapkit is published to PyPI, you can use it with uvx (no installation needed):
 
 ```bash
-uv tool install git+https://github.com/dhis2-chap/chapkit
-chapkit init my-ml-service
-cd my-ml-service
+# One-off project creation
+uvx chapkit init my-ml-service
 ```
 
-Start the service:
+Or install it permanently:
 
 ```bash
+# Install globally
+uv tool install chapkit
+
+# Use the installed tool
+chapkit init my-ml-service
+```
+
+### From GitHub (Development/Pre-release)
+
+Before PyPI release or to use the latest development version:
+
+```bash
+# One-off project creation from GitHub
+uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-ml-service
+
+# Or install from GitHub
+uv tool install git+https://github.com/dhis2-chap/chapkit
+chapkit init my-ml-service
+```
+
+## Quick Start
+
+Create and run a new project:
+
+```bash
+# Create project (using uvx for one-off usage)
+uvx chapkit init my-ml-service
+cd my-ml-service
+
+# Install dependencies and run
 uv sync
 uv run python main.py
 ```
@@ -48,7 +79,10 @@ chapkit init PROJECT_NAME [OPTIONS]
 **Examples:**
 
 ```bash
-# Create basic project in current directory
+# Using uvx (one-off, no installation needed)
+uvx chapkit init my-service
+
+# Using installed tool
 chapkit init my-service
 
 # Create project in specific location
@@ -56,6 +90,9 @@ chapkit init my-service --path ~/projects
 
 # Create project with monitoring stack
 chapkit init my-service --monitoring
+
+# From GitHub (before PyPI release)
+uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
 ```
 
 ---
