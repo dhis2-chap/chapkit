@@ -8,7 +8,7 @@ Install chapkit and initialize a new project:
 
 ```bash
 uv tool install git+https://github.com/dhis2-chap/chapkit
-chapkit my-ml-service
+chapkit init my-ml-service
 cd my-ml-service
 ```
 
@@ -16,7 +16,7 @@ Start the service:
 
 ```bash
 uv sync
-fastapi dev main.py
+uv run python main.py
 ```
 
 Visit http://localhost:8000/docs to interact with the ML API.
@@ -25,14 +25,14 @@ Visit http://localhost:8000/docs to interact with the ML API.
 
 ## CLI Commands
 
-### `chapkit`
+### `chapkit init`
 
 Initialize a new chapkit ML service project.
 
 **Usage:**
 
 ```bash
-chapkit PROJECT_NAME [OPTIONS]
+chapkit init PROJECT_NAME [OPTIONS]
 ```
 
 **Arguments:**
@@ -49,13 +49,13 @@ chapkit PROJECT_NAME [OPTIONS]
 
 ```bash
 # Create basic project in current directory
-chapkit my-service
+chapkit init my-service
 
 # Create project in specific location
-chapkit my-service --path ~/projects
+chapkit init my-service --path ~/projects
 
 # Create project with monitoring stack
-chapkit my-service --monitoring
+chapkit init my-service --monitoring
 ```
 
 ---
@@ -234,8 +234,8 @@ info = MLServiceInfo(
 # Install dependencies
 uv sync
 
-# Run with hot reload
-fastapi dev main.py
+# Run development server
+uv run python main.py
 
 # Run tests (if added)
 pytest
@@ -276,7 +276,7 @@ After scaffolding your project:
 1. **Customize the model**: Update `on_train` and `on_predict` functions
 2. **Add dependencies**: Use `uv add` to install required packages
 3. **Update configuration**: Add model-specific parameters to config schema
-4. **Test locally**: Run with `fastapi dev main.py`
+4. **Test locally**: Run with `uv run python main.py`
 5. **Dockerize**: Build and test with `docker compose up --build`
 6. **Add tests**: Create tests for your training and prediction logic
 7. **Deploy**: Use the generated Dockerfile for deployment

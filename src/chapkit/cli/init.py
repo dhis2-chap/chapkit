@@ -1,4 +1,4 @@
-"""CLI application for chapkit project scaffolding."""
+"""Init subcommand for chapkit CLI."""
 
 import re
 import shutil
@@ -7,12 +7,6 @@ from typing import Annotated, Optional
 
 import typer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-
-app = typer.Typer(
-    name="chapkit",
-    help="Chapkit CLI for ML service scaffolding",
-    no_args_is_help=True,
-)
 
 
 def _slugify(text: str) -> str:
@@ -51,8 +45,7 @@ def _render_template(
     typer.echo(f"  Created {output_file.name}")
 
 
-@app.command()
-def init(
+def init_command(
     project_name: Annotated[str, typer.Argument(help="Name of the project to create")],
     path: Annotated[
         Optional[Path],
@@ -147,7 +140,7 @@ def init(
     typer.echo("Next steps:")
     typer.echo(f"  cd {project_name}")
     typer.echo("  uv sync")
-    typer.echo("  fastapi dev main.py")
+    typer.echo("  uv run python main.py")
     typer.echo()
     if monitoring:
         typer.echo("To start with Docker (including monitoring):")
@@ -155,12 +148,3 @@ def init(
         typer.echo("To start with Docker:")
     typer.echo("  docker compose up --build")
     typer.echo()
-
-
-def main() -> None:
-    """Entry point for the CLI."""
-    app()
-
-
-if __name__ == "__main__":
-    main()

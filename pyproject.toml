@@ -41,7 +41,7 @@ Issues = "https://github.com/dhis2-chap/chapkit/issues"
 Documentation = "https://dhis2-chap.github.io/chapkit"
 
 [project.scripts]
-chapkit = "chapkit.cli.main:main"
+chapkit = "chapkit.cli.cli:main"
 
 [dependency-groups]
 dev = [
