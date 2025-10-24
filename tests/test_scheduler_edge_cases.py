@@ -139,6 +139,7 @@ async def test_cancelled_job_updates_status() -> None:
 async def test_add_job_duplicate_id_raises_runtime_error() -> None:
     """Test that adding a job with duplicate ID raises RuntimeError."""
     import re
+
     scheduler = ChapkitJobScheduler()
 
     # Create a job with a specific ID by manually inserting into _tasks
@@ -149,18 +150,11 @@ async def test_add_job_duplicate_id_raises_runtime_error() -> None:
         scheduler._tasks[duplicate_id] = asyncio.create_task(asyncio.sleep(10))
 
     # Try to add a new job with the same ID - this requires monkey-patching ULID generation
-    original_ulid = ULID
-
-    class FixedULID:
-        """Mock ULID that returns fixed value."""
-        def __init__(self) -> ULID:
-            return duplicate_id
-
-    # Monkey-patch the scheduler's ULID to return our duplicate
     import chapkit.scheduler
+
     old_ulid = chapkit.scheduler.ULID
     try:
-        chapkit.scheduler.ULID = lambda: duplicate_id
+        chapkit.scheduler.ULID = lambda: duplicate_id  # type: ignore[assignment,misc]
 
         async def dummy() -> None:
             pass
