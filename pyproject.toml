@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.3.2"
+version = "0.4.0"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@winterop.com" }]
@@ -30,6 +30,8 @@ dependencies = [
   "scikit-learn>=1.7.2",
   "geojson-pydantic>=2.1.0",
   "servicekit>=0.2.0",
+  "typer>=0.20.0",
+  "jinja2>=3.1.6",
 ]
 
 [project.urls]
@@ -37,6 +39,9 @@ Homepage = "https://github.com/dhis2-chap/chapkit"
 Repository = "https://github.com/dhis2-chap/chapkit"
 Issues = "https://github.com/dhis2-chap/chapkit/issues"
 Documentation = "https://dhis2-chap.github.io/chapkit"
+
+[project.scripts]
+chapkit = "chapkit.cli.cli:main"
 
 [dependency-groups]
 dev = [

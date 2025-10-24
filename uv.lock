@@ -102,13 +102,15 @@ wheels = [
 
 [[package]]
 name = "chapkit"
-version = "0.3.1"
+version = "0.3.2"
 source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
+    { name = "jinja2" },
     { name = "pandas" },
     { name = "scikit-learn" },
     { name = "servicekit" },
+    { name = "typer" },
 ]
 
 [package.dev-dependencies]
@@ -131,9 +133,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "geojson-pydantic", specifier = ">=2.1.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "servicekit", git = "https://github.com/winterop-com/servicekit.git" },
+    { name = "typer", specifier = ">=0.20.0" },
 ]
 
 [package.metadata.requires-dev]

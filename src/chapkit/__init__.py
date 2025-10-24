@@ -1,5 +1,6 @@
 """Chapkit - ML/data service modules built on servicekit."""
 
+# CLI feature
 # Scheduler feature
 # Artifact feature
 from .artifact import (
@@ -12,6 +13,7 @@ from .artifact import (
     ArtifactRouter,
     ArtifactTreeNode,
 )
+from .cli import app as cli_app
 
 # Config feature
 from .config import (
@@ -51,6 +53,8 @@ from .task import (
 )
 
 __all__ = [
+    # CLI
+    "cli_app",
     # Scheduler
     "ChapkitJobRecord",
     "ChapkitJobScheduler",

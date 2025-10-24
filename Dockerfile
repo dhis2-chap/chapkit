@@ -60,7 +60,6 @@ COPY --from=builder --chown=${USER}:${USER} /app/.venv /app/.venv
 COPY --chown=${USER}:${USER} examples/ ./examples/
 COPY --chown=${USER}:${USER} alembic/ ./alembic/
 COPY --chown=${USER}:${USER} alembic.ini ./
-COPY --chown=${USER}:${USER} gunicorn.conf.py ./
 
 ENV VIRTUAL_ENV=/app/.venv
 ENV PATH=/app/.venv/bin:${PATH}
@@ -95,4 +94,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 ENTRYPOINT ["/usr/bin/tini","--"]
 
-CMD ["sh","-c", "effective_cpus() { base=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1); if read -r quota period < /sys/fs/cgroup/cpu.max 2>/dev/null; then if [ $quota != max ]; then echo $(( (quota + period - 1) / period )); return; fi; fi; echo $base; }; CPUS=$(effective_cpus); WORKERS=${WORKERS:-$(( CPUS * 2 + 1 ))}; FORWARDED_ALLOW_IPS=${FORWARDED_ALLOW_IPS:-*}; exec gunicorn -k uvicorn.workers.UvicornWorker ${EXAMPLE_MODULE} --bind 0.0.0.0:${PORT} --workers ${WORKERS} --timeout ${TIMEOUT} --graceful-timeout ${GRACEFUL_TIMEOUT} --keep-alive ${KEEPALIVE} --forwarded-allow-ips=${FORWARDED_ALLOW_IPS} --max-requests ${MAX_REQUESTS} --max-requests-jitter ${MAX_REQUESTS_JITTER} --worker-tmp-dir /dev/shm"]
+CMD ["sh","-c", "GUNICORN_CONF=$(python -c 'import servicekit, os; print(os.path.join(os.path.dirname(servicekit.__file__), \"gunicorn.conf.py\"))'); exec gunicorn -c \"${GUNICORN_CONF}\" -k uvicorn.workers.UvicornWorker ${EXAMPLE_MODULE} --bind 0.0.0.0:${PORT} --workers 1 --timeout ${TIMEOUT} --graceful-timeout ${GRACEFUL_TIMEOUT} --keep-alive ${KEEPALIVE} --forwarded-allow-ips=${FORWARDED_ALLOW_IPS} --max-requests ${MAX_REQUESTS} --max-requests-jitter ${MAX_REQUESTS_JITTER} --worker-tmp-dir /dev/shm"]

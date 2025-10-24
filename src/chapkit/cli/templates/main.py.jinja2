@@ -1,0 +1,124 @@
+"""{{ PROJECT_DESCRIPTION }}."""
+
+from typing import Any
+
+import pandas as pd
+import structlog
+from geojson_pydantic import FeatureCollection
+
+from chapkit import BaseConfig
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.artifact import ArtifactHierarchy
+from chapkit.ml import FunctionalModelRunner
+
+log = structlog.get_logger()
+
+
+class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseConfig):
+    """Configuration for {{ PROJECT_NAME }}."""
+
+    # Add your model-specific parameters here
+    # For example:
+    # min_samples: int = 5
+    # learning_rate: float = 0.01
+
+
+async def on_train(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    data: pd.DataFrame,
+    geo: FeatureCollection | None = None,
+) -> Any:
+    """Train a simple model.
+
+    Args:
+        config: Model configuration
+        data: Training data
+        geo: Optional geographic metadata
+
+    Returns:
+        Trained model (dict with column means)
+    """
+    # Simple example: compute mean of each numeric column
+    model = {"means": data.select_dtypes(include=["number"]).mean().to_dict()}
+
+    log.info(
+        "model_trained",
+        columns=list(model["means"].keys()),
+        samples=len(data),
+    )
+
+    return model
+
+
+async def on_predict(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    model: Any,
+    historic: pd.DataFrame,
+    future: pd.DataFrame,
+    geo: FeatureCollection | None = None,
+) -> pd.DataFrame:
+    """Make predictions using the trained model.
+
+    Args:
+        config: Model configuration
+        model: Trained model object
+        historic: Historical data (not used in this example)
+        future: Future data to make predictions for
+        geo: Optional geographic metadata
+
+    Returns:
+        Future data with predictions added
+    """
+    # Simple example: use the mean from training as prediction
+    means = model.get("means", {})
+    prediction = sum(means.values()) / len(means) if means else 0.0
+
+    # Add predictions to future data
+    future["sample_0"] = prediction
+
+    log.info(
+        "predictions_made",
+        sample_count=len(future),
+        prediction_value=float(prediction),
+    )
+
+    return future
+
+
+# Create ML service info with metadata
+info = MLServiceInfo(
+    display_name="{{ PROJECT_NAME }}",
+    version="1.0.0",
+    summary="{{ PROJECT_DESCRIPTION }}",
+    description="A simple ML service template. Customize with your own model implementation.",
+    author="Your Name",
+    author_assessed_status=AssessedStatus.yellow,
+    contact_email="your.email@example.com",
+)
+
+# Create artifact hierarchy for ML artifacts
+HIERARCHY = ArtifactHierarchy(
+    name="{{ PROJECT_SLUG }}",
+    level_labels={0: "trained_model", 1: "predictions"},
+)
+
+# Create functional model runner
+runner = FunctionalModelRunner(on_train=on_train, on_predict=on_predict)
+
+# Build the FastAPI application
+app = (
+    MLServiceBuilder(
+        info=info,
+        config_schema={{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+        hierarchy=HIERARCHY,
+        runner=runner,
+    )
+    .with_monitoring()
+    .build()
+)
+
+
+if __name__ == "__main__":
+    from chapkit.api import run_app
+
+    run_app("main:app")
