@@ -1,0 +1,13 @@
+[project]
+name = "{{ PROJECT_SLUG }}"
+version = "0.1.0"
+description = "{{ PROJECT_DESCRIPTION }}"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
