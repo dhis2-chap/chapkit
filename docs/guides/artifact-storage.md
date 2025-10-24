@@ -270,10 +270,11 @@ Get artifact with all ancestors and descendants.
 
 ### Storing DataFrames
 
-Use `PandasDataFrame` schema for tabular data:
+Use `DataFrame` schema for tabular data:
 
 ```python
-from chapkit.artifact import ArtifactIn, PandasDataFrame
+from chapkit.artifact import ArtifactIn
+from servicekit.data import DataFrame
 import pandas as pd
 
 df = pd.DataFrame({
@@ -281,15 +282,15 @@ df = pd.DataFrame({
     "feature2": [4.0, 5.0, 6.0]
 })
 
-pandas_df = PandasDataFrame.from_dataframe(df)
+data_frame = DataFrame.from_pandas(df)
 
 artifact = await manager.save(ArtifactIn(
-    data={"dataframe": pandas_df.model_dump()}
+    data={"dataframe": data_frame.model_dump()}
 ))
 
 # Retrieve and convert back
 artifact = await manager.find_by_id(artifact_id)
-df = PandasDataFrame(**artifact.data["dataframe"]).to_dataframe()
+df = DataFrame(**artifact.data["dataframe"]).to_pandas()
 ```
 
 ### Storing Binary Data

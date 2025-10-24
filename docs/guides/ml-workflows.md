@@ -468,9 +468,9 @@ curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq
 
 ## Data Formats
 
-### PandasDataFrame Schema
+### DataFrame Schema
 
-All tabular data uses the `PandasDataFrame` schema:
+All tabular data uses the `DataFrame` schema:
 
 ```json
 {
@@ -486,14 +486,14 @@ All tabular data uses the `PandasDataFrame` schema:
 
 **Python Usage:**
 ```python
-from chapkit.artifact.schemas import PandasDataFrame
+from servicekit.data import DataFrame
 
 # Create from DataFrame
 df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
-pandas_df = PandasDataFrame.from_dataframe(df)
+data_frame = DataFrame.from_pandas(df)
 
 # Convert to DataFrame
-df = pandas_df.to_dataframe()
+df = data_frame.to_pandas()
 ```
 
 ### GeoJSON Support
@@ -572,7 +572,7 @@ Stored at hierarchy level 1 (linked to model):
 - `ml_type`: Always `"prediction"`
 - `config_id`: Config used for prediction
 - `model_artifact_id`: Parent trained model artifact
-- `predictions`: Result DataFrame (PandasDataFrame schema)
+- `predictions`: Result DataFrame (DataFrame schema)
 - `started_at`, `completed_at`: ISO timestamps
 - `duration_seconds`: Prediction duration (rounded to 2 decimals)
 
@@ -1193,7 +1193,7 @@ MLServiceBuilder(..., database_url="postgresql://...")
 
 ### DataFrame Validation Errors
 
-**Problem:** "Invalid PandasDataFrame schema" during train/predict
+**Problem:** "Invalid DataFrame schema" during train/predict
 
 **Cause:** Incorrect data format in request
 
