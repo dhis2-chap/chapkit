@@ -102,7 +102,7 @@ wheels = [
 
 [[package]]
 name = "chapkit"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
@@ -1538,7 +1538,7 @@ wheels = [
 [[package]]
 name = "servicekit"
 version = "0.3.1"
-source = { git = "https://github.com/winterop-com/servicekit.git#964a4cdf31a0ba4ad413187bf66493855dd19f5c" }
+source = { git = "https://github.com/winterop-com/servicekit.git#dd2ba09c9fd4c8cd180bc5454a04714e3d9a7dbb" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "alembic" },
