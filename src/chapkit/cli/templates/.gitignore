@@ -150,6 +150,3 @@ alembic.ini.bak
 
 # Ruff cache
 .ruff_cache/
-
-# Example uv.lock files (examples use local editable chapkit)
-examples/*/uv.lock
