@@ -1,7 +1,7 @@
 # Chapkit
 
-[![CI](https://img.shields.io/badge/CI-passing-brightgreen)](https://github.com/dhis2-chap/chapkit/actions/workflows/ci.yml)
-[![codecov](https://img.shields.io/badge/coverage-83%25-brightgreen)](https://codecov.io/gh/dhis2-chap/chapkit)
+[![CI](https://github.com/dhis2-chap/chapkit/actions/workflows/ci.yml/badge.svg)](https://github.com/dhis2-chap/chapkit/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/dhis2-chap/chapkit/branch/main/graph/badge.svg)](https://codecov.io/gh/dhis2-chap/chapkit)
 [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
