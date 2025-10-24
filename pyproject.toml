@@ -135,6 +135,11 @@ module = [
 ]
 warn_return_any = false
 
+[[tool.mypy.overrides]]
+module = "examples.custom_migrations.*"
+ignore_missing_imports = true
+ignore_errors = true
+
 [tool.pyright]
 include = ["src", "tests", "examples", "alembic"]
 pythonVersion = "3.13"

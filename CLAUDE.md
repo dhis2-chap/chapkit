@@ -156,18 +156,33 @@ app = (
 
 Chapkit uses servicekit's database infrastructure (SqliteDatabase, migrations via Alembic).
 
-**Commands:**
+**Quick Reference:**
 ```bash
 make migrate MSG='description'  # Generate migration
 make upgrade                    # Apply migrations (auto-applied on init)
+make downgrade                  # Rollback last migration
 ```
 
-**Workflow:**
+**Basic Workflow:**
 1. Modify ORM models in `src/chapkit/{module}/models.py`
 2. Generate: `make migrate MSG='description'`
 3. Review in `alembic/versions/`
 4. Restart app (auto-applies)
 5. Commit migration file
+
+**Adding Custom Models:**
+Users extending chapkit with custom tables should:
+- Inherit from `servicekit.models.Entity` or `Base`
+- Import models in `alembic/env.py` for auto-detection
+- Follow the alembic_helpers pattern for reusable migrations
+- See `examples/custom_migrations/` for complete example
+
+**Documentation:**
+See `docs/guides/database-migrations.md` for comprehensive guide including:
+- Setting up your own Alembic configuration
+- Creating custom models and migrations
+- Reusing chapkit's alembic_helpers pattern
+- Troubleshooting migration issues
 
 ## Naming Conventions
 

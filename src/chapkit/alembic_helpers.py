@@ -1,4 +1,50 @@
-"""Reusable Alembic migration helpers for chapkit tables."""
+"""Reusable Alembic migration helpers for chapkit tables.
+
+This module provides helper functions for creating and dropping chapkit's database tables
+in Alembic migrations. Using helpers instead of raw Alembic operations provides:
+
+- Reusability across migrations
+- Consistent table definitions
+- Clear documentation
+- Easier maintenance
+
+Users can create their own helper modules following this pattern for custom tables.
+
+Example:
+    # In your migration file
+    from chapkit.alembic_helpers import create_configs_table, drop_configs_table
+
+    def upgrade() -> None:
+        create_configs_table(op)
+
+    def downgrade() -> None:
+        drop_configs_table(op)
+
+Creating Your Own Helpers:
+    Follow the same pattern for your custom tables:
+
+    # myapp/alembic_helpers.py
+    def create_users_table(op: Any) -> None:
+        '''Create users table.'''
+        op.create_table(
+            'users',
+            sa.Column('email', sa.String(), nullable=False),
+            sa.Column('name', sa.String(), nullable=False),
+            sa.Column('id', servicekit.types.ULIDType(length=26), nullable=False),
+            sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+            sa.Column('tags', sa.JSON(), nullable=False, server_default='[]'),
+            sa.PrimaryKeyConstraint('id'),
+        )
+        op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=False)
+
+    def drop_users_table(op: Any) -> None:
+        '''Drop users table.'''
+        op.drop_index(op.f('ix_users_email'), table_name='users')
+        op.drop_table('users')
+
+See examples/custom_migrations/ for a complete working example.
+"""
 
 from typing import Any
 
