@@ -140,3 +140,64 @@ class TestMigrations:
 
             finally:
                 await db.dispose()
+
+    async def test_alembic_helpers_drop_functions(self) -> None:
+        """Test that alembic helper drop functions work correctly."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+
+            db = (
+                SqliteDatabaseBuilder.from_file(str(db_path))
+                .with_migrations(enabled=True, alembic_dir=ALEMBIC_DIR)
+                .build()
+            )
+            await db.init()
+
+            try:
+                # Import alembic helpers
+                from chapkit import alembic_helpers
+
+                # Create a mock op object to test drop functions
+                class MockOp:
+                    """Mock Alembic operations object."""
+
+                    def __init__(self) -> None:
+                        self.dropped_indices: list[str] = []
+                        self.dropped_tables: list[str] = []
+
+                    def f(self, name: str) -> str:
+                        """Mock f() method that returns the input name."""
+                        return name
+
+                    def drop_index(self, index_name: str, table_name: str) -> None:
+                        """Record dropped index."""
+                        self.dropped_indices.append(index_name)
+
+                    def drop_table(self, table_name: str) -> None:
+                        """Record dropped table."""
+                        self.dropped_tables.append(table_name)
+
+                # Test drop_artifacts_table
+                mock_op = MockOp()
+                alembic_helpers.drop_artifacts_table(mock_op)
+                assert "artifacts" in mock_op.dropped_tables
+                assert len(mock_op.dropped_indices) == 2
+
+                # Test drop_configs_table
+                mock_op = MockOp()
+                alembic_helpers.drop_configs_table(mock_op)
+                assert "configs" in mock_op.dropped_tables
+                assert len(mock_op.dropped_indices) == 1
+
+                # Test drop_config_artifacts_table
+                mock_op = MockOp()
+                alembic_helpers.drop_config_artifacts_table(mock_op)
+                assert "config_artifacts" in mock_op.dropped_tables
+
+                # Test drop_tasks_table
+                mock_op = MockOp()
+                alembic_helpers.drop_tasks_table(mock_op)
+                assert "tasks" in mock_op.dropped_tables
+
+            finally:
+                await db.dispose()

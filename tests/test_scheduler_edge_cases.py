@@ -134,3 +134,65 @@ async def test_cancelled_job_updates_status() -> None:
     record = await scheduler.get_record(job_id)
     assert record.status == JobStatus.canceled
     assert record.finished_at is not None
+
+
+async def test_add_job_duplicate_id_raises_runtime_error() -> None:
+    """Test that adding a job with duplicate ID raises RuntimeError."""
+    import re
+    scheduler = ChapkitJobScheduler()
+
+    # Create a job with a specific ID by manually inserting into _tasks
+    duplicate_id = ULID()
+
+    # Manually add a task with this ID to simulate collision
+    async with scheduler._lock:
+        scheduler._tasks[duplicate_id] = asyncio.create_task(asyncio.sleep(10))
+
+    # Try to add a new job with the same ID - this requires monkey-patching ULID generation
+    original_ulid = ULID
+
+    class FixedULID:
+        """Mock ULID that returns fixed value."""
+        def __init__(self) -> ULID:
+            return duplicate_id
+
+    # Monkey-patch the scheduler's ULID to return our duplicate
+    import chapkit.scheduler
+    old_ulid = chapkit.scheduler.ULID
+    try:
+        chapkit.scheduler.ULID = lambda: duplicate_id
+
+        async def dummy() -> None:
+            pass
+
+        # This should raise RuntimeError - use re.escape for the ULID repr
+        with pytest.raises(RuntimeError, match=re.escape(f"Job {duplicate_id!r} already scheduled")):
+            await scheduler.add_job(dummy)
+    finally:
+        chapkit.scheduler.ULID = old_ulid
+        # Clean up the task we created
+        async with scheduler._lock:
+            if duplicate_id in scheduler._tasks:
+                scheduler._tasks[duplicate_id].cancel()
+
+
+async def test_add_job_with_awaitable_and_args_raises_type_error() -> None:
+    """Test that submitting an awaitable with args/kwargs raises TypeError."""
+    scheduler = ChapkitJobScheduler()
+
+    # Create a coroutine (awaitable object)
+    async def some_coro() -> str:
+        return "result"
+
+    awaitable = some_coro()
+
+    # Add the awaitable with args - error happens during execution, not during add_job
+    job_id = await scheduler.add_job(awaitable, "extra_arg")
+
+    # Wait for job to execute and fail
+    await asyncio.sleep(0.1)
+
+    # Check that the job failed with TypeError
+    record = await scheduler.get_record(job_id)
+    assert record.status == JobStatus.failed
+    assert "Args/kwargs not supported when target is an awaitable object" in (record.error or "")
