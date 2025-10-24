@@ -3,7 +3,7 @@ name = "chapkit"
 version = "0.4.0"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
-authors = [{ name = "Morten Hansen", email = "morten@winterop.com" }]
+authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
 license = { text = "AGPL-3.0-or-later" }
 requires-python = ">=3.13"
 keywords = [
