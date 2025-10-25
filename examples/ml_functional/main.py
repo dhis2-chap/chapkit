@@ -37,7 +37,7 @@ async def on_train(
 ) -> Any:
     """Train a linear regression model for disease prediction."""
     # Convert servicekit DataFrame to pandas for sklearn
-    df = data.to_pandas()  # type: ignore[attr-defined]
+    df = data.to_pandas()
 
     features = ["rainfall", "mean_temperature"]
     X = df[features]
@@ -61,7 +61,7 @@ async def on_predict(
 ) -> DataFrame:
     """Make predictions using the trained model."""
     # Convert to pandas for sklearn
-    future_df = future.to_pandas()  # type: ignore[attr-defined]
+    future_df = future.to_pandas()
 
     X = future_df[["rainfall", "mean_temperature"]]
     y_pred = model.predict(X)
@@ -70,7 +70,7 @@ async def on_predict(
     log.info("predictions_made", sample_count=len(y_pred), mean_prediction=y_pred.mean())
 
     # Convert back to servicekit DataFrame
-    return DataFrame.from_pandas(future_df)  # type: ignore[attr-defined,return-value]
+    return DataFrame.from_pandas(future_df)
 
 
 # Create ML service info with metadata
@@ -99,7 +99,7 @@ app = (
         info=info,
         config_schema=DiseaseConfig,
         hierarchy=HIERARCHY,
-        runner=runner,
+        runner=runner,  # type: ignore[arg-type]
     )
     .with_monitoring()
     .build()

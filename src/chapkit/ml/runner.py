@@ -124,7 +124,7 @@ class ShellModelRunner(BaseModelRunner):
 
             # Write training data to CSV
             data_file = temp_dir / "data.csv"
-            data.to_csv(data_file)  # type: ignore[attr-defined]
+            data.to_csv(data_file)
 
             # Write geo data if provided
             geo_file = temp_dir / "geo.json" if geo else None
@@ -201,11 +201,11 @@ class ShellModelRunner(BaseModelRunner):
 
             # Write historic data
             historic_file = temp_dir / "historic.csv"
-            historic.to_csv(historic_file)  # type: ignore[attr-defined]
+            historic.to_csv(historic_file)
 
             # Write future data to CSV
             future_file = temp_dir / "future.csv"
-            future.to_csv(future_file)  # type: ignore[attr-defined]
+            future.to_csv(future_file)
 
             # Write geo data if provided
             geo_file = temp_dir / "geo.json" if geo else None
@@ -250,8 +250,8 @@ class ShellModelRunner(BaseModelRunner):
             if not output_file.exists():
                 raise RuntimeError(f"Prediction script did not create output file at {output_file}")
 
-            predictions = DataFrame.from_csv(output_file)  # type: ignore[attr-defined]
-            return predictions  # type: ignore[return-value]
+            predictions = DataFrame.from_csv(output_file)
+            return predictions
 
         finally:
             # Cleanup temp files

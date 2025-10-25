@@ -56,7 +56,7 @@ class SimpleRunner(BaseModelRunner):
         """Simple prediction implementation."""
         pred_count = len(future.data)
         self.predictions.append(pred_count)
-        return future.add_column("prediction", [1.0] * len(future.data))  # type: ignore[attr-defined,return-value]
+        return future.add_column("prediction", [1.0] * len(future.data))
 
 
 class StatefulRunner(BaseModelRunner):
@@ -101,10 +101,10 @@ class StatefulRunner(BaseModelRunner):
             if col in future.columns and col in self.normalization_params:
                 col_idx = future.columns.index(col)
                 normalized_values = [row[col_idx] - self.normalization_params[col] for row in future.data]
-                result = result.add_column(f"{col}_normalized", normalized_values)  # type: ignore[attr-defined]
+                result = result.add_column(f"{col}_normalized", normalized_values)
 
-        result = result.add_column("prediction", [1.0] * len(result.data))  # type: ignore[attr-defined]
-        return result  # type: ignore[return-value]
+        result = result.add_column("prediction", [1.0] * len(result.data))
+        return result
 
 
 def test_base_model_runner_is_abstract() -> None:

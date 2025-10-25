@@ -71,7 +71,7 @@ class WeatherModelRunner(BaseModelRunner):
 
         try:
             # Convert to pandas for sklearn
-            df = data.to_pandas()  # type: ignore[attr-defined]
+            df = data.to_pandas()
 
             # Cast config to expected type
             weather_config = WeatherConfig.model_validate(config.model_dump())
@@ -144,7 +144,7 @@ class WeatherModelRunner(BaseModelRunner):
 
         try:
             # Convert to pandas for sklearn
-            future_df = future.to_pandas()  # type: ignore[attr-defined]
+            future_df = future.to_pandas()
 
             log.info("prediction_started", sample_count=len(future_df))
 
@@ -180,7 +180,7 @@ class WeatherModelRunner(BaseModelRunner):
             )
 
             # Convert back to servicekit DataFrame
-            return DataFrame.from_pandas(future_df)  # type: ignore[attr-defined,return-value]
+            return DataFrame.from_pandas(future_df)
 
         finally:
             await self.on_cleanup()
@@ -213,7 +213,7 @@ app = (
         info=info,
         config_schema=WeatherConfig,
         hierarchy=HIERARCHY,
-        runner=runner,
+        runner=runner,  # type: ignore[arg-type]
     )
     .with_monitoring()
     .build()
