@@ -26,6 +26,25 @@ pip install chapkit
 
 Chapkit automatically installs servicekit as a dependency.
 
+## CLI Usage
+
+Quickly scaffold a new ML service project using `uvx`:
+
+```bash
+uvx chapkit@git+https://github.com/dhis2-chap/chapkit init <project-name>
+```
+
+Example:
+```bash
+uvx chapkit@git+https://github.com/dhis2-chap/chapkit init my-ml-service
+```
+
+Options:
+- `--path <directory>` - Target directory (default: current directory)
+- `--monitoring` - Include Prometheus and Grafana monitoring stack
+
+This creates a ready-to-run ML service with configuration, artifacts, and ML endpoints pre-configured.
+
 ## Quick Start
 
 ```python
