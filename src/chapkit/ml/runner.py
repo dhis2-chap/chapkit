@@ -9,9 +9,9 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Generic, TypeVar
 
-import pandas as pd
 import yaml
 from geojson_pydantic import FeatureCollection
+from servicekit.data import DataFrame
 from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
@@ -19,9 +19,9 @@ from chapkit.config.schemas import BaseConfig
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
 # Type aliases for ML runner functions
-type TrainFunction[ConfigT] = Callable[[ConfigT, pd.DataFrame, FeatureCollection | None], Awaitable[Any]]
+type TrainFunction[ConfigT] = Callable[[ConfigT, DataFrame, FeatureCollection | None], Awaitable[Any]]
 type PredictFunction[ConfigT] = Callable[
-    [ConfigT, Any, pd.DataFrame, pd.DataFrame, FeatureCollection | None], Awaitable[pd.DataFrame]
+    [ConfigT, Any, DataFrame, DataFrame, FeatureCollection | None], Awaitable[DataFrame]
 ]
 
 logger = get_logger(__name__)
@@ -42,7 +42,7 @@ class BaseModelRunner(ABC):
     async def on_train(
         self,
         config: BaseConfig,
-        data: pd.DataFrame,
+        data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object (must be pickleable)."""
@@ -53,10 +53,10 @@ class BaseModelRunner(ABC):
         self,
         config: BaseConfig,
         model: Any,
-        historic: pd.DataFrame,
-        future: pd.DataFrame,
+        historic: DataFrame,
+        future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> pd.DataFrame:
+    ) -> DataFrame:
         """Make predictions using a trained model and return predictions as DataFrame."""
         ...
 
@@ -76,7 +76,7 @@ class FunctionalModelRunner(BaseModelRunner, Generic[ConfigT]):
     async def on_train(
         self,
         config: BaseConfig,
-        data: pd.DataFrame,
+        data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object."""
@@ -86,10 +86,10 @@ class FunctionalModelRunner(BaseModelRunner, Generic[ConfigT]):
         self,
         config: BaseConfig,
         model: Any,
-        historic: pd.DataFrame,
-        future: pd.DataFrame,
+        historic: DataFrame,
+        future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> pd.DataFrame:
+    ) -> DataFrame:
         """Make predictions using a trained model."""
         return await self._on_predict(config, model, historic, future, geo)  # type: ignore[arg-type]
 
@@ -111,7 +111,7 @@ class ShellModelRunner(BaseModelRunner):
     async def on_train(
         self,
         config: BaseConfig,
-        data: pd.DataFrame,
+        data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model by executing external training script."""
@@ -124,7 +124,7 @@ class ShellModelRunner(BaseModelRunner):
 
             # Write training data to CSV
             data_file = temp_dir / "data.csv"
-            data.to_csv(data_file, index=False)
+            data.to_csv(data_file)  # type: ignore[attr-defined]
 
             # Write geo data if provided
             geo_file = temp_dir / "geo.json" if geo else None
@@ -182,10 +182,10 @@ class ShellModelRunner(BaseModelRunner):
         self,
         config: BaseConfig,
         model: Any,
-        historic: pd.DataFrame,
-        future: pd.DataFrame,
+        historic: DataFrame,
+        future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> pd.DataFrame:
+    ) -> DataFrame:
         """Make predictions by executing external prediction script."""
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
@@ -201,11 +201,11 @@ class ShellModelRunner(BaseModelRunner):
 
             # Write historic data
             historic_file = temp_dir / "historic.csv"
-            historic.to_csv(historic_file, index=False)
+            historic.to_csv(historic_file)  # type: ignore[attr-defined]
 
             # Write future data to CSV
             future_file = temp_dir / "future.csv"
-            future.to_csv(future_file, index=False)
+            future.to_csv(future_file)  # type: ignore[attr-defined]
 
             # Write geo data if provided
             geo_file = temp_dir / "geo.json" if geo else None
@@ -250,8 +250,8 @@ class ShellModelRunner(BaseModelRunner):
             if not output_file.exists():
                 raise RuntimeError(f"Prediction script did not create output file at {output_file}")
 
-            predictions = pd.read_csv(output_file)
-            return predictions
+            predictions = DataFrame.from_csv(output_file)  # type: ignore[attr-defined]
+            return predictions  # type: ignore[return-value]
 
         finally:
             # Cleanup temp files
