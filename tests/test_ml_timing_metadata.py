@@ -25,25 +25,29 @@ class SimpleConfig(BaseConfig):
 
 async def simple_train(
     config: BaseConfig,
-    data: pd.DataFrame,
+    data: DataFrame,
     geo: FeatureCollection | None = None,
 ) -> dict[str, int]:
     """Simple training function that takes measurable time."""
     await asyncio.sleep(0.1)  # Simulate training time
-    return {"trained": True, "samples": len(data)}
+    # Convert to pandas for processing (users would use their preferred library)
+    df = data.to_pandas()
+    return {"trained": True, "samples": len(df)}
 
 
 async def simple_predict(
     config: BaseConfig,
     model: dict[str, int],
-    historic: pd.DataFrame | None,
-    future: pd.DataFrame,
+    historic: DataFrame | None,
+    future: DataFrame,
     geo: FeatureCollection | None = None,
-) -> pd.DataFrame:
+) -> DataFrame:
     """Simple prediction function that takes measurable time."""
     await asyncio.sleep(0.05)  # Simulate prediction time
-    future["sample_0"] = 1.0
-    return future
+    # Convert to pandas for processing
+    future_df = future.to_pandas()
+    future_df["sample_0"] = 1.0
+    return DataFrame.from_pandas(future_df)
 
 
 class MockModel:
@@ -56,12 +60,13 @@ class MockModel:
 
 async def dict_wrapped_train(
     config: BaseConfig,
-    data: pd.DataFrame,
+    data: DataFrame,
     geo: FeatureCollection | None = None,
 ) -> dict[str, object]:
     """Training function that returns dict with 'model' key (ml_class.py pattern)."""
     await asyncio.sleep(0.1)
-    return {"model": MockModel(42), "metadata": "test", "sample_count": len(data)}
+    df = data.to_pandas()
+    return {"model": MockModel(42), "metadata": "test", "sample_count": len(df)}
 
 
 @pytest.fixture
@@ -74,7 +79,7 @@ async def ml_manager() -> AsyncIterator[MLManager]:
 
     runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
 
-    manager = MLManager(runner, scheduler, database, SimpleConfig)
+    manager = MLManager(runner, scheduler, database, SimpleConfig)  # type: ignore[arg-type]
     yield manager
 
 
@@ -419,7 +424,7 @@ async def test_model_type_extracts_from_dict_wrapped_models(
 
     scheduler = ChapkitJobScheduler()
     runner = FunctionalModelRunner(on_train=dict_wrapped_train, on_predict=simple_predict)
-    manager = MLManager(runner, scheduler, database, SimpleConfig)
+    manager = MLManager(runner, scheduler, database, SimpleConfig)  # type: ignore[arg-type]
 
     config_id, train_df, _ = setup_data
 
@@ -470,7 +475,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     # Train simple model (small dict)
     scheduler1 = ChapkitJobScheduler()
     runner1 = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
-    manager1 = MLManager(runner1, scheduler1, database, SimpleConfig)
+    manager1 = MLManager(runner1, scheduler1, database, SimpleConfig)  # type: ignore[arg-type]
 
     train_request1 = TrainRequest(
         config_id=config.id,
@@ -482,7 +487,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     # Train complex model (dict with nested model object)
     scheduler2 = ChapkitJobScheduler()
     runner2 = FunctionalModelRunner(on_train=dict_wrapped_train, on_predict=simple_predict)
-    manager2 = MLManager(runner2, scheduler2, database, SimpleConfig)
+    manager2 = MLManager(runner2, scheduler2, database, SimpleConfig)  # type: ignore[arg-type]
 
     train_request2 = TrainRequest(
         config_id=config.id,
