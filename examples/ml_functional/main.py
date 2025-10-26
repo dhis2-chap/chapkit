@@ -99,7 +99,7 @@ app = (
         info=info,
         config_schema=DiseaseConfig,
         hierarchy=HIERARCHY,
-        runner=runner,  # type: ignore[arg-type]
+        runner=runner,
     )
     .with_monitoring()
     .build()

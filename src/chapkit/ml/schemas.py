@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Literal, Protocol
 
-import pandas as pd
 from geojson_pydantic import FeatureCollection
 from pydantic import BaseModel, Field
 from servicekit.data import DataFrame
@@ -79,7 +78,7 @@ class ModelRunnerProtocol(Protocol):
     async def on_train(
         self,
         config: BaseConfig,
-        data: pd.DataFrame,
+        data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object (must be pickleable)."""
@@ -89,9 +88,9 @@ class ModelRunnerProtocol(Protocol):
         self,
         config: BaseConfig,
         model: Any,
-        historic: pd.DataFrame,
-        future: pd.DataFrame,
+        historic: DataFrame,
+        future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> pd.DataFrame:
+    ) -> DataFrame:
         """Make predictions using a trained model and return predictions as DataFrame."""
         ...
