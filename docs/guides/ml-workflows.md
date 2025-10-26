@@ -51,11 +51,11 @@ app = (
 from chapkit.ml import BaseModelRunner
 from sklearn.preprocessing import StandardScaler
 
-class CustomModelRunner(BaseModelRunner):
+class CustomModelRunner(BaseModelRunner[ModelConfig]):
     def __init__(self):
         self.scaler = StandardScaler()
 
-    async def on_train(self, config, data, geo=None):
+    async def on_train(self, config: ModelConfig, data, geo=None):
         X = data[["feature1", "feature2"]]
         y = data["target"]
 
@@ -65,7 +65,7 @@ class CustomModelRunner(BaseModelRunner):
 
         return {"model": model, "scaler": self.scaler}
 
-    async def on_predict(self, config, model, historic, future, geo=None):
+    async def on_predict(self, config: ModelConfig, model, historic, future, geo=None):
         X = future[["feature1", "feature2"]]
         X_scaled = model["scaler"].transform(X)
         future["sample_0"] = model["model"].predict(X_scaled)
@@ -149,8 +149,13 @@ Abstract base class for custom model runners with lifecycle hooks.
 
 ```python
 from chapkit.ml import BaseModelRunner
+from chapkit import BaseConfig
 
-class MyRunner(BaseModelRunner):
+class MyConfig(BaseConfig):
+    """Your config schema."""
+    pass
+
+class MyRunner(BaseModelRunner[MyConfig]):
     async def on_init(self):
         """Called before train or predict (optional)."""
         pass
@@ -159,13 +164,15 @@ class MyRunner(BaseModelRunner):
         """Called after train or predict (optional)."""
         pass
 
-    async def on_train(self, config, data, geo=None):
+    async def on_train(self, config: MyConfig, data, geo=None):
         """Train and return model (must be pickleable)."""
+        # config is typed as MyConfig - no casting needed!
         # Your training logic
         return trained_model
 
-    async def on_predict(self, config, model, historic, future, geo=None):
+    async def on_predict(self, config: MyConfig, model, historic, future, geo=None):
         """Make predictions and return DataFrame."""
+        # config is typed as MyConfig - autocomplete works!
         # Your prediction logic
         return predictions_df
 ```
@@ -662,12 +669,12 @@ from chapkit.ml import BaseModelRunner
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
 
-class WeatherModelRunner(BaseModelRunner):
+class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
     def __init__(self):
         self.feature_names = ["rainfall", "mean_temperature", "humidity"]
         self.scaler = None
 
-    async def on_train(self, config, data, geo=None):
+    async def on_train(self, config: WeatherConfig, data, geo=None):
         X = data[self.feature_names].fillna(0)
         y = data["disease_cases"].fillna(0)
 
@@ -686,7 +693,7 @@ class WeatherModelRunner(BaseModelRunner):
             "feature_names": self.feature_names,
         }
 
-    async def on_predict(self, config, model, historic, future, geo=None):
+    async def on_predict(self, config: WeatherConfig, model, historic, future, geo=None):
         # Extract artifacts
         trained_model = model["model"]
         scaler = model["scaler"]

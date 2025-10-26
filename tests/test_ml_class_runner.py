@@ -16,7 +16,7 @@ class MockConfig(BaseConfig):
     threshold: float = 0.5
 
 
-class SimpleRunner(BaseModelRunner):
+class SimpleRunner(BaseModelRunner[MockConfig]):
     """Simple test runner for basic functionality."""
 
     def __init__(self) -> None:
@@ -36,7 +36,7 @@ class SimpleRunner(BaseModelRunner):
 
     async def on_train(
         self,
-        config: BaseConfig,
+        config: MockConfig,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
@@ -47,7 +47,7 @@ class SimpleRunner(BaseModelRunner):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: MockConfig,
         model: Any,
         historic: DataFrame | None,
         future: DataFrame,
@@ -59,7 +59,7 @@ class SimpleRunner(BaseModelRunner):
         return future.add_column("prediction", [1.0] * len(future.data))
 
 
-class StatefulRunner(BaseModelRunner):
+class StatefulRunner(BaseModelRunner[MockConfig]):
     """Runner with shared state between train and predict."""
 
     def __init__(self) -> None:
@@ -69,7 +69,7 @@ class StatefulRunner(BaseModelRunner):
 
     async def on_train(
         self,
-        config: BaseConfig,
+        config: MockConfig,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
@@ -87,7 +87,7 @@ class StatefulRunner(BaseModelRunner):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: MockConfig,
         model: Any,
         historic: DataFrame | None,
         future: DataFrame,
@@ -271,12 +271,12 @@ async def test_runner_with_historic_data() -> None:
 async def test_default_lifecycle_hooks_do_nothing() -> None:
     """Test that default lifecycle hooks don't raise errors."""
 
-    class MinimalRunner(BaseModelRunner):
+    class MinimalRunner(BaseModelRunner[MockConfig]):
         """Runner without overriding lifecycle hooks."""
 
         async def on_train(
             self,
-            config: BaseConfig,
+            config: MockConfig,
             data: DataFrame,
             geo: FeatureCollection | None = None,
         ) -> Any:
@@ -285,7 +285,7 @@ async def test_default_lifecycle_hooks_do_nothing() -> None:
 
         async def on_predict(
             self,
-            config: BaseConfig,
+            config: MockConfig,
             model: Any,
             historic: DataFrame | None,
             future: DataFrame,

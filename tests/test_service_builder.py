@@ -19,12 +19,12 @@ class DummyConfig(BaseConfig):
     test_value: str = Field(default="test")
 
 
-class DummyRunner(ModelRunnerProtocol):
+class DummyRunner(ModelRunnerProtocol[DummyConfig]):
     """Dummy ML runner for testing."""
 
     async def on_train(
         self,
-        config: BaseConfig,
+        config: DummyConfig,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
@@ -33,7 +33,7 @@ class DummyRunner(ModelRunnerProtocol):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: DummyConfig,
         model: Any,
         historic: DataFrame | None,
         future: DataFrame,

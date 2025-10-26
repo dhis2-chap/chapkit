@@ -27,7 +27,7 @@ type PredictFunction[ConfigT] = Callable[
 logger = get_logger(__name__)
 
 
-class BaseModelRunner(ABC):
+class BaseModelRunner(ABC, Generic[ConfigT]):
     """Abstract base class for model runners with lifecycle hooks."""
 
     async def on_init(self) -> None:
@@ -41,7 +41,7 @@ class BaseModelRunner(ABC):
     @abstractmethod
     async def on_train(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
@@ -51,7 +51,7 @@ class BaseModelRunner(ABC):
     @abstractmethod
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         model: Any,
         historic: DataFrame,
         future: DataFrame,
@@ -61,7 +61,7 @@ class BaseModelRunner(ABC):
         ...
 
 
-class FunctionalModelRunner(BaseModelRunner, Generic[ConfigT]):
+class FunctionalModelRunner(BaseModelRunner[ConfigT]):
     """Functional model runner wrapping train and predict functions."""
 
     def __init__(
@@ -75,26 +75,26 @@ class FunctionalModelRunner(BaseModelRunner, Generic[ConfigT]):
 
     async def on_train(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object."""
-        return await self._on_train(config, data, geo)  # type: ignore[arg-type]
+        return await self._on_train(config, data, geo)
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         model: Any,
         historic: DataFrame,
         future: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions using a trained model."""
-        return await self._on_predict(config, model, historic, future, geo)  # type: ignore[arg-type]
+        return await self._on_predict(config, model, historic, future, geo)
 
 
-class ShellModelRunner(BaseModelRunner):
+class ShellModelRunner(BaseModelRunner[ConfigT]):
     """Shell-based model runner that executes external scripts for train/predict operations."""
 
     def __init__(
@@ -110,7 +110,7 @@ class ShellModelRunner(BaseModelRunner):
 
     async def on_train(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
@@ -180,7 +180,7 @@ class ShellModelRunner(BaseModelRunner):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         model: Any,
         historic: DataFrame,
         future: DataFrame,

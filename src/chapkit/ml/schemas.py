@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
+from typing import Any, Literal, Protocol, TypeVar
 
 from geojson_pydantic import FeatureCollection
 from pydantic import BaseModel, Field
@@ -10,6 +10,8 @@ from servicekit.data import DataFrame
 from ulid import ULID
 
 from chapkit.config.schemas import BaseConfig
+
+ConfigT = TypeVar("ConfigT", bound=BaseConfig, contravariant=True)
 
 
 class TrainRequest(BaseModel):
@@ -72,12 +74,12 @@ class PredictionArtifactData(BaseModel):
     predictions: DataFrame = Field(description="Prediction results as structured DataFrame")
 
 
-class ModelRunnerProtocol(Protocol):
+class ModelRunnerProtocol(Protocol[ConfigT]):
     """Protocol defining the interface for model runners."""
 
     async def on_train(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
@@ -86,7 +88,7 @@ class ModelRunnerProtocol(Protocol):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: ConfigT,
         model: Any,
         historic: DataFrame,
         future: DataFrame,

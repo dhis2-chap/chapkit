@@ -56,7 +56,7 @@ predict_command = (
 )
 
 # Create shell model runner
-runner = ShellModelRunner(
+runner: ShellModelRunner[DiseaseConfig] = ShellModelRunner(
     train_command=train_command,
     predict_command=predict_command,
     model_format="pickle",

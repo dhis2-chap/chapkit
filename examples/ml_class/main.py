@@ -31,7 +31,7 @@ class WeatherConfig(BaseConfig):
     normalize_features: bool = True
 
 
-class WeatherModelRunner(BaseModelRunner):
+class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
     """Custom model runner with preprocessing and shared state."""
 
     def __init__(self) -> None:
@@ -53,7 +53,7 @@ class WeatherModelRunner(BaseModelRunner):
 
     async def on_train(
         self,
-        config: BaseConfig,
+        config: WeatherConfig,
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
@@ -73,20 +73,18 @@ class WeatherModelRunner(BaseModelRunner):
             # Convert to pandas for sklearn
             df = data.to_pandas()
 
-            # Cast config to expected type
-            weather_config = WeatherConfig.model_validate(config.model_dump())
-            log.info("training_started", config=weather_config.model_dump(), sample_count=len(df))
+            log.info("training_started", config=config.model_dump(), sample_count=len(df))
 
             # Validate minimum samples
-            if len(df) < weather_config.min_samples:
-                raise ValueError(f"Insufficient training data: {len(df)} < {weather_config.min_samples}")
+            if len(df) < config.min_samples:
+                raise ValueError(f"Insufficient training data: {len(df)} < {config.min_samples}")
 
             # Extract features and target
             X = df[self.feature_names].fillna(0)
             y = df[self.target_name].fillna(0)
 
             # Feature preprocessing
-            if weather_config.normalize_features:
+            if config.normalize_features:
                 self.scaler = StandardScaler()
                 X_scaled = self.scaler.fit_transform(X)
                 log.info(
@@ -114,7 +112,7 @@ class WeatherModelRunner(BaseModelRunner):
                 "model": model,
                 "scaler": self.scaler,
                 "feature_names": self.feature_names,
-                "config": weather_config.model_dump(),
+                "config": config.model_dump(),
             }
 
         finally:
@@ -122,7 +120,7 @@ class WeatherModelRunner(BaseModelRunner):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: WeatherConfig,
         model: Any,
         historic: DataFrame,
         future: DataFrame,

@@ -24,7 +24,7 @@ async def test_shell_runner_train_basic() -> None:
     # Create a pickled model file using python
     train_command = f"{sys.executable} -c \"import pickle; pickle.dump('trained_model', open('{{model_file}}', 'wb'))\""
 
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command="echo 'predictions' > {output_file}",
     )
@@ -45,7 +45,7 @@ async def test_shell_runner_predict_basic() -> None:
     # Create a simple script that writes CSV output
     predict_command = 'echo "feature1,prediction\\n1,0.5\\n2,0.6" > {output_file}'
 
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command="echo 'model' > {model_file}",
         predict_command=predict_command,
     )
@@ -101,7 +101,7 @@ print("Training completed")
     try:
         train_command = f"{sys.executable} {script_path} {{config_file}} {{data_file}} {{model_file}}"
 
-        runner = ShellModelRunner(
+        runner: ShellModelRunner[MockConfig] = ShellModelRunner(
             train_command=train_command,
             predict_command="echo 'predictions' > {output_file}",
         )
@@ -158,7 +158,7 @@ print("Prediction completed")
     try:
         predict_command = f"{sys.executable} {script_path} {{model_file}} {{future_file}} {{output_file}}"
 
-        runner = ShellModelRunner(
+        runner: ShellModelRunner[MockConfig] = ShellModelRunner(
             train_command="echo 'model' > {model_file}",
             predict_command=predict_command,
         )
@@ -185,7 +185,7 @@ async def test_shell_runner_train_failure() -> None:
     # Command that will fail
     train_command = "exit 1"
 
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command="echo 'predictions' > {output_file}",
     )
@@ -203,7 +203,7 @@ async def test_shell_runner_predict_failure() -> None:
     # Command that will fail
     predict_command = "exit 2"
 
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command="echo 'model' > {model_file}",
         predict_command=predict_command,
     )
@@ -223,7 +223,7 @@ async def test_shell_runner_missing_model_file() -> None:
     # Command that doesn't create model file
     train_command = "echo 'no model created'"
 
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command="echo 'predictions' > {output_file}",
     )
@@ -241,7 +241,7 @@ async def test_shell_runner_missing_output_file() -> None:
     # Command that doesn't create output file
     predict_command = "echo 'no predictions created'"
 
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command="echo 'model' > {model_file}",
         predict_command=predict_command,
     )
@@ -263,7 +263,7 @@ async def test_shell_runner_variable_substitution() -> None:
 
     train_command = f"{sys.executable} -c \"import pickle; pickle.dump('model', open('{{model_file}}', 'wb'))\""
 
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command='echo "feature1,prediction\\n1,0.5" > {output_file}',
     )
@@ -290,7 +290,7 @@ async def test_shell_runner_cleanup_temp_files() -> None:
     temp_dirs_before = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
 
     train_command = f"{sys.executable} -c \"import pickle; pickle.dump('model', open('{{model_file}}', 'wb'))\""
-    runner = ShellModelRunner(
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command="echo 'predictions' > {output_file}",
     )
