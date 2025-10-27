@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import tomllib
-from pathlib import Path
-
 # CLI feature
 # Scheduler feature
 # Artifact feature
@@ -57,13 +54,12 @@ from .task import (
     validate_and_disable_orphaned_tasks,
 )
 
-# Read version from pyproject.toml
-_pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
-if _pyproject_path.exists():
-    with open(_pyproject_path, "rb") as f:
-        _pyproject = tomllib.load(f)
-        __version__ = _pyproject["project"]["version"]
-else:
+# Read version from package metadata
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("chapkit")
+except Exception:
     __version__ = "unknown"
 
 __all__ = [

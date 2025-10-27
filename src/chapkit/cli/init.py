@@ -2,7 +2,7 @@
 
 import re
 import shutil
-import tomllib
+from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -11,14 +11,11 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 def _get_chapkit_version() -> str:
-    """Get chapkit version from pyproject.toml."""
-    pyproject_path = Path(__file__).parent.parent.parent.parent / "pyproject.toml"
-    if pyproject_path.exists():
-        with open(pyproject_path, "rb") as f:
-            pyproject = tomllib.load(f)
-            version: str = pyproject["project"]["version"]
-            return version
-    return "unknown"
+    """Get chapkit version from package metadata."""
+    try:
+        return get_version("chapkit")
+    except Exception:
+        return "unknown"
 
 
 def _slugify(text: str) -> str:
