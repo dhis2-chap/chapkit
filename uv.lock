@@ -102,7 +102,7 @@ wheels = [
 
 [[package]]
 name = "chapkit"
-version = "0.4.1"
+version = "0.4.6"
 source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
