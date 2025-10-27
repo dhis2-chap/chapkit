@@ -5,6 +5,14 @@ import typer
 from chapkit import __version__
 from chapkit.cli.init import init_command
 
+# Get servicekit version
+try:
+    from importlib.metadata import version as _get_version
+
+    _servicekit_version = _get_version("servicekit")
+except Exception:
+    _servicekit_version = "unknown"
+
 app = typer.Typer(
     name="chapkit",
     help="Chapkit CLI for ML service management and scaffolding",
@@ -20,6 +28,7 @@ def callback(
     """Chapkit CLI for ML service management and scaffolding."""
     if version:
         typer.echo(f"chapkit version {__version__}")
+        typer.echo(f"servicekit version {_servicekit_version}")
         raise typer.Exit()
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())
