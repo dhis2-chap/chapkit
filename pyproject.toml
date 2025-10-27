@@ -28,9 +28,9 @@ classifiers = [
 dependencies = [
   "scikit-learn>=1.7.2",
   "geojson-pydantic>=2.1.0",
-  "servicekit>=0.2.0",
   "typer>=0.20.0",
   "jinja2>=3.1.6",
+  "servicekit>=0.3.5",
 ]
 
 [project.urls]
@@ -160,6 +160,3 @@ reportUnknownParameterType = false
 reportUnknownVariableType = false
 reportMissingTypeArgument = false
 reportMissingTypeStubs = false
-
-[tool.uv.sources]
-servicekit = { git = "https://github.com/winterop-com/servicekit" }
