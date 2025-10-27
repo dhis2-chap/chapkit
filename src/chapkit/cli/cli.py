@@ -2,6 +2,7 @@
 
 import typer
 
+from chapkit import __version__
 from chapkit.cli.init import init_command
 
 app = typer.Typer(
@@ -12,8 +13,14 @@ app = typer.Typer(
 
 
 @app.callback(invoke_without_command=True)
-def callback(ctx: typer.Context) -> None:
+def callback(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", "-v", help="Show version and exit"),
+) -> None:
     """Chapkit CLI for ML service management and scaffolding."""
+    if version:
+        typer.echo(f"chapkit version {__version__}")
+        raise typer.Exit()
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help())
 

@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+# Read version from package metadata - must be before internal imports
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("chapkit")
+except Exception:
+    __version__ = "unknown"
+
 # CLI feature
 # Scheduler feature
 # Artifact feature
@@ -53,14 +61,6 @@ from .task import (
     TaskRouter,
     validate_and_disable_orphaned_tasks,
 )
-
-# Read version from package metadata
-try:
-    from importlib.metadata import version as _get_version
-
-    __version__ = _get_version("chapkit")
-except Exception:
-    __version__ = "unknown"
 
 __all__ = [
     # Version
