@@ -36,6 +36,51 @@ uv tool install git+https://github.com/dhis2-chap/chapkit
 chapkit init my-ml-service
 ```
 
+---
+
+## Managing Installed Tool
+
+If you installed chapkit with `uv tool install`, you can manage the installation:
+
+### Check Installed Version
+
+```bash
+# List installed tools and versions
+uv tool list
+
+# Check version
+chapkit --version
+```
+
+### Upgrade to Latest
+
+```bash
+# Upgrade to latest version
+uv tool upgrade chapkit
+
+# Upgrade to specific version
+uv tool upgrade [email protected]
+```
+
+### Uninstall
+
+```bash
+# Remove installed tool
+uv tool uninstall chapkit
+```
+
+**Note:** When using `uvx chapkit`, the latest version is used automatically unless you specify a version with `@`:
+
+```bash
+# Always uses latest
+uvx chapkit init my-service
+
+# Pin to specific version
+uvx [email protected] init my-service
+```
+
+---
+
 ## Quick Start
 
 Create and run a new project:
