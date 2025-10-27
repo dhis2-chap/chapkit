@@ -31,12 +31,12 @@ Chapkit automatically installs servicekit as a dependency.
 Quickly scaffold a new ML service project using `uvx`:
 
 ```bash
-uvx chapkit@git+https://github.com/dhis2-chap/chapkit init <project-name>
+uvx chapkit init <project-name>
 ```
 
 Example:
 ```bash
-uvx chapkit@git+https://github.com/dhis2-chap/chapkit init my-ml-service
+uvx chapkit init my-ml-service
 ```
 
 Options:
