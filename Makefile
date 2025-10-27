@@ -101,6 +101,7 @@ clean:
 	@rm -rf .pyright
 	@rm -rf dist build *.egg-info
 	@find examples -type f -name "uv.lock" -delete
+	@find examples -type d -name ".venv" -exec rm -rf {} + 2>/dev/null || true
 
 # ==============================================================================
 # Default
