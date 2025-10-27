@@ -2,11 +2,23 @@
 
 import re
 import shutil
+import tomllib
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+
+def _get_chapkit_version() -> str:
+    """Get chapkit version from pyproject.toml."""
+    pyproject_path = Path(__file__).parent.parent.parent.parent / "pyproject.toml"
+    if pyproject_path.exists():
+        with open(pyproject_path, "rb") as f:
+            pyproject = tomllib.load(f)
+            version: str = pyproject["project"]["version"]
+            return version
+    return "unknown"
 
 
 def _slugify(text: str) -> str:
@@ -85,6 +97,7 @@ def init_command(
         "PROJECT_SLUG": project_slug,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_MONITORING": monitoring,
+        "CHAPKIT_VERSION": _get_chapkit_version(),
     }
 
     typer.echo("Generating project files...")
