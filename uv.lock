@@ -107,7 +107,6 @@ source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
     { name = "jinja2" },
-    { name = "scikit-learn" },
     { name = "servicekit" },
     { name = "typer" },
 ]
@@ -136,7 +135,6 @@ dev = [
 requires-dist = [
     { name = "geojson-pydantic", specifier = ">=2.1.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "servicekit", specifier = ">=0.3.5" },
     { name = "typer", specifier = ">=0.20.0" },
 ]
