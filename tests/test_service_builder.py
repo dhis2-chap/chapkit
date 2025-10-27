@@ -2,11 +2,11 @@
 
 from typing import Any
 
-import pandas as pd
 import pytest
 from geojson_pydantic import FeatureCollection
 from pydantic import Field
 from servicekit.api.service_builder import ServiceInfo
+from servicekit.data import DataFrame
 
 from chapkit import ArtifactHierarchy, BaseConfig
 from chapkit.api import ServiceBuilder
@@ -19,13 +19,13 @@ class DummyConfig(BaseConfig):
     test_value: str = Field(default="test")
 
 
-class DummyRunner(ModelRunnerProtocol):
+class DummyRunner(ModelRunnerProtocol[DummyConfig]):
     """Dummy ML runner for testing."""
 
     async def on_train(
         self,
-        config: BaseConfig,
-        data: pd.DataFrame,
+        config: DummyConfig,
+        data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model."""
@@ -33,14 +33,14 @@ class DummyRunner(ModelRunnerProtocol):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: DummyConfig,
         model: Any,
-        historic: pd.DataFrame | None,
-        future: pd.DataFrame,
+        historic: DataFrame | None,
+        future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> pd.DataFrame:
+    ) -> DataFrame:
         """Make predictions."""
-        return pd.DataFrame({"predictions": []})
+        return DataFrame(columns=["predictions"], data=[])
 
 
 def test_ml_without_config_raises_error() -> None:

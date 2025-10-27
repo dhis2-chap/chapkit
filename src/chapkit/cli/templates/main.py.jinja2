@@ -2,9 +2,9 @@
 
 from typing import Any
 
-import pandas as pd
 import structlog
 from geojson_pydantic import FeatureCollection
+from servicekit.data import DataFrame
 
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
@@ -25,7 +25,7 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
 
 async def on_train(
     config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
-    data: pd.DataFrame,
+    data: DataFrame,
     geo: FeatureCollection | None = None,
 ) -> Any:
     """Train a simple model.
@@ -38,13 +38,16 @@ async def on_train(
     Returns:
         Trained model (dict with column means)
     """
+    # Convert to pandas for processing
+    df = data.to_pandas()
+
     # Simple example: compute mean of each numeric column
-    model = {"means": data.select_dtypes(include=["number"]).mean().to_dict()}
+    model = {"means": df.select_dtypes(include=["number"]).mean().to_dict()}
 
     log.info(
         "model_trained",
         columns=list(model["means"].keys()),
-        samples=len(data),
+        samples=len(df),
     )
 
     return model
@@ -53,10 +56,10 @@ async def on_train(
 async def on_predict(
     config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
     model: Any,
-    historic: pd.DataFrame,
-    future: pd.DataFrame,
+    historic: DataFrame,
+    future: DataFrame,
     geo: FeatureCollection | None = None,
-) -> pd.DataFrame:
+) -> DataFrame:
     """Make predictions using the trained model.
 
     Args:
@@ -69,20 +72,24 @@ async def on_predict(
     Returns:
         Future data with predictions added
     """
+    # Convert to pandas for processing
+    future_df = future.to_pandas()
+
     # Simple example: use the mean from training as prediction
     means = model.get("means", {})
     prediction = sum(means.values()) / len(means) if means else 0.0
 
     # Add predictions to future data
-    future["sample_0"] = prediction
+    future_df["sample_0"] = prediction
 
     log.info(
         "predictions_made",
-        sample_count=len(future),
+        sample_count=len(future_df),
         prediction_value=float(prediction),
     )
 
-    return future
+    # Convert back to servicekit DataFrame
+    return DataFrame.from_pandas(future_df)
 
 
 # Create ML service info with metadata
@@ -103,7 +110,9 @@ HIERARCHY = ArtifactHierarchy(
 )
 
 # Create functional model runner
-runner = FunctionalModelRunner(on_train=on_train, on_predict=on_predict)
+runner: FunctionalModelRunner[{{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config] = FunctionalModelRunner(
+    on_train=on_train, on_predict=on_predict
+)
 
 # Build the FastAPI application
 app = (

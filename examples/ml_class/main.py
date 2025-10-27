@@ -10,9 +10,9 @@ This example demonstrates:
 
 from typing import Any
 
-import pandas as pd
 import structlog
 from geojson_pydantic import FeatureCollection
+from servicekit.data import DataFrame
 from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
@@ -31,7 +31,7 @@ class WeatherConfig(BaseConfig):
     normalize_features: bool = True
 
 
-class WeatherModelRunner(BaseModelRunner):
+class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
     """Custom model runner with preprocessing and shared state."""
 
     def __init__(self) -> None:
@@ -53,8 +53,8 @@ class WeatherModelRunner(BaseModelRunner):
 
     async def on_train(
         self,
-        config: BaseConfig,
-        data: pd.DataFrame,
+        config: WeatherConfig,
+        data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model with preprocessing and feature engineering.
@@ -70,20 +70,21 @@ class WeatherModelRunner(BaseModelRunner):
         await self.on_init()
 
         try:
-            # Cast config to expected type
-            weather_config = WeatherConfig.model_validate(config.model_dump())
-            log.info("training_started", config=weather_config.model_dump(), sample_count=len(data))
+            # Convert to pandas for sklearn
+            df = data.to_pandas()
+
+            log.info("training_started", config=config.model_dump(), sample_count=len(df))
 
             # Validate minimum samples
-            if len(data) < weather_config.min_samples:
-                raise ValueError(f"Insufficient training data: {len(data)} < {weather_config.min_samples}")
+            if len(df) < config.min_samples:
+                raise ValueError(f"Insufficient training data: {len(df)} < {config.min_samples}")
 
             # Extract features and target
-            X = data[self.feature_names].fillna(0)
-            y = data[self.target_name].fillna(0)
+            X = df[self.feature_names].fillna(0)
+            y = df[self.target_name].fillna(0)
 
             # Feature preprocessing
-            if weather_config.normalize_features:
+            if config.normalize_features:
                 self.scaler = StandardScaler()
                 X_scaled = self.scaler.fit_transform(X)
                 log.info(
@@ -111,7 +112,7 @@ class WeatherModelRunner(BaseModelRunner):
                 "model": model,
                 "scaler": self.scaler,
                 "feature_names": self.feature_names,
-                "config": weather_config.model_dump(),
+                "config": config.model_dump(),
             }
 
         finally:
@@ -119,12 +120,12 @@ class WeatherModelRunner(BaseModelRunner):
 
     async def on_predict(
         self,
-        config: BaseConfig,
+        config: WeatherConfig,
         model: Any,
-        historic: pd.DataFrame,
-        future: pd.DataFrame,
+        historic: DataFrame,
+        future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> pd.DataFrame:
+    ) -> DataFrame:
         """Make predictions with preprocessing.
 
         Args:
@@ -140,7 +141,10 @@ class WeatherModelRunner(BaseModelRunner):
         await self.on_init()
 
         try:
-            log.info("prediction_started", sample_count=len(future))
+            # Convert to pandas for sklearn
+            future_df = future.to_pandas()
+
+            log.info("prediction_started", sample_count=len(future_df))
 
             # Extract model artifacts
             if isinstance(model, dict):
@@ -154,7 +158,7 @@ class WeatherModelRunner(BaseModelRunner):
                 feature_names = self.feature_names
 
             # Extract features
-            X = future[feature_names].fillna(0)
+            X = future_df[feature_names].fillna(0)
 
             # Apply same preprocessing as training
             if scaler is not None:
@@ -164,7 +168,7 @@ class WeatherModelRunner(BaseModelRunner):
 
             # Make predictions
             y_pred = trained_model.predict(X_scaled)
-            future["sample_0"] = y_pred
+            future_df["sample_0"] = y_pred
 
             log.info(
                 "predictions_made",
@@ -173,7 +177,8 @@ class WeatherModelRunner(BaseModelRunner):
                 std_prediction=float(y_pred.std()),
             )
 
-            return future
+            # Convert back to servicekit DataFrame
+            return DataFrame.from_pandas(future_df)
 
         finally:
             await self.on_cleanup()

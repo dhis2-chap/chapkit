@@ -10,9 +10,9 @@ This example demonstrates:
 
 from typing import Any
 
-import pandas as pd
 import structlog
 from geojson_pydantic import FeatureCollection
+from servicekit.data import DataFrame
 from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 
 from chapkit import BaseConfig
@@ -32,14 +32,16 @@ class DiseaseConfig(BaseConfig):
 
 async def on_train(
     config: DiseaseConfig,
-    data: pd.DataFrame,
+    data: DataFrame,
     geo: FeatureCollection | None = None,
 ) -> Any:
     """Train a linear regression model for disease prediction."""
-    features = ["rainfall", "mean_temperature"]
+    # Convert servicekit DataFrame to pandas for sklearn
+    df = data.to_pandas()
 
-    X = data[features]
-    y = data["disease_cases"]
+    features = ["rainfall", "mean_temperature"]
+    X = df[features]
+    y = df["disease_cases"]
     y = y.fillna(0)
 
     model = LinearRegression()
@@ -53,19 +55,22 @@ async def on_train(
 async def on_predict(
     config: DiseaseConfig,
     model: Any,
-    historic: pd.DataFrame,
-    future: pd.DataFrame,
+    historic: DataFrame,
+    future: DataFrame,
     geo: FeatureCollection | None = None,
-) -> pd.DataFrame:
+) -> DataFrame:
     """Make predictions using the trained model."""
-    X = future[["rainfall", "mean_temperature"]]
+    # Convert to pandas for sklearn
+    future_df = future.to_pandas()
 
+    X = future_df[["rainfall", "mean_temperature"]]
     y_pred = model.predict(X)
-    future["sample_0"] = y_pred
+    future_df["sample_0"] = y_pred
 
     log.info("predictions_made", sample_count=len(y_pred), mean_prediction=y_pred.mean())
 
-    return future
+    # Convert back to servicekit DataFrame
+    return DataFrame.from_pandas(future_df)
 
 
 # Create ML service info with metadata

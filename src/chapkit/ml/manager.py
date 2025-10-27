@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import pickle
+from typing import Generic, TypeVar
 
 from servicekit import Database
 from ulid import ULID
@@ -22,6 +23,8 @@ from .schemas import (
     TrainRequest,
     TrainResponse,
 )
+
+ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
 
 def _extract_model_type(model: object) -> str | None:
@@ -50,15 +53,15 @@ def _calculate_model_size(model: object) -> int | None:
         return None
 
 
-class MLManager:
+class MLManager(Generic[ConfigT]):
     """Manager for ML train/predict operations with job scheduling and artifact storage."""
 
     def __init__(
         self,
-        runner: ModelRunnerProtocol,
+        runner: ModelRunnerProtocol[ConfigT],
         scheduler: ChapkitJobScheduler,
         database: Database,
-        config_schema: type[BaseConfig],
+        config_schema: type[ConfigT],
     ) -> None:
         """Initialize ML manager with runner, scheduler, database, and config schema."""
         self.runner = runner
@@ -107,20 +110,17 @@ class MLManager:
         # Load config
         async with self.database.session() as session:
             config_repo = ConfigRepository(session)
-            config_manager: ConfigManager[BaseConfig] = ConfigManager(config_repo, self.config_schema)
+            config_manager: ConfigManager[ConfigT] = ConfigManager(config_repo, self.config_schema)
             config = await config_manager.find_by_id(request.config_id)
 
             if config is None:
                 raise ValueError(f"Config {request.config_id} not found")
 
-        # Convert DataFrame to pandas
-        data_df = request.data.to_pandas()
-
         # Train model with timing
         training_started_at = datetime.datetime.now(datetime.UTC)
         trained_model = await self.runner.on_train(
             config=config.data,
-            data=data_df,
+            data=request.data,
             geo=request.geo,
         )
         training_completed_at = datetime.datetime.now(datetime.UTC)
@@ -185,23 +185,19 @@ class MLManager:
         # Load config
         async with self.database.session() as session:
             config_repo = ConfigRepository(session)
-            config_manager: ConfigManager[BaseConfig] = ConfigManager(config_repo, self.config_schema)
+            config_manager: ConfigManager[ConfigT] = ConfigManager(config_repo, self.config_schema)
             config = await config_manager.find_by_id(config_id)
 
             if config is None:
                 raise ValueError(f"Config {config_id} not found")
 
-        # Convert DataFrames to pandas
-        historic_df = request.historic.to_pandas()
-        future_df = request.future.to_pandas()
-
         # Make predictions with timing
         prediction_started_at = datetime.datetime.now(datetime.UTC)
-        predictions_df = await self.runner.on_predict(
+        predictions = await self.runner.on_predict(
             config=config.data,
             model=trained_model,
-            historic=historic_df,
-            future=future_df,
+            historic=request.historic,
+            future=request.future,
             geo=request.geo,
         )
         prediction_completed_at = datetime.datetime.now(datetime.UTC)
@@ -212,14 +208,12 @@ class MLManager:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
 
-            from servicekit.data import DataFrame
-
             # Create and validate artifact data with Pydantic
             artifact_data_model = PredictionArtifactData(
                 ml_type="prediction",
                 model_artifact_id=str(request.model_artifact_id),
                 config_id=str(config_id),
-                predictions=DataFrame.from_pandas(predictions_df),
+                predictions=predictions,
                 started_at=prediction_started_at.isoformat(),
                 completed_at=prediction_completed_at.isoformat(),
                 duration_seconds=round(prediction_duration, 2),
