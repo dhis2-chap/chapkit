@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    volumes:
+      - ./chapkit.db:/workspace/chapkit.db
     environment:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
