@@ -10,11 +10,13 @@ from typing import Any, Callable, Coroutine, List, Self
 
 from fastapi import Depends, FastAPI
 from pydantic import EmailStr, HttpUrl
+from servicekit import SqliteDatabaseBuilder
 from servicekit.api.crud import CrudPermissions
 from servicekit.api.dependencies import get_database, get_scheduler, get_session, set_scheduler
 from servicekit.api.service_builder import BaseServiceBuilder, LifespanFactory, ServiceInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from chapkit import get_alembic_dir
 from chapkit.artifact import (
     ArtifactHierarchy,
     ArtifactIn,
@@ -331,12 +333,28 @@ class MLServiceBuilder(ServiceBuilder):
         include_logging: bool = True,
     ) -> None:
         """Initialize ML service builder with required ML components."""
+        # Create database with migrations for file-based databases
+        if ":memory:" in database_url:
+            # In-memory database: no migrations needed
+            db = SqliteDatabaseBuilder.in_memory().build()
+        else:
+            # File-based database: enable migrations with chapkit's bundled alembic
+            # Extract file path from URL (e.g., "sqlite+aiosqlite:///./chapkit.db" -> "./chapkit.db")
+            db_path = database_url.split("///")[-1] if "///" in database_url else database_url
+            db = (
+                SqliteDatabaseBuilder.from_file(db_path)
+                .with_migrations(enabled=True, alembic_dir=get_alembic_dir())
+                .build()
+            )
+
         super().__init__(
             info=info,
-            database_url=database_url,
             include_error_handlers=include_error_handlers,
             include_logging=include_logging,
         )
+
+        # Configure database with migrations
+        self.with_database(db)
 
         # Automatically configure required ML components
         self.with_health()

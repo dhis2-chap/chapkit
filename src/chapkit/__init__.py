@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 # Read version from package metadata - must be before internal imports
 try:
     from importlib.metadata import version as _get_version
@@ -62,9 +64,17 @@ from .task import (
     validate_and_disable_orphaned_tasks,
 )
 
+
+def get_alembic_dir() -> Path:
+    """Get the path to chapkit's bundled alembic migrations directory."""
+    return Path(__file__).parent / "alembic"
+
+
 __all__ = [
     # Version
     "__version__",
+    # Utils
+    "get_alembic_dir",
     # CLI
     "cli_app",
     # Scheduler

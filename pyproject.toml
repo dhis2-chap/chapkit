@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.4.13"
+version = "0.4.14"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
@@ -79,7 +79,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D"]
-"alembic/**/*.py" = ["D"]
+"src/chapkit/alembic/**/*.py" = ["D"]
 "**/__init__.py" = ["D104"]
 "src/**/*.py" = ["D102", "D105", "D107"]
 "examples/**/*.py" = []
@@ -105,6 +105,7 @@ branch = true
 dynamic_context = "test_function"
 relative_files = true
 source = ["chapkit"]
+omit = ["*/alembic/*"]
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:"]
@@ -147,7 +148,7 @@ ignore_missing_imports = true
 ignore_errors = true
 
 [tool.pyright]
-include = ["src", "tests", "examples", "alembic"]
+include = ["src", "tests", "examples"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
