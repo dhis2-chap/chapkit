@@ -54,9 +54,9 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{baseUrl}}/system",
+                            "raw": "{{baseUrl}}/api/v1/system",
                             "host": ["{{baseUrl}}"],
-                            "path": ["system"]
+                            "path": ["api", "v1", "system"]
                         },
                         "description": "Get platform and system information (Python version, OS, hostname, timezone)."
                     },
@@ -67,9 +67,9 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{baseUrl}}/system",
+                                    "raw": "{{baseUrl}}/api/v1/system",
                                     "host": ["{{baseUrl}}"],
-                                    "path": ["system"]
+                                    "path": ["api", "v1", "system"]
                                 }
                             },
                             "status": "OK",
