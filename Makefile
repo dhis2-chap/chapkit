@@ -39,7 +39,7 @@ lint:
 	@$(UV) run ruff format .
 	@$(UV) run ruff check . --fix
 	@echo ">>> Running type checker"
-	@$(UV) run mypy --exclude 'examples/old' --explicit-package-bases src tests examples alembic
+	@$(UV) run mypy --exclude 'examples/old' --explicit-package-bases src tests examples
 	@$(UV) run pyright
 
 test:
@@ -56,7 +56,7 @@ migrate:
 	@echo ">>> Generating migration: $(MSG)"
 	@$(UV) run alembic revision --autogenerate -m "$(MSG)"
 	@echo ">>> Formatting migration file"
-	@$(UV) run ruff format alembic/versions
+	@$(UV) run ruff format src/chapkit/alembic/versions
 
 upgrade:
 	@echo ">>> Applying pending migrations"

@@ -10,7 +10,7 @@ from chapkit.config.models import Config
 from chapkit.task.models import Task
 
 # Path to chapkit's alembic directory
-ALEMBIC_DIR = Path(__file__).parent.parent / "alembic"
+ALEMBIC_DIR = Path(__file__).parent.parent / "src" / "chapkit" / "alembic"
 
 
 class TestMigrations:

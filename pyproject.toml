@@ -79,7 +79,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D"]
-"alembic/**/*.py" = ["D"]
+"src/chapkit/alembic/**/*.py" = ["D"]
 "**/__init__.py" = ["D104"]
 "src/**/*.py" = ["D102", "D105", "D107"]
 "examples/**/*.py" = []
@@ -147,7 +147,7 @@ ignore_missing_imports = true
 ignore_errors = true
 
 [tool.pyright]
-include = ["src", "tests", "examples", "alembic"]
+include = ["src", "tests", "examples"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
