@@ -40,6 +40,33 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
             **kwargs,
         )
 
+    def _register_schema_route(self) -> None:
+        """Register JSON schema endpoint for the config data type only."""
+        entity_out_type = self.entity_out_type
+
+        async def get_schema() -> dict[str, Any]:
+            """Return the config schema (data field) instead of the full ConfigOut schema."""
+            full_schema = entity_out_type.model_json_schema()
+
+            # Extract the config schema from the data field's $ref
+            if "$defs" in full_schema and "data" in full_schema.get("properties", {}):
+                data_prop = full_schema["properties"]["data"]
+                if "$ref" in data_prop:
+                    # Extract schema name from $ref (e.g., "#/$defs/DiseaseConfig")
+                    ref_name = data_prop["$ref"].split("/")[-1]
+                    if ref_name in full_schema["$defs"]:
+                        return full_schema["$defs"][ref_name]
+
+            # Fallback to full schema if extraction fails
+            return full_schema
+
+        self.register_collection_operation(
+            name="schema",
+            handler=get_schema,
+            http_method="GET",
+            response_model=dict[str, Any],
+        )
+
     def _register_routes(self) -> None:
         """Register config CRUD routes and artifact linking operations."""
         super()._register_routes()
