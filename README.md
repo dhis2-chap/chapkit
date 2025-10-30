@@ -20,6 +20,14 @@ Chapkit provides domain-specific modules for building machine learning services 
 
 ## Installation
 
+Using uv (recommended):
+
+```bash
+uv add chapkit
+```
+
+Or using pip:
+
 ```bash
 pip install chapkit
 ```
@@ -130,27 +138,44 @@ app.with_ml(runner=runner)
 
 ```
 chapkit/
-├── config/           # Configuration module
+├── config/           # Configuration management with Pydantic validation
+├── artifact/         # Hierarchical storage for models and data
+├── task/             # Reusable task templates (Python functions, shell commands)
 ├── ml/               # ML train/predict workflows
+├── cli/              # CLI scaffolding tools
+├── scheduler.py      # Job scheduling integration
 └── api/              # ServiceBuilder with ML integration
-    └── service_builder.py  # .with_config(), .with_ml()
+    └── service_builder.py  # .with_config(), .with_artifacts(), .with_ml()
 ```
 
-Chapkit extends servicekit's `BaseServiceBuilder` with ML-specific features and uses servicekit's artifact and task modules.
+Chapkit extends servicekit's `BaseServiceBuilder` with ML-specific features and domain modules for configuration, artifacts, tasks, and ML workflows.
 
 ## Examples
 
-See the `examples/` directory:
+See the `examples/` directory for complete working examples:
 
-- `quickstart.py` - Complete ML service
-- `config_artifact_api.py` - Config with artifact linking
-- `ml_basic.py`, `ml_class.py` - ML workflow patterns
+- `quickstart/` - Complete ML service with config, artifacts, and ML endpoints
+- `config_artifact/` - Config with artifact linking
+- `ml_functional/`, `ml_class/`, `ml_shell/` - ML workflow patterns (functional, class-based, shell-based)
+- `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
+- `artifact/` - Read-only artifact API with hierarchical storage
+- `task_execution/` - Task execution with Python functions and shell commands
+- `full_featured/` - Comprehensive example with monitoring, custom routers, and hooks
+- `library_usage/` - Using chapkit as a library with custom models
+- `custom_migrations/` - Database migrations with custom models
 
 ## Documentation
 
-See `docs/` for comprehensive guides:
+See `docs/guides/` for comprehensive guides:
 
-- ML workflow guide
+- [ML Workflows](docs/guides/ml-workflows.md) - Train/predict patterns and model runners
+- [Configuration Management](docs/guides/configuration-management.md) - Config schemas and validation
+- [Artifact Storage](docs/guides/artifact-storage.md) - Hierarchical data storage for ML artifacts
+- [Task Execution](docs/guides/task-execution.md) - Python functions and shell command templates
+- [CLI Scaffolding](docs/guides/cli-scaffolding.md) - Project scaffolding with `chapkit init`
+- [Database Migrations](docs/guides/database-migrations.md) - Custom models and Alembic migrations
+
+Full documentation: https://dhis2-chap.github.io/chapkit/
 
 ## Testing
 
