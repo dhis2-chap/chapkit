@@ -3,13 +3,13 @@
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
+
 # Import the Base metadata from servicekit
 from servicekit import Base
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
 
 # This is the Alembic Config object
 config = context.config

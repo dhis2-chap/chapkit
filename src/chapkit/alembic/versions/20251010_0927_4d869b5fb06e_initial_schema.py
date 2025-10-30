@@ -1,6 +1,7 @@
 """Initial database schema migration."""
 
 from alembic import op
+
 from chapkit.alembic_helpers import (
     create_artifacts_table,
     create_config_artifacts_table,
