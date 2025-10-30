@@ -1,5 +1,7 @@
 """Tests for ServiceBuilder validation."""
 
+import tempfile
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -8,8 +10,8 @@ from pydantic import Field
 from servicekit.api.service_builder import ServiceInfo
 from servicekit.data import DataFrame
 
-from chapkit import ArtifactHierarchy, BaseConfig
-from chapkit.api import ServiceBuilder
+from chapkit import ArtifactHierarchy, BaseConfig, get_alembic_dir
+from chapkit.api import MLServiceBuilder, ServiceBuilder
 from chapkit.ml import ModelRunnerProtocol
 
 
@@ -91,5 +93,52 @@ def test_valid_ml_service_builds_successfully() -> None:
     app = (
         builder.with_config(DummyConfig).with_artifacts(hierarchy=hierarchy).with_jobs().with_ml(runner=runner).build()
     )
+
+    assert app is not None
+
+
+def test_get_alembic_dir_returns_valid_path() -> None:
+    """Test that get_alembic_dir returns a valid path to bundled migrations."""
+    alembic_dir = get_alembic_dir()
+
+    assert isinstance(alembic_dir, Path)
+    assert alembic_dir.exists()
+    assert alembic_dir.is_dir()
+    assert (alembic_dir / "env.py").exists()
+    assert (alembic_dir / "versions").exists()
+
+
+def test_ml_service_builder_with_file_database() -> None:
+    """Test MLServiceBuilder with file-based database configures migrations."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = Path(tmpdir) / "test.db"
+        hierarchy = ArtifactHierarchy(name="test")
+        runner = DummyRunner()
+
+        # MLServiceBuilder should auto-configure database with migrations
+        app = MLServiceBuilder(
+            info=ServiceInfo(display_name="Test"),
+            config_schema=DummyConfig,
+            hierarchy=hierarchy,
+            runner=runner,
+            database_url=f"sqlite+aiosqlite:///{db_path}",
+        ).build()
+
+        assert app is not None
+
+
+def test_ml_service_builder_with_memory_database() -> None:
+    """Test MLServiceBuilder with in-memory database doesn't use migrations."""
+    hierarchy = ArtifactHierarchy(name="test")
+    runner = DummyRunner()
+
+    # MLServiceBuilder should use in-memory database without migrations
+    app = MLServiceBuilder(
+        info=ServiceInfo(display_name="Test"),
+        config_schema=DummyConfig,
+        hierarchy=hierarchy,
+        runner=runner,
+        database_url="sqlite+aiosqlite:///:memory:",
+    ).build()
 
     assert app is not None
