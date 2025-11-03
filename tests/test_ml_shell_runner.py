@@ -219,7 +219,7 @@ async def test_shell_runner_predict_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_shell_runner_missing_model_file() -> None:
-    """Test error when training script doesn't create model file."""
+    """Test handling when training script doesn't create model file."""
     # Command that doesn't create model file
     train_command = "echo 'no model created'"
 
@@ -231,8 +231,72 @@ async def test_shell_runner_missing_model_file() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-    with pytest.raises(RuntimeError, match="Training script did not create model file"):
-        await runner.on_train(config, data)
+    # Should return placeholder dict instead of raising error
+    model = await runner.on_train(config, data)
+    assert isinstance(model, dict)
+    assert model["model_type"] == "no_file"
+    assert "stdout" in model
+    assert "stderr" in model
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_predict_with_placeholder_model() -> None:
+    """Test prediction with placeholder model (no model file created during training)."""
+    # Create a predict script that doesn't need a model file
+    predict_script = """
+import sys
+import csv
+
+# Read future data (note: no model file to load)
+with open(sys.argv[1]) as f:
+    reader = csv.DictReader(f)
+    rows = list(reader)
+
+# Make predictions without model (simple rule-based)
+with open(sys.argv[2], "w", newline='') as f:
+    writer = csv.DictWriter(f, fieldnames=["feature1", "prediction"])
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({
+            "feature1": row["feature1"],
+            "prediction": float(row["feature1"]) * 2  # Simple rule
+        })
+
+print("Prediction completed without model file")
+"""
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(predict_script)
+        script_path = f.name
+
+    try:
+        # Note: predict command doesn't use {model_file}
+        predict_command = f"{sys.executable} {script_path} {{future_file}} {{output_file}}"
+
+        runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+            train_command="echo 'no model file'",
+            predict_command=predict_command,
+        )
+
+        config = MockConfig()
+
+        # Simulate placeholder model from training without model file
+        placeholder_model = {"model_type": "no_file", "stdout": "training log"}
+
+        historic = DataFrame(columns=["feature1"], data=[])
+        future = DataFrame(columns=["feature1"], data=[[5], [10]])
+
+        predictions = await runner.on_predict(config, placeholder_model, historic, future)
+
+        # Should successfully predict without model file
+        assert len(predictions.data) == 2
+        assert "prediction" in predictions.columns
+        pred_idx = predictions.columns.index("prediction")
+        assert float(predictions.data[0][pred_idx]) == 10  # 5 * 2
+        assert float(predictions.data[1][pred_idx]) == 20  # 10 * 2
+
+    finally:
+        Path(script_path).unlink()
 
 
 @pytest.mark.asyncio

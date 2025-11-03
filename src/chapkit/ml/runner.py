@@ -114,7 +114,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
-        """Train a model by executing external training script."""
+        """Train a model by executing external training script (model file creation is optional)."""
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_train_"))
 
         try:
@@ -163,14 +163,20 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
             logger.info("train_script_completed", stdout=stdout[:500], stderr=stderr[:500])
 
-            # Load trained model from file
-            if not model_file.exists():
-                raise RuntimeError(f"Training script did not create model file at {model_file}")
-
-            with open(model_file, "rb") as f:
-                model = pickle.load(f)
-
-            return model
+            # Load trained model from file if it exists
+            if model_file.exists():
+                with open(model_file, "rb") as f:
+                    model = pickle.load(f)
+                return model
+            else:
+                # Return metadata placeholder when no model file is created
+                logger.info("train_script_no_model_file", model_file=str(model_file))
+                return {
+                    "model_type": "no_file",
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "temp_dir": str(temp_dir),
+                }
 
         finally:
             # Cleanup temp files
@@ -186,7 +192,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         future: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
-        """Make predictions by executing external prediction script."""
+        """Make predictions by executing external prediction script (skips model file if placeholder)."""
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
         try:
@@ -194,10 +200,15 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             config_file = temp_dir / "config.yml"
             config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
 
-            # Write model to file
-            model_file = temp_dir / f"model.{self.model_format}"
-            with open(model_file, "wb") as f:
-                pickle.dump(model, f)
+            # Write model to file only if it's not a placeholder
+            is_placeholder = isinstance(model, dict) and model.get("model_type") == "no_file"
+            if is_placeholder:
+                logger.info("predict_script_no_model_file", reason="model is placeholder")
+                model_file = None
+            else:
+                model_file = temp_dir / f"model.{self.model_format}"
+                with open(model_file, "wb") as f:
+                    pickle.dump(model, f)
 
             # Write historic data
             historic_file = temp_dir / "historic.csv"
@@ -219,7 +230,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Substitute variables in command
             command = self.predict_command.format(
                 config_file=str(config_file),
-                model_file=str(model_file),
+                model_file=str(model_file) if model_file else "",
                 historic_file=str(historic_file),
                 future_file=str(future_file),
                 output_file=str(output_file),
