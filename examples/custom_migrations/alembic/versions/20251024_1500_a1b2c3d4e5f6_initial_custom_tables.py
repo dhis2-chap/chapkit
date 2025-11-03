@@ -1,9 +1,8 @@
 """Initial custom tables using helper pattern."""
 
 # Import your custom helpers
-from alembic_helpers import create_orders_table, create_users_table, drop_orders_table, drop_users_table
-
 from alembic import op
+from alembic_helpers import create_orders_table, create_users_table, drop_orders_table, drop_users_table
 
 # OPTIONAL: Import chapkit's helpers to create chapkit tables
 # Uncomment these lines to include chapkit's Config, Artifact, Task tables:
