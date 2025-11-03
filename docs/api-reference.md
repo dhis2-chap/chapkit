@@ -58,6 +58,18 @@ Reusable command templates for shell and Python task execution.
 
 ::: chapkit.task.validation
 
+## Data Module
+
+Universal DataFrame interchange format for tabular data across pandas, polars, xarray, and other libraries.
+
+### DataFrame
+
+::: chapkit.data.DataFrame
+
+### GroupBy
+
+::: chapkit.data.GroupBy
+
 ## Config Module
 
 Key-value configuration storage with Pydantic schema validation.
