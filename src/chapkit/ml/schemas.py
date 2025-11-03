@@ -6,10 +6,10 @@ from typing import Any, Literal, Protocol, TypeVar
 
 from geojson_pydantic import FeatureCollection
 from pydantic import BaseModel, Field
-from servicekit.data import DataFrame
 from ulid import ULID
 
 from chapkit.config.schemas import BaseConfig
+from chapkit.data import DataFrame
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig, contravariant=True)
 

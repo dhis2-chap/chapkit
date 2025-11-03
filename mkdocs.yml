@@ -37,6 +37,7 @@ nav:
       - Artifact Storage: guides/artifact-storage.md
       - Task Execution: guides/task-execution.md
       - ML Workflows: guides/ml-workflows.md
+      - DataFrame: guides/dataframe.md
       - Database Migrations: guides/database-migrations.md
   - API Reference: api-reference.md
 

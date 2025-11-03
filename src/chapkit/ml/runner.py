@@ -11,10 +11,10 @@ from typing import Any, Awaitable, Callable, Generic, TypeVar
 
 import yaml
 from geojson_pydantic import FeatureCollection
-from servicekit.data import DataFrame
 from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
+from chapkit.data import DataFrame
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 

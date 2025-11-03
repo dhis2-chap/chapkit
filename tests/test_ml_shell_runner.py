@@ -5,9 +5,9 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from servicekit.data import DataFrame
 
 from chapkit import BaseConfig
+from chapkit.data import DataFrame
 from chapkit.ml import ShellModelRunner
 
 

@@ -12,12 +12,12 @@ from typing import Any
 
 import structlog
 from geojson_pydantic import FeatureCollection
-from servicekit.data import DataFrame
 from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
 from chapkit.artifact import ArtifactHierarchy
+from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner
 
 log = structlog.get_logger()

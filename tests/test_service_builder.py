@@ -8,10 +8,10 @@ import pytest
 from geojson_pydantic import FeatureCollection
 from pydantic import Field
 from servicekit.api.service_builder import ServiceInfo
-from servicekit.data import DataFrame
 
 from chapkit import ArtifactHierarchy, BaseConfig, get_alembic_dir
 from chapkit.api import MLServiceBuilder, ServiceBuilder
+from chapkit.data import DataFrame
 from chapkit.ml import ModelRunnerProtocol
 
 

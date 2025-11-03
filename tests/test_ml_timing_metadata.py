@@ -8,11 +8,11 @@ import pandas as pd
 import pytest
 from geojson_pydantic import FeatureCollection
 from servicekit import SqliteDatabaseBuilder
-from servicekit.data import DataFrame
 from ulid import ULID
 
 from chapkit.artifact import ArtifactManager, ArtifactRepository
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
+from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, TrainRequest
 from chapkit.scheduler import ChapkitJobScheduler
 

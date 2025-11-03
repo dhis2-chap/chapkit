@@ -1,0 +1,261 @@
+{
+  "info": {
+    "name": "Vega Visualization Service",
+    "description": "API collection for the Vega Visualization Service - transforms DataFrame data to Vega-Lite specs and rendered images",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "System Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/system",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "system"]
+            }
+          }
+        },
+        {
+          "name": "Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["metrics"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Generate Charts - JSON",
+      "item": [
+        {
+          "name": "Line Chart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"month\", \"sales\", \"region\"],\n    \"data\": [\n      [\"Jan\", 120, \"North\"],\n      [\"Feb\", 150, \"North\"],\n      [\"Mar\", 180, \"North\"],\n      [\"Jan\", 100, \"South\"],\n      [\"Feb\", 130, \"South\"],\n      [\"Mar\", 160, \"South\"]\n    ]\n  },\n  \"chart_type\": \"line\",\n  \"x_field\": \"month\",\n  \"y_field\": \"sales\",\n  \"color_field\": \"region\",\n  \"title\": \"Monthly Sales by Region\",\n  \"format\": \"json\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$generate"]
+            }
+          }
+        },
+        {
+          "name": "Bar Chart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"category\", \"value\"],\n    \"data\": [\n      [\"A\", 10],\n      [\"B\", 20],\n      [\"C\", 15],\n      [\"D\", 25]\n    ]\n  },\n  \"chart_type\": \"bar\",\n  \"x_field\": \"category\",\n  \"y_field\": \"value\",\n  \"title\": \"Category Breakdown\",\n  \"format\": \"json\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$generate"]
+            }
+          }
+        },
+        {
+          "name": "Scatter Plot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"temperature\", \"ice_cream_sales\", \"season\"],\n    \"data\": [\n      [65, 100, \"Spring\"],\n      [70, 150, \"Spring\"],\n      [75, 200, \"Summer\"],\n      [80, 280, \"Summer\"],\n      [85, 320, \"Summer\"],\n      [55, 50, \"Fall\"]\n    ]\n  },\n  \"chart_type\": \"scatter\",\n  \"x_field\": \"temperature\",\n  \"y_field\": \"ice_cream_sales\",\n  \"color_field\": \"season\",\n  \"title\": \"Ice Cream Sales vs Temperature\",\n  \"format\": \"json\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$generate"]
+            }
+          }
+        },
+        {
+          "name": "Histogram",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"age\"],\n    \"data\": [\n      [25], [28], [32], [35], [38], [42], [45], [48], [52], [55],\n      [22], [26], [29], [33], [36], [40], [44], [47], [50], [54]\n    ]\n  },\n  \"chart_type\": \"histogram\",\n  \"x_field\": \"age\",\n  \"title\": \"Age Distribution\",\n  \"format\": \"json\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$generate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Generate Charts - Images",
+      "item": [
+        {
+          "name": "Line Chart (PNG)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"x\", \"y\"],\n    \"data\": [[1, 10], [2, 25], [3, 15], [4, 30], [5, 20]]\n  },\n  \"chart_type\": \"line\",\n  \"x_field\": \"x\",\n  \"y_field\": \"y\",\n  \"title\": \"Trend Analysis\",\n  \"format\": \"png\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$generate"]
+            }
+          }
+        },
+        {
+          "name": "Bar Chart (SVG)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"category\", \"value\"],\n    \"data\": [[\"A\", 10], [\"B\", 20], [\"C\", 15]]\n  },\n  \"chart_type\": \"bar\",\n  \"x_field\": \"category\",\n  \"y_field\": \"value\",\n  \"title\": \"Category Breakdown\",\n  \"format\": \"svg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$generate"]
+            }
+          }
+        },
+        {
+          "name": "Line Chart (HTML)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"date\", \"temperature\"],\n    \"data\": [[\"Mon\", 72], [\"Tue\", 68], [\"Wed\", 75], [\"Thu\", 70], [\"Fri\", 73]]\n  },\n  \"chart_type\": \"line\",\n  \"x_field\": \"date\",\n  \"y_field\": \"temperature\",\n  \"title\": \"Weekly Temperature\",\n  \"format\": \"html\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$generate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Aggregation",
+      "item": [
+        {
+          "name": "Sum by Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"region\", \"product\", \"revenue\"],\n    \"data\": [\n      [\"North\", \"Widget\", 100],\n      [\"North\", \"Widget\", 150],\n      [\"North\", \"Gadget\", 200],\n      [\"South\", \"Widget\", 80],\n      [\"South\", \"Gadget\", 120]\n    ]\n  },\n  \"group_by\": [\"region\", \"product\"],\n  \"agg_field\": \"revenue\",\n  \"agg_func\": \"sum\",\n  \"chart_type\": \"bar\",\n  \"title\": \"Total Revenue by Region and Product\",\n  \"format\": \"json\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$aggregate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$aggregate"]
+            }
+          }
+        },
+        {
+          "name": "Average by Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"columns\": [\"department\", \"employee_count\"],\n    \"data\": [\n      [\"Engineering\", 120],\n      [\"Engineering\", 135],\n      [\"Sales\", 80],\n      [\"Sales\", 90],\n      [\"Marketing\", 50]\n    ]\n  },\n  \"group_by\": [\"department\"],\n  \"agg_field\": \"employee_count\",\n  \"agg_func\": \"mean\",\n  \"chart_type\": \"bar\",\n  \"title\": \"Average Employees by Department\",\n  \"format\": \"json\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/visualizations/$aggregate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "visualizations", "$aggregate"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

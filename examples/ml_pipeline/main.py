@@ -7,7 +7,6 @@ from typing import Iterable
 
 import pandas as pd
 from servicekit import SqliteDatabaseBuilder
-from servicekit.data import DataFrame
 from ulid import ULID
 
 from chapkit import (
@@ -23,6 +22,7 @@ from chapkit.artifact import (
     ArtifactManager,
     ArtifactRepository,
 )
+from chapkit.data import DataFrame
 
 ML_CONFIG_ID = ULID.from_str("01K72P60ZNX2PJ6QJWZK7RMCRV")
 TRAIN_ROOT_ID = ULID.from_str("01K72P5N5KCRM6MD3BRE4P07N5")

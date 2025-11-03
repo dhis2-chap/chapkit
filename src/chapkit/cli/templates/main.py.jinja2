@@ -4,9 +4,9 @@ from typing import Any
 
 import structlog
 from geojson_pydantic import FeatureCollection
-from servicekit.data import DataFrame
 
 from chapkit import BaseConfig
+from chapkit.data import DataFrame
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import FunctionalModelRunner
@@ -88,7 +88,7 @@ async def on_predict(
         prediction_value=float(prediction),
     )
 
-    # Convert back to servicekit DataFrame
+    # Convert back to chapkit DataFrame
     return DataFrame.from_pandas(future_df)
 
 

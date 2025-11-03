@@ -37,6 +37,9 @@ from .config import (
     ConfigRepository,
 )
 
+# Data feature
+from .data import DataFrame, GroupBy
+
 # ML feature
 from .ml import (
     FunctionalModelRunner,
@@ -96,6 +99,9 @@ __all__ = [
     "ConfigManager",
     "ConfigOut",
     "ConfigRepository",
+    # Data
+    "DataFrame",
+    "GroupBy",
     # ML
     "FunctionalModelRunner",
     "MLManager",

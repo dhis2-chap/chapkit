@@ -4,9 +4,9 @@ from typing import Any
 
 import pytest
 from geojson_pydantic import FeatureCollection
-from servicekit.data import DataFrame
 
 from chapkit import BaseConfig
+from chapkit.data import DataFrame
 from chapkit.ml import BaseModelRunner
 
 
