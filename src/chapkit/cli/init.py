@@ -60,7 +60,7 @@ def init_command(
         Optional[Path],
         typer.Option(help="Target directory (default: current directory)"),
     ] = None,
-    monitoring: Annotated[
+    with_monitoring: Annotated[
         bool,
         typer.Option(help="Include Prometheus and Grafana monitoring stack"),
     ] = False,
@@ -77,7 +77,7 @@ def init_command(
     typer.echo(f"Creating new chapkit project: {project_name}")
     typer.echo(f"Project directory: {target_dir}")
     typer.echo(f"Package name: {project_slug}")
-    if monitoring:
+    if with_monitoring:
         typer.echo("Including monitoring stack (Prometheus + Grafana)")
     typer.echo()
 
@@ -93,7 +93,7 @@ def init_command(
         "PROJECT_NAME": project_name,
         "PROJECT_SLUG": project_slug,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
-        "WITH_MONITORING": monitoring,
+        "WITH_MONITORING": with_monitoring,
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }
 
@@ -104,7 +104,7 @@ def init_command(
     _render_template(template_dir, target_dir, "Dockerfile.jinja2", context, "Dockerfile")
     _render_template(template_dir, target_dir, "README.md.jinja2", context, "README.md")
 
-    if monitoring:
+    if with_monitoring:
         _render_template(template_dir, target_dir, "compose.monitoring.yml.jinja2", context, "compose.yml")
 
         monitoring_dir = target_dir / "monitoring"
@@ -153,7 +153,7 @@ def init_command(
     typer.echo("  uv sync")
     typer.echo("  uv run python main.py")
     typer.echo()
-    if monitoring:
+    if with_monitoring:
         typer.echo("To start with Docker (including monitoring):")
     else:
         typer.echo("To start with Docker:")
