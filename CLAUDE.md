@@ -9,7 +9,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 - Prioritize readability and maintainability
 - Use type annotations consistently
 - Write clear commit messages without Claude attribution
-- Don't use emojis anywhere (in commit messages, docstrings, comments, etc.)
+- NEVER use emojis anywhere - not in commit messages, PR titles, PR descriptions, docstrings, comments, code, or any other output
 - Ask the user before creating branches or pull requests
 - Always run tests and linting after making changes
 
@@ -59,6 +59,7 @@ class AuthManager:
 
 **Commit message requirements:**
 - NEVER include "Co-Authored-By: Claude" or similar AI attribution
+- NEVER use emojis in commit messages
 - Keep messages concise and descriptive
 - Focus on what changed and why
 
@@ -67,6 +68,7 @@ class AuthManager:
 - All linting must pass (`make lint`)
 - Code coverage should not decrease
 - Descriptive PR title and body
+- NEVER use emojis in PR titles or descriptions
 
 ## Project Overview
 
