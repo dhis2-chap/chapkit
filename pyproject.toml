@@ -106,7 +106,7 @@ branch = true
 dynamic_context = "test_function"
 relative_files = true
 source = ["chapkit"]
-omit = ["*/alembic/*"]
+omit = ["*/alembic/*", "*/cli/*"]
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:"]
