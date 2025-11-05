@@ -339,8 +339,11 @@ class MLServiceBuilder(ServiceBuilder):
             db = SqliteDatabaseBuilder.in_memory().build()
         else:
             # File-based database: enable migrations with chapkit's bundled alembic
-            # Extract file path from URL (e.g., "sqlite+aiosqlite:///./chapkit.db" -> "./chapkit.db")
+            # Extract file path from URL (e.g., "sqlite+aiosqlite:///chapkit.db" -> "chapkit.db")
             db_path = database_url.split("///")[-1] if "///" in database_url else database_url
+            # Normalize path: strip leading "./" to avoid path interpretation issues
+            if db_path.startswith("./"):
+                db_path = db_path[2:]
             db = (
                 SqliteDatabaseBuilder.from_file(db_path)
                 .with_migrations(enabled=True, alembic_dir=get_alembic_dir())
