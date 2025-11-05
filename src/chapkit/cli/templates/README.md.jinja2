@@ -98,6 +98,42 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
     learning_rate: float = 0.01
 ```
 
+{% if RUNNER_TYPE == "shell" %}
+### Customize Training (Shell Runner)
+
+Edit the training script in `scripts/train_model.py` to implement your model training logic.
+
+The script receives the following arguments:
+- `--config`: Path to config YAML file
+- `--data`: Path to training data CSV
+- `--model`: Path to save trained model (pickle format)
+- `--geo`: Optional GeoJSON file path
+
+### Customize Prediction (Shell Runner)
+
+Edit the prediction script in `scripts/predict_model.py` to implement your prediction logic.
+
+The script receives the following arguments:
+- `--config`: Path to config YAML file
+- `--model`: Path to trained model pickle file
+- `--historic`: Path to historic data CSV
+- `--future`: Path to future data CSV
+- `--output`: Path to save predictions CSV
+- `--geo`: Optional GeoJSON file path
+
+### Using Other Languages
+
+The shell runner is language-agnostic! You can replace the Python scripts with:
+- R scripts: `Rscript scripts/train_model.R ...`
+- Julia scripts: `julia scripts/train_model.jl ...`
+- Any executable that accepts the same arguments
+
+Just update the command templates in `main.py`:
+
+```python
+train_command = f"Rscript {SCRIPTS_DIR}/train_model.R --config {{config_file}} ..."
+```
+{% else %}
 ### Customize Training
 
 Edit the `on_train` function in `main.py` to implement your model training logic.
@@ -105,17 +141,24 @@ Edit the `on_train` function in `main.py` to implement your model training logic
 ### Customize Prediction
 
 Edit the `on_predict` function in `main.py` to implement your prediction logic.
+{% endif %}
 
 ## Project Structure
 
 ```
 {{ PROJECT_SLUG }}/
 ├── main.py              # Main application file
+{% if RUNNER_TYPE == "shell" %}
+├── scripts/             # External training/prediction scripts
+│   ├── train_model.py   # Training script
+│   └── predict_model.py # Prediction script
+{% endif %}
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # Docker build configuration
 ├── compose.yml          # Docker Compose configuration
-├── chapkit.db           # SQLite database (persisted)
-{% if monitoring %}
+├── data/                # Database directory
+│   └── chapkit.db       # SQLite database (persisted)
+{% if WITH_MONITORING %}
 └── monitoring/          # Monitoring stack configuration
     ├── prometheus/      # Prometheus configuration
     └── grafana/         # Grafana dashboards and data sources

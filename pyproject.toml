@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.5.6"
+version = "0.5.7"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
@@ -106,7 +106,7 @@ branch = true
 dynamic_context = "test_function"
 relative_files = true
 source = ["chapkit"]
-omit = ["*/alembic/*"]
+omit = ["*/alembic/*", "*/cli/*"]
 
 [tool.coverage.report]
 exclude_also = ["if TYPE_CHECKING:"]
