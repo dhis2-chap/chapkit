@@ -64,6 +64,10 @@ def init_command(
         bool,
         typer.Option(help="Include Prometheus and Grafana monitoring stack"),
     ] = False,
+    runner_type: Annotated[
+        str,
+        typer.Option(help="Model runner type: 'functional' or 'shell'"),
+    ] = "functional",
 ) -> None:
     """Initialize a new chapkit ML service project."""
     target_dir = (path or Path.cwd()) / project_name
@@ -72,11 +76,16 @@ def init_command(
         typer.echo(f"Error: Directory '{target_dir}' already exists", err=True)
         raise typer.Exit(code=1)
 
+    if runner_type not in ["functional", "shell"]:
+        typer.echo(f"Error: Invalid runner type '{runner_type}'. Must be 'functional' or 'shell'", err=True)
+        raise typer.Exit(code=1)
+
     project_slug = _slugify(project_name)
 
     typer.echo(f"Creating new chapkit project: {project_name}")
     typer.echo(f"Project directory: {target_dir}")
     typer.echo(f"Package name: {project_slug}")
+    typer.echo(f"Runner type: {runner_type}")
     if with_monitoring:
         typer.echo("Including monitoring stack (Prometheus + Grafana)")
     typer.echo()
@@ -94,15 +103,40 @@ def init_command(
         "PROJECT_SLUG": project_slug,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_MONITORING": with_monitoring,
+        "RUNNER_TYPE": runner_type,
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }
 
     typer.echo("Generating project files...")
 
-    _render_template(template_dir, target_dir, "main.py.jinja2", context, "main.py")
+    # Render main.py based on runner type
+    if runner_type == "shell":
+        _render_template(template_dir, target_dir, "main_shell.py.jinja2", context, "main.py")
+    else:
+        _render_template(template_dir, target_dir, "main.py.jinja2", context, "main.py")
+
     _render_template(template_dir, target_dir, "pyproject.toml.jinja2", context, "pyproject.toml")
     _render_template(template_dir, target_dir, "Dockerfile.jinja2", context, "Dockerfile")
     _render_template(template_dir, target_dir, "README.md.jinja2", context, "README.md")
+
+    # For shell runner, create scripts directory
+    if runner_type == "shell":
+        scripts_dir = target_dir / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        _render_template(
+            template_dir / "scripts",
+            scripts_dir,
+            "train_model.py.jinja2",
+            context,
+            "train_model.py",
+        )
+        _render_template(
+            template_dir / "scripts",
+            scripts_dir,
+            "predict_model.py.jinja2",
+            context,
+            "predict_model.py",
+        )
 
     if with_monitoring:
         _render_template(template_dir, target_dir, "compose.monitoring.yml.jinja2", context, "compose.yml")

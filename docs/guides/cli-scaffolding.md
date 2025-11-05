@@ -119,6 +119,7 @@ chapkit init PROJECT_NAME [OPTIONS]
 
 - `--path PATH` - Target directory (default: current directory)
 - `--with-monitoring` - Include Prometheus and Grafana monitoring stack
+- `--runner-type TYPE` - Model runner type: `functional` (default) or `shell`
 - `--help` - Show help message
 
 **Examples:**
@@ -136,22 +137,86 @@ chapkit init my-service --path ~/projects
 # Create project with monitoring stack
 chapkit init my-service --with-monitoring
 
+# Create project with shell runner (language-agnostic)
+chapkit init my-service --runner-type shell
+
+# Combine options
+chapkit init my-service --runner-type shell --with-monitoring
+
 # From GitHub (development version)
 uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
 ```
 
 ---
 
+## Runner Types
+
+### Functional Runner (Default)
+
+The functional runner is the simpler approach where you define training and prediction logic as Python functions directly in `main.py`:
+
+**Pros:**
+- Simpler to understand and get started
+- All code in one file
+- Direct access to Python ecosystem
+- No external processes
+
+**Cons:**
+- Python-only workflows
+- Less isolation between training and prediction
+
+**Best for:** Python-centric ML workflows, prototyping, simpler models
+
+### Shell Runner
+
+The shell runner executes external scripts for training and prediction, enabling language-agnostic ML workflows:
+
+**Pros:**
+- Language-agnostic (Python, R, Julia, etc.)
+- Better isolation and testing
+- Can integrate existing scripts without modification
+- File-based data interchange (CSV, YAML, pickle)
+
+**Cons:**
+- More files to manage
+- Requires understanding of file I/O formats
+- Slightly more complex
+
+**Best for:** Multi-language environments, integrating existing scripts, team collaboration with different language preferences
+
+---
+
 ## Generated Project Structure
 
-### Basic Project
+### Functional Runner (Default)
 
 ```
 my-service/
-├── main.py              # ML service application
+├── main.py              # ML service with train/predict functions
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # Multi-stage Docker build
 ├── compose.yml          # Docker Compose configuration
+├── data/                # Database directory
+│   └── chapkit.db       # SQLite database (created at runtime)
+├── .gitignore           # Python gitignore
+└── README.md            # Project documentation
+```
+
+### Shell Runner
+
+When using `--runner-type shell`, external scripts are generated:
+
+```
+my-service/
+├── main.py              # ML service with command templates
+├── scripts/             # External training/prediction scripts
+│   ├── train_model.py   # Training script
+│   └── predict_model.py # Prediction script
+├── pyproject.toml       # Python dependencies
+├── Dockerfile           # Multi-stage Docker build
+├── compose.yml          # Docker Compose configuration
+├── data/                # Database directory
+│   └── chapkit.db       # SQLite database (created at runtime)
 ├── .gitignore           # Python gitignore
 └── README.md            # Project documentation
 ```
@@ -162,12 +227,7 @@ When using `--with-monitoring`, additional files are generated:
 
 ```
 my-service/
-├── main.py
-├── pyproject.toml
-├── Dockerfile
-├── compose.yml          # Includes Prometheus & Grafana
-├── .gitignore
-├── README.md
+...
 └── monitoring/
     ├── prometheus/
     │   └── prometheus.yml

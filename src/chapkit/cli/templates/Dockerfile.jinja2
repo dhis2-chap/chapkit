@@ -16,6 +16,9 @@ ENV UV_LINK_MODE=copy
 # Copy project files
 COPY pyproject.toml ./
 COPY main.py ./
+{% if RUNNER_TYPE == "shell" %}
+COPY scripts/ ./scripts/
+{% endif %}
 
 # Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
