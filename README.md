@@ -49,7 +49,7 @@ uvx chapkit init my-ml-service
 
 Options:
 - `--path <directory>` - Target directory (default: current directory)
-- `--monitoring` - Include Prometheus and Grafana monitoring stack
+- `--with-monitoring` - Include Prometheus and Grafana monitoring stack
 
 This creates a ready-to-run ML service with configuration, artifacts, and ML endpoints pre-configured.
 

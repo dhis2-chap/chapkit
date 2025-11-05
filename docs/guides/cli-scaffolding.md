@@ -118,7 +118,7 @@ chapkit init PROJECT_NAME [OPTIONS]
 **Options:**
 
 - `--path PATH` - Target directory (default: current directory)
-- `--monitoring` - Include Prometheus and Grafana monitoring stack
+- `--with-monitoring` - Include Prometheus and Grafana monitoring stack
 - `--help` - Show help message
 
 **Examples:**
@@ -134,7 +134,7 @@ chapkit init my-service
 chapkit init my-service --path ~/projects
 
 # Create project with monitoring stack
-chapkit init my-service --monitoring
+chapkit init my-service --with-monitoring
 
 # From GitHub (development version)
 uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
@@ -158,7 +158,7 @@ my-service/
 
 ### With Monitoring
 
-When using `--monitoring`, additional files are generated:
+When using `--with-monitoring`, additional files are generated:
 
 ```
 my-service/
