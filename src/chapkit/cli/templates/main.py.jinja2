@@ -121,7 +121,7 @@ app = (
         config_schema={{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
         hierarchy=HIERARCHY,
         runner=runner,
-        database_url="sqlite+aiosqlite:///chapkit.db",
+        database_url="sqlite+aiosqlite:///data/chapkit.db",
     )
 {% if WITH_MONITORING %}
     .with_monitoring()

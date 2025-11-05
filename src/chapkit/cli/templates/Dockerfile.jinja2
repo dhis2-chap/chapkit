@@ -47,6 +47,9 @@ COPY --from=builder --chown=${USER}:${USER} /workspace /workspace
 
 WORKDIR /workspace
 
+# Create data directory for database persistence
+RUN mkdir -p /workspace/data && chown ${USER}:${USER} /workspace/data
+
 # Set up environment to use the venv
 ENV VIRTUAL_ENV=/workspace/.venv
 ENV PATH=/workspace/.venv/bin:${PATH}
