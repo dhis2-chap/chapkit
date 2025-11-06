@@ -50,13 +50,14 @@ uvx chapkit init my-ml-service
 Options:
 - `--path <directory>` - Target directory (default: current directory)
 - `--with-monitoring` - Include Prometheus and Grafana monitoring stack
-- `--runner-type <type>` - Model runner type: `functional` (default) or `shell`
+- `--template <type>` - Template type: `ml` (default), `ml-shell`, or `task`
 
-This creates a ready-to-run ML service with configuration, artifacts, and ML endpoints pre-configured.
+This creates a ready-to-run service with configuration, artifacts, and API endpoints pre-configured.
 
-**Runner Types:**
-- **functional**: Define training/prediction as Python functions in `main.py` (simpler, best for Python-only workflows)
-- **shell**: Use external scripts for training/prediction (language-agnostic, supports Python/R/Julia/etc.)
+**Template Types:**
+- **ml**: Define training/prediction as Python functions in `main.py` (simpler, best for Python-only ML workflows)
+- **ml-shell**: Use external scripts for training/prediction (language-agnostic, supports Python/R/Julia/etc.)
+- **task**: General-purpose task execution with Python functions and shell commands (not ML-specific)
 
 ## Quick Start
 

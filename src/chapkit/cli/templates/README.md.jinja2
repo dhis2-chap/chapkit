@@ -98,7 +98,7 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
     learning_rate: float = 0.01
 ```
 
-{% if RUNNER_TYPE == "shell" %}
+{% if TEMPLATE == "ml-shell" %}
 ### Customize Training (Shell Runner)
 
 Edit the training script in `scripts/train_model.py` to implement your model training logic.
@@ -148,7 +148,7 @@ Edit the `on_predict` function in `main.py` to implement your prediction logic.
 ```
 {{ PROJECT_SLUG }}/
 ├── main.py              # Main application file
-{% if RUNNER_TYPE == "shell" %}
+{% if TEMPLATE == "ml-shell" %}
 ├── scripts/             # External training/prediction scripts
 │   ├── train_model.py   # Training script
 │   └── predict_model.py # Prediction script
