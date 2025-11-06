@@ -64,10 +64,10 @@ def init_command(
         bool,
         typer.Option(help="Include Prometheus and Grafana monitoring stack"),
     ] = False,
-    runner_type: Annotated[
+    template: Annotated[
         str,
-        typer.Option(help="Model runner type: 'functional' or 'shell'"),
-    ] = "functional",
+        typer.Option(help="Template type: 'ml', 'ml-shell', or 'task'"),
+    ] = "ml",
 ) -> None:
     """Initialize a new chapkit ML service project."""
     target_dir = (path or Path.cwd()) / project_name
@@ -76,8 +76,8 @@ def init_command(
         typer.echo(f"Error: Directory '{target_dir}' already exists", err=True)
         raise typer.Exit(code=1)
 
-    if runner_type not in ["functional", "shell"]:
-        typer.echo(f"Error: Invalid runner type '{runner_type}'. Must be 'functional' or 'shell'", err=True)
+    if template not in ["ml", "ml-shell", "task"]:
+        typer.echo(f"Error: Invalid template '{template}'. Must be 'ml', 'ml-shell', or 'task'", err=True)
         raise typer.Exit(code=1)
 
     project_slug = _slugify(project_name)
@@ -85,7 +85,7 @@ def init_command(
     typer.echo(f"Creating new chapkit project: {project_name}")
     typer.echo(f"Project directory: {target_dir}")
     typer.echo(f"Package name: {project_slug}")
-    typer.echo(f"Runner type: {runner_type}")
+    typer.echo(f"Template: {template}")
     if with_monitoring:
         typer.echo("Including monitoring stack (Prometheus + Grafana)")
     typer.echo()
@@ -103,15 +103,17 @@ def init_command(
         "PROJECT_SLUG": project_slug,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_MONITORING": with_monitoring,
-        "RUNNER_TYPE": runner_type,
+        "TEMPLATE": template,
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }
 
     typer.echo("Generating project files...")
 
-    # Render main.py based on runner type
-    if runner_type == "shell":
+    # Render main.py based on template type
+    if template == "ml-shell":
         _render_template(template_dir, target_dir, "main_shell.py.jinja2", context, "main.py")
+    elif template == "task":
+        _render_template(template_dir, target_dir, "main_task.py.jinja2", context, "main.py")
     else:
         _render_template(template_dir, target_dir, "main.py.jinja2", context, "main.py")
 
@@ -119,8 +121,8 @@ def init_command(
     _render_template(template_dir, target_dir, "Dockerfile.jinja2", context, "Dockerfile")
     _render_template(template_dir, target_dir, "README.md.jinja2", context, "README.md")
 
-    # For shell runner, create scripts directory
-    if runner_type == "shell":
+    # For ml-shell template, create scripts directory
+    if template == "ml-shell":
         scripts_dir = target_dir / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
         _render_template(

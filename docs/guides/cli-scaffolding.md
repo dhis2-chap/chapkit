@@ -119,7 +119,7 @@ chapkit init PROJECT_NAME [OPTIONS]
 
 - `--path PATH` - Target directory (default: current directory)
 - `--with-monitoring` - Include Prometheus and Grafana monitoring stack
-- `--runner-type TYPE` - Model runner type: `functional` (default) or `shell`
+- `--template TYPE` - Template type: `ml` (default), `ml-shell`, or `task`
 - `--help` - Show help message
 
 **Examples:**
@@ -137,11 +137,14 @@ chapkit init my-service --path ~/projects
 # Create project with monitoring stack
 chapkit init my-service --with-monitoring
 
-# Create project with shell runner (language-agnostic)
-chapkit init my-service --runner-type shell
+# Create project with ml-shell template (language-agnostic)
+chapkit init my-service --template ml-shell
+
+# Create project with task template (task execution)
+chapkit init my-service --template task
 
 # Combine options
-chapkit init my-service --runner-type shell --with-monitoring
+chapkit init my-service --template ml-shell --with-monitoring
 
 # From GitHub (development version)
 uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
@@ -149,11 +152,11 @@ uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
 
 ---
 
-## Runner Types
+## Template Types
 
-### Functional Runner (Default)
+### ML Template (Default)
 
-The functional runner is the simpler approach where you define training and prediction logic as Python functions directly in `main.py`:
+The ML template is the simpler approach where you define training and prediction logic as Python functions directly in `main.py`:
 
 **Pros:**
 - Simpler to understand and get started
@@ -167,9 +170,9 @@ The functional runner is the simpler approach where you define training and pred
 
 **Best for:** Python-centric ML workflows, prototyping, simpler models
 
-### Shell Runner
+### ML-Shell Template
 
-The shell runner executes external scripts for training and prediction, enabling language-agnostic ML workflows:
+The ML-shell template executes external scripts for training and prediction, enabling language-agnostic ML workflows:
 
 **Pros:**
 - Language-agnostic (Python, R, Julia, etc.)
@@ -184,11 +187,29 @@ The shell runner executes external scripts for training and prediction, enabling
 
 **Best for:** Multi-language environments, integrating existing scripts, team collaboration with different language preferences
 
+### Task Template
+
+The task template provides a general-purpose task execution system with both Python functions and shell commands:
+
+**Pros:**
+- Execute both Python functions and shell commands
+- Dependency injection (Database, ArtifactManager, etc.)
+- Dynamic task creation via API
+- Job-based async execution
+- Task results stored in artifacts
+
+**Cons:**
+- Not ML-specific (no train/predict operations)
+- Requires understanding of task registry
+- More complex than simple function calls
+
+**Best for:** General-purpose automation, data processing pipelines, scheduled tasks, non-ML workflows
+
 ---
 
 ## Generated Project Structure
 
-### Functional Runner (Default)
+### ML Template (Default)
 
 ```
 my-service/
@@ -202,9 +223,9 @@ my-service/
 └── README.md            # Project documentation
 ```
 
-### Shell Runner
+### ML-Shell Template
 
-When using `--runner-type shell`, external scripts are generated:
+When using `--template ml-shell`, external scripts are generated:
 
 ```
 my-service/
@@ -212,6 +233,22 @@ my-service/
 ├── scripts/             # External training/prediction scripts
 │   ├── train_model.py   # Training script
 │   └── predict_model.py # Prediction script
+├── pyproject.toml       # Python dependencies
+├── Dockerfile           # Multi-stage Docker build
+├── compose.yml          # Docker Compose configuration
+├── data/                # Database directory
+│   └── chapkit.db       # SQLite database (created at runtime)
+├── .gitignore           # Python gitignore
+└── README.md            # Project documentation
+```
+
+### Task Template
+
+When using `--template task`, a task execution service is generated:
+
+```
+my-service/
+├── main.py              # Task execution service with Python functions
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # Multi-stage Docker build
 ├── compose.yml          # Docker Compose configuration
@@ -245,8 +282,9 @@ my-service/
 
 ### main.py
 
-The generated `main.py` includes:
+The generated `main.py` varies by template:
 
+**ML Template (`ml`):**
 - **Config Schema**: Pydantic model for ML parameters
 - **Training Function**: `on_train` with simple model example
 - **Prediction Function**: `on_predict` for inference
@@ -254,7 +292,18 @@ The generated `main.py` includes:
 - **Artifact Hierarchy**: Storage structure for models and predictions
 - **FastAPI App**: Built using `MLServiceBuilder`
 
-**Example structure:**
+**ML-Shell Template (`ml-shell`):**
+- Similar to ML template but references external training/prediction scripts
+- **Shell Commands**: Command templates for executing scripts
+- **Scripts Directory**: Contains `train_model.py` and `predict_model.py`
+
+**Task Template (`task`):**
+- **Task Functions**: Python functions registered with `@TaskRegistry.register()`
+- **Task Manager**: Handles task execution with dependency injection
+- **Task Router**: API endpoints for task CRUD and execution
+- **FastAPI App**: Built using `ServiceBuilder` (not ML-specific)
+
+**Example structure (ML template):**
 
 ```python
 class MyServiceConfig(BaseConfig):
