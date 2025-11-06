@@ -1,0 +1,327 @@
+{
+    "info": {
+        "_postman_id": "{{ PROJECT_SLUG }}-ml-service",
+        "name": "{{ PROJECT_NAME }} - ML Service",
+        "description": "ML service for {{ PROJECT_NAME }} with train/predict workflows.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Config management with Pydantic validation\n- ML training and prediction\n- Artifact storage with hierarchy\n- Job scheduling for async operations",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Service Health & Info",
+            "item": [
+                {
+                    "name": "Check Service Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/health",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["health"]
+                        }
+                    }
+                },
+                {
+                    "name": "View System Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/system",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "system"]
+                        }
+                    }
+                },
+                {
+                    "name": "View Service Metadata",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/info",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "info"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Config Schema",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs/$schema",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs", "$schema"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "2. Configuration Management",
+            "item": [
+                {
+                    "name": "Create Configuration",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('config_id', response.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"default_config\",\n  \"data\": {}\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs"]
+                        }
+                    }
+                },
+                {
+                    "name": "List All Configs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Config by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs/{%raw%}{{config_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs", "{%raw%}{{config_id}}{%endraw%}"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "3. Model Training",
+            "item": [
+                {
+                    "name": "Train Model",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('train_job_id', response.job_id);",
+                                    "    pm.collectionVariables.set('model_artifact_id', response.model_artifact_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"config_id\": \"{%raw%}{{config_id}}{%endraw%}\",\n  \"data\": {\n    \"columns\": [\"feature_1\", \"feature_2\", \"target\"],\n    \"data\": [\n      [1.0, 2.0, 3.0],\n      [2.0, 3.0, 5.0],\n      [3.0, 4.0, 7.0],\n      [4.0, 5.0, 9.0]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$train",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "ml", "$train"]
+                        }
+                    }
+                },
+                {
+                    "name": "Poll Training Job",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs/{%raw%}{{train_job_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs", "{%raw%}{{train_job_id}}{%endraw%}"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Trained Model Artifact",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{model_artifact_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{model_artifact_id}}{%endraw%}"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "4. Predictions",
+            "item": [
+                {
+                    "name": "Make Predictions",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('predict_job_id', response.job_id);",
+                                    "    pm.collectionVariables.set('prediction_artifact_id', response.prediction_artifact_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"model_artifact_id\": \"{%raw%}{{model_artifact_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$predict",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "ml", "$predict"]
+                        }
+                    }
+                },
+                {
+                    "name": "Poll Prediction Job",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs/{%raw%}{{predict_job_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs", "{%raw%}{{predict_job_id}}{%endraw%}"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Predictions",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{prediction_artifact_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{prediction_artifact_id}}{%endraw%}"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Artifact Tree",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{model_artifact_id}}{%endraw%}/$tree",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{model_artifact_id}}{%endraw%}", "$tree"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "5. Job & Artifact Management",
+            "item": [
+                {
+                    "name": "List All Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs"]
+                        }
+                    }
+                },
+                {
+                    "name": "List All Artifacts",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts"]
+                        }
+                    }
+                },
+                {
+                    "name": "Delete Artifact",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{model_artifact_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{model_artifact_id}}{%endraw%}"]
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8000",
+            "type": "string"
+        },
+        {
+            "key": "config_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "train_job_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "model_artifact_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "predict_job_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "prediction_artifact_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

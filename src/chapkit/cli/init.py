@@ -121,6 +121,18 @@ def init_command(
     _render_template(template_dir, target_dir, "Dockerfile.jinja2", context, "Dockerfile")
     _render_template(template_dir, target_dir, "README.md.jinja2", context, "README.md")
 
+    # Render Postman collection based on template type
+    if template == "ml-shell":
+        _render_template(
+            template_dir, target_dir, "postman_collection_ml_shell.json.jinja2", context, "postman_collection.json"
+        )
+    elif template == "task":
+        _render_template(
+            template_dir, target_dir, "postman_collection_task.json.jinja2", context, "postman_collection.json"
+        )
+    else:
+        _render_template(template_dir, target_dir, "postman_collection_ml.json.jinja2", context, "postman_collection.json")
+
     # For ml-shell template, create scripts directory
     if template == "ml-shell":
         scripts_dir = target_dir / "scripts"

@@ -1,0 +1,350 @@
+{
+    "info": {
+        "_postman_id": "{{ PROJECT_SLUG }}-ml-shell-service",
+        "name": "{{ PROJECT_NAME }} - ML Shell Service",
+        "description": "Language-agnostic ML service for {{ PROJECT_NAME }} using external scripts.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Shell-based ML workflows (Python, R, Julia, etc.)\n- External train/predict scripts in scripts/ directory\n- File-based data interchange (CSV, YAML, pickle)\n- Language-agnostic execution model",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Service Health & Info",
+            "item": [
+                {
+                    "name": "Check Service Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/health",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["health"]
+                        }
+                    }
+                },
+                {
+                    "name": "View System Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/system",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "system"]
+                        }
+                    }
+                },
+                {
+                    "name": "View Service Metadata",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/info",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "info"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Config Schema",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs/$schema",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs", "$schema"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "2. Configuration Management",
+            "item": [
+                {
+                    "name": "Create Configuration",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('config_id', response.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"shell_model_config\",\n  \"data\": {}\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs"]
+                        },
+                        "description": "Create configuration. Accessible by external scripts via config.yml."
+                    }
+                },
+                {
+                    "name": "List All Configs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Config by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/configs/{%raw%}{{config_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "configs", "{%raw%}{{config_id}}{%endraw%}"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "3. Model Training (External Script)",
+            "item": [
+                {
+                    "name": "Train Model via External Script",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('train_job_id', response.job_id);",
+                                    "    pm.collectionVariables.set('model_artifact_id', response.model_artifact_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"config_id\": \"{%raw%}{{config_id}}{%endraw%}\",\n  \"data\": {\n    \"columns\": [\"feature_1\", \"feature_2\", \"target\"],\n    \"data\": [\n      [1.0, 2.0, 3.0],\n      [2.0, 3.0, 5.0],\n      [3.0, 4.0, 7.0],\n      [4.0, 5.0, 9.0]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$train",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "ml", "$train"]
+                        },
+                        "description": "Executes scripts/train_model.py (or your custom script).\n\nWorkflow:\n1. Create temp directory\n2. Write config.yml, data.csv\n3. Execute training script\n4. Read model.pickle\n5. Store in artifact"
+                    }
+                },
+                {
+                    "name": "Poll Training Job",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs/{%raw%}{{train_job_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs", "{%raw%}{{train_job_id}}{%endraw%}"]
+                        },
+                        "description": "Check training job status. Check server logs for script execution details."
+                    }
+                },
+                {
+                    "name": "Get Trained Model Artifact",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{model_artifact_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{model_artifact_id}}{%endraw%}"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "4. Predictions (External Script)",
+            "item": [
+                {
+                    "name": "Make Predictions via External Script",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('predict_job_id', response.job_id);",
+                                    "    pm.collectionVariables.set('prediction_artifact_id', response.prediction_artifact_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"model_artifact_id\": \"{%raw%}{{model_artifact_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$predict",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "ml", "$predict"]
+                        },
+                        "description": "Executes scripts/predict_model.py (or your custom script).\n\nWorkflow:\n1. Create temp directory\n2. Write config.yml, model.pickle, future.csv\n3. Execute prediction script\n4. Read predictions.csv\n5. Store in artifact"
+                    }
+                },
+                {
+                    "name": "Poll Prediction Job",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs/{%raw%}{{predict_job_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs", "{%raw%}{{predict_job_id}}{%endraw%}"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Predictions",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{prediction_artifact_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{prediction_artifact_id}}{%endraw%}"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Artifact Tree",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{model_artifact_id}}{%endraw%}/$tree",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{model_artifact_id}}{%endraw%}", "$tree"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "5. Job & Artifact Management",
+            "item": [
+                {
+                    "name": "List All Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs"]
+                        }
+                    }
+                },
+                {
+                    "name": "List Failed Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs?status_filter=failed",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs"],
+                            "query": [
+                                {
+                                    "key": "status_filter",
+                                    "value": "failed"
+                                }
+                            ]
+                        },
+                        "description": "Filter for failed jobs to debug script errors."
+                    }
+                },
+                {
+                    "name": "List All Artifacts",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts"]
+                        }
+                    }
+                },
+                {
+                    "name": "Delete Artifact",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{model_artifact_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "artifacts", "{%raw%}{{model_artifact_id}}{%endraw%}"]
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8000",
+            "type": "string"
+        },
+        {
+            "key": "config_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "train_job_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "model_artifact_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "predict_job_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "prediction_artifact_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}

@@ -1,0 +1,291 @@
+{
+    "info": {
+        "_postman_id": "{{ PROJECT_SLUG }}-task-service",
+        "name": "{{ PROJECT_NAME }} - Task Execution",
+        "description": "Task execution service for {{ PROJECT_NAME }} with Python functions and shell commands.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Execute Python functions as tasks\n- Execute shell commands\n- Dependency injection (Database, ArtifactManager)\n- Auto-seeded demo tasks\n- Job scheduling integration\n\n**Seeded Tasks:**\n- greet_user - Simple Python function\n- process_data - Python with dependency injection\n- count_files - Count files in directory\n- Shell commands (python --version, echo)",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Service Health & Info",
+            "item": [
+                {
+                    "name": "Check Service Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/health",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["health"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get System Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/system",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "system"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "2. Task Management",
+            "item": [
+                {
+                    "name": "List All Tasks",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks"]
+                        },
+                        "description": "List all registered tasks (auto-seeded on startup)"
+                    }
+                },
+                {
+                    "name": "Get Task by ID",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}"]
+                        }
+                    }
+                },
+                {
+                    "name": "Create Python Function Task",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('task_id', response.id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": true,\n  \"tags\": [\"python\", \"greeting\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks"]
+                        },
+                        "description": "Create task that executes greet_user Python function"
+                    }
+                },
+                {
+                    "name": "Create Shell Command Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"echo 'Hello from task!'\",\n  \"enabled\": true,\n  \"tags\": [\"shell\", \"test\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks"]
+                        },
+                        "description": "Create task that executes shell command"
+                    }
+                },
+                {
+                    "name": "Update Task",
+                    "request": {
+                        "method": "PUT",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": false,\n  \"tags\": [\"python\", \"disabled\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}"]
+                        }
+                    }
+                },
+                {
+                    "name": "Delete Task",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}"]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "3. Task Execution",
+            "item": [
+                {
+                    "name": "Execute Task",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}/$execute",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}", "$execute"]
+                        },
+                        "description": "Execute task by ID. Returns job_id for polling. Get task_id from List All Tasks response."
+                    }
+                },
+                {
+                    "name": "Execute Task with Parameters",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"World\"\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}/$execute",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}", "$execute"]
+                        },
+                        "description": "Execute Python function task with parameters"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "4. Job Management",
+            "item": [
+                {
+                    "name": "List All Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs"]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Job Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs/{%raw%}{{job_id}}{%endraw%}",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs", "{%raw%}{{job_id}}{%endraw%}"]
+                        },
+                        "description": "Poll job status. Job completes when status is 'completed'."
+                    }
+                },
+                {
+                    "name": "List Completed Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs?status_filter=completed",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs"],
+                            "query": [
+                                {
+                                    "key": "status_filter",
+                                    "value": "completed"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "List Failed Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/jobs?status_filter=failed",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "jobs"],
+                            "query": [
+                                {
+                                    "key": "status_filter",
+                                    "value": "failed"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8000",
+            "type": "string"
+        },
+        {
+            "key": "task_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "job_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}
