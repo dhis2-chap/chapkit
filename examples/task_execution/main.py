@@ -23,6 +23,9 @@ TASK_HIERARCHY = ArtifactHierarchy(
 
 # ==================== Python Task Functions ====================
 
+# Clear registry on module reload (for development hot-reload)
+TaskRegistry.clear()
+
 
 @TaskRegistry.register("greet_user")
 async def greet_user(name: str = "World") -> dict[str, str]:
