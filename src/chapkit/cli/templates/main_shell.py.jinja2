@@ -1,5 +1,6 @@
 """{{ PROJECT_DESCRIPTION }}."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -74,6 +75,14 @@ HIERARCHY = ArtifactHierarchy(
     level_labels={0: "trained_model", 1: "predictions"},
 )
 
+# Database configuration
+# Uses environment variable or defaults to data/chapkit.db
+# Creates data directory if it doesn't exist
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/chapkit.db")
+if DATABASE_URL.startswith("sqlite") and ":///" in DATABASE_URL:
+    db_path = Path(DATABASE_URL.split("///")[1])
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
 # Build the FastAPI application
 app = (
     MLServiceBuilder(
@@ -81,7 +90,7 @@ app = (
         config_schema={{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
         hierarchy=HIERARCHY,
         runner=runner,
-        database_url="sqlite+aiosqlite:///data/chapkit.db",
+        database_url=DATABASE_URL,
     )
 {% if WITH_MONITORING %}
     .with_monitoring()
