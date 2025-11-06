@@ -472,6 +472,28 @@ After scaffolding your project:
 6. **Add tests**: Create tests for your training and prediction logic
 7. **Deploy**: Use the generated Dockerfile for deployment
 
+## Examples
+
+The `examples/` directory contains working examples for each template type:
+
+**ML Template Examples:**
+- `ml_functional/` - ML template with Python functions (FunctionalModelRunner)
+- `ml_class/` - Class-based ML runner approach
+- `quickstart/` - Complete ML service with config, artifacts, and ML endpoints
+
+**ML-Shell Template Example:**
+- `ml_shell/` - Language-agnostic ML with external scripts (ShellModelRunner)
+
+**Task Template Example:**
+- `task_execution/` - General-purpose task execution with Python functions and shell commands
+
+**Other Examples:**
+- `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
+- `full_featured/` - Comprehensive example with monitoring and custom routers
+- `config_artifact/` - Configuration with artifact linking
+- `artifact/` - Read-only artifact API
+- `custom_migrations/` - Database migrations with custom models
+
 ## Related Documentation
 
 - [ML Workflows](ml-workflows.md) - Learn about model training and prediction

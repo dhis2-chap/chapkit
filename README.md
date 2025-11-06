@@ -162,7 +162,7 @@ See the `examples/` directory for complete working examples:
 
 - `quickstart/` - Complete ML service with config, artifacts, and ML endpoints
 - `config_artifact/` - Config with artifact linking
-- `ml_functional/`, `ml_class/`, `ml_shell/` - ML workflow patterns (functional, class-based, shell-based)
+- `ml_functional/`, `ml_class/`, `ml_shell/` - ML workflow patterns (ML template, class-based, ML-shell template)
 - `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
 - `artifact/` - Read-only artifact API with hierarchical storage
 - `task_execution/` - Task execution with Python functions and shell commands
