@@ -155,6 +155,7 @@ app: FastAPI = (
     .with_logging()
     .with_health()
     .with_system()
+    .with_artifacts(hierarchy=TASK_HIERARCHY)  # Expose artifact endpoints for task results
     .with_jobs(max_concurrency=5)  # Required for task execution
     .include_router(task_router)  # Add task router before build
     .on_startup(seed_demo_tasks)
