@@ -290,3 +290,39 @@ async def test_inject_scheduler(database: Database, task_executor: TaskExecutor)
         assert artifact is not None
         assert artifact.data["error"] is None
         assert artifact.data["result"]["scheduler_injected"] is True
+
+
+@pytest.mark.asyncio
+async def test_execute_nonexistent_task(database: Database, task_executor: TaskExecutor) -> None:
+    """Test that executing a non-existent task raises ValueError."""
+    with pytest.raises(ValueError, match="not found in registry"):
+        await task_executor.execute("nonexistent_task", {})
+
+
+@pytest.mark.asyncio
+async def test_task_without_type_annotations(database: Database, task_executor: TaskExecutor) -> None:
+    """Test task with parameters that have no type annotations."""
+
+    @TaskRegistry.register("test_no_annotations")
+    async def task_no_annotations(value):  # No type annotation
+        """Task without type annotation."""
+        return {"value": value}
+
+    # Execute with parameter
+    job_id = await task_executor.execute("test_no_annotations", {"value": 42})
+
+    # Wait and verify
+    await task_executor.scheduler.wait(job_id)
+    job_record = await task_executor.scheduler.get_record(job_id)
+    assert job_record is not None
+    assert job_record.status == "completed"
+
+    # Check result
+    assert job_record.artifact_id is not None
+    async with database.session() as session:
+        artifact_repo = ArtifactRepository(session)
+        artifact_mgr = ArtifactManager(artifact_repo)
+        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
+        assert artifact is not None
+        assert artifact.data["error"] is None
+        assert artifact.data["result"]["value"] == 42

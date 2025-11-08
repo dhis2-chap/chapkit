@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from .executor import TaskExecutor
 from .registry import TaskRegistry
@@ -43,14 +43,8 @@ class TaskRouter:
         executor_factory = self.executor_factory
 
         @self.router.get("", response_model=list[TaskInfo])
-        async def list_tasks(
-            tags: str | None = Query(None, description="Comma-separated tags to filter by (requires ALL tags)"),
-        ) -> list[TaskInfo]:
-            """List all registered tasks, optionally filtered by tags."""
-            if tags:
-                tag_list = [tag.strip() for tag in tags.split(",")]
-                matching_names = TaskRegistry.list_by_tags(tag_list)
-                return [TaskRegistry.get_info(name) for name in matching_names]
+        async def list_tasks() -> list[TaskInfo]:
+            """List all registered tasks."""
             return TaskRegistry.list_all_info()
 
         @self.router.get("/{name}", response_model=TaskInfo)

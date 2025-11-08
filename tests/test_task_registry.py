@@ -337,3 +337,33 @@ def test_url_safe_name_validation() -> None:
         @TaskRegistry.register("invalid.name")
         def invalid3() -> None:
             pass
+
+
+def test_register_function_url_safe_validation() -> None:
+    """Test URL-safe validation for imperative registration."""
+
+    def valid_func() -> None:
+        pass
+
+    # Valid name
+    TaskRegistry.register_function("valid-name", valid_func)
+    assert TaskRegistry.has("valid-name")
+
+    # Invalid name
+    with pytest.raises(ValueError, match="must be URL-safe"):
+        TaskRegistry.register_function("invalid name", valid_func)
+
+
+def test_get_info_with_varargs() -> None:
+    """Test get_info with *args and **kwargs parameters."""
+
+    @TaskRegistry.register("task_with_varargs", tags=["test"])
+    def task_with_varargs(a: int, *args, **kwargs) -> dict:
+        """Task with varargs."""
+        return {}
+
+    info = TaskRegistry.get_info("task_with_varargs")
+    assert info.name == "task_with_varargs"
+    # *args and **kwargs should be excluded from parameters
+    assert len(info.parameters) == 1
+    assert info.parameters[0].name == "a"

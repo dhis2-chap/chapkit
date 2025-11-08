@@ -58,49 +58,6 @@ def test_list_all_tasks() -> None:
     assert data[1]["tags"] == ["test"]
 
 
-def test_list_tasks_with_tag_filter() -> None:
-    """Test GET /tasks?tags=tag1,tag2 filters by tags."""
-
-    # Register test tasks
-    @TaskRegistry.register("task1", tags=["demo", "test"])
-    def task1() -> dict:
-        return {}
-
-    @TaskRegistry.register("task2", tags=["demo"])
-    def task2() -> dict:
-        return {}
-
-    @TaskRegistry.register("task3", tags=["demo", "test", "extra"])
-    def task3() -> dict:
-        return {}
-
-    # Create app with router
-    mock_executor = Mock(spec=TaskExecutor)
-
-    def executor_factory() -> TaskExecutor:
-        return mock_executor
-
-    app = FastAPI()
-    task_router = TaskRouter.create(
-        prefix="/api/v1/tasks",
-        tags=["Tasks"],
-        executor_factory=executor_factory,
-    )
-    app.include_router(task_router.router)
-
-    client = TestClient(app)
-
-    # Filter by tags (AND logic - requires ALL tags)
-    response = client.get("/api/v1/tasks?tags=demo,test")
-
-    assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 2
-    task_names = [task["name"] for task in data]
-    assert "task1" in task_names
-    assert "task3" in task_names
-    assert "task2" not in task_names
-
 
 def test_get_task_by_name() -> None:
     """Test GET /tasks/{name} returns task metadata."""
