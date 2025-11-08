@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -17,21 +18,21 @@ class TaskRouter:
     def __init__(
         self,
         prefix: str,
-        tags: list[str],
+        tags: Sequence[str],
         executor_factory: Any,
     ) -> None:
         """Initialize task router with executor factory."""
         self.prefix = prefix
         self.tags = tags
         self.executor_factory = executor_factory
-        self.router = APIRouter(prefix=prefix, tags=tags)
+        self.router = APIRouter(prefix=prefix, tags=list(tags))
         self._register_routes()
 
     @classmethod
     def create(
         cls,
         prefix: str,
-        tags: list[str],
+        tags: Sequence[str],
         executor_factory: Any,
     ) -> TaskRouter:
         """Create a task router with executor factory."""

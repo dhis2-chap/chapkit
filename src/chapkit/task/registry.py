@@ -3,10 +3,10 @@
 import inspect
 import re
 from collections.abc import Callable
-from typing import Any, TypedDict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
-    from .schemas import ParameterInfo, TaskInfo
+    from .schemas import TaskInfo
 
 
 class TaskMetadata(TypedDict):
@@ -30,9 +30,7 @@ class TaskRegistry:
         """Decorator to register a task function with optional tags."""
         # Validate URL-safe name
         if not re.match(r"^[a-zA-Z0-9_-]+$", name):
-            raise ValueError(
-                f"Task name '{name}' must be URL-safe (alphanumeric, underscore, hyphen only)"
-            )
+            raise ValueError(f"Task name '{name}' must be URL-safe (alphanumeric, underscore, hyphen only)")
 
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             if name in cls._registry:
@@ -55,9 +53,7 @@ class TaskRegistry:
         """Imperatively register a task function with optional tags."""
         # Validate URL-safe name
         if not re.match(r"^[a-zA-Z0-9_-]+$", name):
-            raise ValueError(
-                f"Task name '{name}' must be URL-safe (alphanumeric, underscore, hyphen only)"
-            )
+            raise ValueError(f"Task name '{name}' must be URL-safe (alphanumeric, underscore, hyphen only)")
 
         if name in cls._registry:
             raise ValueError(f"Task '{name}' already registered")
@@ -86,7 +82,7 @@ class TaskRegistry:
         return cls._registry[name]["tags"]
 
     @classmethod
-    def get_info(cls, name: str) -> TaskInfo:
+    def get_info(cls, name: str) -> "TaskInfo":
         """Get metadata for a registered task."""
         from .schemas import ParameterInfo, TaskInfo
 
@@ -102,12 +98,14 @@ class TaskRegistry:
         for param_name, param in sig.parameters.items():
             if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
                 continue
-            parameters.append(ParameterInfo(
-                name=param_name,
-                annotation=str(param.annotation) if param.annotation != param.empty else None,
-                default=str(param.default) if param.default != param.empty else None,
-                required=param.default == param.empty,
-            ))
+            parameters.append(
+                ParameterInfo(
+                    name=param_name,
+                    annotation=str(param.annotation) if param.annotation != param.empty else None,
+                    default=str(param.default) if param.default != param.empty else None,
+                    required=param.default == param.empty,
+                )
+            )
 
         return TaskInfo(
             name=name,
@@ -123,7 +121,7 @@ class TaskRegistry:
         return sorted(cls._registry.keys())
 
     @classmethod
-    def list_all_info(cls) -> list[TaskInfo]:
+    def list_all_info(cls) -> list["TaskInfo"]:
         """List metadata for all registered tasks."""
         return [cls.get_info(name) for name in cls.list_all()]
 
