@@ -79,7 +79,6 @@ app = (
 
 2. Task Discovery
    GET /api/v1/tasks
-   GET /api/v1/tasks?tags=tag1,tag2
    GET /api/v1/tasks/task_name
 
 3. Task Execution
@@ -142,7 +141,7 @@ math_tasks = TaskRegistry.list_by_tags(["math"])  # ["double_it"]
 
 ### Tags
 
-Tasks can be tagged for organization and filtering:
+Tasks can be tagged for organization:
 
 ```python
 @TaskRegistry.register("extract_data", tags=["data", "etl", "extract"])
@@ -224,9 +223,6 @@ class ParameterInfo(BaseModel):
 
 List all registered tasks with metadata.
 
-**Query Parameters:**
-- `tags` (optional): Comma-separated tags to filter by (requires ALL tags)
-
 **Response:**
 ```json
 [
@@ -247,13 +243,10 @@ List all registered tasks with metadata.
 ]
 ```
 
-**Examples:**
+**Example:**
 ```bash
 # List all tasks
 curl http://localhost:8000/api/v1/tasks
-
-# Filter by tags (AND operation)
-curl http://localhost:8000/api/v1/tasks?tags=demo,simple
 ```
 
 ### GET /api/v1/tasks/{name}
@@ -661,10 +654,6 @@ Use tags for effective task organization:
 # By priority
 @TaskRegistry.register("urgent_task", tags=["high-priority"])
 @TaskRegistry.register("batch_task", tags=["low-priority", "batch"])
-
-# Filter in API:
-# GET /api/v1/tasks?tags=etl,extract  # Only extract tasks
-# GET /api/v1/tasks?tags=prod         # All prod tasks
 ```
 
 ### Hot Reload During Development
