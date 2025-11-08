@@ -3,7 +3,10 @@
 import inspect
 import re
 from collections.abc import Callable
-from typing import Any, TypedDict
+from typing import Any, TypedDict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .schemas import ParameterInfo, TaskInfo
 
 
 class TaskMetadata(TypedDict):
@@ -83,8 +86,10 @@ class TaskRegistry:
         return cls._registry[name]["tags"]
 
     @classmethod
-    def get_info(cls, name: str) -> dict[str, Any]:
+    def get_info(cls, name: str) -> TaskInfo:
         """Get metadata for a registered task."""
+        from .schemas import ParameterInfo, TaskInfo
+
         if name not in cls._registry:
             raise KeyError(f"Task '{name}' not found in registry")
 
@@ -97,20 +102,20 @@ class TaskRegistry:
         for param_name, param in sig.parameters.items():
             if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
                 continue
-            parameters.append({
-                "name": param_name,
-                "annotation": str(param.annotation) if param.annotation != param.empty else None,
-                "default": str(param.default) if param.default != param.empty else None,
-                "required": param.default == param.empty,
-            })
+            parameters.append(ParameterInfo(
+                name=param_name,
+                annotation=str(param.annotation) if param.annotation != param.empty else None,
+                default=str(param.default) if param.default != param.empty else None,
+                required=param.default == param.empty,
+            ))
 
-        return {
-            "name": name,
-            "docstring": inspect.getdoc(func),
-            "signature": str(sig),
-            "parameters": parameters,
-            "tags": metadata["tags"],
-        }
+        return TaskInfo(
+            name=name,
+            docstring=inspect.getdoc(func),
+            signature=str(sig),
+            parameters=parameters,
+            tags=metadata["tags"],
+        )
 
     @classmethod
     def list_all(cls) -> list[str]:
@@ -118,7 +123,7 @@ class TaskRegistry:
         return sorted(cls._registry.keys())
 
     @classmethod
-    def list_all_info(cls) -> list[dict[str, Any]]:
+    def list_all_info(cls) -> list[TaskInfo]:
         """List metadata for all registered tasks."""
         return [cls.get_info(name) for name in cls.list_all()]
 
