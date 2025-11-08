@@ -58,7 +58,6 @@ def test_list_all_tasks() -> None:
     assert data[1]["tags"] == ["test"]
 
 
-
 def test_get_task_by_name() -> None:
     """Test GET /tasks/{name} returns task metadata."""
 

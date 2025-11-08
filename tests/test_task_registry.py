@@ -356,9 +356,10 @@ def test_register_function_url_safe_validation() -> None:
 
 def test_get_info_with_varargs() -> None:
     """Test get_info with *args and **kwargs parameters."""
+    from typing import Any
 
     @TaskRegistry.register("task_with_varargs", tags=["test"])
-    def task_with_varargs(a: int, *args, **kwargs) -> dict:
+    def task_with_varargs(a: int, *args: Any, **kwargs: Any) -> dict:
         """Task with varargs."""
         return {}
 

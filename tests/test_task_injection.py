@@ -304,7 +304,7 @@ async def test_task_without_type_annotations(database: Database, task_executor: 
     """Test task with parameters that have no type annotations."""
 
     @TaskRegistry.register("test_no_annotations")
-    async def task_no_annotations(value):  # No type annotation
+    async def task_no_annotations(value):  # pyright: ignore[reportMissingParameterType]
         """Task without type annotation."""
         return {"value": value}
 
