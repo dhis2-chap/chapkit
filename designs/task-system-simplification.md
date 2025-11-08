@@ -25,10 +25,26 @@ Current workflow is convoluted:
 
 TaskRegistry is single source of truth. No database layer for task definitions.
 
+## Tags Support
+
+Tasks can be tagged for organization and filtering:
+
+```python
+@TaskRegistry.register("process_data", tags=["data", "etl"])
+@TaskRegistry.register("clean_data", tags=["data", "preprocessing"])
+@TaskRegistry.register("send_email", tags=["notifications"])
+```
+
+**Filter by tags:**
+```
+GET /api/v1/tasks?tags=data
+GET /api/v1/tasks?tags=data,etl  (tasks with ALL specified tags)
+```
+
 ## API Changes
 
 **New endpoints:**
-- `GET /api/v1/tasks` - List all registered functions
+- `GET /api/v1/tasks` - List all registered functions (supports `?tags=` filter)
 - `GET /api/v1/tasks/{name}` - Get function metadata
 - `POST /api/v1/tasks/{name}/$execute` - Execute with runtime params
 
@@ -53,9 +69,9 @@ TaskRegistry is single source of truth. No database layer for task definitions.
 - `src/chapkit/task/executor.py`
 
 **Modify:**
-- `src/chapkit/task/registry.py` - Add `get_info()`, `list_all_info()`
-- `src/chapkit/task/router.py` - Replace CRUD with 3 endpoints
-- `src/chapkit/task/schemas.py` - Remove TaskIn/TaskOut, add TaskInfo
+- `src/chapkit/task/registry.py` - Add tags support, `get_info()`, `list_all_info()`, `list_by_tags()`
+- `src/chapkit/task/router.py` - Replace CRUD with 3 endpoints, add tag filtering
+- `src/chapkit/task/schemas.py` - Remove TaskIn/TaskOut, add TaskInfo with tags field
 - `src/chapkit/task/__init__.py` - Update exports
 - `src/chapkit/cli/templates/main_task.py.jinja2` - Remove seed functions
 - `examples/task_execution/main.py` - Remove seed functions
@@ -113,14 +129,10 @@ POST /api/v1/tasks/my_task/$execute {"params": {"param": "value"}}
    - Current: removed (unregister function instead)
    - Alternative: decorator flag `@TaskRegistry.register("task", enabled=False)`
 
-2. **Task metadata beyond docstrings?**
-   - Tags, categories, authors?
-   - Example: `@TaskRegistry.register("task", tags=["data"])`
-
-3. **Task discovery in multi-module apps?**
+2. **Task discovery in multi-module apps?**
    - Import all task modules explicitly
    - Or: auto-discover tasks in specific directory
 
-4. **Task name namespaces?**
+3. **Task name namespaces?**
    - Example: `user.create`, `user.delete`
    - Would allow grouping related tasks
