@@ -72,36 +72,36 @@ class MLManager(Generic[ConfigT]):
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""
         # Pre-allocate artifact ID for the trained model
-        training_artifact_id = ULID()
+        artifact_id = ULID()
 
         # Submit job to scheduler
         job_id = await self.scheduler.add_job(
             self._train_task,
             request,
-            training_artifact_id,
+            artifact_id,
         )
 
         return TrainResponse(
             job_id=str(job_id),
-            artifact_id=str(training_artifact_id),
+            artifact_id=str(artifact_id),
             message=f"Training job submitted. Job ID: {job_id}",
         )
 
     async def execute_predict(self, request: PredictRequest) -> PredictResponse:
         """Submit a prediction job to the scheduler and return job/artifact IDs."""
         # Pre-allocate artifact ID for predictions
-        prediction_artifact_id = ULID()
+        artifact_id = ULID()
 
         # Submit job to scheduler
         job_id = await self.scheduler.add_job(
             self._predict_task,
             request,
-            prediction_artifact_id,
+            artifact_id,
         )
 
         return PredictResponse(
             job_id=str(job_id),
-            artifact_id=str(prediction_artifact_id),
+            artifact_id=str(artifact_id),
             message=f"Prediction job submitted. Job ID: {job_id}",
         )
 
