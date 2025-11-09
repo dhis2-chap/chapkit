@@ -20,12 +20,18 @@ async def test_abstract_base_class_methods() -> None:
     scheduler = MinimalScheduler()
 
     # Test get_record raises NotImplementedError
-    with pytest.raises(NotImplementedError):
+    try:
         await scheduler.get_record(ULID())
+        assert False, "Should have raised NotImplementedError"
+    except NotImplementedError:
+        pass
 
     # Test list_records raises NotImplementedError
-    with pytest.raises(NotImplementedError):
+    try:
         await scheduler.list_records()
+        assert False, "Should have raised NotImplementedError"
+    except NotImplementedError:
+        pass
 
 
 async def test_add_job_with_sync_function() -> None:
