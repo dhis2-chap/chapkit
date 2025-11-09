@@ -6,7 +6,26 @@ import pytest
 from servicekit import JobStatus
 from ulid import ULID
 
-from chapkit.scheduler import InMemoryScheduler
+from chapkit.scheduler import ChapkitScheduler, InMemoryScheduler
+
+
+async def test_abstract_base_class_methods() -> None:
+    """Test ChapkitScheduler abstract methods raise NotImplementedError."""
+
+    class MinimalScheduler(ChapkitScheduler):
+        """Minimal scheduler that doesn't override abstract methods."""
+
+        pass
+
+    scheduler = MinimalScheduler()
+
+    # Test get_record raises NotImplementedError
+    with pytest.raises(NotImplementedError):
+        await scheduler.get_record(ULID())
+
+    # Test list_records raises NotImplementedError
+    with pytest.raises(NotImplementedError):
+        await scheduler.list_records()
 
 
 async def test_add_job_with_sync_function() -> None:
