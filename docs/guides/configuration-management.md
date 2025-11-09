@@ -482,7 +482,7 @@ app = (
     .with_config(WeatherModelConfig, enable_artifact_operations=True)
     .with_artifacts(hierarchy=ArtifactHierarchy(
         name="weather_models",
-        level_labels={0: "trained_model", 1: "predictions"}
+        level_labels={0: "ml_training", 1: "ml_prediction"}
     ))
     .build()
 )

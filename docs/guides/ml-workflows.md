@@ -36,7 +36,7 @@ app = (
     MLServiceBuilder(
         info=MLServiceInfo(display_name="My ML Service"),
         config_schema=ModelConfig,
-        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "model", 1: "predictions"}),
+        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training", 1: "ml_prediction"}),
         runner=runner,
     )
     .build()
@@ -297,7 +297,7 @@ info = MLServiceInfo(
 
 hierarchy = ArtifactHierarchy(
     name="ml_pipeline",
-    level_labels={0: "trained_model", 1: "predictions"},
+    level_labels={0: "ml_training", 1: "ml_prediction"},
 )
 
 app = (

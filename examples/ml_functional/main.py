@@ -87,7 +87,7 @@ info = MLServiceInfo(
 # Create artifact hierarchy for ML artifacts
 HIERARCHY = ArtifactHierarchy(
     name="ml_pipeline",
-    level_labels={0: "trained_model", 1: "predictions"},
+    level_labels={0: "ml_training", 1: "ml_prediction"},
 )
 
 # Create functional model runner
