@@ -120,7 +120,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
 
     # Make predictions
     predict_request = {
-        "model_artifact_id": model_artifact_id,
+        "training_artifact_id": model_artifact_id,
         "historic": {
             "columns": ["rainfall", "mean_temperature", "humidity"],
             "data": [],
@@ -153,7 +153,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
 
     # Check predictions data
     data = artifact["data"]
-    assert data["ml_type"] == "prediction"
+    assert data["ml_type"] == "ml_prediction"
     assert "predictions" in data
     predictions = data["predictions"]
     assert "sample_0" in predictions["columns"]
@@ -212,7 +212,7 @@ def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
 
     for i in range(3):
         predict_request = {
-            "model_artifact_id": model_artifact_id,
+            "training_artifact_id": model_artifact_id,
             "historic": {"columns": ["rainfall", "mean_temperature", "humidity"], "data": []},
             "future": {"columns": ["rainfall", "mean_temperature", "humidity"], "data": [[10 + i, 25 + i, 60 + i]]},
         }

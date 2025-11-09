@@ -120,7 +120,7 @@ def test_train_and_predict_with_preprocessing(client: TestClient) -> None:
 
     # Make predictions
     predict_request = {
-        "model_artifact_id": model_artifact_id,
+        "training_artifact_id": model_artifact_id,
         "historic": {
             "columns": ["rainfall", "mean_temperature", "humidity"],
             "data": [],

@@ -348,7 +348,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"model_artifact_id\": \"{{model_artifact_id}}\",\n  \"historic\": {\n    \"columns\": [\n      \"rainfall\",\n      \"mean_temperature\",\n      \"humidity\"\n    ],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\n      \"rainfall\",\n      \"mean_temperature\",\n      \"humidity\"\n    ],\n    \"data\": [\n      [\n        110.0,\n        26.0,\n        81.0\n      ],\n      [\n        90.0,\n        28.0,\n        79.0\n      ],\n      [\n        125.0,\n        24.0,\n        82.5\n      ]\n    ]\n  }\n}"
+                            "raw": "{\n  \"training_artifact_id\": \"{{model_artifact_id}}\",\n  \"historic\": {\n    \"columns\": [\n      \"rainfall\",\n      \"mean_temperature\",\n      \"humidity\"\n    ],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\n      \"rainfall\",\n      \"mean_temperature\",\n      \"humidity\"\n    ],\n    \"data\": [\n      [\n        110.0,\n        26.0,\n        81.0\n      ],\n      [\n        90.0,\n        28.0,\n        79.0\n      ],\n      [\n        125.0,\n        24.0,\n        82.5\n      ]\n    ]\n  }\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/v1/ml/$predict",

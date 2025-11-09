@@ -126,7 +126,7 @@ async def test_training_timing_metadata_captured(
         artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
-    assert artifact.data["ml_type"] == "trained_model"
+    assert artifact.data["ml_type"] == "ml_training"
 
     # Verify timing metadata exists
     assert "started_at" in artifact.data
@@ -171,7 +171,7 @@ async def test_prediction_timing_metadata_captured(
 
     # Submit prediction job
     predict_request = PredictRequest(
-        model_artifact_id=ULID.from_str(train_response.artifact_id),
+        training_artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -187,7 +187,7 @@ async def test_prediction_timing_metadata_captured(
         artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.artifact_id))
 
     assert artifact is not None
-    assert artifact.data["ml_type"] == "prediction"
+    assert artifact.data["ml_type"] == "ml_prediction"
 
     # Verify timing metadata exists
     assert "started_at" in artifact.data
@@ -296,13 +296,13 @@ async def test_original_metadata_preserved(
 
     # Original fields should still exist
     assert train_artifact is not None
-    assert train_artifact.data["ml_type"] == "trained_model"
+    assert train_artifact.data["ml_type"] == "ml_training"
     assert train_artifact.data["config_id"] == str(config_id)
     assert "model" in train_artifact.data
 
     # Predict
     predict_request = PredictRequest(
-        model_artifact_id=ULID.from_str(train_response.artifact_id),
+        training_artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -317,8 +317,8 @@ async def test_original_metadata_preserved(
 
     # Original fields should still exist
     assert predict_artifact is not None
-    assert predict_artifact.data["ml_type"] == "prediction"
-    assert predict_artifact.data["model_artifact_id"] == str(train_response.artifact_id)
+    assert predict_artifact.data["ml_type"] == "ml_prediction"
+    assert predict_artifact.data["training_artifact_id"] == str(train_response.artifact_id)
     assert predict_artifact.data["config_id"] == str(config_id)
     assert "predictions" in predict_artifact.data
 
@@ -386,7 +386,7 @@ async def test_model_metrics_are_optional_fields(
 
     # Create artifact data with None values for optional fields
     artifact_data = TrainedModelArtifactData(
-        ml_type="trained_model",
+        ml_type="ml_training",
         config_id="01K72P5N5KCRM6MD3BRE4P0001",
         model={"test": "model"},
         started_at="2025-01-01T00:00:00+00:00",
@@ -402,7 +402,7 @@ async def test_model_metrics_are_optional_fields(
 
     # Verify schema can omit these fields entirely
     artifact_data_minimal = TrainedModelArtifactData(
-        ml_type="trained_model",
+        ml_type="ml_training",
         config_id="01K72P5N5KCRM6MD3BRE4P0001",
         model={"test": "model"},
         started_at="2025-01-01T00:00:00+00:00",

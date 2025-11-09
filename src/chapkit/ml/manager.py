@@ -138,7 +138,7 @@ class MLManager(Generic[ConfigT]):
 
             # Create and validate artifact data with Pydantic
             artifact_data_model = TrainedModelArtifactData(
-                ml_type="trained_model",
+                ml_type="ml_training",
                 config_id=str(request.config_id),
                 model=trained_model,
                 started_at=training_started_at.isoformat(),
@@ -169,15 +169,15 @@ class MLManager(Generic[ConfigT]):
         async with self.database.session() as session:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
-            model_artifact = await artifact_manager.find_by_id(request.model_artifact_id)
+            model_artifact = await artifact_manager.find_by_id(request.training_artifact_id)
 
             if model_artifact is None:
-                raise ValueError(f"Model artifact {request.model_artifact_id} not found")
+                raise ValueError(f"Model artifact {request.training_artifact_id} not found")
 
         # Extract model and config_id from artifact
         model_data = model_artifact.data
-        if not isinstance(model_data, dict) or model_data.get("ml_type") != "trained_model":
-            raise ValueError(f"Artifact {request.model_artifact_id} is not a trained model")
+        if not isinstance(model_data, dict) or model_data.get("ml_type") != "ml_training":
+            raise ValueError(f"Artifact {request.training_artifact_id} is not a trained model")
 
         trained_model = model_data["model"]
         config_id = ULID.from_str(model_data["config_id"])
@@ -210,8 +210,8 @@ class MLManager(Generic[ConfigT]):
 
             # Create and validate artifact data with Pydantic
             artifact_data_model = PredictionArtifactData(
-                ml_type="prediction",
-                model_artifact_id=str(request.model_artifact_id),
+                ml_type="ml_prediction",
+                training_artifact_id=str(request.training_artifact_id),
                 config_id=str(config_id),
                 predictions=predictions,
                 started_at=prediction_started_at.isoformat(),
@@ -223,7 +223,7 @@ class MLManager(Generic[ConfigT]):
                 ArtifactIn(
                     id=prediction_artifact_id,
                     data=artifact_data_model.model_dump(),
-                    parent_id=request.model_artifact_id,
+                    parent_id=request.training_artifact_id,
                     level=1,
                 )
             )
