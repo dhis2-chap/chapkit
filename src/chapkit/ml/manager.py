@@ -105,7 +105,7 @@ class MLManager(Generic[ConfigT]):
             message=f"Prediction job submitted. Job ID: {job_id}",
         )
 
-    async def _train_task(self, request: TrainRequest, training_artifact_id: ULID) -> ULID:
+    async def _train_task(self, request: TrainRequest, artifact_id: ULID) -> ULID:
         """Execute training task and store trained model in artifact."""
         # Load config
         async with self.database.session() as session:
@@ -150,7 +150,7 @@ class MLManager(Generic[ConfigT]):
 
             await artifact_manager.save(
                 ArtifactIn(
-                    id=training_artifact_id,
+                    id=artifact_id,
                     data=artifact_data_model.model_dump(),
                     parent_id=None,
                     level=0,
@@ -158,12 +158,12 @@ class MLManager(Generic[ConfigT]):
             )
 
             # Link config to root artifact for tree traversal
-            await config_repo.link_artifact(request.config_id, training_artifact_id)
+            await config_repo.link_artifact(request.config_id, artifact_id)
             await config_repo.commit()
 
-        return training_artifact_id
+        return artifact_id
 
-    async def _predict_task(self, request: PredictRequest, prediction_artifact_id: ULID) -> ULID:
+    async def _predict_task(self, request: PredictRequest, artifact_id: ULID) -> ULID:
         """Execute prediction task and store predictions in artifact."""
         # Load training artifact
         async with self.database.session() as session:
@@ -221,11 +221,11 @@ class MLManager(Generic[ConfigT]):
 
             await artifact_manager.save(
                 ArtifactIn(
-                    id=prediction_artifact_id,
+                    id=artifact_id,
                     data=artifact_data_model.model_dump(),
                     parent_id=request.training_artifact_id,
                     level=1,
                 )
             )
 
-        return prediction_artifact_id
+        return artifact_id
