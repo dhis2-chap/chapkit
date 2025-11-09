@@ -76,6 +76,32 @@ def get_task_executor(database: Database = Depends(get_database)) -> TaskExecuto
     return TaskExecutor(database)
 
 
+# Advanced: For tasks that need job scheduling or artifact storage, uncomment below:
+# from servicekit.api.dependencies import get_scheduler
+# from chapkit.artifact import ArtifactHierarchy, ArtifactManager, ArtifactRepository
+# from chapkit.scheduler import ChapkitJobScheduler
+#
+# TASK_HIERARCHY = ArtifactHierarchy(
+#     name="task_results",
+#     level_labels={0: "task_run"},
+# )
+#
+# async def get_task_executor_advanced(
+#     database: Database = Depends(get_database),
+#     scheduler = Depends(get_scheduler),
+# ) -> TaskExecutor:
+#     """Provide task executor with scheduler and artifact manager."""
+#     async with database.session() as session:
+#         artifact_repo = ArtifactRepository(session)
+#         artifact_manager = ArtifactManager(artifact_repo, hierarchy=TASK_HIERARCHY)
+#         if isinstance(scheduler, ChapkitJobScheduler):
+#             return TaskExecutor(database, scheduler, artifact_manager)
+#         return TaskExecutor(database)
+#
+# Then replace get_task_executor with get_task_executor_advanced in TaskRouter.create()
+# And add .with_jobs(max_concurrency=5) and .with_artifacts(hierarchy=TASK_HIERARCHY) to ServiceBuilder
+
+
 # Create task router
 task_router = TaskRouter.create(
     prefix="/api/v1/tasks",

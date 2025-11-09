@@ -10,21 +10,33 @@ from typing import Any, Union, get_origin, get_type_hints
 from servicekit import Database
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from chapkit.artifact import ArtifactManager
+from chapkit.scheduler import ChapkitJobScheduler
+
 from .registry import TaskRegistry
 
 # Framework-provided types that can be injected into task functions
 INJECTABLE_TYPES = {
     AsyncSession,
     Database,
+    ChapkitJobScheduler,
+    ArtifactManager,
 }
 
 
 class TaskExecutor:
     """Executes registered task functions with dependency injection."""
 
-    def __init__(self, database: Database) -> None:
+    def __init__(
+        self,
+        database: Database,
+        scheduler: ChapkitJobScheduler | None = None,
+        artifact_manager: ArtifactManager | None = None,
+    ) -> None:
         """Initialize task executor with framework dependencies."""
         self.database = database
+        self.scheduler = scheduler
+        self.artifact_manager = artifact_manager
 
     async def execute(self, name: str, params: dict[str, Any] | None = None) -> Any:
         """Execute registered function by name with runtime parameters and return result."""
@@ -65,10 +77,16 @@ class TaskExecutor:
 
     def _build_injection_map(self, session: AsyncSession | None) -> dict[type, Any]:
         """Build map of injectable types to their instances."""
-        return {
+        injection_map: dict[type, Any] = {
             AsyncSession: session,
             Database: self.database,
         }
+        # Add optional dependencies if available
+        if self.scheduler is not None:
+            injection_map[ChapkitJobScheduler] = self.scheduler
+        if self.artifact_manager is not None:
+            injection_map[ArtifactManager] = self.artifact_manager
+        return injection_map
 
     def _inject_parameters(
         self,
