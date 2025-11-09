@@ -563,7 +563,7 @@ async def test_predict_with_wrong_artifact_type_raises_error(ml_manager: MLManag
     """Test that predicting with a non-training artifact raises ValueError."""
     from chapkit.artifact import ArtifactIn
 
-    config_id, train_df, predict_df = setup_data
+    _, _, predict_df = setup_data
 
     # Create an artifact with wrong ml_type (not a training artifact)
     wrong_artifact_id = ULID()
