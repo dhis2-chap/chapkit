@@ -123,7 +123,7 @@ async def test_training_timing_metadata_captured(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     assert artifact.data["ml_type"] == "trained_model"
@@ -171,7 +171,7 @@ async def test_prediction_timing_metadata_captured(
 
     # Submit prediction job
     predict_request = PredictRequest(
-        model_artifact_id=ULID.from_str(train_response.model_artifact_id),
+        model_artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -184,7 +184,7 @@ async def test_prediction_timing_metadata_captured(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.prediction_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.artifact_id))
 
     assert artifact is not None
     assert artifact.data["ml_type"] == "prediction"
@@ -230,7 +230,7 @@ async def test_timing_metadata_iso_format(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     # Verify ISO format can be parsed
@@ -262,7 +262,7 @@ async def test_timing_duration_rounded_to_two_decimals(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     duration = artifact.data["duration_seconds"]
@@ -292,7 +292,7 @@ async def test_original_metadata_preserved(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        train_artifact = await artifact_manager.find_by_id(ULID.from_str(train_response.model_artifact_id))
+        train_artifact = await artifact_manager.find_by_id(ULID.from_str(train_response.artifact_id))
 
     # Original fields should still exist
     assert train_artifact is not None
@@ -302,7 +302,7 @@ async def test_original_metadata_preserved(
 
     # Predict
     predict_request = PredictRequest(
-        model_artifact_id=ULID.from_str(train_response.model_artifact_id),
+        model_artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -313,12 +313,12 @@ async def test_original_metadata_preserved(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        predict_artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.prediction_artifact_id))
+        predict_artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.artifact_id))
 
     # Original fields should still exist
     assert predict_artifact is not None
     assert predict_artifact.data["ml_type"] == "prediction"
-    assert predict_artifact.data["model_artifact_id"] == str(train_response.model_artifact_id)
+    assert predict_artifact.data["model_artifact_id"] == str(train_response.artifact_id)
     assert predict_artifact.data["config_id"] == str(config_id)
     assert "predictions" in predict_artifact.data
 
@@ -339,7 +339,7 @@ async def test_model_type_captured_in_training_artifact(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     assert "model_type" in artifact.data
@@ -367,7 +367,7 @@ async def test_model_size_bytes_captured_in_training_artifact(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     assert "model_size_bytes" in artifact.data
@@ -447,7 +447,7 @@ async def test_model_type_extracts_from_dict_wrapped_models(
     async with manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     assert "model_type" in artifact.data
@@ -500,8 +500,8 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     async with database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact1 = await artifact_manager.find_by_id(ULID.from_str(response1.model_artifact_id))
-        artifact2 = await artifact_manager.find_by_id(ULID.from_str(response2.model_artifact_id))
+        artifact1 = await artifact_manager.find_by_id(ULID.from_str(response1.artifact_id))
+        artifact2 = await artifact_manager.find_by_id(ULID.from_str(response2.artifact_id))
 
     assert artifact1 is not None
     assert artifact2 is not None
@@ -534,7 +534,7 @@ async def test_model_metrics_present_alongside_timing_metadata(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     data = artifact.data

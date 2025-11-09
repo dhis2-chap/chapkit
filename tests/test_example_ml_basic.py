@@ -108,11 +108,11 @@ def test_train_model(client: TestClient) -> None:
     train_response = response.json()
 
     assert "job_id" in train_response
-    assert "model_artifact_id" in train_response
+    assert "artifact_id" in train_response
     assert "Training job submitted" in train_response["message"]
 
     job_id = train_response["job_id"]
-    model_artifact_id = train_response["model_artifact_id"]
+    model_artifact_id = train_response["artifact_id"]
 
     # Wait for job completion
     job = wait_for_job_completion(client, job_id)
@@ -170,7 +170,7 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
     train_response = client.post("/api/v1/ml/$train", json=train_request)
     train_data = train_response.json()
     train_job_id = train_data["job_id"]
-    model_artifact_id = train_data["model_artifact_id"]
+    model_artifact_id = train_data["artifact_id"]
 
     # Wait for training to complete
     train_job = wait_for_job_completion(client, train_job_id)
@@ -198,8 +198,8 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
     predict_data = predict_response.json()
 
     assert "job_id" in predict_data
-    assert "prediction_artifact_id" in predict_data
-    prediction_artifact_id = predict_data["prediction_artifact_id"]
+    assert "artifact_id" in predict_data
+    prediction_artifact_id = predict_data["artifact_id"]
 
     # Wait for prediction to complete
     predict_job = wait_for_job_completion(client, predict_data["job_id"])
@@ -336,7 +336,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
     }
 
     train_response = client.post("/api/v1/ml/$train", json=train_request)
-    model_artifact_id = train_response.json()["model_artifact_id"]
+    model_artifact_id = train_response.json()["artifact_id"]
     train_job = wait_for_job_completion(client, train_response.json()["job_id"])
     assert train_job["status"] == "completed"
 
@@ -357,7 +357,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
         predict_job = wait_for_job_completion(client, predict_data["job_id"])
         assert predict_job["status"] == "completed"
 
-        prediction_artifact_ids.append(predict_data["prediction_artifact_id"])
+        prediction_artifact_ids.append(predict_data["artifact_id"])
 
     # Verify all prediction artifacts exist and link to the same model
     assert len(set(prediction_artifact_ids)) == 3  # All unique
@@ -387,7 +387,7 @@ def test_artifact_hierarchy_levels(client: TestClient) -> None:
     }
 
     train_response = client.post("/api/v1/ml/$train", json=train_request)
-    model_artifact_id = train_response.json()["model_artifact_id"]
+    model_artifact_id = train_response.json()["artifact_id"]
     wait_for_job_completion(client, train_response.json()["job_id"])
 
     # Get model artifact and check level
@@ -403,7 +403,7 @@ def test_artifact_hierarchy_levels(client: TestClient) -> None:
     }
 
     predict_response = client.post("/api/v1/ml/$predict", json=predict_request)
-    prediction_artifact_id = predict_response.json()["prediction_artifact_id"]
+    prediction_artifact_id = predict_response.json()["artifact_id"]
     wait_for_job_completion(client, predict_response.json()["job_id"])
 
     # Get prediction artifact and check level

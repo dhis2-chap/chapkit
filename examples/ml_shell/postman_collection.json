@@ -225,7 +225,7 @@
                                     "if (pm.response.code === 200 || pm.response.code === 202) {",
                                     "    const response = pm.response.json();",
                                     "    pm.collectionVariables.set('train_job_id', response.job_id);",
-                                    "    pm.collectionVariables.set('model_artifact_id', response.model_artifact_id);",
+                                    "    pm.collectionVariables.set('model_artifact_id', response.artifact_id);",
                                     "}"
                                 ],
                                 "type": "text/javascript"
@@ -331,7 +331,7 @@
                                     "if (pm.response.code === 200 || pm.response.code === 202) {",
                                     "    const response = pm.response.json();",
                                     "    pm.collectionVariables.set('predict_job_id', response.job_id);",
-                                    "    pm.collectionVariables.set('prediction_artifact_id', response.prediction_artifact_id);",
+                                    "    pm.collectionVariables.set('prediction_artifact_id', response.artifact_id);",
                                     "}"
                                 ],
                                 "type": "text/javascript"

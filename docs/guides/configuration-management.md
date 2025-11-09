@@ -517,7 +517,7 @@ TRAIN_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train \
     "data": {...}
   }')
 
-MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.model_artifact_id')
+MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.artifact_id')
 ```
 
 ### 5. Link Model to Config

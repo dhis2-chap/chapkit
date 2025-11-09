@@ -383,7 +383,7 @@ Train a model asynchronously.
 ```json
 {
   "job_id": "01JOB123...",
-  "model_artifact_id": "01MODEL456...",
+  "artifact_id": "01MODEL456...",
   "message": "Training job submitted. Job ID: 01JOB123..."
 }
 ```
@@ -434,7 +434,7 @@ Make predictions using a trained model.
 ```json
 {
   "job_id": "01JOB789...",
-  "prediction_artifact_id": "01PRED012...",
+  "artifact_id": "01PRED012...",
   "message": "Prediction job submitted. Job ID: 01JOB789..."
 }
 ```
@@ -616,7 +616,7 @@ TRAIN_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train \
   }')
 
 JOB_ID=$(echo $TRAIN_RESPONSE | jq -r '.job_id')
-MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.model_artifact_id')
+MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.artifact_id')
 
 echo "Training Job ID: $JOB_ID"
 echo "Model Artifact ID: $MODEL_ARTIFACT_ID"
@@ -647,7 +647,7 @@ PREDICT_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict \
   }')
 
 PRED_JOB_ID=$(echo $PREDICT_RESPONSE | jq -r '.job_id')
-PRED_ARTIFACT_ID=$(echo $PREDICT_RESPONSE | jq -r '.prediction_artifact_id')
+PRED_ARTIFACT_ID=$(echo $PREDICT_RESPONSE | jq -r '.artifact_id')
 
 # 7. Wait for predictions
 curl -N http://localhost:8000/api/v1/jobs/$PRED_JOB_ID/\$stream
@@ -777,7 +777,7 @@ TRAIN=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train -d '{
   "data":{"columns":["a","b","y"],"data":[[1,2,10],[2,3,15],[3,4,20]]}
 }')
 
-MODEL_ID=$(echo $TRAIN | jq -r '.model_artifact_id')
+MODEL_ID=$(echo $TRAIN | jq -r '.artifact_id')
 JOB_ID=$(echo $TRAIN | jq -r '.job_id')
 
 # Wait for completion
@@ -791,7 +791,7 @@ PRED=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict -d '{
   "future":{"columns":["a","b"],"data":[[1.5,2.5],[2.5,3.5]]}
 }')
 
-PRED_ID=$(echo $PRED | jq -r '.prediction_artifact_id')
+PRED_ID=$(echo $PRED | jq -r '.artifact_id')
 sleep 2
 
 # View results
@@ -836,7 +836,7 @@ def test_train_predict_workflow(client: TestClient):
 
     train_data = train_resp.json()
     job_id = train_data["job_id"]
-    model_id = train_data["model_artifact_id"]
+    model_id = train_data["artifact_id"]
 
     # Wait for training
     job = wait_for_job(client, job_id)
@@ -863,7 +863,7 @@ def test_train_predict_workflow(client: TestClient):
 
     pred_data = pred_resp.json()
     pred_job_id = pred_data["job_id"]
-    pred_id = pred_data["prediction_artifact_id"]
+    pred_id = pred_data["artifact_id"]
 
     # Wait for prediction
     pred_job = wait_for_job(client, pred_job_id)

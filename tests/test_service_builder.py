@@ -99,8 +99,6 @@ def test_valid_ml_service_builds_successfully() -> None:
 
 async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
     """Test that ML operations require ChapkitScheduler, not just any scheduler."""
-    from unittest.mock import Mock
-
     from servicekit import AIOJobScheduler
     from servicekit.api.dependencies import set_scheduler
 
@@ -114,9 +112,8 @@ async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
     # Get the ML manager dependency function
     ml_dependency = builder._build_ml_dependency()
 
-    # Override the scheduler with a non-ChapkitScheduler
-    wrong_scheduler = Mock(spec=AIOJobScheduler)
-    wrong_scheduler.__class__ = AIOJobScheduler
+    # Override the scheduler with a non-ChapkitScheduler (use plain AIOJobScheduler)
+    wrong_scheduler = AIOJobScheduler()
     set_scheduler(wrong_scheduler)
 
     # Try to get ML manager - should fail because scheduler is wrong type

@@ -83,7 +83,7 @@ class MLManager(Generic[ConfigT]):
 
         return TrainResponse(
             job_id=str(job_id),
-            model_artifact_id=str(model_artifact_id),
+            artifact_id=str(model_artifact_id),
             message=f"Training job submitted. Job ID: {job_id}",
         )
 
@@ -101,7 +101,7 @@ class MLManager(Generic[ConfigT]):
 
         return PredictResponse(
             job_id=str(job_id),
-            prediction_artifact_id=str(prediction_artifact_id),
+            artifact_id=str(prediction_artifact_id),
             message=f"Prediction job submitted. Job ID: {job_id}",
         )
 

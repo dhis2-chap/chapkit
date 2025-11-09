@@ -26,7 +26,7 @@ class TrainResponse(BaseModel):
     """Response schema for train operation submission."""
 
     job_id: str = Field(description="ID of the training job in the scheduler")
-    model_artifact_id: str = Field(description="ID that will contain the trained model artifact")
+    artifact_id: str = Field(description="ID that will contain the trained model artifact")
     message: str = Field(description="Human-readable message")
 
 
@@ -43,7 +43,7 @@ class PredictResponse(BaseModel):
     """Response schema for predict operation submission."""
 
     job_id: str = Field(description="ID of the prediction job in the scheduler")
-    prediction_artifact_id: str = Field(description="ID that will contain the prediction artifact")
+    artifact_id: str = Field(description="ID that will contain the prediction artifact")
     message: str = Field(description="Human-readable message")
 
 

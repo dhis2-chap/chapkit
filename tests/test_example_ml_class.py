@@ -72,7 +72,7 @@ def test_train_with_class_runner(client: TestClient) -> None:
     train_data = response.json()
 
     job_id = train_data["job_id"]
-    model_artifact_id = train_data["model_artifact_id"]
+    model_artifact_id = train_data["artifact_id"]
 
     # Wait for training
     job = wait_for_job_completion(client, job_id)
@@ -112,7 +112,7 @@ def test_train_and_predict_with_preprocessing(client: TestClient) -> None:
 
     train_response = client.post("/api/v1/ml/$train", json=train_request)
     train_data = train_response.json()
-    model_artifact_id = train_data["model_artifact_id"]
+    model_artifact_id = train_data["artifact_id"]
 
     # Wait for training
     train_job = wait_for_job_completion(client, train_data["job_id"])
@@ -143,7 +143,7 @@ def test_train_and_predict_with_preprocessing(client: TestClient) -> None:
     assert predict_job["status"] == "completed"
 
     # Verify prediction artifact
-    prediction_artifact_id = predict_data["prediction_artifact_id"]
+    prediction_artifact_id = predict_data["artifact_id"]
     artifact_response = client.get(f"/api/v1/artifacts/{prediction_artifact_id}")
     assert artifact_response.status_code == 200
     artifact = artifact_response.json()
@@ -245,7 +245,7 @@ def test_multiple_models_from_same_config(client: TestClient) -> None:
         job = wait_for_job_completion(client, train_data["job_id"])
         assert job["status"] == "completed"
 
-        model_artifact_ids.append(train_data["model_artifact_id"])
+        model_artifact_ids.append(train_data["artifact_id"])
 
     # Verify all models are unique
     assert len(set(model_artifact_ids)) == 2

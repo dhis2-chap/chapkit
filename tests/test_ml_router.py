@@ -130,7 +130,7 @@ def test_train_successful_submission() -> None:
 
     response_obj = TrainResponse(
         job_id=job_id,
-        model_artifact_id=model_artifact_id,
+        artifact_id=model_artifact_id,
         message=f"Training job submitted. Job ID: {job_id}",
     )
     mock_manager.execute_train = AsyncMock(return_value=response_obj)
@@ -158,7 +158,7 @@ def test_train_successful_submission() -> None:
     assert response.status_code == 202
     data = response.json()
     assert data["job_id"] == job_id
-    assert data["model_artifact_id"] == model_artifact_id
+    assert data["artifact_id"] == model_artifact_id
     assert "Training job submitted" in data["message"]
 
 
@@ -172,7 +172,7 @@ def test_predict_successful_submission() -> None:
 
     response_obj = PredictResponse(
         job_id=job_id,
-        prediction_artifact_id=prediction_artifact_id,
+        artifact_id=prediction_artifact_id,
         message=f"Prediction job submitted. Job ID: {job_id}",
     )
     mock_manager.execute_predict = AsyncMock(return_value=response_obj)
@@ -201,7 +201,7 @@ def test_predict_successful_submission() -> None:
     assert response.status_code == 202
     data = response.json()
     assert data["job_id"] == job_id
-    assert data["prediction_artifact_id"] == prediction_artifact_id
+    assert data["artifact_id"] == prediction_artifact_id
     assert "Prediction job submitted" in data["message"]
 
 
