@@ -435,9 +435,6 @@ fastapi dev main.py
 # List all tasks
 curl http://localhost:8000/api/v1/tasks | jq
 
-# Filter tasks by tags
-curl 'http://localhost:8000/api/v1/tasks?tags=demo,simple' | jq
-
 # Get task metadata
 curl http://localhost:8000/api/v1/tasks/greet_user | jq
 
@@ -453,7 +450,7 @@ echo "Job ID: $JOB_ID"
 curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq
 
 # Wait for completion and get artifact ID
-ARTIFACT_ID=$(curl -s http://localhost:8000/api/v1/jobs/$JOB_ID | jq -r '.result')
+ARTIFACT_ID=$(curl -s http://localhost:8000/api/v1/jobs/$JOB_ID | jq -r '.artifact_id')
 echo "Artifact ID: $ARTIFACT_ID"
 
 # Get task results from artifact
@@ -499,7 +496,7 @@ Task execution results are automatically stored in artifacts:
 }
 ```
 
-The artifact ID is returned as the job result field.
+The artifact ID is stored in the job's `artifact_id` field.
 
 ---
 
