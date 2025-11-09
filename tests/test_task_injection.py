@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 from servicekit import Database, SqliteDatabaseBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from chapkit.artifact import ArtifactManager
+from chapkit.scheduler import ChapkitJobScheduler
 from chapkit.task import TaskExecutor
 from chapkit.task.registry import TaskRegistry
 
@@ -149,3 +152,113 @@ async def test_task_without_type_annotations(database: Database, task_executor: 
     # Execute with user parameter
     result = await task_executor.execute("test_no_annotations", {"value": "test"})
     assert result["value"] == "test"
+
+
+@pytest.mark.asyncio
+async def test_inject_scheduler(database: Database) -> None:
+    """Test ChapkitJobScheduler injection into Python task."""
+    mock_scheduler = Mock(spec=ChapkitJobScheduler)
+    executor = TaskExecutor(database, scheduler=mock_scheduler)
+
+    @TaskRegistry.register("test_scheduler_injection")
+    async def task_with_scheduler(scheduler: ChapkitJobScheduler) -> dict[str, Any]:
+        """Task that uses injected scheduler."""
+        assert scheduler is not None
+        assert scheduler is mock_scheduler
+        return {"scheduler_injected": True}
+
+    # Execute and get result directly
+    result = await executor.execute("test_scheduler_injection", {})
+    assert result["scheduler_injected"] is True
+
+
+@pytest.mark.asyncio
+async def test_inject_artifact_manager(database: Database) -> None:
+    """Test ArtifactManager injection into Python task."""
+    mock_artifact_manager = Mock(spec=ArtifactManager)
+    executor = TaskExecutor(database, artifact_manager=mock_artifact_manager)
+
+    @TaskRegistry.register("test_artifact_manager_injection")
+    async def task_with_artifact_manager(artifact_manager: ArtifactManager) -> dict[str, Any]:
+        """Task that uses injected artifact manager."""
+        assert artifact_manager is not None
+        assert artifact_manager is mock_artifact_manager
+        return {"artifact_manager_injected": True}
+
+    # Execute and get result directly
+    result = await executor.execute("test_artifact_manager_injection", {})
+    assert result["artifact_manager_injected"] is True
+
+
+@pytest.mark.asyncio
+async def test_inject_all_optional_dependencies(database: Database) -> None:
+    """Test injection with all optional dependencies."""
+    mock_scheduler = Mock(spec=ChapkitJobScheduler)
+    mock_artifact_manager = Mock(spec=ArtifactManager)
+    executor = TaskExecutor(database, scheduler=mock_scheduler, artifact_manager=mock_artifact_manager)
+
+    @TaskRegistry.register("test_all_dependencies")
+    async def task_with_all(
+        scheduler: ChapkitJobScheduler,
+        artifact_manager: ArtifactManager,
+        database: Database,
+    ) -> dict[str, Any]:
+        """Task that uses all injectable dependencies."""
+        assert scheduler is mock_scheduler
+        assert artifact_manager is mock_artifact_manager
+        assert database is not None
+        return {"all_injected": True}
+
+    # Execute and get result directly
+    result = await executor.execute("test_all_dependencies", {})
+    assert result["all_injected"] is True
+
+
+@pytest.mark.asyncio
+async def test_optional_scheduler_not_provided(database: Database, task_executor: TaskExecutor) -> None:
+    """Test optional scheduler injection when not provided."""
+
+    @TaskRegistry.register("test_optional_scheduler")
+    async def task_with_optional_scheduler(
+        scheduler: ChapkitJobScheduler | None = None,
+    ) -> dict[str, Any]:
+        """Task with optional scheduler parameter."""
+        return {"scheduler_provided": scheduler is not None}
+
+    # Execute without scheduler - should default to None
+    result = await task_executor.execute("test_optional_scheduler", {})
+    assert result["scheduler_provided"] is False
+
+
+@pytest.mark.asyncio
+async def test_varargs_parameters(database: Database, task_executor: TaskExecutor) -> None:
+    """Test that *args and **kwargs parameters are skipped."""
+
+    @TaskRegistry.register("test_varargs")
+    async def task_with_varargs(name: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Task with *args and **kwargs."""
+        return {"name": name, "args": args, "kwargs": kwargs}
+
+    # Execute with parameters
+    result = await task_executor.execute("test_varargs", {"name": "test"})
+    assert result["name"] == "test"
+    assert result["args"] == ()
+    assert result["kwargs"] == {}
+
+
+@pytest.mark.asyncio
+async def test_user_parameter_with_default(database: Database, task_executor: TaskExecutor) -> None:
+    """Test user parameter with default value."""
+
+    @TaskRegistry.register("test_default_param")
+    async def task_with_default(name: str = "default_name") -> dict[str, str]:
+        """Task with default parameter value."""
+        return {"name": name}
+
+    # Execute without parameter - should use default
+    result = await task_executor.execute("test_default_param", {})
+    assert result["name"] == "default_name"
+
+    # Execute with parameter - should override default
+    result = await task_executor.execute("test_default_param", {"name": "custom"})
+    assert result["name"] == "custom"
