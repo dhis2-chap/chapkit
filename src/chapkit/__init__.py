@@ -57,14 +57,13 @@ from .scheduler import ChapkitJobRecord, ChapkitJobScheduler
 
 # Task feature
 from .task import (
-    Task,
-    TaskIn,
-    TaskManager,
-    TaskOut,
+    ParameterInfo,
+    TaskExecuteRequest,
+    TaskExecuteResponse,
+    TaskExecutor,
+    TaskInfo,
     TaskRegistry,
-    TaskRepository,
     TaskRouter,
-    validate_and_disable_orphaned_tasks,
 )
 
 
@@ -114,12 +113,11 @@ __all__ = [
     "TrainRequest",
     "TrainResponse",
     # Task
-    "Task",
-    "TaskIn",
-    "TaskManager",
-    "TaskOut",
+    "ParameterInfo",
+    "TaskExecuteRequest",
+    "TaskExecuteResponse",
+    "TaskExecutor",
+    "TaskInfo",
     "TaskRegistry",
-    "TaskRepository",
     "TaskRouter",
-    "validate_and_disable_orphaned_tasks",
 ]

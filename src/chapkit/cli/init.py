@@ -131,7 +131,9 @@ def init_command(
             template_dir, target_dir, "postman_collection_task.json.jinja2", context, "postman_collection.json"
         )
     else:
-        _render_template(template_dir, target_dir, "postman_collection_ml.json.jinja2", context, "postman_collection.json")
+        _render_template(
+            template_dir, target_dir, "postman_collection_ml.json.jinja2", context, "postman_collection.json"
+        )
 
     # For ml-shell template, create scripts directory
     if template == "ml-shell":

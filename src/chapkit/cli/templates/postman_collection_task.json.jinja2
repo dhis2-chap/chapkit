@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "{{ PROJECT_SLUG }}-task-service",
         "name": "{{ PROJECT_NAME }} - Task Execution",
-        "description": "Task execution service for {{ PROJECT_NAME }} with Python functions and shell commands.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Execute Python functions as tasks\n- Execute shell commands\n- Dependency injection (Database, ArtifactManager)\n- Auto-seeded demo tasks\n- Job scheduling integration\n\n**Seeded Tasks:**\n- greet_user - Simple Python function\n- process_data - Python with dependency injection\n- count_files - Count files in directory\n- Shell commands (python --version, echo)",
+        "description": "Registry-based task execution service for {{ PROJECT_NAME }}.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Execute Python functions as tasks\n- Dependency injection (Database, ArtifactManager, ChapkitJobScheduler, AsyncSession)\n- Tag-based task filtering\n- Job scheduling integration\n- Artifact result storage\n\n**Registered Tasks:**\n- greet_user (tags: demo, simple)\n- process_data (tags: demo, injection)\n- count_files (tags: demo, filesystem)\n- multiply_numbers (tags: demo, math)",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -36,7 +36,7 @@
             ]
         },
         {
-            "name": "2. Task Management",
+            "name": "2. Task Discovery",
             "item": [
                 {
                     "name": "List All Tasks",
@@ -48,61 +48,14 @@
                             "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
                             "path": ["api", "v1", "tasks"]
                         },
-                        "description": "List all registered tasks (auto-seeded on startup)"
-                    }
-                },
-                {
-                    "name": "Get Task by ID",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}",
-                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
-                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}"]
-                        }
-                    }
-                },
-                {
-                    "name": "Create Python Function Task",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "if (pm.response.code === 200 || pm.response.code === 201) {",
-                                    "    const response = pm.response.json();",
-                                    "    pm.collectionVariables.set('task_id', response.id);",
-                                    "}"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [{"key": "Content-Type", "value": "application/json"}],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": true,\n  \"tags\": [\"python\", \"greeting\"]\n}"
-                        },
-                        "url": {
-                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks",
-                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
-                            "path": ["api", "v1", "tasks"]
-                        },
-                        "description": "Create task that executes greet_user Python function"
+                        "description": "List all registered tasks with metadata (name, signature, parameters, docstring, tags)"
                     },
                     "response": [
                         {
-                            "name": "Task Created",
+                            "name": "All Tasks",
                             "originalRequest": {
-                                "method": "POST",
-                                "header": [{"key": "Content-Type", "value": "application/json"}],
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": true,\n  \"tags\": [\"python\", \"greeting\"]\n}"
-                                },
+                                "method": "GET",
+                                "header": [],
                                 "url": {
                                     "raw": "http://localhost:8000/api/v1/tasks",
                                     "host": ["http://localhost:8000"],
@@ -114,54 +67,62 @@
                             "_postman_previewlanguage": "json",
                             "header": [{"key": "Content-Type", "value": "application/json"}],
                             "cookie": [],
-                            "body": "{\n  \"id\": \"01JC0001TTTTTTTTTTT0000001\",\n  \"command\": \"greet_user\",\n  \"enabled\": true,\n  \"tags\": [\"python\", \"greeting\"],\n  \"created_at\": \"2025-11-06T16:00:00Z\",\n  \"updated_at\": \"2025-11-06T16:00:00Z\"\n}"
+                            "body": "[\n  {\n    \"name\": \"greet_user\",\n    \"docstring\": \"Simple task that returns a greeting.\",\n    \"signature\": \"(name: str = 'World') -> dict[str, str]\",\n    \"parameters\": [\n      {\n        \"name\": \"name\",\n        \"annotation\": \"<class 'str'>\",\n        \"default\": \"'World'\",\n        \"required\": false\n      }\n    ],\n    \"tags\": [\"demo\", \"simple\"]\n  }\n]"
                         }
                     ]
                 },
                 {
-                    "name": "Create Shell Command Task",
+                    "name": "Filter Tasks by Tags",
                     "request": {
-                        "method": "POST",
-                        "header": [{"key": "Content-Type", "value": "application/json"}],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"command\": \"echo 'Hello from task!'\",\n  \"enabled\": true,\n  \"tags\": [\"shell\", \"test\"]\n}"
-                        },
-                        "url": {
-                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks",
-                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
-                            "path": ["api", "v1", "tasks"]
-                        },
-                        "description": "Create task that executes shell command"
-                    }
-                },
-                {
-                    "name": "Update Task",
-                    "request": {
-                        "method": "PUT",
-                        "header": [{"key": "Content-Type", "value": "application/json"}],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": false,\n  \"tags\": [\"python\", \"disabled\"]\n}"
-                        },
-                        "url": {
-                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}",
-                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
-                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}"]
-                        }
-                    }
-                },
-                {
-                    "name": "Delete Task",
-                    "request": {
-                        "method": "DELETE",
+                        "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}",
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks?tags=demo,simple",
                             "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
-                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}"]
-                        }
+                            "path": ["api", "v1", "tasks"],
+                            "query": [
+                                {
+                                    "key": "tags",
+                                    "value": "demo,simple",
+                                    "description": "Comma-separated tags (requires ALL tags)"
+                                }
+                            ]
+                        },
+                        "description": "Filter tasks that have ALL specified tags"
                     }
+                },
+                {
+                    "name": "Get Task by Name",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/greet_user",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "greet_user"]
+                        },
+                        "description": "Get task metadata by URL-safe name"
+                    },
+                    "response": [
+                        {
+                            "name": "Task Info",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "http://localhost:8000/api/v1/tasks/greet_user",
+                                    "host": ["http://localhost:8000"],
+                                    "path": ["api", "v1", "tasks", "greet_user"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{"key": "Content-Type", "value": "application/json"}],
+                            "cookie": [],
+                            "body": "{\n  \"name\": \"greet_user\",\n  \"docstring\": \"Simple task that returns a greeting.\",\n  \"signature\": \"(name: str = 'World') -> dict[str, str]\",\n  \"parameters\": [\n    {\n      \"name\": \"name\",\n      \"annotation\": \"<class 'str'>\",\n      \"default\": \"'World'\",\n      \"required\": false\n    }\n  ],\n  \"tags\": [\"demo\", \"simple\"]\n}"
+                        }
+                    ]
                 }
             ]
         },
@@ -169,34 +130,7 @@
             "name": "3. Task Execution",
             "item": [
                 {
-                    "name": "Execute Task",
-                    "event": [
-                        {
-                            "listen": "test",
-                            "script": {
-                                "exec": [
-                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
-                                    "    const response = pm.response.json();",
-                                    "    pm.collectionVariables.set('job_id', response.job_id);",
-                                    "}"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [],
-                        "url": {
-                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}/$execute",
-                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
-                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}", "$execute"]
-                        },
-                        "description": "Execute task by ID. Returns job_id for polling. Get task_id from List All Tasks response."
-                    }
-                },
-                {
-                    "name": "Execute Task with Parameters",
+                    "name": "Execute greet_user (no params)",
                     "event": [
                         {
                             "listen": "test",
@@ -216,14 +150,138 @@
                         "header": [{"key": "Content-Type", "value": "application/json"}],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"name\": \"World\"\n}"
+                            "raw": "{}"
                         },
                         "url": {
-                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/{%raw%}{{task_id}}{%endraw%}/$execute",
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/greet_user/$execute",
                             "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
-                            "path": ["api", "v1", "tasks", "{%raw%}{{task_id}}{%endraw%}", "$execute"]
+                            "path": ["api", "v1", "tasks", "greet_user", "$execute"]
                         },
-                        "description": "Execute Python function task with parameters"
+                        "description": "Execute task by name. Returns job_id for polling."
+                    }
+                },
+                {
+                    "name": "Execute greet_user (with params)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"params\": {\n    \"name\": \"Claude\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/greet_user/$execute",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "greet_user", "$execute"]
+                        },
+                        "description": "Execute task with runtime parameters"
+                    }
+                },
+                {
+                    "name": "Execute multiply_numbers",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"params\": {\n    \"a\": 6,\n    \"b\": 7\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/multiply_numbers/$execute",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "multiply_numbers", "$execute"]
+                        },
+                        "description": "Execute synchronous task with multiple parameters"
+                    }
+                },
+                {
+                    "name": "Execute process_data (with injection)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/process_data/$execute",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "process_data", "$execute"]
+                        },
+                        "description": "Execute task with dependency injection. Database and ArtifactManager are injected automatically."
+                    }
+                },
+                {
+                    "name": "Execute count_files",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"params\": {\n    \"directory\": \".\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/tasks/count_files/$execute",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "tasks", "count_files", "$execute"]
+                        },
+                        "description": "Execute task with optional parameter (uses default if not provided)"
                     }
                 }
             ]
@@ -250,10 +308,10 @@
                             "listen": "test",
                             "script": {
                                 "exec": [
-                                    "if (pm.response.code === 200 && pm.response.json().result) {",
-                                    "    const result = pm.response.json().result;",
-                                    "    if (result.artifact_id) {",
-                                    "        pm.collectionVariables.set('artifact_id', result.artifact_id);",
+                                    "if (pm.response.code === 200) {",
+                                    "    const job = pm.response.json();",
+                                    "    if (job.status === 'completed' && job.result) {",
+                                    "        pm.collectionVariables.set('artifact_id', job.result);",
                                     "    }",
                                     "}"
                                 ],
@@ -269,7 +327,7 @@
                             "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
                             "path": ["api", "v1", "jobs", "{%raw%}{{job_id}}{%endraw%}"]
                         },
-                        "description": "Poll job status. Job completes when status is 'completed'. Result contains task output."
+                        "description": "Poll job status. When completed, result field contains artifact_id with task results."
                     },
                     "response": [
                         {
@@ -288,7 +346,7 @@
                             "_postman_previewlanguage": "json",
                             "header": [{"key": "Content-Type", "value": "application/json"}],
                             "cookie": [],
-                            "body": "{\n  \"id\": \"01JC0002JJJJJJJJJJJ0000002\",\n  \"status\": \"completed\",\n  \"result\": {\n    \"status\": \"complete\",\n    \"artifact_id\": \"01JC0003AAAAAAAAAAA0000003\",\n    \"database_url\": \"sqlite+aiosqlite:///:memory:\"\n  },\n  \"created_at\": \"2025-11-06T16:00:00Z\",\n  \"updated_at\": \"2025-11-06T16:00:05Z\"\n}"
+                            "body": "{\n  \"id\": \"01JC0002JJJJJJJJJJJ0000002\",\n  \"status\": \"completed\",\n  \"result\": \"01JC0003AAAAAAAAAAA0000003\",\n  \"created_at\": \"2025-11-06T16:00:00Z\",\n  \"updated_at\": \"2025-11-06T16:00:05Z\"\n}"
                         }
                     ]
                 },
@@ -338,8 +396,28 @@
                             "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
                             "path": ["api", "v1", "artifacts", "{%raw%}{{artifact_id}}{%endraw%}"]
                         },
-                        "description": "Retrieve artifact created by task execution. Artifact ID is extracted from job result."
-                    }
+                        "description": "Retrieve artifact containing task execution results. Artifact ID is extracted from job result field."
+                    },
+                    "response": [
+                        {
+                            "name": "Task Result Artifact",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "http://localhost:8000/api/v1/artifacts/01JC0003AAAAAAAAAAA0000003",
+                                    "host": ["http://localhost:8000"],
+                                    "path": ["api", "v1", "artifacts", "01JC0003AAAAAAAAAAA0000003"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{"key": "Content-Type", "value": "application/json"}],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01JC0003AAAAAAAAAAA0000003\",\n  \"data\": {\n    \"task_name\": \"greet_user\",\n    \"params\": {\"name\": \"Claude\"},\n    \"result\": {\"message\": \"Hello, Claude!\"},\n    \"error\": null\n  },\n  \"parent_id\": null,\n  \"created_at\": \"2025-11-06T16:00:05Z\",\n  \"updated_at\": \"2025-11-06T16:00:05Z\"\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "List All Artifacts",
@@ -360,11 +438,6 @@
         {
             "key": "baseUrl",
             "value": "http://localhost:8000",
-            "type": "string"
-        },
-        {
-            "key": "task_id",
-            "value": "01JC0001TTTTTTTTTTT0000001",
             "type": "string"
         },
         {
