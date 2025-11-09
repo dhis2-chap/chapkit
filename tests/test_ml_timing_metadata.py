@@ -557,3 +557,44 @@ async def test_model_metrics_present_alongside_timing_metadata(
     assert isinstance(data["model_type"], str)
     assert isinstance(data["model_size_bytes"], int)
     assert isinstance(data["duration_seconds"], (int, float))
+
+
+async def test_predict_with_wrong_artifact_type_raises_error(ml_manager: MLManager, setup_data: tuple) -> None:
+    """Test that predicting with a non-training artifact raises ValueError."""
+    from chapkit.artifact import ArtifactIn
+
+    config_id, train_df, predict_df = setup_data
+
+    # Create an artifact with wrong ml_type (not a training artifact)
+    wrong_artifact_id = ULID()
+    async with ml_manager.database.session() as session:
+        artifact_repo = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repo)
+
+        # Create artifact with ml_type="ml_prediction" instead of "ml_training"
+        await artifact_manager.save(
+            ArtifactIn(
+                id=wrong_artifact_id,
+                data={"ml_type": "ml_prediction", "some_data": "test"},
+                parent_id=None,
+                level=0,
+            )
+        )
+
+    # Try to predict using this wrong artifact
+    predict_request = PredictRequest(
+        training_artifact_id=wrong_artifact_id,
+        historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
+        future=DataFrame.from_pandas(predict_df),
+    )
+
+    response = await ml_manager.execute_predict(predict_request)
+    job_id = ULID.from_str(response.job_id)
+
+    # Wait for job to fail
+    await asyncio.sleep(0.5)
+
+    # Check that job failed with the right error
+    record = await ml_manager.scheduler.get_record(job_id)
+    assert record.status == "failed"
+    assert "is not a training artifact" in str(record.error)
