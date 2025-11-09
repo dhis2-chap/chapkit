@@ -72,18 +72,18 @@ class MLManager(Generic[ConfigT]):
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""
         # Pre-allocate artifact ID for the trained model
-        model_artifact_id = ULID()
+        training_artifact_id = ULID()
 
         # Submit job to scheduler
         job_id = await self.scheduler.add_job(
             self._train_task,
             request,
-            model_artifact_id,
+            training_artifact_id,
         )
 
         return TrainResponse(
             job_id=str(job_id),
-            artifact_id=str(model_artifact_id),
+            artifact_id=str(training_artifact_id),
             message=f"Training job submitted. Job ID: {job_id}",
         )
 
@@ -105,7 +105,7 @@ class MLManager(Generic[ConfigT]):
             message=f"Prediction job submitted. Job ID: {job_id}",
         )
 
-    async def _train_task(self, request: TrainRequest, model_artifact_id: ULID) -> ULID:
+    async def _train_task(self, request: TrainRequest, training_artifact_id: ULID) -> ULID:
         """Execute training task and store trained model in artifact."""
         # Load config
         async with self.database.session() as session:
@@ -150,7 +150,7 @@ class MLManager(Generic[ConfigT]):
 
             await artifact_manager.save(
                 ArtifactIn(
-                    id=model_artifact_id,
+                    id=training_artifact_id,
                     data=artifact_data_model.model_dump(),
                     parent_id=None,
                     level=0,
@@ -158,29 +158,29 @@ class MLManager(Generic[ConfigT]):
             )
 
             # Link config to root artifact for tree traversal
-            await config_repo.link_artifact(request.config_id, model_artifact_id)
+            await config_repo.link_artifact(request.config_id, training_artifact_id)
             await config_repo.commit()
 
-        return model_artifact_id
+        return training_artifact_id
 
     async def _predict_task(self, request: PredictRequest, prediction_artifact_id: ULID) -> ULID:
         """Execute prediction task and store predictions in artifact."""
-        # Load model artifact
+        # Load training artifact
         async with self.database.session() as session:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
-            model_artifact = await artifact_manager.find_by_id(request.training_artifact_id)
+            training_artifact = await artifact_manager.find_by_id(request.training_artifact_id)
 
-            if model_artifact is None:
-                raise ValueError(f"Model artifact {request.training_artifact_id} not found")
+            if training_artifact is None:
+                raise ValueError(f"Training artifact {request.training_artifact_id} not found")
 
         # Extract model and config_id from artifact
-        model_data = model_artifact.data
-        if not isinstance(model_data, dict) or model_data.get("ml_type") != "ml_training":
-            raise ValueError(f"Artifact {request.training_artifact_id} is not a trained model")
+        training_data = training_artifact.data
+        if not isinstance(training_data, dict) or training_data.get("ml_type") != "ml_training":
+            raise ValueError(f"Artifact {request.training_artifact_id} is not a training artifact")
 
-        trained_model = model_data["model"]
-        config_id = ULID.from_str(model_data["config_id"])
+        trained_model = training_data["model"]
+        config_id = ULID.from_str(training_data["config_id"])
 
         # Load config
         async with self.database.session() as session:
