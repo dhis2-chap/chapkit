@@ -58,26 +58,42 @@ class TaskRouter:
                     detail=str(e),
                 ) from e
 
-        @self.router.post("/{name}/$execute", response_model=TaskExecuteResponse, status_code=status.HTTP_202_ACCEPTED)
+        @self.router.post("/{name}/$execute", response_model=TaskExecuteResponse)
         async def execute_task(
             name: str,
             request: TaskExecuteRequest = TaskExecuteRequest(),
             executor: TaskExecutor = Depends(executor_factory),
         ) -> TaskExecuteResponse:
-            """Execute task by name with runtime parameters."""
-            try:
-                job_id = await executor.execute(name, request.params)
-                return TaskExecuteResponse(
-                    job_id=str(job_id),
-                    message=f"Task '{name}' submitted for execution. Job ID: {job_id}",
-                )
-            except ValueError as e:
+            """Execute task by name with runtime parameters and return result."""
+            import traceback
+
+            # Check if task exists
+            if not TaskRegistry.has(name):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=str(e),
-                ) from e
+                    detail=f"Task '{name}' not found in registry",
+                )
+
+            params = request.params or {}
+
+            # Execute task and handle errors
+            try:
+                result = await executor.execute(name, params)
+                return TaskExecuteResponse(
+                    task_name=name,
+                    params=params,
+                    result=result,
+                    error=None,
+                )
             except Exception as e:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Task execution failed: {str(e)}",
-                ) from e
+                # Return error in response (don't raise exception)
+                return TaskExecuteResponse(
+                    task_name=name,
+                    params=params,
+                    result=None,
+                    error={
+                        "type": type(e).__name__,
+                        "message": str(e),
+                        "traceback": traceback.format_exc(),
+                    },
+                )

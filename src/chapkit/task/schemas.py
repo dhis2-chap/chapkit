@@ -35,5 +35,7 @@ class TaskExecuteRequest(BaseModel):
 class TaskExecuteResponse(BaseModel):
     """Response from task execution."""
 
-    job_id: str = Field(description="ID of the scheduler job")
-    message: str = Field(description="Human-readable message")
+    task_name: str = Field(description="Name of the executed task")
+    params: dict[str, Any] = Field(default_factory=dict, description="Parameters used for execution")
+    result: Any = Field(description="Task execution result")
+    error: dict[str, str] | None = Field(default=None, description="Error information if execution failed")

@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from ulid import ULID
 
 from chapkit.task import TaskExecutor, TaskRouter
 from chapkit.task.registry import TaskRegistry
@@ -115,7 +114,7 @@ def test_get_task_by_name_not_found() -> None:
 
 
 def test_execute_task_by_name() -> None:
-    """Test POST /tasks/{name}/$execute executes task."""
+    """Test POST /tasks/{name}/$execute executes task and returns result."""
 
     @TaskRegistry.register("test_task")
     def test_task(value: int) -> dict:
@@ -124,8 +123,7 @@ def test_execute_task_by_name() -> None:
 
     # Create mock executor
     mock_executor = Mock(spec=TaskExecutor)
-    job_id = ULID()
-    mock_executor.execute = AsyncMock(return_value=job_id)
+    mock_executor.execute = AsyncMock(return_value={"result": 42})
 
     def executor_factory() -> TaskExecutor:
         return mock_executor
@@ -145,10 +143,12 @@ def test_execute_task_by_name() -> None:
         json={"params": {"value": 21}},
     )
 
-    assert response.status_code == 202
+    assert response.status_code == 200
     data = response.json()
-    assert data["job_id"] == str(job_id)
-    assert "test_task" in data["message"]
+    assert data["task_name"] == "test_task"
+    assert data["params"] == {"value": 21}
+    assert data["result"] == {"result": 42}
+    assert data["error"] is None
 
     # Verify executor.execute was called with correct params
     mock_executor.execute.assert_called_once_with("test_task", {"value": 21})
@@ -164,8 +164,7 @@ def test_execute_task_without_params() -> None:
 
     # Create mock executor
     mock_executor = Mock(spec=TaskExecutor)
-    job_id = ULID()
-    mock_executor.execute = AsyncMock(return_value=job_id)
+    mock_executor.execute = AsyncMock(return_value={"result": "success"})
 
     def executor_factory() -> TaskExecutor:
         return mock_executor
@@ -182,8 +181,11 @@ def test_execute_task_without_params() -> None:
     client = TestClient(app)
     response = client.post("/api/v1/tasks/test_task/$execute", json={})
 
-    assert response.status_code == 202
-    mock_executor.execute.assert_called_once_with("test_task", None)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["task_name"] == "test_task"
+    assert data["result"] == {"result": "success"}
+    mock_executor.execute.assert_called_once_with("test_task", {})
 
 
 def test_execute_task_not_found() -> None:
@@ -212,7 +214,7 @@ def test_execute_task_not_found() -> None:
 
 
 def test_execute_task_internal_error() -> None:
-    """Test POST /tasks/{name}/$execute returns 500 on execution error."""
+    """Test POST /tasks/{name}/$execute returns 200 with error in response."""
 
     @TaskRegistry.register("test_task")
     def test_task() -> dict:
@@ -238,5 +240,10 @@ def test_execute_task_internal_error() -> None:
     client = TestClient(app)
     response = client.post("/api/v1/tasks/test_task/$execute", json={})
 
-    assert response.status_code == 500
-    assert "execution failed" in response.json()["detail"].lower()
+    assert response.status_code == 200
+    data = response.json()
+    assert data["task_name"] == "test_task"
+    assert data["result"] is None
+    assert data["error"] is not None
+    assert data["error"]["type"] == "Exception"
+    assert data["error"]["message"] == "Something went wrong"

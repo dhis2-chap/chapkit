@@ -4,16 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import traceback
 import types
 from typing import Any, Union, get_origin, get_type_hints
 
 from servicekit import Database
 from sqlalchemy.ext.asyncio import AsyncSession
-from ulid import ULID
-
-from chapkit.artifact import ArtifactIn, ArtifactManager, ArtifactRepository
-from chapkit.scheduler import ChapkitJobScheduler
 
 from .registry import TaskRegistry
 
@@ -21,34 +16,37 @@ from .registry import TaskRegistry
 INJECTABLE_TYPES = {
     AsyncSession,
     Database,
-    ArtifactManager,
-    ChapkitJobScheduler,
 }
 
 
 class TaskExecutor:
     """Executes registered task functions with dependency injection."""
 
-    def __init__(
-        self,
-        scheduler: ChapkitJobScheduler,
-        database: Database,
-        artifact_manager: ArtifactManager,
-    ) -> None:
+    def __init__(self, database: Database) -> None:
         """Initialize task executor with framework dependencies."""
-        self.scheduler = scheduler
         self.database = database
-        self.artifact_manager = artifact_manager
 
-    async def execute(self, name: str, params: dict[str, Any] | None = None) -> ULID:
-        """Execute registered function by name with runtime parameters."""
+    async def execute(self, name: str, params: dict[str, Any] | None = None) -> Any:
+        """Execute registered function by name with runtime parameters and return result."""
         # Verify function exists
         if not TaskRegistry.has(name):
             raise ValueError(f"Task '{name}' not found in registry")
 
-        # Submit to scheduler
-        job_id = await self.scheduler.add_job(self._execute_task, name, params or {})
-        return job_id
+        # Get function from registry
+        func = TaskRegistry.get(name)
+
+        # Create a database session for potential injection
+        async with self.database.session() as session:
+            # Inject framework dependencies based on function signature
+            final_params = self._inject_parameters(func, params or {}, session)
+
+            # Handle sync/async functions
+            if inspect.iscoroutinefunction(func):
+                result = await func(**final_params)
+            else:
+                result = await asyncio.to_thread(func, **final_params)
+
+        return result
 
     def _is_injectable_type(self, param_type: type | None) -> bool:
         """Check if a parameter type should be injected by the framework."""
@@ -70,8 +68,6 @@ class TaskExecutor:
         return {
             AsyncSession: session,
             Database: self.database,
-            ArtifactManager: self.artifact_manager,
-            ChapkitJobScheduler: self.scheduler,
         }
 
     def _inject_parameters(
@@ -136,54 +132,3 @@ class TaskExecutor:
                 )
 
         return final_params
-
-    async def _execute_task(self, name: str, params: dict[str, Any]) -> ULID:
-        """Execute task function and return artifact_id containing results."""
-        # Create a database session for potential injection
-        session_context = self.database.session()
-        session = await session_context.__aenter__()
-
-        try:
-            # Get function from registry
-            func = TaskRegistry.get(name)
-
-            # Execute function with type-based injection
-            result_data: dict[str, Any]
-            try:
-                # Inject framework dependencies based on function signature
-                final_params = self._inject_parameters(func, params, session)
-
-                # Handle sync/async functions
-                if inspect.iscoroutinefunction(func):
-                    result = await func(**final_params)
-                else:
-                    result = await asyncio.to_thread(func, **final_params)
-
-                result_data = {
-                    "task_name": name,
-                    "params": params,
-                    "result": result,
-                    "error": None,
-                }
-            except Exception as e:
-                result_data = {
-                    "task_name": name,
-                    "params": params,
-                    "result": None,
-                    "error": {
-                        "type": type(e).__name__,
-                        "message": str(e),
-                        "traceback": traceback.format_exc(),
-                    },
-                }
-        finally:
-            # Always close the session
-            await session_context.__aexit__(None, None, None)
-
-        # Create artifact (with a new session)
-        async with self.database.session() as artifact_session:
-            artifact_repo = ArtifactRepository(artifact_session)
-            artifact_mgr = ArtifactManager(artifact_repo)
-            artifact_out = await artifact_mgr.save(ArtifactIn(data=result_data, parent_id=None))
-
-        return artifact_out.id

@@ -1,6 +1,6 @@
 # Task Execution
 
-Chapkit provides a registry-based task execution system for running Python functions asynchronously with dependency injection, tag-based organization, and artifact storage integration.
+Chapkit provides a registry-based task execution system for running Python functions synchronously with dependency injection and tag-based organization.
 
 ## Quick Start
 
@@ -10,7 +10,7 @@ Chapkit provides a registry-based task execution system for running Python funct
 from chapkit.task import TaskRegistry, TaskExecutor, TaskRouter
 from chapkit.api import ServiceBuilder, ServiceInfo
 from servicekit import Database
-from chapkit.artifact import ArtifactManager
+from servicekit.api.dependencies import get_database
 from fastapi import Depends
 
 # Clear registry on module reload (for development)
@@ -24,22 +24,16 @@ async def greet_user(name: str = "World") -> dict[str, str]:
 
 # Task with dependency injection
 @TaskRegistry.register("process_data", tags=["demo", "injection"])
-async def process_data(database: Database, artifact_manager: ArtifactManager) -> dict[str, object]:
+async def process_data(database: Database) -> dict[str, object]:
     """Dependencies are automatically injected."""
-    return {"status": "complete", "database_url": str(database.url)}
+    return {"status": "processed", "database_url": str(database.url)}
 
 # Build service
 info = ServiceInfo(display_name="Task Service")
 
-async def get_task_executor(
-    scheduler = Depends(get_scheduler),
-    database = Depends(get_database),
-) -> TaskExecutor:
+def get_task_executor(database: Database = Depends(get_database)) -> TaskExecutor:
     """Provide task executor for dependency injection."""
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_manager = ArtifactManager(artifact_repo)
-        return TaskExecutor(scheduler, database, artifact_manager)
+    return TaskExecutor(database)
 
 task_router = TaskRouter.create(
     prefix="/api/v1/tasks",
@@ -50,8 +44,7 @@ task_router = TaskRouter.create(
 app = (
     ServiceBuilder(info=info)
     .with_health()
-    .with_jobs(max_concurrency=5)
-    .include_router(task_router)
+    .include_router(task_router.router)
     .build()
 )
 ```
@@ -83,14 +76,9 @@ app = (
 
 3. Task Execution
    POST /api/v1/tasks/task_name/$execute
-   ├─> Job created in scheduler
    ├─> Dependencies injected
-   └─> Execution started
-
-4. Results Storage
-   ├─> Artifact created with task results
-   ├─> Job result contains artifact_id
-   └─> Retrieve via /api/v1/artifacts/{artifact_id}
+   ├─> Function executed synchronously
+   └─> Result returned in response (200 OK)
 ```
 
 ---
@@ -168,29 +156,22 @@ Tasks can request framework dependencies as function parameters:
 
 ```python
 from servicekit import Database
-from chapkit.artifact import ArtifactManager
-from chapkit.scheduler import ChapkitJobScheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 
 @TaskRegistry.register("with_dependencies")
 async def with_dependencies(
     database: Database,
-    artifact_manager: ArtifactManager,
-    scheduler: ChapkitJobScheduler,
     session: AsyncSession,
     custom_param: str = "default"
 ) -> dict[str, object]:
     """Dependencies automatically injected at runtime."""
     # Framework types are injected, user params come from request
-    artifact = await artifact_manager.save(ArtifactIn(data={"result": custom_param}))
-    return {"artifact_id": str(artifact.id)}
+    return {"database_url": str(database.url), "custom_param": custom_param}
 ```
 
 **Available Injectable Types:**
 - `AsyncSession` - Database session
 - `Database` - Database instance
-- `ArtifactManager` - Artifact manager
-- `ChapkitJobScheduler` - Job scheduler
 
 **Note:** Parameters are categorized automatically:
 - Framework types (in INJECTABLE_TYPES) are injected
@@ -287,18 +268,32 @@ Execute task by name with runtime parameters.
 }
 ```
 
-**Response (202 Accepted):**
+**Response (200 OK):**
 ```json
 {
-  "job_id": "01JOB456...",
-  "message": "Task 'greet_user' submitted for execution. Job ID: 01JOB456..."
+  "task_name": "greet_user",
+  "params": {"name": "Alice"},
+  "result": {"message": "Hello, Alice!"},
+  "error": null
+}
+```
+
+**Response on Error (200 OK):**
+```json
+{
+  "task_name": "greet_user",
+  "params": {"name": "Alice"},
+  "result": null,
+  "error": {
+    "type": "ValueError",
+    "message": "Invalid parameter",
+    "traceback": "Traceback (most recent call last)..."
+  }
 }
 ```
 
 **Errors:**
 - 404 Not Found: Task not registered
-- 400 Bad Request: Missing required parameters
-- 500 Internal Server Error: Execution failed
 
 **Examples:**
 ```bash
@@ -509,33 +504,17 @@ curl http://localhost:8000/api/v1/tasks | jq
 # Get task metadata
 curl http://localhost:8000/api/v1/tasks/greet_user | jq
 
-# Execute task
-JOB_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/tasks/greet_user/\$execute \
+# Execute task and get result immediately
+curl -s -X POST http://localhost:8000/api/v1/tasks/greet_user/\$execute \
   -H "Content-Type: application/json" \
-  -d '{"params": {"name": "Alice"}}')
+  -d '{"params": {"name": "Alice"}}' | jq
 
-JOB_ID=$(echo $JOB_RESPONSE | jq -r '.job_id')
-echo "Job ID: $JOB_ID"
-
-# Monitor job status
-curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq
-
-# Wait for completion and get artifact ID
-ARTIFACT_ID=$(curl -s http://localhost:8000/api/v1/jobs/$JOB_ID | jq -r '.artifact_id')
-echo "Artifact ID: $ARTIFACT_ID"
-
-# Get task results from artifact
-curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq
-
-# Expected artifact data structure:
+# Expected response:
 # {
-#   "id": "01ABC...",
-#   "data": {
-#     "task_name": "greet_user",
-#     "params": {"name": "Alice"},
-#     "result": {"message": "Hello, Alice!"},
-#     "error": null
-#   }
+#   "task_name": "greet_user",
+#   "params": {"name": "Alice"},
+#   "result": {"message": "Hello, Alice!"},
+#   "error": null
 # }
 ```
 
@@ -543,18 +522,22 @@ curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq
 
 ## Result Storage
 
-Task execution results are automatically stored in artifacts:
+Task execution results are **ephemeral** - they are returned directly in the HTTP response and not persisted.
 
-```python
-# Artifact data structure for successful execution:
+**For task history/persistence needs:** Use the ML module instead, which provides artifact-based storage for train/predict workflows.
+
+**Response structure for successful execution:**
+```json
 {
     "task_name": "greet_user",
     "params": {"name": "Alice"},
     "result": {"message": "Hello, Alice!"},
     "error": null
 }
+```
 
-# Artifact data structure for failed execution:
+**Response structure for failed execution:**
+```json
 {
     "task_name": "failing_task",
     "params": {},
@@ -566,8 +549,6 @@ Task execution results are automatically stored in artifacts:
     }
 }
 ```
-
-The artifact ID is stored in the job's `artifact_id` field.
 
 ---
 

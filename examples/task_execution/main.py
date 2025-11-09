@@ -4,20 +4,11 @@ from __future__ import annotations
 
 from fastapi import Depends, FastAPI
 from servicekit import Database
-from servicekit.api.dependencies import get_database, get_scheduler
+from servicekit.api.dependencies import get_database
 
 from chapkit import run_shell
 from chapkit.api import ServiceBuilder, ServiceInfo
-from chapkit.artifact import ArtifactHierarchy, ArtifactIn, ArtifactManager, ArtifactRepository
-from chapkit.scheduler import ChapkitJobScheduler
 from chapkit.task import TaskExecutor, TaskRegistry, TaskRouter
-
-# Define artifact hierarchy for task results
-TASK_HIERARCHY = ArtifactHierarchy(
-    name="task_results",
-    level_labels={0: "task_run", 1: "output"},
-)
-
 
 # ==================== Task Functions ====================
 
@@ -32,21 +23,12 @@ async def greet_user(name: str = "World") -> dict[str, str]:
 
 
 @TaskRegistry.register("process_data", tags=["demo", "injection"])
-async def process_data(database: Database, artifact_manager: ArtifactManager) -> dict[str, object]:
-    """Task with dependency injection - database and artifact manager injected automatically."""
-    # Example: Store processing result in artifact
-    artifact = await artifact_manager.save(
-        ArtifactIn(
-            data={
-                "status": "processed",
-                "records": 42,
-                "timestamp": "2025-10-18T12:00:00Z",
-            }
-        )
-    )
+async def process_data(database: Database) -> dict[str, object]:
+    """Task with dependency injection - database injected automatically."""
+    # Example: You could query the database here
     return {
-        "status": "complete",
-        "artifact_id": str(artifact.id),
+        "status": "processed",
+        "records": 42,
         "database_url": str(database.url),
     }
 
@@ -85,15 +67,9 @@ info = ServiceInfo(
 
 
 # Define task executor dependency
-async def get_task_executor(
-    scheduler: ChapkitJobScheduler = Depends(get_scheduler),
-    database: Database = Depends(get_database),
-) -> TaskExecutor:
+def get_task_executor(database: Database = Depends(get_database)) -> TaskExecutor:
     """Provide task executor for dependency injection."""
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_manager = ArtifactManager(artifact_repo, hierarchy=TASK_HIERARCHY)
-        return TaskExecutor(scheduler, database, artifact_manager)
+    return TaskExecutor(database)
 
 
 # Create task router
@@ -109,7 +85,6 @@ app: FastAPI = (
     .with_logging()
     .with_health()
     .with_system()
-    .with_jobs(max_concurrency=5)  # Required for task execution
     .include_router(task_router.router)  # Add task router before build
     .build()
 )

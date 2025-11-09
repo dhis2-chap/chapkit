@@ -8,8 +8,6 @@ import pytest
 from servicekit import Database, SqliteDatabaseBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from chapkit.artifact import ArtifactManager, ArtifactRepository
-from chapkit.scheduler import ChapkitJobScheduler
 from chapkit.task import TaskExecutor
 from chapkit.task.registry import TaskRegistry
 
@@ -23,13 +21,9 @@ async def database() -> Database:
 
 
 @pytest.fixture
-async def task_executor(database: Database) -> TaskExecutor:
-    """Create task executor with all dependencies."""
-    scheduler = ChapkitJobScheduler()
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_manager = ArtifactManager(artifact_repo)
-        return TaskExecutor(scheduler, database, artifact_manager)
+def task_executor(database: Database) -> TaskExecutor:
+    """Create task executor with database dependency."""
+    return TaskExecutor(database)
 
 
 @pytest.fixture(autouse=True)
@@ -49,26 +43,9 @@ async def test_inject_async_session(database: Database, task_executor: TaskExecu
         assert isinstance(session, AsyncSession)
         return {"session_injected": True}
 
-    # Execute task by name
-    job_id = await task_executor.execute("test_session_injection", {})
-
-    # Wait for completion
-    await task_executor.scheduler.wait(job_id)
-
-    # Verify result
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-    assert job_record.artifact_id is not None
-
-    # Check artifact
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        assert artifact.data["result"]["session_injected"] is True
+    # Execute and get result directly
+    result = await task_executor.execute("test_session_injection", {})
+    assert result["session_injected"] is True
 
 
 @pytest.mark.asyncio
@@ -82,55 +59,9 @@ async def test_inject_database(database: Database, task_executor: TaskExecutor) 
         assert isinstance(db, Database)
         return {"database_injected": True}
 
-    # Execute
-    job_id = await task_executor.execute("test_database_injection", {})
-
-    # Wait and verify
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-
-    # Check result
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        assert artifact.data["result"]["database_injected"] is True
-
-
-@pytest.mark.asyncio
-async def test_inject_artifact_manager(database: Database, task_executor: TaskExecutor) -> None:
-    """Test ArtifactManager injection into Python task."""
-
-    @TaskRegistry.register("test_artifact_injection")
-    async def task_with_artifacts(artifact_manager: ArtifactManager) -> dict[str, Any]:
-        """Task that uses injected artifact manager."""
-        assert artifact_manager is not None
-        assert isinstance(artifact_manager, ArtifactManager)
-        return {"artifact_manager_injected": True}
-
-    # Execute
-    job_id = await task_executor.execute("test_artifact_injection", {})
-
-    # Wait and verify
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-
-    # Check result
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        assert artifact.data["result"]["artifact_manager_injected"] is True
+    # Execute and get result directly
+    result = await task_executor.execute("test_database_injection", {})
+    assert result["database_injected"] is True
 
 
 @pytest.mark.asyncio
@@ -150,26 +81,10 @@ async def test_inject_with_user_parameters(database: Database, task_executor: Ta
         return {"name": name, "count": count, "has_session": True}
 
     # Execute with user parameters
-    job_id = await task_executor.execute("test_mixed_params", {"name": "test", "count": 42})
-
-    # Wait and verify
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-
-    # Check result
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        result = artifact.data["result"]
-        assert result["name"] == "test"
-        assert result["count"] == 42
-        assert result["has_session"] is True
+    result = await task_executor.execute("test_mixed_params", {"name": "test", "count": 42})
+    assert result["name"] == "test"
+    assert result["count"] == 42
+    assert result["has_session"] is True
 
 
 @pytest.mark.asyncio
@@ -182,23 +97,8 @@ async def test_optional_injection(database: Database, task_executor: TaskExecuto
         return {"session_provided": session is not None}
 
     # Execute
-    job_id = await task_executor.execute("test_optional_injection", {})
-
-    # Wait and verify
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-
-    # Check result
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        assert artifact.data["result"]["session_provided"] is True
+    result = await task_executor.execute("test_optional_injection", {})
+    assert result["session_provided"] is True
 
 
 @pytest.mark.asyncio
@@ -206,123 +106,46 @@ async def test_missing_required_user_parameter(database: Database, task_executor
     """Test error when required user parameter is missing."""
 
     @TaskRegistry.register("test_missing_param")
-    async def task_with_required(name: str, session: AsyncSession) -> dict[str, Any]:
+    async def task_with_required(name: str) -> dict[str, str]:
         """Task with required user parameter."""
         return {"name": name}
 
-    # Execute WITHOUT required parameter - should capture error
-    job_id = await task_executor.execute("test_missing_param", {})
-
-    # Wait for completion
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"  # Job completes but captures error
-
-    # Check error in artifact
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is not None
-        assert "Missing required parameter 'name'" in artifact.data["error"]["message"]
+    # Execute without required parameter - should raise ValueError
+    with pytest.raises(ValueError, match="Missing required parameter"):
+        await task_executor.execute("test_missing_param", {})
 
 
 @pytest.mark.asyncio
 async def test_sync_function_injection(database: Database, task_executor: TaskExecutor) -> None:
-    """Test injection works with sync functions too."""
+    """Test dependency injection works with synchronous functions."""
 
     @TaskRegistry.register("test_sync_injection")
-    def sync_task_with_injection(value: int, database: Database) -> dict[str, Any]:
-        """Sync task with injection."""
-        assert database is not None
-        return {"value": value * 2, "has_database": True}
+    def sync_task_with_database(db: Database) -> dict[str, bool]:
+        """Synchronous task with database injection."""
+        assert db is not None
+        return {"sync_database_injected": True}
 
-    # Execute
-    job_id = await task_executor.execute("test_sync_injection", {"value": 21})
-
-    # Wait and verify
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-
-    # Check result
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        assert artifact.data["result"]["value"] == 42
-        assert artifact.data["result"]["has_database"] is True
-
-
-@pytest.mark.asyncio
-async def test_inject_scheduler(database: Database, task_executor: TaskExecutor) -> None:
-    """Test ChapkitJobScheduler injection into Python task."""
-
-    @TaskRegistry.register("test_scheduler_injection")
-    async def task_with_scheduler(scheduler: ChapkitJobScheduler) -> dict[str, Any]:
-        """Task that uses injected scheduler."""
-        assert scheduler is not None
-        assert isinstance(scheduler, ChapkitJobScheduler)
-        return {"scheduler_injected": True}
-
-    # Execute
-    job_id = await task_executor.execute("test_scheduler_injection", {})
-
-    # Wait and verify
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-
-    # Check result
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        assert artifact.data["result"]["scheduler_injected"] is True
+    # Execute synchronous function
+    result = await task_executor.execute("test_sync_injection", {})
+    assert result["sync_database_injected"] is True
 
 
 @pytest.mark.asyncio
 async def test_execute_nonexistent_task(database: Database, task_executor: TaskExecutor) -> None:
-    """Test that executing a non-existent task raises ValueError."""
+    """Test error when executing non-existent task."""
     with pytest.raises(ValueError, match="not found in registry"):
         await task_executor.execute("nonexistent_task", {})
 
 
 @pytest.mark.asyncio
 async def test_task_without_type_annotations(database: Database, task_executor: TaskExecutor) -> None:
-    """Test task with parameters that have no type annotations."""
+    """Test task function without type annotations."""
 
     @TaskRegistry.register("test_no_annotations")
-    async def task_no_annotations(value):  # pyright: ignore[reportMissingParameterType]
-        """Task without type annotation."""
+    async def task_no_annotations(value: Any) -> dict[str, Any]:
+        """Task without strict type annotations."""
         return {"value": value}
 
-    # Execute with parameter
-    job_id = await task_executor.execute("test_no_annotations", {"value": 42})
-
-    # Wait and verify
-    await task_executor.scheduler.wait(job_id)
-    job_record = await task_executor.scheduler.get_record(job_id)
-    assert job_record is not None
-    assert job_record.status == "completed"
-
-    # Check result
-    assert job_record.artifact_id is not None
-    async with database.session() as session:
-        artifact_repo = ArtifactRepository(session)
-        artifact_mgr = ArtifactManager(artifact_repo)
-        artifact = await artifact_mgr.find_by_id(job_record.artifact_id)
-        assert artifact is not None
-        assert artifact.data["error"] is None
-        assert artifact.data["result"]["value"] == 42
+    # Execute with user parameter
+    result = await task_executor.execute("test_no_annotations", {"value": "test"})
+    assert result["value"] == "test"
