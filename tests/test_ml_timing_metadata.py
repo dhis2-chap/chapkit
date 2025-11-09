@@ -14,7 +14,7 @@ from chapkit.artifact import ArtifactManager, ArtifactRepository
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, TrainRequest
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import InMemoryScheduler
 
 
 class SimpleConfig(BaseConfig):
@@ -75,7 +75,7 @@ async def ml_manager() -> AsyncIterator[MLManager]:
     database = SqliteDatabaseBuilder().in_memory().build()
     await database.init()
 
-    scheduler = ChapkitJobScheduler()
+    scheduler = InMemoryScheduler()
 
     runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
 
@@ -422,7 +422,7 @@ async def test_model_type_extracts_from_dict_wrapped_models(
     database = SqliteDatabaseBuilder().in_memory().build()
     await database.init()
 
-    scheduler = ChapkitJobScheduler()
+    scheduler = InMemoryScheduler()
     runner = FunctionalModelRunner(on_train=dict_wrapped_train, on_predict=simple_predict)
     manager = MLManager(runner, scheduler, database, SimpleConfig)
 
@@ -473,7 +473,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     train_df = pd.DataFrame({"feature1": [1, 2, 3], "feature2": [4, 5, 6], "target": [7, 8, 9]})
 
     # Train simple model (small dict)
-    scheduler1 = ChapkitJobScheduler()
+    scheduler1 = InMemoryScheduler()
     runner1 = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
     manager1 = MLManager(runner1, scheduler1, database, SimpleConfig)
 
@@ -485,7 +485,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     await asyncio.sleep(0.5)
 
     # Train complex model (dict with nested model object)
-    scheduler2 = ChapkitJobScheduler()
+    scheduler2 = InMemoryScheduler()
     runner2 = FunctionalModelRunner(on_train=dict_wrapped_train, on_predict=simple_predict)
     manager2 = MLManager(runner2, scheduler2, database, SimpleConfig)
 

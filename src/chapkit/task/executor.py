@@ -11,7 +11,7 @@ from servicekit import Database
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chapkit.artifact import ArtifactManager
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import ChapkitScheduler
 
 from .registry import TaskRegistry
 
@@ -19,7 +19,7 @@ from .registry import TaskRegistry
 INJECTABLE_TYPES = {
     AsyncSession,
     Database,
-    ChapkitJobScheduler,
+    ChapkitScheduler,
     ArtifactManager,
 }
 
@@ -30,7 +30,7 @@ class TaskExecutor:
     def __init__(
         self,
         database: Database,
-        scheduler: ChapkitJobScheduler | None = None,
+        scheduler: ChapkitScheduler | None = None,
         artifact_manager: ArtifactManager | None = None,
     ) -> None:
         """Initialize task executor with framework dependencies."""
@@ -83,7 +83,7 @@ class TaskExecutor:
         }
         # Add optional dependencies if available
         if self.scheduler is not None:
-            injection_map[ChapkitJobScheduler] = self.scheduler
+            injection_map[ChapkitScheduler] = self.scheduler
         if self.artifact_manager is not None:
             injection_map[ArtifactManager] = self.artifact_manager
         return injection_map

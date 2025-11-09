@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import traceback
+from abc import ABC
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,8 +23,22 @@ class ChapkitJobRecord(JobRecord):
     artifact_id: ULID | None = Field(default=None, description="ID of artifact created by job (if job returns a ULID)")
 
 
-class ChapkitJobScheduler(AIOJobScheduler):
-    """Chapkit job scheduler with automatic artifact tracking for jobs that return ULIDs."""
+class ChapkitScheduler(AIOJobScheduler, ABC):
+    """Abstract base class for Chapkit job schedulers with artifact tracking."""
+
+    async def get_record(self, job_id: ULID) -> ChapkitJobRecord:
+        """Get complete job record with artifact_id if available."""
+        raise NotImplementedError
+
+    async def list_records(
+        self, *, status_filter: JobStatus | None = None, reverse: bool = False
+    ) -> list[ChapkitJobRecord]:
+        """List all job records with optional status filtering."""
+        raise NotImplementedError
+
+
+class InMemoryScheduler(ChapkitScheduler):
+    """In-memory scheduler with automatic artifact tracking for jobs that return ULIDs."""
 
     # Override with ChapkitJobRecord type to support artifact_id tracking
     # dict is invariant, but we always use ChapkitJobRecord in this subclass

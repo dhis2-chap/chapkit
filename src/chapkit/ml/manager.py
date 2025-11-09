@@ -12,7 +12,7 @@ from ulid import ULID
 from chapkit.artifact import ArtifactIn, ArtifactManager, ArtifactRepository
 from chapkit.config import ConfigManager, ConfigRepository
 from chapkit.config.schemas import BaseConfig
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import ChapkitScheduler
 
 from .schemas import (
     ModelRunnerProtocol,
@@ -59,7 +59,7 @@ class MLManager(Generic[ConfigT]):
     def __init__(
         self,
         runner: ModelRunnerProtocol[ConfigT],
-        scheduler: ChapkitJobScheduler,
+        scheduler: ChapkitScheduler,
         database: Database,
         config_schema: type[ConfigT],
     ) -> None:

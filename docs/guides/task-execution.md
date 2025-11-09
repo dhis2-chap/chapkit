@@ -172,7 +172,7 @@ async def with_dependencies(
 **Available Injectable Types:**
 - `AsyncSession` - Database session (always available)
 - `Database` - Database instance (always available)
-- `ChapkitJobScheduler` - Job scheduler (available when `.with_jobs()` is configured)
+- `ChapkitScheduler` - Job scheduler (available when `.with_jobs()` is configured)
 - `ArtifactManager` - Artifact manager (available when `.with_artifacts()` is configured and passed to TaskExecutor)
 
 **Note:** Parameters are categorized automatically:
@@ -553,11 +553,11 @@ async def list_files(directory: str = ".") -> dict[str, object]:
 When a task needs to spawn long-running background work:
 
 ```python
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import ChapkitScheduler
 
 @TaskRegistry.register("spawn_background_job", tags=["admin", "background"])
 async def spawn_background_job(
-    scheduler: ChapkitJobScheduler,
+    scheduler: ChapkitScheduler,
     processing_time: int = 60
 ) -> dict[str, object]:
     """Task that spawns a background job for long-running work."""
@@ -664,7 +664,7 @@ Combining job scheduling with artifact storage for complex workflows:
 ```python
 @TaskRegistry.register("orchestrate_pipeline", tags=["pipeline", "orchestration"])
 async def orchestrate_pipeline(
-    scheduler: ChapkitJobScheduler,
+    scheduler: ChapkitScheduler,
     artifact_manager: ArtifactManager,
     pipeline_config: dict
 ) -> dict[str, object]:
@@ -725,7 +725,7 @@ from servicekit.api.dependencies import get_database, get_scheduler
 
 from chapkit.api import ServiceBuilder, ServiceInfo
 from chapkit.artifact import ArtifactHierarchy, ArtifactManager, ArtifactRepository
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import ChapkitScheduler
 from chapkit.task import TaskExecutor, TaskRouter
 
 # Define artifact hierarchy for task results
@@ -743,7 +743,7 @@ async def get_task_executor(
     async with database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo, hierarchy=TASK_HIERARCHY)
-        if isinstance(scheduler, ChapkitJobScheduler):
+        if isinstance(scheduler, ChapkitScheduler):
             return TaskExecutor(database, scheduler, artifact_manager)
         return TaskExecutor(database)
 
@@ -1015,7 +1015,7 @@ async def quick_task(data: dict) -> dict[str, object]:
 
 # For longer operations, use advanced setup with scheduler
 @TaskRegistry.register("long_operation", tags=["production"])
-async def long_operation(scheduler: ChapkitJobScheduler, data: dict) -> dict[str, object]:
+async def long_operation(scheduler: ChapkitScheduler, data: dict) -> dict[str, object]:
     """Spawn background job for long-running work."""
     async def background_work():
         return slow_processing(data)
@@ -1078,7 +1078,7 @@ async def long_task(artifact_manager: ArtifactManager) -> dict[str, object]:
 ```python
 @TaskRegistry.register("long_batch", tags=["processing", "batch"])
 async def long_batch(
-    scheduler: ChapkitJobScheduler,
+    scheduler: ChapkitScheduler,
     artifact_manager: ArtifactManager
 ) -> dict[str, object]:
     """Spawn background job for truly long operations."""

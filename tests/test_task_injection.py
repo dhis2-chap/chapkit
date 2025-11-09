@@ -10,7 +10,7 @@ from servicekit import Database, SqliteDatabaseBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chapkit.artifact import ArtifactManager
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import ChapkitScheduler
 from chapkit.task import TaskExecutor
 from chapkit.task.registry import TaskRegistry
 
@@ -156,12 +156,12 @@ async def test_task_without_type_annotations(database: Database, task_executor: 
 
 @pytest.mark.asyncio
 async def test_inject_scheduler(database: Database) -> None:
-    """Test ChapkitJobScheduler injection into Python task."""
-    mock_scheduler = Mock(spec=ChapkitJobScheduler)
+    """Test ChapkitScheduler injection into Python task."""
+    mock_scheduler = Mock(spec=ChapkitScheduler)
     executor = TaskExecutor(database, scheduler=mock_scheduler)
 
     @TaskRegistry.register("test_scheduler_injection")
-    async def task_with_scheduler(scheduler: ChapkitJobScheduler) -> dict[str, Any]:
+    async def task_with_scheduler(scheduler: ChapkitScheduler) -> dict[str, Any]:
         """Task that uses injected scheduler."""
         assert scheduler is not None
         assert scheduler is mock_scheduler
@@ -193,13 +193,13 @@ async def test_inject_artifact_manager(database: Database) -> None:
 @pytest.mark.asyncio
 async def test_inject_all_optional_dependencies(database: Database) -> None:
     """Test injection with all optional dependencies."""
-    mock_scheduler = Mock(spec=ChapkitJobScheduler)
+    mock_scheduler = Mock(spec=ChapkitScheduler)
     mock_artifact_manager = Mock(spec=ArtifactManager)
     executor = TaskExecutor(database, scheduler=mock_scheduler, artifact_manager=mock_artifact_manager)
 
     @TaskRegistry.register("test_all_dependencies")
     async def task_with_all(
-        scheduler: ChapkitJobScheduler,
+        scheduler: ChapkitScheduler,
         artifact_manager: ArtifactManager,
         database: Database,
     ) -> dict[str, Any]:
@@ -220,7 +220,7 @@ async def test_optional_scheduler_not_provided(database: Database, task_executor
 
     @TaskRegistry.register("test_optional_scheduler")
     async def task_with_optional_scheduler(
-        scheduler: ChapkitJobScheduler | None = None,
+        scheduler: ChapkitScheduler | None = None,
     ) -> dict[str, Any]:
         """Task with optional scheduler parameter."""
         return {"scheduler_provided": scheduler is not None}
