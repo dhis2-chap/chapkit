@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import pickle
 import tempfile
 from abc import ABC, abstractmethod
@@ -15,6 +14,7 @@ from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
+from chapkit.utils import run_shell
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
@@ -146,20 +146,13 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             logger.info("executing_train_script", command=command, temp_dir=str(temp_dir))
 
             # Execute subprocess
-            process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(temp_dir),
-            )
+            result = await run_shell(command, cwd=str(temp_dir))
+            stdout = result["stdout"]
+            stderr = result["stderr"]
 
-            stdout_bytes, stderr_bytes = await process.communicate()
-            stdout = stdout_bytes.decode("utf-8") if stdout_bytes else ""
-            stderr = stderr_bytes.decode("utf-8") if stderr_bytes else ""
-
-            if process.returncode != 0:
-                logger.error("train_script_failed", exit_code=process.returncode, stderr=stderr)
-                raise RuntimeError(f"Training script failed with exit code {process.returncode}: {stderr}")
+            if result["returncode"] != 0:
+                logger.error("train_script_failed", exit_code=result["returncode"], stderr=stderr)
+                raise RuntimeError(f"Training script failed with exit code {result['returncode']}: {stderr}")
 
             logger.info("train_script_completed", stdout=stdout[:500], stderr=stderr[:500])
 
@@ -240,20 +233,13 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             logger.info("executing_predict_script", command=command, temp_dir=str(temp_dir))
 
             # Execute subprocess
-            process = await asyncio.create_subprocess_shell(
-                command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(temp_dir),
-            )
+            result = await run_shell(command, cwd=str(temp_dir))
+            stdout = result["stdout"]
+            stderr = result["stderr"]
 
-            stdout_bytes, stderr_bytes = await process.communicate()
-            stdout = stdout_bytes.decode("utf-8") if stdout_bytes else ""
-            stderr = stderr_bytes.decode("utf-8") if stderr_bytes else ""
-
-            if process.returncode != 0:
-                logger.error("predict_script_failed", exit_code=process.returncode, stderr=stderr)
-                raise RuntimeError(f"Prediction script failed with exit code {process.returncode}: {stderr}")
+            if result["returncode"] != 0:
+                logger.error("predict_script_failed", exit_code=result["returncode"], stderr=stderr)
+                raise RuntimeError(f"Prediction script failed with exit code {result['returncode']}: {stderr}")
 
             logger.info("predict_script_completed", stdout=stdout[:500], stderr=stderr[:500])
 

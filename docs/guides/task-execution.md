@@ -424,6 +424,77 @@ def multiply(a: int, b: int) -> dict[str, int]:
     return {"result": a * b}
 ```
 
+### Shell Command Task
+
+```python
+from chapkit.task import run_shell
+
+@TaskRegistry.register("backup_database", tags=["admin", "backup"])
+async def backup_database(database_url: str, s3_bucket: str) -> dict[str, object]:
+    """Backup database to S3 using shell commands."""
+    # Dump database
+    dump_result = await run_shell(
+        f"pg_dump {database_url} | gzip > /tmp/backup.sql.gz",
+        timeout=300.0
+    )
+
+    if dump_result["returncode"] != 0:
+        return {
+            "status": "failed",
+            "step": "dump",
+            "error": dump_result["stderr"]
+        }
+
+    # Upload to S3
+    upload_result = await run_shell(
+        f"aws s3 cp /tmp/backup.sql.gz s3://{s3_bucket}/backup.sql.gz",
+        timeout=60.0
+    )
+
+    if upload_result["returncode"] != 0:
+        return {
+            "status": "failed",
+            "step": "upload",
+            "error": upload_result["stderr"]
+        }
+
+    return {
+        "status": "success",
+        "size": len(dump_result["stdout"])
+    }
+
+# Simple shell command task
+@TaskRegistry.register("run_command", tags=["demo", "subprocess"])
+async def run_command(command: str) -> dict[str, object]:
+    """Run a shell command."""
+    return await run_shell(command)
+
+# Shell command with custom working directory and timeout
+@TaskRegistry.register("list_files", tags=["filesystem"])
+async def list_files(directory: str = ".") -> dict[str, object]:
+    """List files in directory."""
+    result = await run_shell("ls -la", cwd=directory, timeout=5.0)
+    return {
+        "directory": directory,
+        "output": result["stdout"],
+        "success": result["returncode"] == 0
+    }
+```
+
+**run_shell() options:**
+- `command: str` - Shell command to execute
+- `timeout: float | None` - Optional timeout in seconds
+- `cwd: str | Path | None` - Optional working directory
+- `env: dict[str, str] | None` - Optional environment variables
+
+**Returns dict with:**
+- `command: str` - The command that was executed
+- `stdout: str` - Standard output (decoded)
+- `stderr: str` - Standard error (decoded)
+- `returncode: int` - Exit code (0 = success, -1 = timeout)
+
+**Note:** `run_shell()` never raises exceptions for non-zero exit codes. Always check `returncode` in the result.
+
 ---
 
 ## Complete Workflow Example

@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI
 from servicekit import Database
 from servicekit.api.dependencies import get_database, get_scheduler
 
+from chapkit import run_shell
 from chapkit.api import ServiceBuilder, ServiceInfo
 from chapkit.artifact import ArtifactHierarchy, ArtifactIn, ArtifactManager, ArtifactRepository
 from chapkit.scheduler import ChapkitJobScheduler
@@ -70,22 +71,8 @@ def multiply_numbers(a: int, b: int) -> dict[str, int]:
 
 @TaskRegistry.register("run_command", tags=["demo", "subprocess"])
 async def run_command(command: str) -> dict[str, object]:
-    """Run a shell command using asyncio subprocess."""
-    import asyncio
-
-    proc = await asyncio.create_subprocess_shell(
-        command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-
-    return {
-        "command": command,
-        "stdout": stdout.decode() if stdout else "",
-        "stderr": stderr.decode() if stderr else "",
-        "returncode": proc.returncode,
-    }
+    """Run a shell command using the run_shell utility."""
+    return await run_shell(command)
 
 
 # ==================== Service Setup ====================

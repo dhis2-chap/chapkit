@@ -66,6 +66,9 @@ from .task import (
     TaskRouter,
 )
 
+# Utils
+from .utils import run_shell
+
 
 def get_alembic_dir() -> Path:
     """Get the path to chapkit's bundled alembic migrations directory."""
@@ -77,6 +80,7 @@ __all__ = [
     "__version__",
     # Utils
     "get_alembic_dir",
+    "run_shell",
     # CLI
     "cli_app",
     # Scheduler
