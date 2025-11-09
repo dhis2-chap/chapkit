@@ -65,6 +65,26 @@ def multiply_numbers(a: int, b: int) -> dict[str, int]:
     return {"result": a * b, "a": a, "b": b}
 
 
+@TaskRegistry.register("run_command", tags=["demo", "subprocess"])
+async def run_command(command: str) -> dict[str, object]:
+    """Run a shell command using asyncio subprocess."""
+    import asyncio
+
+    proc = await asyncio.create_subprocess_shell(
+        command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+
+    return {
+        "command": command,
+        "stdout": stdout.decode() if stdout else "",
+        "stderr": stderr.decode() if stderr else "",
+        "returncode": proc.returncode,
+    }
+
+
 # ==================== Service Setup ====================
 
 
