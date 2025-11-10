@@ -5,10 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Response, status
 from servicekit.api.crud import CrudPermissions, CrudRouter
 
 from ..config.schemas import BaseConfig, ConfigOut
+from ..data import DataFrame
 from .manager import ArtifactManager
 from .schemas import ArtifactIn, ArtifactOut, ArtifactTreeNode
 
@@ -124,3 +125,113 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                 summary="Get artifact config",
                 description="Get configuration linked to this artifact by traversing to root",
             )
+
+        # Download endpoint
+        async def download_artifact(
+            entity_id: str,
+            manager: ArtifactManager = Depends(manager_factory),
+        ) -> Response:
+            """Download artifact content as binary file."""
+            ulid_id = self._parse_ulid(entity_id)
+
+            artifact = await manager.find_by_id(ulid_id)
+            if artifact is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Artifact with id {entity_id} not found",
+                )
+
+            if not isinstance(artifact.data, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Artifact has no downloadable content",
+                )
+
+            content = artifact.data.get("content")
+            if content is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Artifact has no content",
+                )
+
+            content_type = artifact.data.get("content_type", "application/octet-stream")
+
+            # Serialize content to bytes based on type
+            if isinstance(content, bytes):
+                # Most common case: ZIP files, PNG images, etc.
+                binary = content
+            elif isinstance(content, DataFrame):
+                # Serialize DataFrame based on content_type
+                if content_type == "text/csv":
+                    csv_string = content.to_csv()
+                    binary = csv_string.encode() if csv_string else b""
+                else:
+                    # Default to JSON for all other types
+                    binary = content.to_json().encode()
+            elif isinstance(content, dict):
+                # DataFrame serialized to dict in database - reconstruct and serialize
+                if content_type == "application/x-pandas-dataframe":
+                    df = DataFrame.model_validate(content)
+                    binary = df.to_json().encode()
+                else:
+                    # Generic dict content - serialize to JSON
+                    import json
+
+                    binary = json.dumps(content).encode()
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Cannot serialize content of type {type(content).__name__}",
+                )
+
+            # Determine filename extension
+            extension_map = {
+                "application/zip": "zip",
+                "text/csv": "csv",
+                "application/json": "json",
+                "application/x-pandas-dataframe": "json",
+                "image/png": "png",
+            }
+            ext = extension_map.get(content_type, "bin")
+
+            return Response(
+                content=binary,
+                media_type=content_type,
+                headers={"Content-Disposition": f"attachment; filename=artifact_{entity_id}.{ext}"},
+            )
+
+        # Metadata endpoint
+        async def get_artifact_metadata(
+            entity_id: str,
+            manager: ArtifactManager = Depends(manager_factory),
+        ) -> dict[str, Any]:
+            """Get only JSON-serializable metadata, excluding binary content."""
+            ulid_id = self._parse_ulid(entity_id)
+
+            artifact = await manager.find_by_id(ulid_id)
+            if artifact is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Artifact with id {entity_id} not found",
+                )
+
+            if not isinstance(artifact.data, dict):
+                return {}
+
+            return artifact.data.get("metadata", {})
+
+        self.register_entity_operation(
+            "download",
+            download_artifact,
+            response_model=None,  # Raw Response, don't serialize
+            summary="Download artifact content",
+            description="Download artifact content as binary file (ZIP, CSV, etc.)",
+        )
+
+        self.register_entity_operation(
+            "metadata",
+            get_artifact_metadata,
+            response_model=dict[str, Any],
+            summary="Get artifact metadata",
+            description="Get JSON-serializable metadata without binary content",
+        )
