@@ -77,18 +77,10 @@ class BaseArtifactData[MetadataT: BaseModel](BaseModel):
     model_config = {"extra": "forbid"}
 
 # Metadata schemas
-class MLTrainingMetadata(BaseModel):
-    """Metadata for ML training artifacts."""
+class MLMetadata(BaseModel):
+    """Metadata for ML artifacts (training and prediction)."""
     config_id: str
     started_at: str  # ISO 8601 format
-    completed_at: str
-    duration_seconds: float
-    status: Literal["success", "failed"]
-
-class MLPredictionMetadata(BaseModel):
-    """Metadata for ML prediction artifacts."""
-    config_id: str
-    started_at: str
     completed_at: str
     duration_seconds: float
     status: Literal["success", "failed"]
@@ -98,7 +90,7 @@ class GenericMetadata(BaseModel):
     model_config = {"extra": "allow"}
 
 # Concrete artifact types
-class MLTrainingArtifactData(BaseArtifactData[MLTrainingMetadata]):
+class MLTrainingArtifactData(BaseArtifactData[MLMetadata]):
     """Schema for ML training artifact data with trained model.
 
     Content varies based on status:
@@ -110,9 +102,9 @@ class MLTrainingArtifactData(BaseArtifactData[MLTrainingMetadata]):
     Note: Content is stored as Python object, PickleType handles DB serialization.
     """
     type: Literal["ml_training"] = "ml_training"
-    metadata: MLTrainingMetadata
+    metadata: MLMetadata
 
-class MLPredictionArtifactData(BaseArtifactData[MLPredictionMetadata]):
+class MLPredictionArtifactData(BaseArtifactData[MLMetadata]):
     """Schema for ML prediction artifact data with results.
 
     Content varies based on status:
@@ -124,7 +116,7 @@ class MLPredictionArtifactData(BaseArtifactData[MLPredictionMetadata]):
     Note: Content is stored as Python object, PickleType handles DB serialization.
     """
     type: Literal["ml_prediction"] = "ml_prediction"
-    metadata: MLPredictionMetadata
+    metadata: MLMetadata
 
 class GenericArtifactData(BaseArtifactData[GenericMetadata]):
     """Schema for generic artifact data with free-form metadata."""
@@ -369,7 +361,7 @@ import zipfile
 from io import BytesIO
 from datetime import UTC, datetime
 from pathlib import Path
-from chapkit.artifact.data_schemas import MLTrainingArtifactData, MLTrainingMetadata
+from chapkit.artifact.data_schemas import MLTrainingArtifactData, MLMetadata
 
 # Most common case: ZIP entire training directory
 zip_buffer = BytesIO()
@@ -382,7 +374,7 @@ with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
 zip_bytes = zip_buffer.getvalue()
 
 # Create strongly-typed metadata
-metadata = MLTrainingMetadata(
+metadata = MLMetadata(
     config_id=str(config_id),
     started_at=started_at.isoformat(),
     completed_at=datetime.now(UTC).isoformat(),
@@ -416,7 +408,7 @@ print(f"Size: {training_data.content_size} bytes")
 import zipfile
 from io import BytesIO
 from datetime import UTC, datetime
-from chapkit.artifact.data_schemas import MLTrainingArtifactData, MLTrainingMetadata
+from chapkit.artifact.data_schemas import MLTrainingArtifactData, MLMetadata
 
 # Zip entire temp directory for debugging
 zip_buffer = BytesIO()
@@ -429,7 +421,7 @@ with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
 zip_bytes = zip_buffer.getvalue()
 
 # Create metadata for failed training
-metadata = MLTrainingMetadata(
+metadata = MLMetadata(
     config_id=str(config_id),
     started_at=started_at.isoformat(),
     completed_at=datetime.now(UTC).isoformat(),
