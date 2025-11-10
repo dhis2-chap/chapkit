@@ -1,0 +1,521 @@
+# Design: Typed Artifact Data with Download Support
+
+## Status
+**Proposed** - November 2025
+
+## Problem Statement
+
+The current artifact system has several limitations that make it difficult to work with artifacts containing both JSON metadata and binary content:
+
+### Current Architecture
+- Artifacts store data in a single `data` column using SQLAlchemy's `PickleType`
+- The `data` field accepts `Any` type, allowing arbitrary Python objects
+- When retrieved via HTTP API, non-JSON-serializable objects are converted to metadata placeholders
+- No way for external clients to download the actual binary content (trained models, datasets, etc.)
+
+### Specific Issues
+
+1. **No Binary Downloads**: ML models and other binary artifacts cannot be downloaded by external clients
+2. **Untyped Data**: No validation or type safety for artifact data structures
+3. **Metadata Loss**: Important metadata is hidden inside pickled objects, not queryable
+4. **Poor API Experience**: Clients receive placeholder metadata instead of actual data
+5. **No Content Separation**: Metadata and binary content are mixed together
+
+### Example Problem
+
+When storing a trained ML model:
+
+```python
+# What you store (internally)
+artifact = Artifact(data=trained_sklearn_model)
+
+# What API clients get back
+{
+  "id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "data": {
+    "_type": "LinearRegression",
+    "_serialization_error": "Object is not JSON-serializable",
+    "_repr": "LinearRegression(fit_intercept=True)"
+  }
+}
+# ❌ Cannot download the actual model
+```
+
+## Proposed Solution
+
+Introduce a typed artifact data system using Pydantic discriminated unions with a `type` field, standardize the structure for metadata and content, and add download endpoints.
+
+### Key Design Principles
+
+1. **Type Safety**: Use Pydantic discriminated unions for validation
+2. **Backward Compatible**: No database migrations, support legacy data
+3. **Simple Storage**: Keep using PickleType, add structure at application layer
+4. **Clear Separation**: Distinguish metadata (JSON) from content (binary)
+5. **Download Support**: Add endpoints for binary content retrieval
+
+## Technical Design
+
+### 1. Typed Artifact Data Schemas
+
+Create typed schemas using Pydantic discriminated unions:
+
+```python
+# src/chapkit/artifact/data_schemas.py (NEW)
+
+from typing import Annotated, Any, Literal
+from pydantic import BaseModel, Field
+
+class BaseArtifactData(BaseModel):
+    """Base class for all artifact data types."""
+    type: str = Field(description="Discriminator field for artifact type")
+    model_config = {"extra": "forbid"}
+
+class MLTrainingArtifactData(BaseArtifactData):
+    """Schema for ML training artifact data with trained model."""
+    type: Literal["ml_training"] = "ml_training"
+    ml_type: Literal["ml_training"] = "ml_training"  # Specific to ML artifacts
+    config_id: str
+    started_at: str
+    completed_at: str
+    duration_seconds: float
+    model: Any  # The trained model object (pickleable)
+    model_type: str | None = None
+    model_size_bytes: int | None = None
+
+    model_config = {"arbitrary_types_allowed": True, "extra": "forbid"}
+
+class MLPredictionArtifactData(BaseArtifactData):
+    """Schema for ML prediction artifact data with results."""
+    type: Literal["ml_prediction"] = "ml_prediction"
+    ml_type: Literal["ml_prediction"] = "ml_prediction"
+    config_id: str
+    training_artifact_id: str
+    started_at: str
+    completed_at: str
+    duration_seconds: float
+    predictions: DataFrame
+
+    model_config = {"extra": "forbid"}
+
+class GenericArtifactData(BaseArtifactData):
+    """Schema for generic artifact data with free-form structure."""
+    type: Literal["generic"] = "generic"
+    model_config = {"extra": "allow", "arbitrary_types_allowed": True}
+
+# Discriminated union type
+ArtifactData = Annotated[
+    MLTrainingArtifactData | MLPredictionArtifactData | GenericArtifactData,
+    Field(discriminator="type")
+]
+```
+
+### 2. Type Field Structure
+
+The design uses two related type fields:
+
+- **`type`**: Base discriminator for Pydantic unions (`"ml_training"`, `"ml_prediction"`, `"generic"`)
+- **`ml_type`**: ML-specific field (only present in ML artifact types)
+
+This allows:
+- Pydantic to route to correct schema based on `type`
+- ML-specific logic to use `ml_type` as before
+- Generic artifacts to not have ML-specific fields
+
+### 3. Download Endpoints
+
+Add new operations to the artifact router:
+
+```python
+# src/chapkit/artifact/router.py
+
+@router.get("/{artifact_id}/$download")
+async def download_artifact(artifact_id: str) -> Response:
+    """Download artifact data as pickled binary."""
+    artifact = await manager.find_by_id(artifact_id)
+    if not artifact:
+        raise HTTPException(status_code=404)
+
+    # Return pickled bytes
+    pickled_data = pickle.dumps(artifact.data)
+    return Response(
+        content=pickled_data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename=artifact_{artifact_id}.pkl"
+        }
+    )
+
+@router.get("/{artifact_id}/$metadata")
+async def get_artifact_metadata(artifact_id: str) -> dict:
+    """Get only JSON-serializable metadata, excluding binary content."""
+    artifact = await manager.find_by_id(artifact_id)
+    if not artifact:
+        raise HTTPException(status_code=404)
+
+    return manager.extract_metadata(artifact)
+```
+
+### 4. Manager Methods
+
+Add helper methods to ArtifactManager:
+
+```python
+# src/chapkit/artifact/manager.py
+
+class ArtifactManager(BaseManager):
+
+    def extract_metadata(self, artifact: Artifact) -> dict:
+        """Extract JSON-serializable metadata from artifact data."""
+        data = artifact.data
+
+        if not isinstance(data, dict):
+            return {}
+
+        # Extract all JSON-serializable fields
+        metadata = {}
+        for key, value in data.items():
+            try:
+                json.dumps(value)  # Test if JSON-serializable
+                metadata[key] = value
+            except (TypeError, ValueError):
+                # Skip non-JSON fields (like model objects)
+                continue
+
+        return metadata
+
+    async def pre_save(self, entity: Artifact, data: ArtifactIn):
+        """Validate artifact data if typed."""
+        if isinstance(data.data, dict) and "type" in data.data:
+            from chapkit.artifact.data_schemas import validate_artifact_data
+            validate_artifact_data(data.data)
+
+        await super().pre_save(entity, data)
+```
+
+### 5. Storage Format
+
+No changes to database schema - continue using PickleType:
+
+```python
+# src/chapkit/artifact/models.py (NO CHANGE)
+
+class Artifact(Entity):
+    data: Mapped[Any] = mapped_column(PickleType(protocol=4), nullable=False)
+    # ... rest unchanged
+```
+
+The typed structure is enforced at the application layer, pickled objects in the database remain transparent.
+
+## Implementation Phases
+
+### Phase 1: Core Schemas (Week 1)
+- [ ] Create `src/chapkit/artifact/data_schemas.py`
+- [ ] Implement `BaseArtifactData`, `MLTrainingArtifactData`, `MLPredictionArtifactData`, `GenericArtifactData`
+- [ ] Add `validate_artifact_data()` helper
+- [ ] Add tests for schema validation
+- [ ] Add tests for discriminated union behavior
+
+### Phase 2: ML Module Integration (Week 1)
+- [ ] Update `ml/manager.py` to use `MLTrainingArtifactData`
+- [ ] Update `ml/manager.py` to use `MLPredictionArtifactData`
+- [ ] Update `ml/schemas.py` to re-export from `data_schemas`
+- [ ] Update type checks to use `type` field (with `ml_type` fallback)
+- [ ] Update ML tests
+
+### Phase 3: Download Endpoints (Week 2)
+- [ ] Add `GET /{id}/$download` endpoint to `artifact/router.py`
+- [ ] Add `GET /{id}/$metadata` endpoint to `artifact/router.py`
+- [ ] Add `extract_metadata()` method to `artifact/manager.py`
+- [ ] Add tests for download endpoints
+- [ ] Update Postman collection
+
+### Phase 4: Examples and Documentation (Week 2)
+- [ ] Update `examples/artifact/main.py` to demonstrate typed artifacts
+- [ ] Add download examples to Postman collection
+- [ ] Update docstrings throughout
+- [ ] Add migration guide for users
+
+### Phase 5: Optional Enhancements (Future)
+- [ ] Add content-type detection for downloads
+- [ ] Add compression support for large artifacts
+- [ ] Add streaming support for very large artifacts
+- [ ] Consider external blob storage for huge files
+
+## API Examples
+
+### Creating a Typed ML Training Artifact
+
+```python
+from chapkit.artifact.data_schemas import MLTrainingArtifactData
+
+# Create typed data
+training_data = MLTrainingArtifactData(
+    type="ml_training",
+    ml_type="ml_training",
+    config_id=str(config_id),
+    model=trained_model,
+    started_at=datetime.now(UTC).isoformat(),
+    completed_at=datetime.now(UTC).isoformat(),
+    duration_seconds=42.5,
+    model_type="sklearn.ensemble.RandomForestClassifier",
+    model_size_bytes=1048576,
+)
+
+# Save artifact
+artifact = await artifact_manager.save(
+    ArtifactIn(data=training_data.model_dump())
+)
+```
+
+### Retrieving Metadata vs Downloading Binary
+
+```bash
+# Get artifact with metadata (JSON response)
+GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV
+# Returns JSON with all JSON-serializable fields
+
+# Get only metadata (excludes binary content)
+GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$metadata
+# Returns JSON with just config_id, timestamps, model_type, etc.
+
+# Download binary content
+GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download
+# Returns pickled bytes as application/octet-stream
+```
+
+### Using Downloaded Artifacts
+
+```python
+import pickle
+import requests
+
+# Download artifact
+response = requests.get(
+    "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download"
+)
+artifact_data = pickle.loads(response.content)
+
+# Access typed data
+if artifact_data["type"] == "ml_training":
+    model = artifact_data["model"]
+    predictions = model.predict(X_test)
+```
+
+## Backward Compatibility
+
+### Legacy Data Support
+
+The design maintains full backward compatibility:
+
+1. **Legacy `ml_type` field**: Validation checks both `type` and `ml_type`
+2. **Untyped artifacts**: Generic artifacts accept any structure
+3. **No migration**: Existing pickled data works without changes
+4. **Gradual adoption**: Can mix typed and untyped artifacts
+
+### Migration Strategy
+
+```python
+# Validation helper handles legacy data
+def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
+    """Validate artifact data, supporting legacy formats."""
+
+    # Extract type (with fallback to legacy ml_type)
+    artifact_type = data.get("type") or data.get("ml_type") or "generic"
+
+    # Handle legacy ml_type field
+    if "ml_type" in data and "type" not in data:
+        data = {**data, "type": data["ml_type"]}
+
+    # Validate with appropriate schema
+    schema_map = {
+        "ml_training": MLTrainingArtifactData,
+        "ml_prediction": MLPredictionArtifactData,
+        "generic": GenericArtifactData,
+    }
+
+    schema = schema_map.get(artifact_type, GenericArtifactData)
+    return schema.model_validate(data)
+```
+
+### Breaking Changes
+
+**None** - This design is fully backward compatible:
+- No database schema changes
+- No changes to existing API endpoints (only additions)
+- Legacy artifacts continue to work
+- New `type` field is added alongside `ml_type`, not replacing it
+
+## Benefits
+
+### For Developers
+1. **Type Safety**: IDE autocomplete and type checking for artifact fields
+2. **Validation**: Pydantic catches data errors at creation time
+3. **Self-Documenting**: Schemas clearly define artifact structure
+4. **Extensibility**: Easy to add new artifact types
+
+### For API Users
+1. **Download Support**: Can retrieve binary content (models, datasets)
+2. **Better Metadata**: JSON responses show queryable metadata
+3. **Clear Structure**: Discriminated types make artifact format explicit
+4. **Flexibility**: Choose between metadata-only or full download
+
+### For System
+1. **No Migration**: No database changes required
+2. **Backward Compatible**: Existing code works unchanged
+3. **Gradual Adoption**: Can migrate incrementally
+4. **Performance**: No storage overhead, same pickle format
+
+## Alternatives Considered
+
+### Alternative 1: Separate Metadata and Content Columns
+
+Split `data` into two columns:
+```python
+metadata: Mapped[dict] = mapped_column(JSON)
+content: Mapped[bytes | None] = mapped_column(LargeBinary)
+```
+
+**Rejected because:**
+- Requires database migration
+- Breaking change for existing data
+- More complex to implement
+- Overkill for current needs
+
+### Alternative 2: Base64 Encoding in JSON Column
+
+Store everything as JSON with base64-encoded binary:
+```python
+data: Mapped[dict] = mapped_column(JSON)
+{
+    "metadata": {...},
+    "content": "base64_encoded_string"
+}
+```
+
+**Rejected because:**
+- 33% storage overhead from base64
+- Still requires migration from PickleType
+- Larger payloads over HTTP
+- No clear benefit over pickle
+
+### Alternative 3: External Blob Storage
+
+Store binary content in S3/filesystem, metadata in database.
+
+**Deferred because:**
+- Significantly more complex
+- Requires infrastructure setup
+- Not needed for typical artifact sizes
+- Can be added later if needed
+
+## Open Questions
+
+1. **Content-Type Detection**: Should we detect and return specific content types (e.g., `application/x-sklearn-model`)?
+   - **Resolution**: Start with generic `application/octet-stream`, add specific types later if needed
+
+2. **Compression**: Should we compress large artifacts?
+   - **Resolution**: Not initially, can add transparent gzip compression in future
+
+3. **Size Limits**: What's the maximum artifact size we support?
+   - **Resolution**: Document 100MB soft limit, SQLite hard limit is 1GB
+
+4. **Streaming**: Do we need streaming for very large downloads?
+   - **Resolution**: Not initially, add if users request it
+
+## Security Considerations
+
+1. **Pickle Security**: Unpickling untrusted data can execute arbitrary code
+   - **Mitigation**: Only system-created artifacts are pickled, not user uploads
+   - **Future**: Consider safer serialization for user-uploaded content
+
+2. **Download Access Control**: Who can download artifacts?
+   - **Current**: Same permissions as GET endpoint (no additional restrictions)
+   - **Future**: Could add download-specific permissions if needed
+
+3. **Size-Based DoS**: Large downloads could overwhelm server
+   - **Mitigation**: Document size limits, consider rate limiting in future
+
+## Success Metrics
+
+1. **Adoption**: ML module uses typed artifacts (100% of new code)
+2. **Backward Compatibility**: All existing tests pass without modification
+3. **Performance**: No measurable performance degradation (<5% overhead)
+4. **API Usage**: Download endpoint used by external clients
+5. **Type Safety**: Pydantic catches validation errors during development
+
+## Timeline
+
+- **Week 1**: Core schemas and ML module integration
+- **Week 2**: Download endpoints and examples
+- **Week 3**: Documentation and testing
+- **Week 4**: Review, refinement, and merge
+
+## References
+
+- [Pydantic Discriminated Unions](https://docs.pydantic.dev/latest/concepts/unions/#discriminated-unions)
+- [SQLAlchemy PickleType](https://docs.sqlalchemy.org/en/20/core/type_basics.html#sqlalchemy.types.PickleType)
+- [FastAPI Response Models](https://fastapi.tiangolo.com/tutorial/response-model/)
+- [servicekit Repository Pattern](https://winterop-com.github.io/servicekit)
+
+## Appendix: Complete Schema Examples
+
+### ML Training Artifact
+
+```json
+{
+  "id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "name": "rf-classifier-training",
+  "data": {
+    "type": "ml_training",
+    "ml_type": "ml_training",
+    "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+    "model_type": "sklearn.ensemble.RandomForestClassifier",
+    "model_size_bytes": 1048576,
+    "started_at": "2025-01-10T10:00:00Z",
+    "completed_at": "2025-01-10T10:00:42Z",
+    "duration_seconds": 42.5,
+    "model": "<non-serializable: RandomForestClassifier>"
+  },
+  "level": 0,
+  "parent_id": null
+}
+```
+
+### ML Prediction Artifact
+
+```json
+{
+  "id": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+  "name": "predictions-2025-01-10",
+  "data": {
+    "type": "ml_prediction",
+    "ml_type": "ml_prediction",
+    "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+    "training_artifact_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    "started_at": "2025-01-10T11:00:00Z",
+    "completed_at": "2025-01-10T11:00:05Z",
+    "duration_seconds": 5.2,
+    "predictions": "<DataFrame with 1000 rows>"
+  },
+  "level": 1,
+  "parent_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+}
+```
+
+### Generic Artifact
+
+```json
+{
+  "id": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+  "name": "experiment-metadata",
+  "data": {
+    "type": "generic",
+    "experiment_name": "rainfall-prediction-v1",
+    "dataset_path": "/data/rainfall_2024.csv",
+    "notes": "Initial baseline experiment",
+    "custom_field": "arbitrary value"
+  },
+  "level": 0,
+  "parent_id": null
+}
+```
