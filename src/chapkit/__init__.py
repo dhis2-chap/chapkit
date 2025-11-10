@@ -53,19 +53,21 @@ from .ml import (
     TrainRequest,
     TrainResponse,
 )
-from .scheduler import ChapkitJobRecord, ChapkitJobScheduler
+from .scheduler import ChapkitJobRecord, ChapkitScheduler, InMemoryScheduler
 
 # Task feature
 from .task import (
-    Task,
-    TaskIn,
-    TaskManager,
-    TaskOut,
+    ParameterInfo,
+    TaskExecuteRequest,
+    TaskExecuteResponse,
+    TaskExecutor,
+    TaskInfo,
     TaskRegistry,
-    TaskRepository,
     TaskRouter,
-    validate_and_disable_orphaned_tasks,
 )
+
+# Utils
+from .utils import run_shell
 
 
 def get_alembic_dir() -> Path:
@@ -78,11 +80,13 @@ __all__ = [
     "__version__",
     # Utils
     "get_alembic_dir",
+    "run_shell",
     # CLI
     "cli_app",
     # Scheduler
     "ChapkitJobRecord",
-    "ChapkitJobScheduler",
+    "ChapkitScheduler",
+    "InMemoryScheduler",
     # Artifact
     "Artifact",
     "ArtifactHierarchy",
@@ -114,12 +118,11 @@ __all__ = [
     "TrainRequest",
     "TrainResponse",
     # Task
-    "Task",
-    "TaskIn",
-    "TaskManager",
-    "TaskOut",
+    "ParameterInfo",
+    "TaskExecuteRequest",
+    "TaskExecuteResponse",
+    "TaskExecutor",
+    "TaskInfo",
     "TaskRegistry",
-    "TaskRepository",
     "TaskRouter",
-    "validate_and_disable_orphaned_tasks",
 ]

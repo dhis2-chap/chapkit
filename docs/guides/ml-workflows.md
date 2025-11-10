@@ -36,7 +36,7 @@ app = (
     MLServiceBuilder(
         info=MLServiceInfo(display_name="My ML Service"),
         config_schema=ModelConfig,
-        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "model", 1: "predictions"}),
+        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training", 1: "ml_prediction"}),
         runner=runner,
     )
     .build()
@@ -297,7 +297,7 @@ info = MLServiceInfo(
 
 hierarchy = ArtifactHierarchy(
     name="ml_pipeline",
-    level_labels={0: "trained_model", 1: "predictions"},
+    level_labels={0: "ml_training", 1: "ml_prediction"},
 )
 
 app = (
@@ -383,7 +383,7 @@ Train a model asynchronously.
 ```json
 {
   "job_id": "01JOB123...",
-  "model_artifact_id": "01MODEL456...",
+  "artifact_id": "01MODEL456...",
   "message": "Training job submitted. Job ID: 01JOB123..."
 }
 ```
@@ -414,7 +414,7 @@ Make predictions using a trained model.
 **Request:**
 ```json
 {
-  "model_artifact_id": "01MODEL456...",
+  "training_artifact_id": "01MODEL456...",
   "historic": {
     "columns": ["feature1", "feature2"],
     "data": []
@@ -434,7 +434,7 @@ Make predictions using a trained model.
 ```json
 {
   "job_id": "01JOB789...",
-  "prediction_artifact_id": "01PRED012...",
+  "artifact_id": "01PRED012...",
   "message": "Prediction job submitted. Job ID: 01JOB789..."
 }
 ```
@@ -445,7 +445,7 @@ Make predictions using a trained model.
 curl -X POST http://localhost:8000/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
-    "model_artifact_id": "'$MODEL_ARTIFACT_ID'",
+    "training_artifact_id": "'$MODEL_ARTIFACT_ID'",
     "historic": {
       "columns": ["rainfall", "temperature"],
       "data": []
@@ -536,7 +536,7 @@ Stored at hierarchy level 0:
 
 ```json
 {
-  "ml_type": "trained_model",
+  "ml_type": "ml_training",
   "config_id": "01CONFIG...",
   "model": "<pickled model object>",
   "model_type": "sklearn.linear_model.LinearRegression",
@@ -548,7 +548,7 @@ Stored at hierarchy level 0:
 ```
 
 **Fields:**
-- `ml_type`: Always `"trained_model"`
+- `ml_type`: Always `"ml_training"`
 - `config_id`: Config used for training
 - `model`: Pickled model object (any Python object)
 - `model_type`: Fully qualified class name (e.g., `sklearn.linear_model.LinearRegression`)
@@ -562,9 +562,9 @@ Stored at hierarchy level 1 (linked to model):
 
 ```json
 {
-  "ml_type": "prediction",
+  "ml_type": "ml_prediction",
   "config_id": "01CONFIG...",
-  "model_artifact_id": "01MODEL...",
+  "training_artifact_id": "01MODEL...",
   "predictions": {
     "columns": ["feature1", "feature2", "sample_0"],
     "data": [[1.5, 2.5, 12.3], [2.5, 3.5, 17.8]]
@@ -576,9 +576,9 @@ Stored at hierarchy level 1 (linked to model):
 ```
 
 **Fields:**
-- `ml_type`: Always `"prediction"`
+- `ml_type`: Always `"ml_prediction"`
 - `config_id`: Config used for prediction
-- `model_artifact_id`: Parent trained model artifact
+- `training_artifact_id`: Parent trained model artifact
 - `predictions`: Result DataFrame (DataFrame schema)
 - `started_at`, `completed_at`: ISO timestamps
 - `duration_seconds`: Prediction duration (rounded to 2 decimals)
@@ -616,7 +616,7 @@ TRAIN_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train \
   }')
 
 JOB_ID=$(echo $TRAIN_RESPONSE | jq -r '.job_id')
-MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.model_artifact_id')
+MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.artifact_id')
 
 echo "Training Job ID: $JOB_ID"
 echo "Model Artifact ID: $MODEL_ARTIFACT_ID"
@@ -631,7 +631,7 @@ curl http://localhost:8000/api/v1/artifacts/$MODEL_ARTIFACT_ID | jq
 PREDICT_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
-    "model_artifact_id": "'$MODEL_ARTIFACT_ID'",
+    "training_artifact_id": "'$MODEL_ARTIFACT_ID'",
     "historic": {
       "columns": ["rainfall", "mean_temperature"],
       "data": []
@@ -647,7 +647,7 @@ PREDICT_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict \
   }')
 
 PRED_JOB_ID=$(echo $PREDICT_RESPONSE | jq -r '.job_id')
-PRED_ARTIFACT_ID=$(echo $PREDICT_RESPONSE | jq -r '.prediction_artifact_id')
+PRED_ARTIFACT_ID=$(echo $PREDICT_RESPONSE | jq -r '.artifact_id')
 
 # 7. Wait for predictions
 curl -N http://localhost:8000/api/v1/jobs/$PRED_JOB_ID/\$stream
@@ -777,7 +777,7 @@ TRAIN=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train -d '{
   "data":{"columns":["a","b","y"],"data":[[1,2,10],[2,3,15],[3,4,20]]}
 }')
 
-MODEL_ID=$(echo $TRAIN | jq -r '.model_artifact_id')
+MODEL_ID=$(echo $TRAIN | jq -r '.artifact_id')
 JOB_ID=$(echo $TRAIN | jq -r '.job_id')
 
 # Wait for completion
@@ -786,12 +786,12 @@ curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq '.status'
 
 # Predict
 PRED=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict -d '{
-  "model_artifact_id":"'$MODEL_ID'",
+  "training_artifact_id":"'$MODEL_ID'",
   "historic":{"columns":["a","b"],"data":[]},
   "future":{"columns":["a","b"],"data":[[1.5,2.5],[2.5,3.5]]}
 }')
 
-PRED_ID=$(echo $PRED | jq -r '.prediction_artifact_id')
+PRED_ID=$(echo $PRED | jq -r '.artifact_id')
 sleep 2
 
 # View results
@@ -836,7 +836,7 @@ def test_train_predict_workflow(client: TestClient):
 
     train_data = train_resp.json()
     job_id = train_data["job_id"]
-    model_id = train_data["model_artifact_id"]
+    model_id = train_data["artifact_id"]
 
     # Wait for training
     job = wait_for_job(client, job_id)
@@ -844,12 +844,12 @@ def test_train_predict_workflow(client: TestClient):
 
     # Verify model artifact
     model_artifact = client.get(f"/api/v1/artifacts/{model_id}").json()
-    assert model_artifact["data"]["ml_type"] == "trained_model"
+    assert model_artifact["data"]["ml_type"] == "ml_training"
     assert model_artifact["level"] == 0
 
     # Predict
     pred_resp = client.post("/api/v1/ml/$predict", json={
-        "model_artifact_id": model_id,
+        "training_artifact_id": model_id,
         "historic": {
             "columns": ["x1", "x2"],
             "data": []
@@ -863,7 +863,7 @@ def test_train_predict_workflow(client: TestClient):
 
     pred_data = pred_resp.json()
     pred_job_id = pred_data["job_id"]
-    pred_id = pred_data["prediction_artifact_id"]
+    pred_id = pred_data["artifact_id"]
 
     # Wait for prediction
     pred_job = wait_for_job(client, pred_job_id)
@@ -871,7 +871,7 @@ def test_train_predict_workflow(client: TestClient):
 
     # Verify predictions
     pred_artifact = client.get(f"/api/v1/artifacts/{pred_id}").json()
-    assert pred_artifact["data"]["ml_type"] == "prediction"
+    assert pred_artifact["data"]["ml_type"] == "ml_prediction"
     assert pred_artifact["parent_id"] == model_id
     assert pred_artifact["level"] == 1
     assert "sample_0" in pred_artifact["data"]["predictions"]["columns"]

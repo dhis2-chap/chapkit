@@ -28,35 +28,23 @@ Hierarchical storage system for models, data, and experiment tracking.
 
 ## Task Module
 
-Reusable command templates for shell and Python task execution.
-
-### Models
-
-::: chapkit.task.models
-
-### Schemas
-
-::: chapkit.task.schemas
-
-### Repository
-
-::: chapkit.task.repository
-
-### Manager
-
-::: chapkit.task.manager
-
-### Router
-
-::: chapkit.task.router
+Registry-based task execution system for Python functions with dependency injection.
 
 ### Registry
 
 ::: chapkit.task.registry
 
-### Validation
+### Executor
 
-::: chapkit.task.validation
+::: chapkit.task.executor
+
+### Router
+
+::: chapkit.task.router
+
+### Schemas
+
+::: chapkit.task.schemas
 
 ## Data Module
 

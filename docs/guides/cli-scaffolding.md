@@ -189,12 +189,12 @@ The ML-shell template executes external scripts for training and prediction, ena
 
 ### Task Template
 
-The task template provides a general-purpose task execution system with both Python functions and shell commands:
+The task template provides a general-purpose task execution system for Python functions:
 
 **Pros:**
-- Execute both Python functions and shell commands
+- Execute Python functions as tasks
 - Dependency injection (Database, ArtifactManager, etc.)
-- Dynamic task creation via API
+- Registry-based task management
 - Job-based async execution
 - Task results stored in artifacts
 
@@ -485,7 +485,7 @@ The `examples/` directory contains working examples for each template type:
 - `ml_shell/` - Language-agnostic ML with external scripts (ShellModelRunner)
 
 **Task Template Example:**
-- `task_execution/` - General-purpose task execution with Python functions and shell commands
+- `task_execution/` - General-purpose task execution with Python functions
 
 **Other Examples:**
 - `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts

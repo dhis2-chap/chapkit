@@ -108,11 +108,11 @@ def test_train_model(client: TestClient) -> None:
     train_response = response.json()
 
     assert "job_id" in train_response
-    assert "model_artifact_id" in train_response
+    assert "artifact_id" in train_response
     assert "Training job submitted" in train_response["message"]
 
     job_id = train_response["job_id"]
-    model_artifact_id = train_response["model_artifact_id"]
+    model_artifact_id = train_response["artifact_id"]
 
     # Wait for job completion
     job = wait_for_job_completion(client, job_id)
@@ -134,7 +134,7 @@ def test_train_model(client: TestClient) -> None:
     if isinstance(data, dict):
         # Either it's the actual data dict or it's serialization metadata
         if "ml_type" in data:
-            assert data["ml_type"] == "trained_model"
+            assert data["ml_type"] == "ml_training"
             assert data["config_id"] == config_id
             assert "model" in data
         elif "_type" in data:
@@ -170,7 +170,7 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
     train_response = client.post("/api/v1/ml/$train", json=train_request)
     train_data = train_response.json()
     train_job_id = train_data["job_id"]
-    model_artifact_id = train_data["model_artifact_id"]
+    model_artifact_id = train_data["artifact_id"]
 
     # Wait for training to complete
     train_job = wait_for_job_completion(client, train_job_id)
@@ -178,7 +178,7 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
 
     # 3. Make predictions
     predict_request = {
-        "model_artifact_id": model_artifact_id,
+        "training_artifact_id": model_artifact_id,
         "historic": {
             "columns": ["rainfall", "mean_temperature"],
             "data": [],
@@ -198,8 +198,8 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
     predict_data = predict_response.json()
 
     assert "job_id" in predict_data
-    assert "prediction_artifact_id" in predict_data
-    prediction_artifact_id = predict_data["prediction_artifact_id"]
+    assert "artifact_id" in predict_data
+    prediction_artifact_id = predict_data["artifact_id"]
 
     # Wait for prediction to complete
     predict_job = wait_for_job_completion(client, predict_data["job_id"])
@@ -217,8 +217,8 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
 
     # Check prediction data
     data = artifact["data"]
-    assert data["ml_type"] == "prediction"
-    assert data["model_artifact_id"] == model_artifact_id
+    assert data["ml_type"] == "ml_prediction"
+    assert data["training_artifact_id"] == model_artifact_id
     assert data["config_id"] == config_id
     assert "predictions" in data
 
@@ -254,7 +254,7 @@ def test_train_with_invalid_config_id(client: TestClient) -> None:
 def test_predict_with_invalid_model_artifact(client: TestClient) -> None:
     """Test prediction with non-existent model artifact."""
     predict_request = {
-        "model_artifact_id": "01K72P5N5KCRM6MD3BRE4P0999",  # Non-existent
+        "training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0999",  # Non-existent
         "historic": {
             "columns": ["rainfall", "mean_temperature"],
             "data": [],
@@ -293,7 +293,7 @@ def test_train_request_validation(client: TestClient) -> None:
 
 def test_predict_request_validation(client: TestClient) -> None:
     """Test predict request validation with missing fields."""
-    # Missing model_artifact_id
+    # Missing training_artifact_id
     response = client.post(
         "/api/v1/ml/$predict",
         json={"historic": {"columns": [], "data": []}, "future": {"columns": [], "data": []}},
@@ -303,14 +303,14 @@ def test_predict_request_validation(client: TestClient) -> None:
     # Missing historic
     response = client.post(
         "/api/v1/ml/$predict",
-        json={"model_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "future": {"columns": [], "data": []}},
+        json={"training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "future": {"columns": [], "data": []}},
     )
     assert response.status_code == 422
 
     # Missing future
     response = client.post(
         "/api/v1/ml/$predict",
-        json={"model_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "historic": {"columns": [], "data": []}},
+        json={"training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "historic": {"columns": [], "data": []}},
     )
     assert response.status_code == 422
 
@@ -336,7 +336,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
     }
 
     train_response = client.post("/api/v1/ml/$train", json=train_request)
-    model_artifact_id = train_response.json()["model_artifact_id"]
+    model_artifact_id = train_response.json()["artifact_id"]
     train_job = wait_for_job_completion(client, train_response.json()["job_id"])
     assert train_job["status"] == "completed"
 
@@ -345,7 +345,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
 
     for i in range(3):
         predict_request = {
-            "model_artifact_id": model_artifact_id,
+            "training_artifact_id": model_artifact_id,
             "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
             "future": {"columns": ["rainfall", "mean_temperature"], "data": [[10 + i, 25 + i]]},
         }
@@ -357,7 +357,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
         predict_job = wait_for_job_completion(client, predict_data["job_id"])
         assert predict_job["status"] == "completed"
 
-        prediction_artifact_ids.append(predict_data["prediction_artifact_id"])
+        prediction_artifact_ids.append(predict_data["artifact_id"])
 
     # Verify all prediction artifacts exist and link to the same model
     assert len(set(prediction_artifact_ids)) == 3  # All unique
@@ -367,7 +367,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
         artifact = artifact_response.json()
 
         assert artifact["parent_id"] == model_artifact_id
-        assert artifact["data"]["model_artifact_id"] == model_artifact_id
+        assert artifact["data"]["training_artifact_id"] == model_artifact_id
 
 
 def test_artifact_hierarchy_levels(client: TestClient) -> None:
@@ -387,7 +387,7 @@ def test_artifact_hierarchy_levels(client: TestClient) -> None:
     }
 
     train_response = client.post("/api/v1/ml/$train", json=train_request)
-    model_artifact_id = train_response.json()["model_artifact_id"]
+    model_artifact_id = train_response.json()["artifact_id"]
     wait_for_job_completion(client, train_response.json()["job_id"])
 
     # Get model artifact and check level
@@ -397,13 +397,13 @@ def test_artifact_hierarchy_levels(client: TestClient) -> None:
 
     # Make prediction
     predict_request = {
-        "model_artifact_id": model_artifact_id,
+        "training_artifact_id": model_artifact_id,
         "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
         "future": {"columns": ["rainfall", "mean_temperature"], "data": [[11.0, 26.0]]},
     }
 
     predict_response = client.post("/api/v1/ml/$predict", json=predict_request)
-    prediction_artifact_id = predict_response.json()["prediction_artifact_id"]
+    prediction_artifact_id = predict_response.json()["artifact_id"]
     wait_for_job_completion(client, predict_response.json()["job_id"])
 
     # Get prediction artifact and check level

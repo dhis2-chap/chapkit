@@ -91,7 +91,31 @@
                             "path": ["api", "v1", "configs"]
                         },
                         "description": "Create configuration. Accessible by external scripts via config.yml."
-                    }
+                    },
+                    "response": [
+                        {
+                            "name": "Config Created",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [{"key": "Content-Type", "value": "application/json"}],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"shell_model_config\",\n  \"data\": {}\n}"
+                                },
+                                "url": {
+                                    "raw": "http://localhost:8000/api/v1/configs",
+                                    "host": ["http://localhost:8000"],
+                                    "path": ["api", "v1", "configs"]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [{"key": "Content-Type", "value": "application/json"}],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01JC0001AAAAAAAAAAA0000001\",\n  \"name\": \"shell_model_config\",\n  \"data\": {},\n  \"created_at\": \"2025-11-06T16:00:00Z\",\n  \"updated_at\": \"2025-11-06T16:00:00Z\"\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "List All Configs",
@@ -132,7 +156,7 @@
                                     "if (pm.response.code === 200 || pm.response.code === 202) {",
                                     "    const response = pm.response.json();",
                                     "    pm.collectionVariables.set('train_job_id', response.job_id);",
-                                    "    pm.collectionVariables.set('model_artifact_id', response.model_artifact_id);",
+                                    "    pm.collectionVariables.set('model_artifact_id', response.artifact_id);",
                                     "}"
                                 ],
                                 "type": "text/javascript"
@@ -194,7 +218,7 @@
                                     "if (pm.response.code === 200 || pm.response.code === 202) {",
                                     "    const response = pm.response.json();",
                                     "    pm.collectionVariables.set('predict_job_id', response.job_id);",
-                                    "    pm.collectionVariables.set('prediction_artifact_id', response.prediction_artifact_id);",
+                                    "    pm.collectionVariables.set('prediction_artifact_id', response.artifact_id);",
                                     "}"
                                 ],
                                 "type": "text/javascript"
@@ -323,27 +347,27 @@
         },
         {
             "key": "config_id",
-            "value": "",
+            "value": "01JC0001AAAAAAAAAAA0000001",
             "type": "string"
         },
         {
             "key": "train_job_id",
-            "value": "",
+            "value": "01JC0002BBBBBBBBBBB0000002",
             "type": "string"
         },
         {
             "key": "model_artifact_id",
-            "value": "",
+            "value": "01JC0003CCCCCCCCCCC0000003",
             "type": "string"
         },
         {
             "key": "predict_job_id",
-            "value": "",
+            "value": "01JC0004DDDDDDDDDDD0000004",
             "type": "string"
         },
         {
             "key": "prediction_artifact_id",
-            "value": "",
+            "value": "01JC0005EEEEEEEEEEE0000005",
             "type": "string"
         }
     ]

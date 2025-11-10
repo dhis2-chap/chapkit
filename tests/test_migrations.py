@@ -7,7 +7,6 @@ from servicekit import SqliteDatabaseBuilder
 
 from chapkit.artifact.models import Artifact
 from chapkit.config.models import Config
-from chapkit.task.models import Task
 
 # Path to chapkit's alembic directory
 ALEMBIC_DIR = Path(__file__).parent.parent / "src" / "chapkit" / "alembic"
@@ -51,19 +50,6 @@ class TestMigrations:
                     result = await session.execute(select(Config))
                     loaded_config = result.scalar_one()
                     assert loaded_config.tags == ["config-tag", "production"]
-
-                # Test Task with tags
-                async with db.session() as session:
-                    task = Task(
-                        command="echo test",
-                        task_type="shell",
-                        tags=["task-tag", "daily"],
-                    )
-                    session.add(task)
-                    await session.commit()
-                    await session.refresh(task)
-
-                    assert task.tags == ["task-tag", "daily"]
 
                 # Test Artifact with tags
                 async with db.session() as session:
@@ -128,11 +114,6 @@ class TestMigrations:
                     columns = {row[1] for row in result}
                     assert "tags" in columns, "configs table missing tags column"
 
-                    # Check tasks table
-                    result = await session.execute(text("PRAGMA table_info(tasks)"))
-                    columns = {row[1] for row in result}
-                    assert "tags" in columns, "tasks table missing tags column"
-
                     # Check artifacts table
                     result = await session.execute(text("PRAGMA table_info(artifacts)"))
                     columns = {row[1] for row in result}
@@ -193,11 +174,6 @@ class TestMigrations:
                 mock_op = MockOp()
                 alembic_helpers.drop_config_artifacts_table(mock_op)
                 assert "config_artifacts" in mock_op.dropped_tables
-
-                # Test drop_tasks_table
-                mock_op = MockOp()
-                alembic_helpers.drop_tasks_table(mock_op)
-                assert "tasks" in mock_op.dropped_tables
 
             finally:
                 await db.dispose()

@@ -1,147 +1,607 @@
 {
-	"info": {
-		"_postman_id": "chapkit-task-execution",
-		"name": "Chapkit - Task Execution",
-		"description": "Task execution system demonstrating Python functions and shell commands with dependency injection.\n\n## Features\n- Execute Python functions as tasks\n- Execute shell commands\n- Dependency injection (Database, ArtifactManager)\n- Auto-seeded demo tasks\n- Job scheduling integration\n\n## Quick Start\n1. Start service: `cd examples/task_execution && uv run python main.py`\n2. Run `Check Service Health` to verify\n3. Service auto-seeds 4 example tasks\n4. Execute tasks via API\n\n## Seeded Tasks\n- greet_user - Simple Python function\n- process_data - Python with dependency injection\n- python --version - Shell command\n- echo 'Task system ready!' - Shell command",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"item": [
-		{
-			"name": "1. Health & System",
-			"item": [
-				{
-					"name": "Check Service Health",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/health",
-							"host": ["{{baseUrl}}"],
-							"path": ["health"]
-						}
-					}
-				},
-				{
-					"name": "Get System Info",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/system",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "system"]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "2. Task Management",
-			"item": [
-				{
-					"name": "List All Tasks",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/tasks",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "tasks"]
-						}
-					}
-				},
-				{
-					"name": "Create Python Function Task",
-					"request": {
-						"method": "POST",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"command\": \"greet_user\",\n  \"enabled\": true,\n  \"tags\": [\"python\", \"greet\"]\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/tasks",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "tasks"]
-						}
-					}
-				},
-				{
-					"name": "Create Shell Command Task",
-					"request": {
-						"method": "POST",
-						"header": [{"key": "Content-Type", "value": "application/json"}],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"command\": \"echo 'Hello from task!'\",\n  \"enabled\": true,\n  \"tags\": [\"shell\", \"test\"]\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/tasks",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "tasks"]
-						}
-					}
-				},
-				{
-					"name": "Execute Task (Set task_id variable first)",
-					"request": {
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/tasks/{{task_id}}/$execute",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "tasks", "{{task_id}}", "$execute"]
-						},
-						"description": "Execute a task by ID. Get task_id from List All Tasks response."
-					}
-				}
-			]
-		},
-		{
-			"name": "3. Job Status",
-			"item": [
-				{
-					"name": "List All Jobs",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/jobs",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "jobs"]
-						}
-					}
-				},
-				{
-					"name": "Get Job Status (Set job_id variable first)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/v1/jobs/{{job_id}}",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "jobs", "{{job_id}}"]
-						}
-					}
-				}
-			]
-		}
-	],
-	"variable": [
-		{
-			"key": "baseUrl",
-			"value": "http://localhost:8000",
-			"type": "string"
-		},
-		{
-			"key": "task_id",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "job_id",
-			"value": "",
-			"type": "string"
-		}
-	]
+    "info": {
+        "_postman_id": "chapkit-task-execution-task-service",
+        "name": "Chapkit - Task Execution - Task Execution",
+        "description": "Registry-based task execution service for Chapkit - Task Execution.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Execute Python functions as tasks\n- Dependency injection (Database, ArtifactManager, ChapkitJobScheduler, AsyncSession)\n- Tag-based task organization\n- Job scheduling integration\n- Artifact result storage\n\n**Registered Tasks:**\n- greet_user (tags: demo, simple)\n- process_data (tags: demo, injection)\n- count_files (tags: demo, filesystem)\n- multiply_numbers (tags: demo, math)\n- run_command (tags: demo, subprocess)",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Service Health & Info",
+            "item": [
+                {
+                    "name": "Check Service Health",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/health",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "health"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get System Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/system",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "system"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "2. Task Discovery",
+            "item": [
+                {
+                    "name": "List All Tasks",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "tasks"
+                            ]
+                        },
+                        "description": "List all registered tasks with metadata (name, signature, parameters, docstring, tags)"
+                    },
+                    "response": [
+                        {
+                            "name": "All Tasks",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "http://localhost:8000/api/v1/tasks",
+                                    "host": [
+                                        "http://localhost:8000"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "tasks"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "[\n  {\n    \"name\": \"greet_user\",\n    \"docstring\": \"Simple task that returns a greeting.\",\n    \"signature\": \"(name: str = 'World') -> dict[str, str]\",\n    \"parameters\": [\n      {\n        \"name\": \"name\",\n        \"annotation\": \"<class 'str'>\",\n        \"default\": \"'World'\",\n        \"required\": false\n      }\n    ],\n    \"tags\": [\"demo\", \"simple\"]\n  }\n]"
+                        }
+                    ]
+                },
+                {
+                    "name": "Get Task by Name",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/greet_user",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "tasks",
+                                "greet_user"
+                            ]
+                        },
+                        "description": "Get task metadata by URL-safe name"
+                    },
+                    "response": [
+                        {
+                            "name": "Task Info",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "http://localhost:8000/api/v1/tasks/greet_user",
+                                    "host": [
+                                        "http://localhost:8000"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "tasks",
+                                        "greet_user"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"name\": \"greet_user\",\n  \"docstring\": \"Simple task that returns a greeting.\",\n  \"signature\": \"(name: str = 'World') -> dict[str, str]\",\n  \"parameters\": [\n    {\n      \"name\": \"name\",\n      \"annotation\": \"<class 'str'>\",\n      \"default\": \"'World'\",\n      \"required\": false\n    }\n  ],\n  \"tags\": [\"demo\", \"simple\"]\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "3. Task Execution",
+            "item": [
+                {
+                    "name": "Execute greet_user (no params)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/greet_user/$execute",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "tasks",
+                                "greet_user",
+                                "$execute"
+                            ]
+                        },
+                        "description": "Execute task by name. Returns job_id for polling."
+                    }
+                },
+                {
+                    "name": "Execute greet_user (with params)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"params\": {\n    \"name\": \"Claude\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/greet_user/$execute",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "tasks",
+                                "greet_user",
+                                "$execute"
+                            ]
+                        },
+                        "description": "Execute task with runtime parameters"
+                    }
+                },
+                {
+                    "name": "Execute multiply_numbers",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"params\": {\n    \"a\": 6,\n    \"b\": 7\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/multiply_numbers/$execute",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "tasks",
+                                "multiply_numbers",
+                                "$execute"
+                            ]
+                        },
+                        "description": "Execute synchronous task with multiple parameters"
+                    }
+                },
+                {
+                    "name": "Execute process_data (with injection)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/process_data/$execute",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "tasks",
+                                "process_data",
+                                "$execute"
+                            ]
+                        },
+                        "description": "Execute task with dependency injection. Database and ArtifactManager are injected automatically."
+                    }
+                },
+                {
+                    "name": "Execute count_files",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200 || pm.response.code === 202) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.collectionVariables.set('job_id', response.job_id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"params\": {\n    \"directory\": \".\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/tasks/count_files/$execute",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "tasks",
+                                "count_files",
+                                "$execute"
+                            ]
+                        },
+                        "description": "Execute task with optional parameter (uses default if not provided)"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "4. Job & Artifact Management",
+            "item": [
+                {
+                    "name": "List All Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "jobs"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Job Status",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const job = pm.response.json();",
+                                    "    if (job.status === 'completed' && job.result) {",
+                                    "        pm.collectionVariables.set('artifact_id', job.result);",
+                                    "    }",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs/{%raw%}{{job_id}}{%endraw%}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "jobs",
+                                "{%raw%}{{job_id}}{%endraw%}"
+                            ]
+                        },
+                        "description": "Poll job status. When completed, result field contains artifact_id with task results."
+                    },
+                    "response": [
+                        {
+                            "name": "Job Completed",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "http://localhost:8000/api/v1/jobs/01JC0002JJJJJJJJJJJ0000002",
+                                    "host": [
+                                        "http://localhost:8000"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "jobs",
+                                        "01JC0002JJJJJJJJJJJ0000002"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01JC0002JJJJJJJJJJJ0000002\",\n  \"status\": \"completed\",\n  \"result\": \"01JC0003AAAAAAAAAAA0000003\",\n  \"created_at\": \"2025-11-06T16:00:00Z\",\n  \"updated_at\": \"2025-11-06T16:00:05Z\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List Completed Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs?status_filter=completed",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "jobs"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status_filter",
+                                    "value": "completed"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "List Failed Jobs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/jobs?status_filter=failed",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "jobs"
+                            ],
+                            "query": [
+                                {
+                                    "key": "status_filter",
+                                    "value": "failed"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Result Artifact",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{%raw%}{{artifact_id}}{%endraw%}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{%raw%}{{artifact_id}}{%endraw%}"
+                            ]
+                        },
+                        "description": "Retrieve artifact containing task execution results. Artifact ID is extracted from job result field."
+                    },
+                    "response": [
+                        {
+                            "name": "Task Result Artifact",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "http://localhost:8000/api/v1/artifacts/01JC0003AAAAAAAAAAA0000003",
+                                    "host": [
+                                        "http://localhost:8000"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "artifacts",
+                                        "01JC0003AAAAAAAAAAA0000003"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n  \"id\": \"01JC0003AAAAAAAAAAA0000003\",\n  \"data\": {\n    \"task_name\": \"greet_user\",\n    \"params\": {\"name\": \"Claude\"},\n    \"result\": {\"message\": \"Hello, Claude!\"},\n    \"error\": null\n  },\n  \"parent_id\": null,\n  \"created_at\": \"2025-11-06T16:00:05Z\",\n  \"updated_at\": \"2025-11-06T16:00:05Z\"\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "List All Artifacts",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8000",
+            "type": "string"
+        },
+        {
+            "key": "job_id",
+            "value": "01JC0002JJJJJJJJJJJ0000002",
+            "type": "string"
+        },
+        {
+            "key": "artifact_id",
+            "value": "01JC0003AAAAAAAAAAA0000003",
+            "type": "string"
+        }
+    ]
 }

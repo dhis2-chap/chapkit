@@ -14,7 +14,7 @@ from chapkit.artifact import ArtifactManager, ArtifactRepository
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, TrainRequest
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import InMemoryScheduler
 
 
 class SimpleConfig(BaseConfig):
@@ -75,7 +75,7 @@ async def ml_manager() -> AsyncIterator[MLManager]:
     database = SqliteDatabaseBuilder().in_memory().build()
     await database.init()
 
-    scheduler = ChapkitJobScheduler()
+    scheduler = InMemoryScheduler()
 
     runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
 
@@ -123,10 +123,10 @@ async def test_training_timing_metadata_captured(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
-    assert artifact.data["ml_type"] == "trained_model"
+    assert artifact.data["ml_type"] == "ml_training"
 
     # Verify timing metadata exists
     assert "started_at" in artifact.data
@@ -171,7 +171,7 @@ async def test_prediction_timing_metadata_captured(
 
     # Submit prediction job
     predict_request = PredictRequest(
-        model_artifact_id=ULID.from_str(train_response.model_artifact_id),
+        training_artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -184,10 +184,10 @@ async def test_prediction_timing_metadata_captured(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.prediction_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.artifact_id))
 
     assert artifact is not None
-    assert artifact.data["ml_type"] == "prediction"
+    assert artifact.data["ml_type"] == "ml_prediction"
 
     # Verify timing metadata exists
     assert "started_at" in artifact.data
@@ -230,7 +230,7 @@ async def test_timing_metadata_iso_format(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     # Verify ISO format can be parsed
@@ -262,7 +262,7 @@ async def test_timing_duration_rounded_to_two_decimals(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     duration = artifact.data["duration_seconds"]
@@ -292,17 +292,17 @@ async def test_original_metadata_preserved(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        train_artifact = await artifact_manager.find_by_id(ULID.from_str(train_response.model_artifact_id))
+        train_artifact = await artifact_manager.find_by_id(ULID.from_str(train_response.artifact_id))
 
     # Original fields should still exist
     assert train_artifact is not None
-    assert train_artifact.data["ml_type"] == "trained_model"
+    assert train_artifact.data["ml_type"] == "ml_training"
     assert train_artifact.data["config_id"] == str(config_id)
     assert "model" in train_artifact.data
 
     # Predict
     predict_request = PredictRequest(
-        model_artifact_id=ULID.from_str(train_response.model_artifact_id),
+        training_artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -313,12 +313,12 @@ async def test_original_metadata_preserved(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        predict_artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.prediction_artifact_id))
+        predict_artifact = await artifact_manager.find_by_id(ULID.from_str(predict_response.artifact_id))
 
     # Original fields should still exist
     assert predict_artifact is not None
-    assert predict_artifact.data["ml_type"] == "prediction"
-    assert predict_artifact.data["model_artifact_id"] == str(train_response.model_artifact_id)
+    assert predict_artifact.data["ml_type"] == "ml_prediction"
+    assert predict_artifact.data["training_artifact_id"] == str(train_response.artifact_id)
     assert predict_artifact.data["config_id"] == str(config_id)
     assert "predictions" in predict_artifact.data
 
@@ -339,7 +339,7 @@ async def test_model_type_captured_in_training_artifact(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     assert "model_type" in artifact.data
@@ -367,7 +367,7 @@ async def test_model_size_bytes_captured_in_training_artifact(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     assert "model_size_bytes" in artifact.data
@@ -386,7 +386,7 @@ async def test_model_metrics_are_optional_fields(
 
     # Create artifact data with None values for optional fields
     artifact_data = TrainedModelArtifactData(
-        ml_type="trained_model",
+        ml_type="ml_training",
         config_id="01K72P5N5KCRM6MD3BRE4P0001",
         model={"test": "model"},
         started_at="2025-01-01T00:00:00+00:00",
@@ -402,7 +402,7 @@ async def test_model_metrics_are_optional_fields(
 
     # Verify schema can omit these fields entirely
     artifact_data_minimal = TrainedModelArtifactData(
-        ml_type="trained_model",
+        ml_type="ml_training",
         config_id="01K72P5N5KCRM6MD3BRE4P0001",
         model={"test": "model"},
         started_at="2025-01-01T00:00:00+00:00",
@@ -422,7 +422,7 @@ async def test_model_type_extracts_from_dict_wrapped_models(
     database = SqliteDatabaseBuilder().in_memory().build()
     await database.init()
 
-    scheduler = ChapkitJobScheduler()
+    scheduler = InMemoryScheduler()
     runner = FunctionalModelRunner(on_train=dict_wrapped_train, on_predict=simple_predict)
     manager = MLManager(runner, scheduler, database, SimpleConfig)
 
@@ -447,7 +447,7 @@ async def test_model_type_extracts_from_dict_wrapped_models(
     async with manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     assert "model_type" in artifact.data
@@ -473,7 +473,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     train_df = pd.DataFrame({"feature1": [1, 2, 3], "feature2": [4, 5, 6], "target": [7, 8, 9]})
 
     # Train simple model (small dict)
-    scheduler1 = ChapkitJobScheduler()
+    scheduler1 = InMemoryScheduler()
     runner1 = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
     manager1 = MLManager(runner1, scheduler1, database, SimpleConfig)
 
@@ -485,7 +485,7 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     await asyncio.sleep(0.5)
 
     # Train complex model (dict with nested model object)
-    scheduler2 = ChapkitJobScheduler()
+    scheduler2 = InMemoryScheduler()
     runner2 = FunctionalModelRunner(on_train=dict_wrapped_train, on_predict=simple_predict)
     manager2 = MLManager(runner2, scheduler2, database, SimpleConfig)
 
@@ -500,8 +500,8 @@ async def test_model_size_bytes_varies_with_complexity() -> None:
     async with database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact1 = await artifact_manager.find_by_id(ULID.from_str(response1.model_artifact_id))
-        artifact2 = await artifact_manager.find_by_id(ULID.from_str(response2.model_artifact_id))
+        artifact1 = await artifact_manager.find_by_id(ULID.from_str(response1.artifact_id))
+        artifact2 = await artifact_manager.find_by_id(ULID.from_str(response2.artifact_id))
 
     assert artifact1 is not None
     assert artifact2 is not None
@@ -534,7 +534,7 @@ async def test_model_metrics_present_alongside_timing_metadata(
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
-        artifact = await artifact_manager.find_by_id(ULID.from_str(response.model_artifact_id))
+        artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
     data = artifact.data
@@ -557,3 +557,44 @@ async def test_model_metrics_present_alongside_timing_metadata(
     assert isinstance(data["model_type"], str)
     assert isinstance(data["model_size_bytes"], int)
     assert isinstance(data["duration_seconds"], (int, float))
+
+
+async def test_predict_with_wrong_artifact_type_raises_error(ml_manager: MLManager, setup_data: tuple) -> None:
+    """Test that predicting with a non-training artifact raises ValueError."""
+    from chapkit.artifact import ArtifactIn
+
+    _, _, predict_df = setup_data
+
+    # Create an artifact with wrong ml_type (not a training artifact)
+    wrong_artifact_id = ULID()
+    async with ml_manager.database.session() as session:
+        artifact_repo = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repo)
+
+        # Create artifact with ml_type="ml_prediction" instead of "ml_training"
+        await artifact_manager.save(
+            ArtifactIn(
+                id=wrong_artifact_id,
+                data={"ml_type": "ml_prediction", "some_data": "test"},
+                parent_id=None,
+                level=0,
+            )
+        )
+
+    # Try to predict using this wrong artifact
+    predict_request = PredictRequest(
+        training_artifact_id=wrong_artifact_id,
+        historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
+        future=DataFrame.from_pandas(predict_df),
+    )
+
+    response = await ml_manager.execute_predict(predict_request)
+    job_id = ULID.from_str(response.job_id)
+
+    # Wait for job to fail
+    await asyncio.sleep(0.5)
+
+    # Check that job failed with the right error
+    record = await ml_manager.scheduler.get_record(job_id)
+    assert record.status == "failed"
+    assert "is not a training artifact" in str(record.error)
