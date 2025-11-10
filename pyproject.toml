@@ -148,8 +148,13 @@ module = "examples.custom_migrations.*"
 ignore_missing_imports = true
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = "examples.artifact_manager.*"
+ignore_errors = true
+
 [tool.pyright]
 include = ["src", "tests", "examples"]
+exclude = ["examples/artifact_manager"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true

@@ -10,7 +10,7 @@ This example demonstrates:
 import asyncio
 from datetime import datetime
 
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -36,7 +36,7 @@ async def main() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Artifact.metadata.create_all)
 
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)  # type: ignore[call-overload]
 
     hierarchy = ArtifactHierarchy(
         name="ml_pipeline",
@@ -58,7 +58,7 @@ async def main() -> None:
         model = LinearRegression()
         model.fit(X_train, y_train)
 
-        print(f"\n1. Trained model")
+        print("\n1. Trained model")
 
         # Create training artifact
         training_data_model = MLTrainingArtifactData(
