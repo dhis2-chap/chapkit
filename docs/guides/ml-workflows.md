@@ -79,15 +79,15 @@ runner = CustomModelRunner()
 
 ```python
 from chapkit.ml import ShellModelRunner
-import sys
 
+# Use any command - python, Rscript, julia, or custom binaries
 train_command = (
-    f"{sys.executable} scripts/train.py "
+    "python scripts/train.py "
     "--config {config_file} --data {data_file} --model {model_file}"
 )
 
 predict_command = (
-    f"{sys.executable} scripts/predict.py "
+    "python scripts/predict.py "
     "--config {config_file} --model {model_file} "
     "--future {future_file} --output {output_file}"
 )
@@ -724,13 +724,20 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
 # - Container-friendly workflows
 
 from chapkit.ml import ShellModelRunner
-import sys
 
+# Python example - just use "python"
 runner = ShellModelRunner(
-    train_command=f"{sys.executable} scripts/train_model.py --config {{config_file}} --data {{data_file}} --model {{model_file}}",
-    predict_command=f"{sys.executable} scripts/predict_model.py --config {{config_file}} --model {{model_file}} --future {{future_file}} --output {{output_file}}",
+    train_command="python scripts/train_model.py --config {config_file} --data {data_file} --model {model_file}",
+    predict_command="python scripts/predict_model.py --config {config_file} --model {model_file} --future {future_file} --output {output_file}",
     model_format="pickle"
 )
+
+# Or use any other language - Rscript, julia, etc.
+# runner = ShellModelRunner(
+#     train_command="Rscript scripts/train.R --config {config_file} --data {data_file} --model {model_file}",
+#     predict_command="Rscript scripts/predict.R --config {config_file} --model {model_file} --future {future_file} --output {output_file}",
+#     model_format="rds"
+# )
 ```
 
 **External Script Example (R):**

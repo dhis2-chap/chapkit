@@ -8,7 +8,6 @@ This example demonstrates:
 - Integration with existing scripts without modification
 """
 
-import sys
 from pathlib import Path
 
 from chapkit import BaseConfig
@@ -39,15 +38,12 @@ class DiseaseConfig(BaseConfig):
 
 # Training command template
 train_command = (
-    f"{sys.executable} {SCRIPTS_DIR}/train_model.py "
-    "--config {config_file} "
-    "--data {data_file} "
-    "--model {model_file}"
+    f"python {SCRIPTS_DIR}/train_model.py --config {{config_file}} --data {{data_file}} --model {{model_file}}"
 )
 
 # Prediction command template
 predict_command = (
-    f"{sys.executable} {SCRIPTS_DIR}/predict_model.py "
+    f"python {SCRIPTS_DIR}/predict_model.py "
     "--config {config_file} "
     "--model {model_file} "
     "--historic {historic_file} "

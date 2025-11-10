@@ -1,6 +1,5 @@
 """Tests for ShellModelRunner implementation."""
 
-import sys
 import tempfile
 from pathlib import Path
 
@@ -22,7 +21,7 @@ class MockConfig(BaseConfig):
 async def test_shell_runner_train_basic() -> None:
     """Test basic training with shell runner using echo command."""
     # Create a pickled model file using python
-    train_command = f"{sys.executable} -c \"import pickle; pickle.dump('trained_model', open('{{model_file}}', 'wb'))\""
+    train_command = "python -c \"import pickle; pickle.dump('trained_model', open('{model_file}', 'wb'))\""
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
@@ -99,7 +98,7 @@ print("Training completed")
         script_path = f.name
 
     try:
-        train_command = f"{sys.executable} {script_path} {{config_file}} {{data_file}} {{model_file}}"
+        train_command = f"python {script_path} {{config_file}} {{data_file}} {{model_file}}"
 
         runner: ShellModelRunner[MockConfig] = ShellModelRunner(
             train_command=train_command,
@@ -156,7 +155,7 @@ print("Prediction completed")
         script_path = f.name
 
     try:
-        predict_command = f"{sys.executable} {script_path} {{model_file}} {{future_file}} {{output_file}}"
+        predict_command = f"python {script_path} {{model_file}} {{future_file}} {{output_file}}"
 
         runner: ShellModelRunner[MockConfig] = ShellModelRunner(
             train_command="echo 'model' > {model_file}",
@@ -271,7 +270,7 @@ print("Prediction completed without model file")
 
     try:
         # Note: predict command doesn't use {model_file}
-        predict_command = f"{sys.executable} {script_path} {{future_file}} {{output_file}}"
+        predict_command = f"python {script_path} {{future_file}} {{output_file}}"
 
         runner: ShellModelRunner[MockConfig] = ShellModelRunner(
             train_command="echo 'no model file'",
@@ -325,7 +324,7 @@ async def test_shell_runner_variable_substitution() -> None:
     # Test that the runner creates the expected files with substituted paths
     # This is implicitly tested by the other tests, but we verify explicitly here
 
-    train_command = f"{sys.executable} -c \"import pickle; pickle.dump('model', open('{{model_file}}', 'wb'))\""
+    train_command = "python -c \"import pickle; pickle.dump('model', open('{model_file}', 'wb'))\""
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
@@ -353,7 +352,7 @@ async def test_shell_runner_cleanup_temp_files() -> None:
 
     temp_dirs_before = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
 
-    train_command = f"{sys.executable} -c \"import pickle; pickle.dump('model', open('{{model_file}}', 'wb'))\""
+    train_command = "python -c \"import pickle; pickle.dump('model', open('{model_file}', 'wb'))\""
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command="echo 'predictions' > {output_file}",
