@@ -465,34 +465,34 @@ GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download
 ### Using Downloaded Artifacts
 
 ```python
-import joblib
+import zipfile
 import requests
+from io import BytesIO
 
-# First, get metadata to understand what format to expect
-metadata_response = requests.get(
-    "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$metadata"
+# First, get artifact to check content_type
+artifact_response = requests.get(
+    "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV"
 )
-metadata = metadata_response.json()
-model_format = metadata["model_format"]  # "joblib"
+artifact = artifact_response.json()
+content_type = artifact["data"]["content_type"]  # "application/zip"
 
 # Download binary content
 download_response = requests.get(
     "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download"
 )
 
-# Deserialize based on format
-if model_format == "joblib":
-    model = joblib.loads(download_response.content)
-elif model_format == "pytorch":
-    import torch
-    import io
-    model = torch.load(io.BytesIO(download_response.content))
-elif model_format == "onnx":
-    import onnx
-    model = onnx.load(io.BytesIO(download_response.content))
+# Most common case: Extract ZIP archive
+if content_type == "application/zip":
+    with zipfile.ZipFile(BytesIO(download_response.content)) as zip_file:
+        # Extract model file
+        model_bytes = zip_file.read("model.joblib")
 
-# Use the model
-predictions = model.predict(X_test)
+        # Load the model
+        import joblib
+        model = joblib.loads(model_bytes)
+
+        # Use the model
+        predictions = model.predict(X_test)
 ```
 
 ### Creating a Generic Artifact with ZIP File
@@ -766,6 +766,8 @@ Store binary content in S3/filesystem, metadata in database.
 }
 ```
 
+**Note**: `content` is stored as a DataFrame Python object (PickleType handles DB serialization). On download via `/$download`, it's serialized to the format specified by `content_type` (CSV in this example).
+
 ### Generic Artifact
 
 ```json
@@ -774,10 +776,15 @@ Store binary content in S3/filesystem, metadata in database.
   "name": "experiment-metadata",
   "data": {
     "type": "generic",
-    "experiment_name": "rainfall-prediction-v1",
-    "dataset_path": "/data/rainfall_2024.csv",
-    "notes": "Initial baseline experiment",
-    "custom_field": "arbitrary value"
+    "metadata": {
+      "experiment_name": "rainfall-prediction-v1",
+      "dataset_path": "/data/rainfall_2024.csv",
+      "notes": "Initial baseline experiment",
+      "custom_field": "arbitrary value"
+    },
+    "content": null,
+    "content_type": null,
+    "content_size": null
   },
   "level": 0,
   "parent_id": null
