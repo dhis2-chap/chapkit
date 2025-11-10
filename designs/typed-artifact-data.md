@@ -85,7 +85,6 @@ class MLTrainingMetadata(BaseModel):
     completed_at: str
     duration_seconds: float
     status: Literal["success", "failed"]
-    model_type: str | None = None  # e.g., "sklearn.ensemble.RandomForestClassifier" - None if failed
 
 class MLPredictionMetadata(BaseModel):
     """Metadata for ML prediction artifacts."""
@@ -166,7 +165,7 @@ Artifacts are created **after** job completion, with `status` indicating outcome
 - `metadata.status = "success"`
 - `content` = serialized model/predictions in original format
 - `content_type` = format-specific MIME type
-- Model metadata fields populated (model_type, model_format, etc.)
+- All required metadata fields populated
 
 **Failed:**
 - `metadata.status = "failed"`
@@ -397,7 +396,6 @@ metadata = MLTrainingMetadata(
     completed_at=datetime.now(UTC).isoformat(),
     duration_seconds=42.5,
     status="success",
-    model_type="sklearn.ensemble.RandomForestClassifier",
 )
 
 # Create typed artifact data
@@ -416,7 +414,7 @@ artifact = await artifact_manager.save(
 
 # Type-safe access
 print(f"Status: {training_data.metadata.status}")
-print(f"Model type: {training_data.metadata.model_type}")  # IDE autocomplete!
+print(f"Duration: {training_data.metadata.duration_seconds}s")  # IDE autocomplete!
 print(f"Size: {training_data.content_size} bytes")
 ```
 
@@ -446,7 +444,6 @@ metadata = MLTrainingMetadata(
     completed_at=datetime.now(UTC).isoformat(),
     duration_seconds=15.2,
     status="failed",
-    model_type=None,  # No model produced
 )
 
 # Create artifact with zipped temp directory
@@ -474,7 +471,7 @@ GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV
 
 # Get only metadata (excludes binary content entirely)
 GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$metadata
-# Returns: {"ml_type": "ml_training", "config_id": "...", "model_type": "...", ...}
+# Returns: {"ml_type": "ml_training", "config_id": "...", "status": "success", ...}
 
 # Download binary content in ORIGINAL format
 GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download
@@ -751,14 +748,17 @@ Store binary content in S3/filesystem, metadata in database.
   "name": "rf-classifier-training",
   "data": {
     "type": "ml_training",
-    "ml_type": "ml_training",
-    "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
-    "model_type": "sklearn.ensemble.RandomForestClassifier",
-    "model_size_bytes": 1048576,
-    "started_at": "2025-01-10T10:00:00Z",
-    "completed_at": "2025-01-10T10:00:42Z",
-    "duration_seconds": 42.5,
-    "model": "<non-serializable: RandomForestClassifier>"
+    "metadata": {
+      "ml_type": "ml_training",
+      "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "started_at": "2025-01-10T10:00:00Z",
+      "completed_at": "2025-01-10T10:00:42Z",
+      "duration_seconds": 42.5,
+      "status": "success"
+    },
+    "content": "<bytes: ZIP file>",
+    "content_type": "application/zip",
+    "content_size": 1048576
   },
   "level": 0,
   "parent_id": null
