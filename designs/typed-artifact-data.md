@@ -79,7 +79,6 @@ class BaseArtifactData[MetadataT: BaseModel](BaseModel):
 # Metadata schemas
 class MLTrainingMetadata(BaseModel):
     """Metadata for ML training artifacts."""
-    ml_type: Literal["ml_training"] = "ml_training"
     config_id: str
     started_at: str  # ISO 8601 format
     completed_at: str
@@ -88,7 +87,6 @@ class MLTrainingMetadata(BaseModel):
 
 class MLPredictionMetadata(BaseModel):
     """Metadata for ML prediction artifacts."""
-    ml_type: Literal["ml_prediction"] = "ml_prediction"
     config_id: str
     training_artifact_id: str
     started_at: str
@@ -191,17 +189,16 @@ if training_artifact.metadata.status != "success":
 
 ### 3. Type Field Structure
 
-The design uses two related type fields:
+The design uses a single `type` field at the root level:
 
-- **`type`**: Base discriminator for Pydantic unions (`"ml_training"`, `"ml_prediction"`, `"generic"`)
-- **`ml_type`**: ML-specific field (only present in ML artifact types)
+- **`type`**: Discriminator for Pydantic unions (`"ml_training"`, `"ml_prediction"`, `"generic"`)
 
 This allows:
 - Pydantic to route to correct schema based on `type`
-- ML-specific logic to use `ml_type` as before
-- Generic artifacts to not have ML-specific fields
+- ML logic to determine artifact type from `artifact.data["type"]`
+- Simple, non-redundant design
 
-### 3. Download Endpoints
+### 4. Download Endpoints
 
 Add new operations to the artifact router:
 
@@ -281,7 +278,7 @@ async def get_artifact_metadata(artifact_id: str) -> dict:
 - No complex serializer registry needed
 - Raises error for unsupported content types (no pickle fallback)
 
-### 4. Manager Methods
+### 5. Manager Methods
 
 Add helper methods to ArtifactManager:
 
@@ -318,7 +315,7 @@ class ArtifactManager(BaseManager):
         await super().pre_save(entity, data)
 ```
 
-### 5. Storage Format
+### 6. Storage Format
 
 No changes to database schema - continue using PickleType:
 
@@ -345,7 +342,7 @@ The typed structure is enforced at the application layer, pickled objects in the
 - [ ] Update `ml/manager.py` to use `MLTrainingArtifactData`
 - [ ] Update `ml/manager.py` to use `MLPredictionArtifactData`
 - [ ] Update `ml/schemas.py` to re-export from `data_schemas`
-- [ ] Update type checks to use `type` field (with `ml_type` fallback)
+- [ ] Update type checks to use `type` field
 - [ ] Update ML tests
 
 ### Phase 3: Download Endpoints (Week 2)
@@ -390,7 +387,6 @@ zip_bytes = zip_buffer.getvalue()
 
 # Create strongly-typed metadata
 metadata = MLTrainingMetadata(
-    ml_type="ml_training",
     config_id=str(config_id),
     started_at=started_at.isoformat(),
     completed_at=datetime.now(UTC).isoformat(),
@@ -438,7 +434,6 @@ zip_bytes = zip_buffer.getvalue()
 
 # Create metadata for failed training
 metadata = MLTrainingMetadata(
-    ml_type="ml_training",
     config_id=str(config_id),
     started_at=started_at.isoformat(),
     completed_at=datetime.now(UTC).isoformat(),
@@ -471,7 +466,7 @@ GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV
 
 # Get only metadata (excludes binary content entirely)
 GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$metadata
-# Returns: {"ml_type": "ml_training", "config_id": "...", "status": "success", ...}
+# Returns: {"config_id": "...", "status": "success", "started_at": "...", ...}
 
 # Download binary content in ORIGINAL format
 GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download
@@ -586,26 +581,21 @@ with zipfile.ZipFile(BytesIO(download_response.content)) as zip_file:
 
 ### Legacy Data Support
 
-The design maintains full backward compatibility:
+The design maintains backward compatibility:
 
-1. **Legacy `ml_type` field**: Validation checks both `type` and `ml_type`
-2. **Untyped artifacts**: Generic artifacts accept any structure
-3. **No migration**: Existing pickled data works without changes
-4. **Gradual adoption**: Can mix typed and untyped artifacts
+1. **Untyped artifacts**: Generic artifacts accept any structure
+2. **No migration**: Existing pickled data works without changes
+3. **Gradual adoption**: Can mix typed and untyped artifacts
 
 ### Migration Strategy
 
 ```python
-# Validation helper handles legacy data
+# Validation helper for artifact data
 def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
-    """Validate artifact data, supporting legacy formats."""
+    """Validate artifact data against appropriate schema."""
 
-    # Extract type (with fallback to legacy ml_type)
-    artifact_type = data.get("type") or data.get("ml_type") or "generic"
-
-    # Handle legacy ml_type field
-    if "ml_type" in data and "type" not in data:
-        data = {**data, "type": data["ml_type"]}
+    # Determine artifact type
+    artifact_type = data.get("type", "generic")
 
     # Validate with appropriate schema
     schema_map = {
@@ -623,8 +613,8 @@ def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
 **None** - This design is fully backward compatible:
 - No database schema changes
 - No changes to existing API endpoints (only additions)
-- Legacy artifacts continue to work
-- New `type` field is added alongside `ml_type`, not replacing it
+- Legacy artifacts continue to work (treated as generic)
+- New artifacts use strongly-typed schemas
 
 ## Benefits
 
@@ -749,7 +739,6 @@ Store binary content in S3/filesystem, metadata in database.
   "data": {
     "type": "ml_training",
     "metadata": {
-      "ml_type": "ml_training",
       "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
       "started_at": "2025-01-10T10:00:00Z",
       "completed_at": "2025-01-10T10:00:42Z",
@@ -773,13 +762,19 @@ Store binary content in S3/filesystem, metadata in database.
   "name": "predictions-2025-01-10",
   "data": {
     "type": "ml_prediction",
-    "ml_type": "ml_prediction",
-    "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
-    "training_artifact_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-    "started_at": "2025-01-10T11:00:00Z",
-    "completed_at": "2025-01-10T11:00:05Z",
-    "duration_seconds": 5.2,
-    "predictions": "<DataFrame with 1000 rows>"
+    "metadata": {
+      "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      "training_artifact_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+      "started_at": "2025-01-10T11:00:00Z",
+      "completed_at": "2025-01-10T11:00:05Z",
+      "duration_seconds": 5.2,
+      "status": "success",
+      "row_count": 1000,
+      "column_count": 5
+    },
+    "content": "<DataFrame with predictions>",
+    "content_type": "text/csv",
+    "content_size": 50000
   },
   "level": 1,
   "parent_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV"
