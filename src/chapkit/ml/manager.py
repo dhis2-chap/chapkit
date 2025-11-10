@@ -12,7 +12,7 @@ from ulid import ULID
 from chapkit.artifact import ArtifactIn, ArtifactManager, ArtifactRepository
 from chapkit.config import ConfigManager, ConfigRepository
 from chapkit.config.schemas import BaseConfig
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import ChapkitScheduler
 
 from .schemas import (
     ModelRunnerProtocol,
@@ -59,7 +59,7 @@ class MLManager(Generic[ConfigT]):
     def __init__(
         self,
         runner: ModelRunnerProtocol[ConfigT],
-        scheduler: ChapkitJobScheduler,
+        scheduler: ChapkitScheduler,
         database: Database,
         config_schema: type[ConfigT],
     ) -> None:
@@ -72,40 +72,40 @@ class MLManager(Generic[ConfigT]):
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""
         # Pre-allocate artifact ID for the trained model
-        model_artifact_id = ULID()
+        artifact_id = ULID()
 
         # Submit job to scheduler
         job_id = await self.scheduler.add_job(
             self._train_task,
             request,
-            model_artifact_id,
+            artifact_id,
         )
 
         return TrainResponse(
             job_id=str(job_id),
-            model_artifact_id=str(model_artifact_id),
+            artifact_id=str(artifact_id),
             message=f"Training job submitted. Job ID: {job_id}",
         )
 
     async def execute_predict(self, request: PredictRequest) -> PredictResponse:
         """Submit a prediction job to the scheduler and return job/artifact IDs."""
         # Pre-allocate artifact ID for predictions
-        prediction_artifact_id = ULID()
+        artifact_id = ULID()
 
         # Submit job to scheduler
         job_id = await self.scheduler.add_job(
             self._predict_task,
             request,
-            prediction_artifact_id,
+            artifact_id,
         )
 
         return PredictResponse(
             job_id=str(job_id),
-            prediction_artifact_id=str(prediction_artifact_id),
+            artifact_id=str(artifact_id),
             message=f"Prediction job submitted. Job ID: {job_id}",
         )
 
-    async def _train_task(self, request: TrainRequest, model_artifact_id: ULID) -> ULID:
+    async def _train_task(self, request: TrainRequest, artifact_id: ULID) -> ULID:
         """Execute training task and store trained model in artifact."""
         # Load config
         async with self.database.session() as session:
@@ -138,7 +138,7 @@ class MLManager(Generic[ConfigT]):
 
             # Create and validate artifact data with Pydantic
             artifact_data_model = TrainedModelArtifactData(
-                ml_type="trained_model",
+                ml_type="ml_training",
                 config_id=str(request.config_id),
                 model=trained_model,
                 started_at=training_started_at.isoformat(),
@@ -150,7 +150,7 @@ class MLManager(Generic[ConfigT]):
 
             await artifact_manager.save(
                 ArtifactIn(
-                    id=model_artifact_id,
+                    id=artifact_id,
                     data=artifact_data_model.model_dump(),
                     parent_id=None,
                     level=0,
@@ -158,29 +158,29 @@ class MLManager(Generic[ConfigT]):
             )
 
             # Link config to root artifact for tree traversal
-            await config_repo.link_artifact(request.config_id, model_artifact_id)
+            await config_repo.link_artifact(request.config_id, artifact_id)
             await config_repo.commit()
 
-        return model_artifact_id
+        return artifact_id
 
-    async def _predict_task(self, request: PredictRequest, prediction_artifact_id: ULID) -> ULID:
+    async def _predict_task(self, request: PredictRequest, artifact_id: ULID) -> ULID:
         """Execute prediction task and store predictions in artifact."""
-        # Load model artifact
+        # Load training artifact
         async with self.database.session() as session:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
-            model_artifact = await artifact_manager.find_by_id(request.model_artifact_id)
+            training_artifact = await artifact_manager.find_by_id(request.training_artifact_id)
 
-            if model_artifact is None:
-                raise ValueError(f"Model artifact {request.model_artifact_id} not found")
+            if training_artifact is None:
+                raise ValueError(f"Training artifact {request.training_artifact_id} not found")
 
         # Extract model and config_id from artifact
-        model_data = model_artifact.data
-        if not isinstance(model_data, dict) or model_data.get("ml_type") != "trained_model":
-            raise ValueError(f"Artifact {request.model_artifact_id} is not a trained model")
+        training_data = training_artifact.data
+        if not isinstance(training_data, dict) or training_data.get("ml_type") != "ml_training":
+            raise ValueError(f"Artifact {request.training_artifact_id} is not a training artifact")
 
-        trained_model = model_data["model"]
-        config_id = ULID.from_str(model_data["config_id"])
+        trained_model = training_data["model"]
+        config_id = ULID.from_str(training_data["config_id"])
 
         # Load config
         async with self.database.session() as session:
@@ -210,8 +210,8 @@ class MLManager(Generic[ConfigT]):
 
             # Create and validate artifact data with Pydantic
             artifact_data_model = PredictionArtifactData(
-                ml_type="prediction",
-                model_artifact_id=str(request.model_artifact_id),
+                ml_type="ml_prediction",
+                training_artifact_id=str(request.training_artifact_id),
                 config_id=str(config_id),
                 predictions=predictions,
                 started_at=prediction_started_at.isoformat(),
@@ -221,11 +221,11 @@ class MLManager(Generic[ConfigT]):
 
             await artifact_manager.save(
                 ArtifactIn(
-                    id=prediction_artifact_id,
+                    id=artifact_id,
                     data=artifact_data_model.model_dump(),
-                    parent_id=request.model_artifact_id,
+                    parent_id=request.training_artifact_id,
                     level=1,
                 )
             )
 
-        return prediction_artifact_id
+        return artifact_id

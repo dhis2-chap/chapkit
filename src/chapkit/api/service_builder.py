@@ -27,7 +27,7 @@ from chapkit.artifact import (
 )
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigOut, ConfigRepository, ConfigRouter
 from chapkit.ml import MLManager, MLRouter, ModelRunnerProtocol
-from chapkit.scheduler import ChapkitJobScheduler
+from chapkit.scheduler import ChapkitScheduler, InMemoryScheduler
 
 from .dependencies import get_artifact_manager as default_get_artifact_manager
 from .dependencies import get_config_manager as default_get_config_manager
@@ -288,28 +288,28 @@ class ServiceBuilder(BaseServiceBuilder):
 
             runner: ModelRunnerProtocol = ml_runner
             scheduler_base = get_scheduler()
-            # ChapkitJobScheduler extends AIOJobScheduler which extends JobScheduler
-            if not isinstance(scheduler_base, ChapkitJobScheduler):
-                raise RuntimeError("Scheduler must be ChapkitJobScheduler for ML operations")
-            scheduler: ChapkitJobScheduler = scheduler_base
+            # ChapkitScheduler extends AIOJobScheduler which extends JobScheduler
+            if not isinstance(scheduler_base, ChapkitScheduler):
+                raise RuntimeError("Scheduler must be ChapkitScheduler for ML operations")
+            scheduler: ChapkitScheduler = scheduler_base
             database = get_database()
             return MLManager(runner, scheduler, database, config_schema)
 
         return _dependency
 
     def _build_lifespan(self) -> LifespanFactory:
-        """Build lifespan context manager with ChapkitJobScheduler instead of AIOJobScheduler."""
+        """Build lifespan context manager with InMemoryScheduler instead of AIOJobScheduler."""
         # Get parent lifespan factory
         parent_lifespan = super()._build_lifespan()
 
         @asynccontextmanager
         async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-            """Override scheduler creation to use ChapkitJobScheduler."""
+            """Override scheduler creation to use InMemoryScheduler."""
             # Call parent lifespan which handles database and most setup
             async with parent_lifespan(app):
-                # Replace AIOJobScheduler with ChapkitJobScheduler if jobs are enabled
+                # Replace AIOJobScheduler with InMemoryScheduler if jobs are enabled
                 if self._job_options is not None:
-                    scheduler = ChapkitJobScheduler(max_concurrency=self._job_options.max_concurrency)
+                    scheduler = InMemoryScheduler(max_concurrency=self._job_options.max_concurrency)
                     set_scheduler(scheduler)
                     app.state.scheduler = scheduler
 

@@ -123,7 +123,7 @@ app = (
     ServiceBuilder(info=ServiceInfo(display_name="My Service"))
     .with_health()
     .with_config(MyConfig)
-    .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "model"}))
+    .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training", 1: "ml_prediction"}))
     .with_jobs()
     .build()
 )

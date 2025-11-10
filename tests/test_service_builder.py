@@ -97,6 +97,30 @@ def test_valid_ml_service_builds_successfully() -> None:
     assert app is not None
 
 
+async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
+    """Test that ML operations require ChapkitScheduler, not just any scheduler."""
+    from servicekit import AIOJobScheduler
+    from servicekit.api.dependencies import set_scheduler
+
+    builder = ServiceBuilder(info=ServiceInfo(display_name="Test"))
+    hierarchy = ArtifactHierarchy(name="test")
+    runner = DummyRunner()
+
+    # Build ML service to get the dependency
+    builder.with_config(DummyConfig).with_artifacts(hierarchy=hierarchy).with_jobs().with_ml(runner=runner)
+
+    # Get the ML manager dependency function
+    ml_dependency = builder._build_ml_dependency()
+
+    # Override the scheduler with a non-ChapkitScheduler (use plain AIOJobScheduler)
+    wrong_scheduler = AIOJobScheduler()
+    set_scheduler(wrong_scheduler)
+
+    # Try to get ML manager - should fail because scheduler is wrong type
+    with pytest.raises(RuntimeError, match="Scheduler must be ChapkitScheduler"):
+        await ml_dependency()
+
+
 def test_get_alembic_dir_returns_valid_path() -> None:
     """Test that get_alembic_dir returns a valid path to bundled migrations."""
     alembic_dir = get_alembic_dir()

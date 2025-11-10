@@ -482,7 +482,7 @@ app = (
     .with_config(WeatherModelConfig, enable_artifact_operations=True)
     .with_artifacts(hierarchy=ArtifactHierarchy(
         name="weather_models",
-        level_labels={0: "trained_model", 1: "predictions"}
+        level_labels={0: "ml_training", 1: "ml_prediction"}
     ))
     .build()
 )
@@ -517,7 +517,7 @@ TRAIN_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train \
     "data": {...}
   }')
 
-MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.model_artifact_id')
+MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.artifact_id')
 ```
 
 ### 5. Link Model to Config

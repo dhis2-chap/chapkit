@@ -72,7 +72,7 @@ def test_train_with_shell_runner(client: TestClient) -> None:
     train_data = response.json()
 
     job_id = train_data["job_id"]
-    model_artifact_id = train_data["model_artifact_id"]
+    model_artifact_id = train_data["artifact_id"]
 
     # Wait for training
     job = wait_for_job_completion(client, job_id)
@@ -112,7 +112,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
 
     train_response = client.post("/api/v1/ml/$train", json=train_request)
     train_data = train_response.json()
-    model_artifact_id = train_data["model_artifact_id"]
+    model_artifact_id = train_data["artifact_id"]
 
     # Wait for training
     train_job = wait_for_job_completion(client, train_data["job_id"])
@@ -120,7 +120,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
 
     # Make predictions
     predict_request = {
-        "model_artifact_id": model_artifact_id,
+        "training_artifact_id": model_artifact_id,
         "historic": {
             "columns": ["rainfall", "mean_temperature", "humidity"],
             "data": [],
@@ -143,7 +143,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
     assert predict_job["status"] == "completed", f"Prediction failed: {predict_job.get('error')}"
 
     # Verify prediction artifact
-    prediction_artifact_id = predict_data["prediction_artifact_id"]
+    prediction_artifact_id = predict_data["artifact_id"]
     artifact_response = client.get(f"/api/v1/artifacts/{prediction_artifact_id}")
     assert artifact_response.status_code == 200
     artifact = artifact_response.json()
@@ -153,7 +153,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
 
     # Check predictions data
     data = artifact["data"]
-    assert data["ml_type"] == "prediction"
+    assert data["ml_type"] == "ml_prediction"
     assert "predictions" in data
     predictions = data["predictions"]
     assert "sample_0" in predictions["columns"]
@@ -203,7 +203,7 @@ def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
     }
 
     train_response = client.post("/api/v1/ml/$train", json=train_request)
-    model_artifact_id = train_response.json()["model_artifact_id"]
+    model_artifact_id = train_response.json()["artifact_id"]
     train_job = wait_for_job_completion(client, train_response.json()["job_id"])
     assert train_job["status"] == "completed"
 
@@ -212,7 +212,7 @@ def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
 
     for i in range(3):
         predict_request = {
-            "model_artifact_id": model_artifact_id,
+            "training_artifact_id": model_artifact_id,
             "historic": {"columns": ["rainfall", "mean_temperature", "humidity"], "data": []},
             "future": {"columns": ["rainfall", "mean_temperature", "humidity"], "data": [[10 + i, 25 + i, 60 + i]]},
         }
@@ -224,7 +224,7 @@ def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
         predict_job = wait_for_job_completion(client, predict_data["job_id"])
         assert predict_job["status"] == "completed"
 
-        prediction_artifact_ids.append(predict_data["prediction_artifact_id"])
+        prediction_artifact_ids.append(predict_data["artifact_id"])
 
     # Verify all predictions are unique and linked to the same model
     assert len(set(prediction_artifact_ids)) == 3

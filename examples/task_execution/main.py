@@ -75,7 +75,7 @@ def get_task_executor(database: Database = Depends(get_database)) -> TaskExecuto
 # Advanced: For tasks that need job scheduling or artifact storage, uncomment below:
 # from servicekit.api.dependencies import get_scheduler
 # from chapkit.artifact import ArtifactHierarchy, ArtifactManager, ArtifactRepository
-# from chapkit.scheduler import ChapkitJobScheduler
+# from chapkit.scheduler import ChapkitScheduler
 #
 # TASK_HIERARCHY = ArtifactHierarchy(
 #     name="task_results",
@@ -90,7 +90,7 @@ def get_task_executor(database: Database = Depends(get_database)) -> TaskExecuto
 #     async with database.session() as session:
 #         artifact_repo = ArtifactRepository(session)
 #         artifact_manager = ArtifactManager(artifact_repo, hierarchy=TASK_HIERARCHY)
-#         if isinstance(scheduler, ChapkitJobScheduler):
+#         if isinstance(scheduler, ChapkitScheduler):
 #             return TaskExecutor(database, scheduler, artifact_manager)
 #         return TaskExecutor(database)
 #

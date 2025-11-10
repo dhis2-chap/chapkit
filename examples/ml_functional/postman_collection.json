@@ -319,7 +319,7 @@
                                     "if (pm.response.code === 200 || pm.response.code === 202) {",
                                     "    const response = pm.response.json();",
                                     "    pm.collectionVariables.set('train_job_id', response.job_id);",
-                                    "    pm.collectionVariables.set('model_artifact_id', response.model_artifact_id);",
+                                    "    pm.collectionVariables.set('model_artifact_id', response.artifact_id);",
                                     "}"
                                 ],
                                 "type": "text/javascript"
@@ -376,7 +376,7 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n  \"job_id\": \"01K79YAHJ7BR4E87VVTG8FNBMB\",\n  \"model_artifact_id\": \"01K79YAHJ7BR4E87VVTG8FNBMC\",\n  \"status\": \"pending\",\n  \"message\": \"Training job submitted\"\n}"
+                            "body": "{\n  \"job_id\": \"01K79YAHJ7BR4E87VVTG8FNBMB\",\n  \"training_artifact_id\": \"01K79YAHJ7BR4E87VVTG8FNBMC\",\n  \"status\": \"pending\",\n  \"message\": \"Training job submitted\"\n}"
                         }
                     ]
                 },
@@ -565,7 +565,7 @@
                                     "if (pm.response.code === 200 || pm.response.code === 202) {",
                                     "    const response = pm.response.json();",
                                     "    pm.collectionVariables.set('predict_job_id', response.job_id);",
-                                    "    pm.collectionVariables.set('prediction_artifact_id', response.prediction_artifact_id);",
+                                    "    pm.collectionVariables.set('prediction_artifact_id', response.artifact_id);",
                                     "}"
                                 ],
                                 "type": "text/javascript"
@@ -582,7 +582,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"model_artifact_id\": \"{{model_artifact_id}}\",\n  \"historic\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": [\n      [110.0, 26.0],\n      [90.0, 28.0],\n      [125.0, 24.0],\n      [80.0, 29.0]\n    ]\n  }\n}"
+                            "raw": "{\n  \"training_artifact_id\": \"{{model_artifact_id}}\",\n  \"historic\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": [\n      [110.0, 26.0],\n      [90.0, 28.0],\n      [125.0, 24.0],\n      [80.0, 29.0]\n    ]\n  }\n}"
                         },
                         "url": {
                             "raw": "{{baseUrl}}/api/v1/ml/$predict",
@@ -604,7 +604,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"model_artifact_id\": \"01K79YAHJ7BR4E87VVTG8FNBMC\",\n  \"historic\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": [\n      [110.0, 26.0],\n      [90.0, 28.0],\n      [125.0, 24.0],\n      [80.0, 29.0]\n    ]\n  }\n}"
+                                    "raw": "{\n  \"training_artifact_id\": \"01K79YAHJ7BR4E87VVTG8FNBMC\",\n  \"historic\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"rainfall\", \"mean_temperature\"],\n    \"data\": [\n      [110.0, 26.0],\n      [90.0, 28.0],\n      [125.0, 24.0],\n      [80.0, 29.0]\n    ]\n  }\n}"
                                 },
                                 "url": {
                                     "raw": "{{baseUrl}}/api/v1/ml/$predict",

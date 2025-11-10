@@ -37,7 +37,7 @@ app = (
     MLServiceBuilder(
         info=MLServiceInfo(display_name="Disease Prediction Service"),
         config_schema=MyMLConfig,
-        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "model", 1: "predictions"}),
+        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training", 1: "ml_prediction"}),
         runner=FunctionalModelRunner(on_train=train_model, on_predict=predict),
     )
     .with_monitoring()  # Optional: Add Prometheus metrics
