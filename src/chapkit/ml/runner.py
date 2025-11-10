@@ -146,7 +146,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             logger.info("executing_train_script", command=command, temp_dir=str(temp_dir))
 
             # Execute subprocess
-            result = await run_shell(command)
+            result = await run_shell(command, cwd=str(temp_dir))
             stdout = result["stdout"]
             stderr = result["stderr"]
 
@@ -233,7 +233,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             logger.info("executing_predict_script", command=command, temp_dir=str(temp_dir))
 
             # Execute subprocess
-            result = await run_shell(command)
+            result = await run_shell(command, cwd=str(temp_dir))
             stdout = result["stdout"]
             stderr = result["stderr"]
 
