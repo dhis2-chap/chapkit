@@ -530,58 +530,102 @@ Optional geospatial data via `geojson-pydantic`:
 
 ## Artifact Structure
 
-### TrainedModelArtifactData
+Chapkit uses typed artifact data schemas for consistent ML artifact storage with structured metadata.
 
-Stored at hierarchy level 0:
+### ML Training Artifact
+
+Stored at hierarchy level 0 using `MLTrainingArtifactData`:
 
 ```json
 {
-  "ml_type": "ml_training",
-  "config_id": "01CONFIG...",
-  "model": "<pickled model object>",
-  "model_type": "sklearn.linear_model.LinearRegression",
-  "model_size_bytes": 1234,
-  "started_at": "2025-10-14T10:00:00Z",
-  "completed_at": "2025-10-14T10:00:15Z",
-  "duration_seconds": 15.23
+  "type": "ml_training",
+  "metadata": {
+    "status": "success",
+    "config_id": "01CONFIG...",
+    "started_at": "2025-10-14T10:00:00Z",
+    "completed_at": "2025-10-14T10:00:15Z",
+    "duration_seconds": 15.23
+  },
+  "content": "<Python model object>",
+  "content_type": "application/x-pickle",
+  "content_size": 1234
 }
 ```
 
-**Fields:**
-- `ml_type`: Always `"ml_training"`
-- `config_id`: Config used for training
-- `model`: Pickled model object (any Python object)
-- `model_type`: Fully qualified class name (e.g., `sklearn.linear_model.LinearRegression`)
-- `model_size_bytes`: Serialized pickle size
-- `started_at`, `completed_at`: ISO timestamps
-- `duration_seconds`: Training duration (rounded to 2 decimals)
+**Schema Structure:**
+- `type`: Discriminator field - always `"ml_training"`
+- `metadata`: Structured execution metadata
+  - `status`: "success" or "failed"
+  - `config_id`: Config used for training
+  - `started_at`, `completed_at`: ISO 8601 timestamps
+  - `duration_seconds`: Training duration
+- `content`: Trained model (Python object, stored as PickleType)
+- `content_type`: MIME type (e.g., "application/x-pickle")
+- `content_size`: Size in bytes (optional)
 
-### PredictionArtifactData
+### ML Prediction Artifact
 
-Stored at hierarchy level 1 (linked to model):
+Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training artifact):
 
 ```json
 {
-  "ml_type": "ml_prediction",
-  "config_id": "01CONFIG...",
-  "training_artifact_id": "01MODEL...",
-  "predictions": {
+  "type": "ml_prediction",
+  "metadata": {
+    "status": "success",
+    "config_id": "01CONFIG...",
+    "started_at": "2025-10-14T10:05:00Z",
+    "completed_at": "2025-10-14T10:05:02Z",
+    "duration_seconds": 2.15
+  },
+  "content": {
     "columns": ["feature1", "feature2", "sample_0"],
     "data": [[1.5, 2.5, 12.3], [2.5, 3.5, 17.8]]
   },
-  "started_at": "2025-10-14T10:05:00Z",
-  "completed_at": "2025-10-14T10:05:02Z",
-  "duration_seconds": 2.15
+  "content_type": "application/x-pandas-dataframe",
+  "content_size": null
 }
 ```
 
-**Fields:**
-- `ml_type`: Always `"ml_prediction"`
-- `config_id`: Config used for prediction
-- `training_artifact_id`: Parent trained model artifact
-- `predictions`: Result DataFrame (DataFrame schema)
-- `started_at`, `completed_at`: ISO timestamps
-- `duration_seconds`: Prediction duration (rounded to 2 decimals)
+**Schema Structure:**
+- `type`: Discriminator field - always `"ml_prediction"`
+- `metadata`: Structured execution metadata (same as training)
+- `content`: Prediction DataFrame with results
+- `content_type`: "application/x-pandas-dataframe"
+
+### Accessing Artifact Data
+
+```python
+# Get training artifact
+artifact = await artifact_manager.find_by_id(model_artifact_id)
+
+# Access typed data
+assert artifact.data["type"] == "ml_training"
+metadata = artifact.data["metadata"]
+trained_model = artifact.data["content"]
+
+# Metadata fields
+config_id = metadata["config_id"]
+duration = metadata["duration_seconds"]
+status = metadata["status"]
+
+# Get prediction artifact
+pred_artifact = await artifact_manager.find_by_id(prediction_artifact_id)
+predictions_df = pred_artifact.data["content"]  # DataFrame dict
+```
+
+### Download Endpoints
+
+Download artifact content as files:
+
+```bash
+# Download predictions as JSON
+curl -O -J http://localhost:8000/api/v1/artifacts/$PRED_ARTIFACT_ID/\$download
+
+# Get metadata only (no binary content)
+curl http://localhost:8000/api/v1/artifacts/$MODEL_ARTIFACT_ID/\$metadata | jq
+```
+
+See [Artifact Storage Guide](./artifact-storage.md#get-apiv1artifactsiddownload) for more details.
 
 ---
 
@@ -653,7 +697,7 @@ PRED_ARTIFACT_ID=$(echo $PREDICT_RESPONSE | jq -r '.artifact_id')
 curl -N http://localhost:8000/api/v1/jobs/$PRED_JOB_ID/\$stream
 
 # 8. View predictions
-curl http://localhost:8000/api/v1/artifacts/$PRED_ARTIFACT_ID | jq '.data.predictions'
+curl http://localhost:8000/api/v1/artifacts/$PRED_ARTIFACT_ID | jq '.data.content'
 ```
 
 ### Class-Based with Preprocessing
@@ -802,7 +846,7 @@ PRED_ID=$(echo $PRED | jq -r '.artifact_id')
 sleep 2
 
 # View results
-curl http://localhost:8000/api/v1/artifacts/$PRED_ID | jq '.data.predictions'
+curl http://localhost:8000/api/v1/artifacts/$PRED_ID | jq '.data.content'
 ```
 
 ### Automated Testing
@@ -851,7 +895,7 @@ def test_train_predict_workflow(client: TestClient):
 
     # Verify model artifact
     model_artifact = client.get(f"/api/v1/artifacts/{model_id}").json()
-    assert model_artifact["data"]["ml_type"] == "ml_training"
+    assert model_artifact["data"]["type"] == "ml_training"
     assert model_artifact["level"] == 0
 
     # Predict
@@ -878,10 +922,10 @@ def test_train_predict_workflow(client: TestClient):
 
     # Verify predictions
     pred_artifact = client.get(f"/api/v1/artifacts/{pred_id}").json()
-    assert pred_artifact["data"]["ml_type"] == "ml_prediction"
+    assert pred_artifact["data"]["type"] == "ml_prediction"
     assert pred_artifact["parent_id"] == model_id
     assert pred_artifact["level"] == 1
-    assert "sample_0" in pred_artifact["data"]["predictions"]["columns"]
+    assert "sample_0" in pred_artifact["data"]["content"]["columns"]
 ```
 
 ### Browser Testing (Swagger UI)

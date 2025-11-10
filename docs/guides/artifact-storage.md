@@ -125,8 +125,51 @@ artifact = ArtifactIn(
 - `id`: ULID (auto-generated)
 - `parent_id`: Optional parent artifact ID
 - `level`: Hierarchy level (computed from parent)
-- `data`: JSON-serializable dictionary
+- `data`: JSON-serializable dictionary (can use typed schemas - see below)
 - `created_at`, `updated_at`: Timestamps
+
+### Typed Artifact Data
+
+Chapkit provides strongly-typed schemas for artifact data to ensure consistency and enable validation:
+
+```python
+from chapkit.artifact import (
+    MLTrainingArtifactData,
+    MLPredictionArtifactData,
+    GenericArtifactData,
+    MLMetadata
+)
+
+# ML training artifact with typed metadata
+training_data = MLTrainingArtifactData(
+    type="ml_training",
+    metadata=MLMetadata(
+        status="success",
+        config_id="01ABC123...",
+        started_at="2025-10-18T10:00:00Z",
+        completed_at="2025-10-18T10:05:00Z",
+        duration_seconds=300.0
+    ),
+    content=trained_model,  # Python object (stored as PickleType)
+    content_type="application/x-pickle",
+    content_size=1024
+)
+
+# Validate before saving
+artifact_data = training_data.model_dump()
+artifact = await manager.save(ArtifactIn(data=artifact_data))
+```
+
+**Available Schemas:**
+- `MLTrainingArtifactData`: For trained ML models with execution metadata
+- `MLPredictionArtifactData`: For prediction results with execution metadata
+- `GenericArtifactData`: For custom artifacts with flexible metadata
+
+**Benefits:**
+- Type safety and validation
+- Consistent metadata structure
+- Better IDE support and autocomplete
+- Clear separation of metadata vs content
 
 ### ArtifactManager
 
@@ -253,16 +296,72 @@ Get artifact tree structure.
 }
 ```
 
-### POST /api/v1/artifacts/$expand
+### GET /api/v1/artifacts/{id}/$expand
 
-Get artifact with all ancestors and descendants.
+Get artifact with hierarchy metadata but without children array.
 
-**Request:**
+**Response:**
 ```json
 {
-  "artifact_id": "01ARTIFACT456..."
+  "id": "01ARTIFACT456...",
+  "parent_id": null,
+  "level": 0,
+  "level_label": "experiment",
+  "hierarchy": "ml_pipeline",
+  "data": {...},
+  "created_at": "2025-10-18T12:00:00Z",
+  "updated_at": "2025-10-18T12:00:00Z"
 }
 ```
+
+### GET /api/v1/artifacts/{id}/$download
+
+Download artifact content as a binary file.
+
+**Response Headers:**
+- `Content-Type`: Indicates format (e.g., `application/x-pandas-dataframe`, `text/csv`, `application/zip`)
+- `Content-Disposition`: `attachment; filename=artifact_{id}.{ext}`
+
+**Supported Content Types:**
+- DataFrames: Serialized to JSON (orient=records) or CSV
+- Binary data: ZIP files, images, pickled models
+- JSON: Generic dict content
+
+**Example:**
+```bash
+# Download predictions as JSON
+curl -O -J http://localhost:8000/api/v1/artifacts/01PRED123.../$download
+
+# Returns: artifact_01PRED123....json with prediction data
+```
+
+**Response (DataFrame):**
+```json
+[
+  {"rainfall": 110.0, "temperature": 26.0, "prediction": 13.2},
+  {"rainfall": 90.0, "temperature": 28.0, "prediction": 8.5}
+]
+```
+
+### GET /api/v1/artifacts/{id}/$metadata
+
+Get only JSON-serializable metadata without binary content.
+
+**Response:**
+```json
+{
+  "status": "success",
+  "config_id": "01CONFIG123...",
+  "started_at": "2025-10-18T10:00:00Z",
+  "completed_at": "2025-10-18T10:05:00Z",
+  "duration_seconds": 300.0
+}
+```
+
+**Use Cases:**
+- Quick metadata inspection without downloading large files
+- Checking job status and timing information
+- Retrieving execution metadata for monitoring
 
 ---
 
@@ -313,28 +412,42 @@ artifact = await manager.save(ArtifactIn(
 
 ### Storing Model Objects
 
-Use pickle for Python objects:
+Use typed schemas for ML artifacts with PickleType storage:
 
 ```python
-import pickle
-import base64
+from chapkit.artifact import MLTrainingArtifactData, MLMetadata
+from datetime import datetime
 
-# Serialize model
-model_bytes = pickle.dumps(model)
-model_b64 = base64.b64encode(model_bytes).decode('utf-8')
+# Create typed artifact data
+training_data = MLTrainingArtifactData(
+    type="ml_training",
+    metadata=MLMetadata(
+        status="success",
+        config_id=config_id,
+        started_at=started_at.isoformat(),
+        completed_at=datetime.now().isoformat(),
+        duration_seconds=duration
+    ),
+    content=trained_model,  # Python object stored directly
+    content_type="application/x-pickle"
+)
 
+# Save artifact
 artifact = await manager.save(ArtifactIn(
-    data={
-        "model": model_b64,
-        "model_type": type(model).__name__,
-        "model_size": len(model_bytes)
-    }
+    parent_id=parent_id,
+    data=training_data.model_dump()
 ))
 
-# Deserialize
-model_bytes = base64.b64decode(artifact.data["model"])
-model = pickle.loads(model_bytes)
+# Retrieve model
+artifact = await manager.find_by_id(artifact_id)
+trained_model = artifact.data["content"]  # Python object ready to use
 ```
+
+**Advantages:**
+- No manual pickle/unpickle needed
+- Structured metadata with validation
+- Type-safe content access
+- Consistent format across artifacts
 
 ---
 
