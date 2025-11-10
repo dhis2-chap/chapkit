@@ -57,77 +57,75 @@ Introduce a typed artifact data system using Pydantic discriminated unions with 
 
 ### 1. Typed Artifact Data Schemas with Metadata/Content Separation
 
-The key insight: **separate JSON-serializable metadata from binary content at storage time**.
+The key insight: **separate JSON-serializable metadata from binary content at storage time**, using **strongly-typed metadata schemas** with Python 3.13+ generics.
 
 ```python
 # src/chapkit/artifact/data_schemas.py (NEW)
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
-class BaseArtifactData(BaseModel):
-    """Base class for all artifact data types with metadata/content separation."""
+# Generic base class using Python 3.13+ syntax
+class BaseArtifactData[MetadataT: BaseModel](BaseModel):
+    """Base class for all artifact data types with typed metadata."""
     type: str = Field(description="Discriminator field for artifact type")
-    metadata: dict = Field(description="JSON-serializable metadata")
+    metadata: MetadataT = Field(description="Strongly-typed JSON-serializable metadata")
     content: bytes | None = Field(default=None, description="Raw binary content in original format")
-    content_type: str | None = Field(default=None, description="MIME type of content (e.g., application/x-pytorch, application/zip)")
+    content_type: str | None = Field(default=None, description="MIME type of content")
 
     model_config = {"extra": "forbid"}
 
-class MLTrainingArtifactData(BaseArtifactData):
+# Metadata schemas
+class MLTrainingMetadata(BaseModel):
+    """Metadata for ML training artifacts."""
+    ml_type: Literal["ml_training"] = "ml_training"
+    config_id: str
+    started_at: str  # ISO 8601 format
+    completed_at: str
+    duration_seconds: float
+    model_type: str  # e.g., "sklearn.ensemble.RandomForestClassifier"
+    model_size_bytes: int
+    model_format: str  # "joblib", "pytorch", "onnx", "pickle"
+
+class MLPredictionMetadata(BaseModel):
+    """Metadata for ML prediction artifacts."""
+    ml_type: Literal["ml_prediction"] = "ml_prediction"
+    config_id: str
+    training_artifact_id: str
+    started_at: str
+    completed_at: str
+    duration_seconds: float
+    prediction_count: int
+    prediction_format: str  # "csv", "parquet", "json"
+
+class GenericMetadata(BaseModel):
+    """Free-form metadata for generic artifacts."""
+    model_config = {"extra": "allow"}
+
+# Concrete artifact types
+class MLTrainingArtifactData(BaseArtifactData[MLTrainingMetadata]):
     """Schema for ML training artifact data with trained model."""
     type: Literal["ml_training"] = "ml_training"
+    metadata: MLTrainingMetadata
 
-    # metadata contains:
-    # - ml_type: "ml_training"
-    # - config_id: str
-    # - started_at: str (ISO format)
-    # - completed_at: str (ISO format)
-    # - duration_seconds: float
-    # - model_type: str (e.g., "sklearn.linear_model.LinearRegression")
-    # - model_size_bytes: int
-    # - model_format: str (e.g., "joblib", "pytorch", "onnx")
+    # content: Raw model bytes (joblib, pytorch .pt, onnx, etc.)
+    # content_type: "application/x-joblib", "application/x-pytorch", etc.
 
-    # content contains:
-    # - Raw serialized model bytes (joblib, torch.save, etc.)
-    # - NOT pickled Python objects
-
-    # content_type examples:
-    # - "application/x-joblib" for sklearn models
-    # - "application/x-pytorch" for PyTorch models
-    # - "application/x-tensorflow" for TensorFlow
-    # - "application/x-pickle" as fallback
-
-class MLPredictionArtifactData(BaseArtifactData):
+class MLPredictionArtifactData(BaseArtifactData[MLPredictionMetadata]):
     """Schema for ML prediction artifact data with results."""
     type: Literal["ml_prediction"] = "ml_prediction"
+    metadata: MLPredictionMetadata
 
-    # metadata contains:
-    # - ml_type: "ml_prediction"
-    # - config_id: str
-    # - training_artifact_id: str
-    # - started_at: str
-    # - completed_at: str
-    # - duration_seconds: float
-    # - prediction_count: int
-    # - prediction_format: str (e.g., "csv", "parquet", "json")
+    # content: Raw prediction data (CSV, Parquet, JSON bytes)
+    # content_type: "text/csv", "application/x-parquet", "application/json"
 
-    # content contains:
-    # - Raw prediction data (CSV bytes, Parquet bytes, etc.)
-    # - NOT pickled DataFrame objects
-
-    # content_type examples:
-    # - "text/csv" for CSV predictions
-    # - "application/x-parquet" for Parquet
-    # - "application/json" for JSON
-
-class GenericArtifactData(BaseArtifactData):
+class GenericArtifactData(BaseArtifactData[GenericMetadata]):
     """Schema for generic artifact data with free-form metadata."""
     type: Literal["generic"] = "generic"
+    metadata: GenericMetadata
 
-    # metadata: arbitrary JSON dict
-    # content: any binary data
-    # content_type: any MIME type
+    # content: Any binary data
+    # content_type: Any MIME type
 
 # Discriminated union type
 ArtifactData = Annotated[
@@ -136,11 +134,12 @@ ArtifactData = Annotated[
 ]
 ```
 
-**Key Changes:**
-1. All artifact types now have `metadata` (dict), `content` (bytes), and `content_type` (str) fields
-2. Content stores raw bytes in **original format** (not pickle)
-3. Content-Type indicates format for proper download headers
-4. Metadata is always JSON-serializable
+**Key Features:**
+1. **Python 3.13+ generics**: `class BaseArtifactData[MetadataT: BaseModel]` for clean type parameterization
+2. **Strongly-typed metadata**: Separate `Metadata` models with full validation
+3. **Clear separation**: `metadata` (typed JSON) vs `content` (raw bytes)
+4. **Content in original format**: No pickle bytes, store joblib/pytorch/csv/etc. directly
+5. **Type safety**: IDE autocomplete for `artifact.metadata.config_id`
 
 ### 2. Type Field Structure
 
@@ -310,32 +309,40 @@ The typed structure is enforced at the application layer, pickled objects in the
 
 ```python
 import joblib
-from chapkit.artifact.data_schemas import MLTrainingArtifactData
+from datetime import UTC, datetime
+from chapkit.artifact.data_schemas import MLTrainingArtifactData, MLTrainingMetadata
 
 # Serialize model to bytes in original format (joblib, not pickle!)
 model_bytes = joblib.dumps(trained_model)
 
-# Create typed data with metadata/content separation
+# Create strongly-typed metadata
+metadata = MLTrainingMetadata(
+    ml_type="ml_training",
+    config_id=str(config_id),
+    started_at=datetime.now(UTC).isoformat(),
+    completed_at=datetime.now(UTC).isoformat(),
+    duration_seconds=42.5,
+    model_type="sklearn.ensemble.RandomForestClassifier",
+    model_size_bytes=len(model_bytes),
+    model_format="joblib",
+)
+
+# Create typed artifact data with metadata/content separation
 training_data = MLTrainingArtifactData(
     type="ml_training",
-    metadata={
-        "ml_type": "ml_training",
-        "config_id": str(config_id),
-        "started_at": datetime.now(UTC).isoformat(),
-        "completed_at": datetime.now(UTC).isoformat(),
-        "duration_seconds": 42.5,
-        "model_type": "sklearn.ensemble.RandomForestClassifier",
-        "model_size_bytes": len(model_bytes),
-        "model_format": "joblib",
-    },
+    metadata=metadata,  # Strongly-typed!
     content=model_bytes,  # Raw joblib bytes
-    content_type="application/x-joblib",  # MIME type
+    content_type="application/x-joblib",
 )
 
 # Save artifact
 artifact = await artifact_manager.save(
     ArtifactIn(data=training_data.model_dump())
 )
+
+# Type-safe access
+print(f"Model type: {training_data.metadata.model_type}")  # IDE autocomplete!
+print(f"Duration: {training_data.metadata.duration_seconds}s")
 ```
 
 ### Retrieving Metadata vs Downloading Binary
