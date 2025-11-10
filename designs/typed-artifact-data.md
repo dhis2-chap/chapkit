@@ -70,8 +70,9 @@ class BaseArtifactData[MetadataT: BaseModel](BaseModel):
     """Base class for all artifact data types with typed metadata."""
     type: str = Field(description="Discriminator field for artifact type")
     metadata: MetadataT = Field(description="Strongly-typed JSON-serializable metadata")
-    content: bytes | None = Field(default=None, description="Raw binary content in original format")
-    content_type: str | None = Field(default=None, description="MIME type of content")
+    content: JsonSafe = Field(description="Content as Python object (bytes, DataFrame, models, etc.)")
+    content_type: str | None = Field(default=None, description="MIME type for download responses")
+    content_size: int | None = Field(default=None, description="Size of content in bytes")
 
     model_config = {"extra": "forbid"}
 
@@ -85,7 +86,6 @@ class MLTrainingMetadata(BaseModel):
     duration_seconds: float
     status: Literal["success", "failed"]
     model_type: str | None = None  # e.g., "sklearn.ensemble.RandomForestClassifier" - None if failed
-    model_size_bytes: int | None = None  # Size of serialized model - None if failed
 
 class MLPredictionMetadata(BaseModel):
     """Metadata for ML prediction artifacts."""
@@ -109,10 +109,12 @@ class MLTrainingArtifactData(BaseArtifactData[MLTrainingMetadata]):
     """Schema for ML training artifact data with trained model.
 
     Content varies based on status:
-    - success: Serialized model (joblib, pytorch, onnx)
-      - content_type: "application/x-joblib", "application/x-pytorch", etc.
+    - success: Model object (sklearn, pytorch, etc.) or ZIP of training outputs
+      - content_type: "application/zip" (most common)
     - failed: ZIP of entire temp directory for debugging
       - content_type: "application/zip"
+
+    Note: Content is stored as Python object, PickleType handles DB serialization.
     """
     type: Literal["ml_training"] = "ml_training"
     metadata: MLTrainingMetadata
@@ -121,10 +123,12 @@ class MLPredictionArtifactData(BaseArtifactData[MLPredictionMetadata]):
     """Schema for ML prediction artifact data with results.
 
     Content varies based on status:
-    - success: Prediction results (CSV, Parquet, JSON)
-      - content_type: "text/csv", "application/x-parquet", "application/json"
+    - success: DataFrame with predictions or ZIP of prediction outputs
+      - content_type: "text/csv", "application/x-parquet", "application/zip"
     - failed: ZIP of temp directory for debugging
       - content_type: "application/zip"
+
+    Note: Content is stored as Python object, PickleType handles DB serialization.
     """
     type: Literal["ml_prediction"] = "ml_prediction"
     metadata: MLPredictionMetadata
@@ -147,10 +151,12 @@ ArtifactData = Annotated[
 **Key Features:**
 1. **Python 3.13+ generics**: `class BaseArtifactData[MetadataT: BaseModel]` for clean type parameterization
 2. **Strongly-typed metadata**: Separate `Metadata` models with full validation
-3. **Clear separation**: `metadata` (typed JSON) vs `content` (raw bytes)
-4. **Content in original format**: No pickle bytes, store joblib/pytorch/csv/etc. directly
-5. **Type safety**: IDE autocomplete for `artifact.metadata.config_id`
-6. **Status tracking**: Both successful and failed jobs create artifacts with `status` field
+3. **Clear separation**: `metadata` (typed JSON) vs `content` (Python objects)
+4. **Flexible content**: Store any Python object (bytes, DataFrame, models, dicts, etc.)
+5. **Automatic serialization**: PickleType handles DB storage, JsonSafe handles API responses
+6. **Type safety**: IDE autocomplete for `artifact.metadata.config_id`
+7. **Status tracking**: Both successful and failed jobs create artifacts with `status` field
+8. **Simple downloads**: Most downloads (99%) are ZIP files, just return the bytes
 
 ### 2. Artifact Status Pattern
 
@@ -198,43 +204,59 @@ This allows:
 
 ### 3. Download Endpoints
 
-Add new operations to the artifact router that return content in its **original format**:
+Add new operations to the artifact router:
 
 ```python
 # src/chapkit/artifact/router.py
 
+from chapkit.data import DataFrame
+
 @router.get("/{artifact_id}/$download")
 async def download_artifact(artifact_id: str) -> Response:
-    """Download artifact binary content in its original format."""
+    """Download artifact content as binary file.
+
+    Most commonly used for ZIP files (99% of downloads).
+    """
     artifact = await manager.find_by_id(artifact_id)
     if not artifact:
         raise HTTPException(status_code=404)
 
-    # Extract content and content_type from artifact data
     if not isinstance(artifact.data, dict):
         raise HTTPException(status_code=400, detail="Artifact has no downloadable content")
 
     content = artifact.data.get("content")
     if content is None:
-        raise HTTPException(status_code=404, detail="Artifact has no binary content")
+        raise HTTPException(status_code=404, detail="Artifact has no content")
 
     content_type = artifact.data.get("content_type", "application/octet-stream")
 
-    # Determine filename extension from content_type
+    # Serialize content to bytes based on type
+    if isinstance(content, bytes):
+        # Most common case: ZIP files, PNG images, etc.
+        binary = content
+    elif isinstance(content, DataFrame):
+        # Serialize DataFrame based on content_type
+        if content_type == "text/csv":
+            binary = content.to_csv().encode()
+        elif content_type == "application/x-parquet":
+            binary = content.to_parquet_bytes()
+        else:
+            binary = content.to_json().encode()
+    else:
+        raise ValueError(f"Cannot serialize content of type {type(content).__name__}")
+
+    # Determine filename extension
     extension_map = {
-        "application/x-joblib": "joblib",
-        "application/x-pytorch": "pt",
-        "application/x-pickle": "pkl",
-        "text/csv": "csv",
-        "application/json": "json",
         "application/zip": "zip",
-        "image/png": "png",
+        "text/csv": "csv",
         "application/x-parquet": "parquet",
+        "application/json": "json",
+        "image/png": "png",
     }
     ext = extension_map.get(content_type, "bin")
 
     return Response(
-        content=content,  # Raw bytes in original format!
+        content=binary,
         media_type=content_type,
         headers={
             "Content-Disposition": f"attachment; filename=artifact_{artifact_id}.{ext}"
@@ -255,10 +277,10 @@ async def get_artifact_metadata(artifact_id: str) -> dict:
 ```
 
 **Key Points:**
-- Downloads return content in **original format** (joblib, PyTorch, CSV, etc.)
-- Proper Content-Type headers for each format
-- Correct file extensions based on content type
-- No pickle bytes sent to clients!
+- 99% of downloads are ZIP files (bytes) - just return them
+- DataFrame serialization using chapkit.data.DataFrame methods
+- No complex serializer registry needed
+- Raises error for unsupported content types (no pickle fallback)
 
 ### 4. Manager Methods
 
@@ -348,15 +370,24 @@ The typed structure is enforced at the application layer, pickled objects in the
 
 ## API Examples
 
-### Creating a Typed ML Training Artifact (Success)
+### Creating a Typed ML Training Artifact (Success with ZIP)
 
 ```python
-import joblib
+import zipfile
+from io import BytesIO
 from datetime import UTC, datetime
+from pathlib import Path
 from chapkit.artifact.data_schemas import MLTrainingArtifactData, MLTrainingMetadata
 
-# Serialize model to bytes in original format (joblib, not pickle!)
-model_bytes = joblib.dumps(trained_model)
+# Most common case: ZIP entire training directory
+zip_buffer = BytesIO()
+with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+    # Add model file, training logs, plots, etc.
+    for file_path in training_dir.rglob("*"):
+        if file_path.is_file():
+            zip_file.write(file_path, file_path.relative_to(training_dir))
+
+zip_bytes = zip_buffer.getvalue()
 
 # Create strongly-typed metadata
 metadata = MLTrainingMetadata(
@@ -367,18 +398,18 @@ metadata = MLTrainingMetadata(
     duration_seconds=42.5,
     status="success",
     model_type="sklearn.ensemble.RandomForestClassifier",
-    model_size_bytes=len(model_bytes),
 )
 
-# Create typed artifact data with metadata/content separation
+# Create typed artifact data
 training_data = MLTrainingArtifactData(
     type="ml_training",
     metadata=metadata,  # Strongly-typed!
-    content=model_bytes,  # Raw joblib bytes
-    content_type="application/x-joblib",
+    content=zip_bytes,  # ZIP file as bytes
+    content_type="application/zip",
+    content_size=len(zip_bytes),
 )
 
-# Save artifact
+# Save artifact (PickleType handles DB serialization automatically)
 artifact = await artifact_manager.save(
     ArtifactIn(data=training_data.model_dump())
 )
@@ -386,7 +417,7 @@ artifact = await artifact_manager.save(
 # Type-safe access
 print(f"Status: {training_data.metadata.status}")
 print(f"Model type: {training_data.metadata.model_type}")  # IDE autocomplete!
-print(f"Duration: {training_data.metadata.duration_seconds}s")
+print(f"Size: {training_data.content_size} bytes")
 ```
 
 ### Creating a Failed Training Artifact
@@ -416,7 +447,6 @@ metadata = MLTrainingMetadata(
     duration_seconds=15.2,
     status="failed",
     model_type=None,  # No model produced
-    model_size_bytes=None,
 )
 
 # Create artifact with zipped temp directory
@@ -425,6 +455,7 @@ training_data = MLTrainingArtifactData(
     metadata=metadata,
     content=zip_bytes,  # ZIP of temp directory for debugging
     content_type="application/zip",
+    content_size=len(zip_bytes),
 )
 
 # Save failed artifact for audit trail
