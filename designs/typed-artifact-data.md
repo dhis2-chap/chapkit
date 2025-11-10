@@ -396,6 +396,76 @@ elif model_format == "onnx":
 predictions = model.predict(X_test)
 ```
 
+### Creating a Generic Artifact with ZIP File
+
+```python
+import zipfile
+from io import BytesIO
+from chapkit.artifact.data_schemas import GenericArtifactData, GenericMetadata
+
+# Create a ZIP file containing multiple files
+zip_buffer = BytesIO()
+with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+    zip_file.writestr("data.csv", csv_data)
+    zip_file.writestr("metadata.json", json_metadata)
+    zip_file.writestr("README.md", documentation)
+
+zip_bytes = zip_buffer.getvalue()
+
+# Create artifact with free-form metadata
+artifact_data = GenericArtifactData(
+    type="generic",
+    metadata=GenericMetadata(
+        description="Dataset package for rainfall prediction experiment",
+        files=["data.csv", "metadata.json", "README.md"],
+        created_by="data_pipeline_v2",
+        dataset_version="2024-11-10",
+        total_size_bytes=len(zip_bytes),
+    ),
+    content=zip_bytes,
+    content_type="application/zip",
+)
+
+# Save artifact
+artifact = await artifact_manager.save(
+    ArtifactIn(
+        name="rainfall-dataset-2024-11-10",
+        data=artifact_data.model_dump(),
+    )
+)
+```
+
+### Downloading and Extracting ZIP Artifacts
+
+```python
+import zipfile
+from io import BytesIO
+import requests
+
+# Get metadata to verify it's a ZIP
+metadata_response = requests.get(
+    "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAZ/$metadata"
+)
+metadata = metadata_response.json()
+print(f"Files in archive: {metadata['files']}")
+
+# Download ZIP content
+download_response = requests.get(
+    "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAZ/$download"
+)
+
+# Extract and use files
+with zipfile.ZipFile(BytesIO(download_response.content)) as zip_file:
+    # List contents
+    print(zip_file.namelist())  # ['data.csv', 'metadata.json', 'README.md']
+
+    # Extract specific file
+    csv_data = zip_file.read("data.csv").decode()
+
+    # Or extract all to directory
+    zip_file.extractall("/tmp/dataset")
+```
+
 ## Backward Compatibility
 
 ### Legacy Data Support
