@@ -84,9 +84,8 @@ class MLTrainingMetadata(BaseModel):
     completed_at: str
     duration_seconds: float
     status: Literal["success", "failed"]
-    model_type: str | None = None  # None if failed
-    model_size_bytes: int | None = None  # None if failed
-    model_format: str | None = None  # "joblib", "pytorch", "onnx", "pickle" - None if failed
+    model_type: str | None = None  # e.g., "sklearn.ensemble.RandomForestClassifier" - None if failed
+    model_size_bytes: int | None = None  # Size of serialized model - None if failed
 
 class MLPredictionMetadata(BaseModel):
     """Metadata for ML prediction artifacts."""
@@ -100,7 +99,6 @@ class MLPredictionMetadata(BaseModel):
     # Prediction-specific fields (None if failed):
     row_count: int | None = None  # Number of prediction rows
     column_count: int | None = None  # Number of columns in predictions DataFrame
-    format: str | None = None  # "csv", "parquet", "json" - serialization format
 
 class GenericMetadata(BaseModel):
     """Free-form metadata for generic artifacts."""
@@ -370,7 +368,6 @@ metadata = MLTrainingMetadata(
     status="success",
     model_type="sklearn.ensemble.RandomForestClassifier",
     model_size_bytes=len(model_bytes),
-    model_format="joblib",
 )
 
 # Create typed artifact data with metadata/content separation
@@ -420,7 +417,6 @@ metadata = MLTrainingMetadata(
     status="failed",
     model_type=None,  # No model produced
     model_size_bytes=None,
-    model_format=None,
 )
 
 # Create artifact with zipped temp directory
