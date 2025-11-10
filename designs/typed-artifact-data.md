@@ -93,9 +93,6 @@ class MLPredictionMetadata(BaseModel):
     completed_at: str
     duration_seconds: float
     status: Literal["success", "failed"]
-    # Prediction-specific fields (None if failed):
-    row_count: int | None = None  # Number of prediction rows
-    column_count: int | None = None  # Number of columns in predictions DataFrame
 
 class GenericMetadata(BaseModel):
     """Free-form metadata for generic artifacts."""
@@ -768,9 +765,7 @@ Store binary content in S3/filesystem, metadata in database.
       "started_at": "2025-01-10T11:00:00Z",
       "completed_at": "2025-01-10T11:00:05Z",
       "duration_seconds": 5.2,
-      "status": "success",
-      "row_count": 1000,
-      "column_count": 5
+      "status": "success"
     },
     "content": "<DataFrame with predictions>",
     "content_type": "text/csv",
