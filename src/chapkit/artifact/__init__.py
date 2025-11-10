@@ -4,7 +4,20 @@ from .manager import ArtifactManager
 from .models import Artifact
 from .repository import ArtifactRepository
 from .router import ArtifactRouter
-from .schemas import ArtifactHierarchy, ArtifactIn, ArtifactOut, ArtifactTreeNode
+from .schemas import (
+    ArtifactData,
+    ArtifactHierarchy,
+    ArtifactIn,
+    ArtifactOut,
+    ArtifactTreeNode,
+    BaseArtifactData,
+    GenericArtifactData,
+    GenericMetadata,
+    MLMetadata,
+    MLPredictionArtifactData,
+    MLTrainingArtifactData,
+    validate_artifact_data,
+)
 
 __all__ = [
     "Artifact",
@@ -15,4 +28,12 @@ __all__ = [
     "ArtifactRepository",
     "ArtifactManager",
     "ArtifactRouter",
+    "ArtifactData",
+    "BaseArtifactData",
+    "MLTrainingArtifactData",
+    "MLPredictionArtifactData",
+    "GenericArtifactData",
+    "MLMetadata",
+    "GenericMetadata",
+    "validate_artifact_data",
 ]

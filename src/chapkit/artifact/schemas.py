@@ -65,3 +65,78 @@ class ArtifactHierarchy(BaseModel):
             self.depth_key: level,
             self.label_key: self.label_for(level),
         }
+
+
+# Typed artifact data schemas
+
+from typing import Annotated, Literal
+
+
+class BaseArtifactData[MetadataT: BaseModel](BaseModel):
+    """Base class for all artifact data types with typed metadata."""
+
+    type: str = Field(description="Discriminator field for artifact type")
+    metadata: MetadataT = Field(description="Strongly-typed JSON-serializable metadata")
+    content: JsonSafe = Field(description="Content as Python object (bytes, DataFrame, models, etc.)")
+    content_type: str | None = Field(default=None, description="MIME type for download responses")
+    content_size: int | None = Field(default=None, description="Size of content in bytes")
+
+    model_config = {"extra": "forbid"}
+
+
+class MLMetadata(BaseModel):
+    """Metadata for ML artifacts (training and prediction)."""
+
+    status: Literal["success", "failed"] = Field(description="Job execution status")
+    config_id: str = Field(description="ID of the config used for this operation")
+    started_at: str = Field(description="ISO 8601 timestamp when operation started")
+    completed_at: str = Field(description="ISO 8601 timestamp when operation completed")
+    duration_seconds: float = Field(description="Operation duration in seconds")
+
+
+class GenericMetadata(BaseModel):
+    """Free-form metadata for generic artifacts."""
+
+    model_config = {"extra": "allow"}
+
+
+class MLTrainingArtifactData(BaseArtifactData[MLMetadata]):
+    """Schema for ML training artifact data with trained model."""
+
+    type: Literal["ml_training"] = "ml_training"
+    metadata: MLMetadata
+
+
+class MLPredictionArtifactData(BaseArtifactData[MLMetadata]):
+    """Schema for ML prediction artifact data with results."""
+
+    type: Literal["ml_prediction"] = "ml_prediction"
+    metadata: MLMetadata
+
+
+class GenericArtifactData(BaseArtifactData[GenericMetadata]):
+    """Schema for generic artifact data with free-form metadata."""
+
+    type: Literal["generic"] = "generic"
+    metadata: GenericMetadata
+
+
+ArtifactData = Annotated[
+    MLTrainingArtifactData | MLPredictionArtifactData | GenericArtifactData,
+    Field(discriminator="type"),
+]
+"""Discriminated union type for all artifact data types."""
+
+
+def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
+    """Validate artifact data against appropriate schema based on type field."""
+    artifact_type = data.get("type", "generic")
+
+    schema_map = {
+        "ml_training": MLTrainingArtifactData,
+        "ml_prediction": MLPredictionArtifactData,
+        "generic": GenericArtifactData,
+    }
+
+    schema = schema_map.get(artifact_type, GenericArtifactData)
+    return schema.model_validate(data)
