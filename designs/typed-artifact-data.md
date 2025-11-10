@@ -83,9 +83,10 @@ class MLTrainingMetadata(BaseModel):
     started_at: str  # ISO 8601 format
     completed_at: str
     duration_seconds: float
-    model_type: str  # e.g., "sklearn.ensemble.RandomForestClassifier"
-    model_size_bytes: int
-    model_format: str  # "joblib", "pytorch", "onnx", "pickle"
+    status: Literal["success", "failed"]
+    model_type: str | None = None  # None if failed
+    model_size_bytes: int | None = None  # None if failed
+    model_format: str | None = None  # "joblib", "pytorch", "onnx", "pickle" - None if failed
 
 class MLPredictionMetadata(BaseModel):
     """Metadata for ML prediction artifacts."""
@@ -95,8 +96,11 @@ class MLPredictionMetadata(BaseModel):
     started_at: str
     completed_at: str
     duration_seconds: float
-    prediction_count: int
-    prediction_format: str  # "csv", "parquet", "json"
+    status: Literal["success", "failed"]
+    # Prediction-specific fields (None if failed):
+    row_count: int | None = None  # Number of prediction rows
+    column_count: int | None = None  # Number of columns in predictions DataFrame
+    format: str | None = None  # "csv", "parquet", "json" - serialization format
 
 class GenericMetadata(BaseModel):
     """Free-form metadata for generic artifacts."""
@@ -104,20 +108,28 @@ class GenericMetadata(BaseModel):
 
 # Concrete artifact types
 class MLTrainingArtifactData(BaseArtifactData[MLTrainingMetadata]):
-    """Schema for ML training artifact data with trained model."""
+    """Schema for ML training artifact data with trained model.
+
+    Content varies based on status:
+    - success: Serialized model (joblib, pytorch, onnx)
+      - content_type: "application/x-joblib", "application/x-pytorch", etc.
+    - failed: ZIP of entire temp directory for debugging
+      - content_type: "application/zip"
+    """
     type: Literal["ml_training"] = "ml_training"
     metadata: MLTrainingMetadata
 
-    # content: Raw model bytes (joblib, pytorch .pt, onnx, etc.)
-    # content_type: "application/x-joblib", "application/x-pytorch", etc.
-
 class MLPredictionArtifactData(BaseArtifactData[MLPredictionMetadata]):
-    """Schema for ML prediction artifact data with results."""
+    """Schema for ML prediction artifact data with results.
+
+    Content varies based on status:
+    - success: Prediction results (CSV, Parquet, JSON)
+      - content_type: "text/csv", "application/x-parquet", "application/json"
+    - failed: ZIP of temp directory for debugging
+      - content_type: "application/zip"
+    """
     type: Literal["ml_prediction"] = "ml_prediction"
     metadata: MLPredictionMetadata
-
-    # content: Raw prediction data (CSV, Parquet, JSON bytes)
-    # content_type: "text/csv", "application/x-parquet", "application/json"
 
 class GenericArtifactData(BaseArtifactData[GenericMetadata]):
     """Schema for generic artifact data with free-form metadata."""
@@ -140,8 +152,41 @@ ArtifactData = Annotated[
 3. **Clear separation**: `metadata` (typed JSON) vs `content` (raw bytes)
 4. **Content in original format**: No pickle bytes, store joblib/pytorch/csv/etc. directly
 5. **Type safety**: IDE autocomplete for `artifact.metadata.config_id`
+6. **Status tracking**: Both successful and failed jobs create artifacts with `status` field
 
-### 2. Type Field Structure
+### 2. Artifact Status Pattern
+
+Artifacts are created **after** job completion, with `status` indicating outcome:
+
+**Success:**
+- `metadata.status = "success"`
+- `content` = serialized model/predictions in original format
+- `content_type` = format-specific MIME type
+- Model metadata fields populated (model_type, model_format, etc.)
+
+**Failed:**
+- `metadata.status = "failed"`
+- `content` = ZIP of entire temp directory for debugging/reproducibility
+- `content_type = "application/zip"`
+- Model metadata fields = None
+
+**Workflow Validation (Future):**
+```python
+# Before running predict, validate training succeeded
+training_artifact = await artifact_manager.find_by_id(training_artifact_id)
+if training_artifact.metadata.status != "success":
+    raise ValueError("Cannot predict with failed training artifact")
+
+# Unpack ZIP and run prediction...
+```
+
+**Benefits:**
+- Full reproducibility even for failures
+- Debugging support (inspect logs, intermediate files)
+- Audit trail of all job executions
+- Workflow validation based on persistent state
+
+### 3. Type Field Structure
 
 The design uses two related type fields:
 
@@ -305,7 +350,7 @@ The typed structure is enforced at the application layer, pickled objects in the
 
 ## API Examples
 
-### Creating a Typed ML Training Artifact
+### Creating a Typed ML Training Artifact (Success)
 
 ```python
 import joblib
@@ -319,9 +364,10 @@ model_bytes = joblib.dumps(trained_model)
 metadata = MLTrainingMetadata(
     ml_type="ml_training",
     config_id=str(config_id),
-    started_at=datetime.now(UTC).isoformat(),
+    started_at=started_at.isoformat(),
     completed_at=datetime.now(UTC).isoformat(),
     duration_seconds=42.5,
+    status="success",
     model_type="sklearn.ensemble.RandomForestClassifier",
     model_size_bytes=len(model_bytes),
     model_format="joblib",
@@ -341,8 +387,54 @@ artifact = await artifact_manager.save(
 )
 
 # Type-safe access
+print(f"Status: {training_data.metadata.status}")
 print(f"Model type: {training_data.metadata.model_type}")  # IDE autocomplete!
 print(f"Duration: {training_data.metadata.duration_seconds}s")
+```
+
+### Creating a Failed Training Artifact
+
+```python
+import zipfile
+from io import BytesIO
+from datetime import UTC, datetime
+from chapkit.artifact.data_schemas import MLTrainingArtifactData, MLTrainingMetadata
+
+# Zip entire temp directory for debugging
+zip_buffer = BytesIO()
+with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+    # Add all files from temp directory
+    for file_path in temp_dir.rglob("*"):
+        if file_path.is_file():
+            zip_file.write(file_path, file_path.relative_to(temp_dir))
+
+zip_bytes = zip_buffer.getvalue()
+
+# Create metadata for failed training
+metadata = MLTrainingMetadata(
+    ml_type="ml_training",
+    config_id=str(config_id),
+    started_at=started_at.isoformat(),
+    completed_at=datetime.now(UTC).isoformat(),
+    duration_seconds=15.2,
+    status="failed",
+    model_type=None,  # No model produced
+    model_size_bytes=None,
+    model_format=None,
+)
+
+# Create artifact with zipped temp directory
+training_data = MLTrainingArtifactData(
+    type="ml_training",
+    metadata=metadata,
+    content=zip_bytes,  # ZIP of temp directory for debugging
+    content_type="application/zip",
+)
+
+# Save failed artifact for audit trail
+artifact = await artifact_manager.save(
+    ArtifactIn(data=training_data.model_dump())
+)
 ```
 
 ### Retrieving Metadata vs Downloading Binary
