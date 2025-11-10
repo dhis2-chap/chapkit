@@ -55,9 +55,9 @@ Introduce a typed artifact data system using Pydantic discriminated unions with 
 
 ## Technical Design
 
-### 1. Typed Artifact Data Schemas
+### 1. Typed Artifact Data Schemas with Metadata/Content Separation
 
-Create typed schemas using Pydantic discriminated unions:
+The key insight: **separate JSON-serializable metadata from binary content at storage time**.
 
 ```python
 # src/chapkit/artifact/data_schemas.py (NEW)
@@ -66,41 +66,68 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, Field
 
 class BaseArtifactData(BaseModel):
-    """Base class for all artifact data types."""
+    """Base class for all artifact data types with metadata/content separation."""
     type: str = Field(description="Discriminator field for artifact type")
+    metadata: dict = Field(description="JSON-serializable metadata")
+    content: bytes | None = Field(default=None, description="Raw binary content in original format")
+    content_type: str | None = Field(default=None, description="MIME type of content (e.g., application/x-pytorch, application/zip)")
+
     model_config = {"extra": "forbid"}
 
 class MLTrainingArtifactData(BaseArtifactData):
     """Schema for ML training artifact data with trained model."""
     type: Literal["ml_training"] = "ml_training"
-    ml_type: Literal["ml_training"] = "ml_training"  # Specific to ML artifacts
-    config_id: str
-    started_at: str
-    completed_at: str
-    duration_seconds: float
-    model: Any  # The trained model object (pickleable)
-    model_type: str | None = None
-    model_size_bytes: int | None = None
 
-    model_config = {"arbitrary_types_allowed": True, "extra": "forbid"}
+    # metadata contains:
+    # - ml_type: "ml_training"
+    # - config_id: str
+    # - started_at: str (ISO format)
+    # - completed_at: str (ISO format)
+    # - duration_seconds: float
+    # - model_type: str (e.g., "sklearn.linear_model.LinearRegression")
+    # - model_size_bytes: int
+    # - model_format: str (e.g., "joblib", "pytorch", "onnx")
+
+    # content contains:
+    # - Raw serialized model bytes (joblib, torch.save, etc.)
+    # - NOT pickled Python objects
+
+    # content_type examples:
+    # - "application/x-joblib" for sklearn models
+    # - "application/x-pytorch" for PyTorch models
+    # - "application/x-tensorflow" for TensorFlow
+    # - "application/x-pickle" as fallback
 
 class MLPredictionArtifactData(BaseArtifactData):
     """Schema for ML prediction artifact data with results."""
     type: Literal["ml_prediction"] = "ml_prediction"
-    ml_type: Literal["ml_prediction"] = "ml_prediction"
-    config_id: str
-    training_artifact_id: str
-    started_at: str
-    completed_at: str
-    duration_seconds: float
-    predictions: DataFrame
 
-    model_config = {"extra": "forbid"}
+    # metadata contains:
+    # - ml_type: "ml_prediction"
+    # - config_id: str
+    # - training_artifact_id: str
+    # - started_at: str
+    # - completed_at: str
+    # - duration_seconds: float
+    # - prediction_count: int
+    # - prediction_format: str (e.g., "csv", "parquet", "json")
+
+    # content contains:
+    # - Raw prediction data (CSV bytes, Parquet bytes, etc.)
+    # - NOT pickled DataFrame objects
+
+    # content_type examples:
+    # - "text/csv" for CSV predictions
+    # - "application/x-parquet" for Parquet
+    # - "application/json" for JSON
 
 class GenericArtifactData(BaseArtifactData):
-    """Schema for generic artifact data with free-form structure."""
+    """Schema for generic artifact data with free-form metadata."""
     type: Literal["generic"] = "generic"
-    model_config = {"extra": "allow", "arbitrary_types_allowed": True}
+
+    # metadata: arbitrary JSON dict
+    # content: any binary data
+    # content_type: any MIME type
 
 # Discriminated union type
 ArtifactData = Annotated[
@@ -108,6 +135,12 @@ ArtifactData = Annotated[
     Field(discriminator="type")
 ]
 ```
+
+**Key Changes:**
+1. All artifact types now have `metadata` (dict), `content` (bytes), and `content_type` (str) fields
+2. Content stores raw bytes in **original format** (not pickle)
+3. Content-Type indicates format for proper download headers
+4. Metadata is always JSON-serializable
 
 ### 2. Type Field Structure
 
@@ -123,25 +156,46 @@ This allows:
 
 ### 3. Download Endpoints
 
-Add new operations to the artifact router:
+Add new operations to the artifact router that return content in its **original format**:
 
 ```python
 # src/chapkit/artifact/router.py
 
 @router.get("/{artifact_id}/$download")
 async def download_artifact(artifact_id: str) -> Response:
-    """Download artifact data as pickled binary."""
+    """Download artifact binary content in its original format."""
     artifact = await manager.find_by_id(artifact_id)
     if not artifact:
         raise HTTPException(status_code=404)
 
-    # Return pickled bytes
-    pickled_data = pickle.dumps(artifact.data)
+    # Extract content and content_type from artifact data
+    if not isinstance(artifact.data, dict):
+        raise HTTPException(status_code=400, detail="Artifact has no downloadable content")
+
+    content = artifact.data.get("content")
+    if content is None:
+        raise HTTPException(status_code=404, detail="Artifact has no binary content")
+
+    content_type = artifact.data.get("content_type", "application/octet-stream")
+
+    # Determine filename extension from content_type
+    extension_map = {
+        "application/x-joblib": "joblib",
+        "application/x-pytorch": "pt",
+        "application/x-pickle": "pkl",
+        "text/csv": "csv",
+        "application/json": "json",
+        "application/zip": "zip",
+        "image/png": "png",
+        "application/x-parquet": "parquet",
+    }
+    ext = extension_map.get(content_type, "bin")
+
     return Response(
-        content=pickled_data,
-        media_type="application/octet-stream",
+        content=content,  # Raw bytes in original format!
+        media_type=content_type,
         headers={
-            "Content-Disposition": f"attachment; filename=artifact_{artifact_id}.pkl"
+            "Content-Disposition": f"attachment; filename=artifact_{artifact_id}.{ext}"
         }
     )
 
@@ -152,8 +206,17 @@ async def get_artifact_metadata(artifact_id: str) -> dict:
     if not artifact:
         raise HTTPException(status_code=404)
 
-    return manager.extract_metadata(artifact)
+    if not isinstance(artifact.data, dict):
+        return {}
+
+    return artifact.data.get("metadata", {})
 ```
+
+**Key Points:**
+- Downloads return content in **original format** (joblib, PyTorch, CSV, etc.)
+- Proper Content-Type headers for each format
+- Correct file extensions based on content type
+- No pickle bytes sent to clients!
 
 ### 4. Manager Methods
 
@@ -246,19 +309,27 @@ The typed structure is enforced at the application layer, pickled objects in the
 ### Creating a Typed ML Training Artifact
 
 ```python
+import joblib
 from chapkit.artifact.data_schemas import MLTrainingArtifactData
 
-# Create typed data
+# Serialize model to bytes in original format (joblib, not pickle!)
+model_bytes = joblib.dumps(trained_model)
+
+# Create typed data with metadata/content separation
 training_data = MLTrainingArtifactData(
     type="ml_training",
-    ml_type="ml_training",
-    config_id=str(config_id),
-    model=trained_model,
-    started_at=datetime.now(UTC).isoformat(),
-    completed_at=datetime.now(UTC).isoformat(),
-    duration_seconds=42.5,
-    model_type="sklearn.ensemble.RandomForestClassifier",
-    model_size_bytes=1048576,
+    metadata={
+        "ml_type": "ml_training",
+        "config_id": str(config_id),
+        "started_at": datetime.now(UTC).isoformat(),
+        "completed_at": datetime.now(UTC).isoformat(),
+        "duration_seconds": 42.5,
+        "model_type": "sklearn.ensemble.RandomForestClassifier",
+        "model_size_bytes": len(model_bytes),
+        "model_format": "joblib",
+    },
+    content=model_bytes,  # Raw joblib bytes
+    content_type="application/x-joblib",  # MIME type
 )
 
 # Save artifact
@@ -272,33 +343,50 @@ artifact = await artifact_manager.save(
 ```bash
 # Get artifact with metadata (JSON response)
 GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV
-# Returns JSON with all JSON-serializable fields
+# Returns JSON with type, metadata dict, content_type
+# (content is excluded or base64-encoded)
 
-# Get only metadata (excludes binary content)
+# Get only metadata (excludes binary content entirely)
 GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$metadata
-# Returns JSON with just config_id, timestamps, model_type, etc.
+# Returns: {"ml_type": "ml_training", "config_id": "...", "model_type": "...", ...}
 
-# Download binary content
+# Download binary content in ORIGINAL format
 GET /api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download
-# Returns pickled bytes as application/octet-stream
+# Returns: joblib bytes with Content-Type: application/x-joblib
+# Filename: artifact_01ARZ3NDEKTSV4RRFFQ69G5FAV.joblib
 ```
 
 ### Using Downloaded Artifacts
 
 ```python
-import pickle
+import joblib
 import requests
 
-# Download artifact
-response = requests.get(
+# First, get metadata to understand what format to expect
+metadata_response = requests.get(
+    "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$metadata"
+)
+metadata = metadata_response.json()
+model_format = metadata["model_format"]  # "joblib"
+
+# Download binary content
+download_response = requests.get(
     "http://api/v1/artifacts/01ARZ3NDEKTSV4RRFFQ69G5FAV/$download"
 )
-artifact_data = pickle.loads(response.content)
 
-# Access typed data
-if artifact_data["type"] == "ml_training":
-    model = artifact_data["model"]
-    predictions = model.predict(X_test)
+# Deserialize based on format
+if model_format == "joblib":
+    model = joblib.loads(download_response.content)
+elif model_format == "pytorch":
+    import torch
+    import io
+    model = torch.load(io.BytesIO(download_response.content))
+elif model_format == "onnx":
+    import onnx
+    model = onnx.load(io.BytesIO(download_response.content))
+
+# Use the model
+predictions = model.predict(X_test)
 ```
 
 ## Backward Compatibility
