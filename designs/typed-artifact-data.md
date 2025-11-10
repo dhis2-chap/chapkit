@@ -624,62 +624,16 @@ def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
 3. **Gradual Adoption**: Can migrate incrementally
 4. **Performance**: No storage overhead, same pickle format
 
-## Alternatives Considered
+## Future Enhancements
 
-### Alternative 1: Separate Metadata and Content Columns
+Potential improvements that could be added in later iterations:
 
-Split `data` into two columns:
-```python
-metadata: Mapped[dict] = mapped_column(JSON)
-content: Mapped[bytes | None] = mapped_column(LargeBinary)
-```
-
-**Rejected because:**
-- Requires database migration
-- Breaking change for existing data
-- More complex to implement
-- Overkill for current needs
-
-### Alternative 2: Base64 Encoding in JSON Column
-
-Store everything as JSON with base64-encoded binary:
-```python
-data: Mapped[dict] = mapped_column(JSON)
-{
-    "metadata": {...},
-    "content": "base64_encoded_string"
-}
-```
-
-**Rejected because:**
-- 33% storage overhead from base64
-- Still requires migration from PickleType
-- Larger payloads over HTTP
-- No clear benefit over pickle
-
-### Alternative 3: External Blob Storage
-
-Store binary content in S3/filesystem, metadata in database.
-
-**Deferred because:**
-- Significantly more complex
-- Requires infrastructure setup
-- Not needed for typical artifact sizes
-- Can be added later if needed
-
-## Open Questions
-
-1. **Content-Type Detection**: Should we detect and return specific content types (e.g., `application/x-sklearn-model`)?
-   - **Resolution**: Start with generic `application/octet-stream`, add specific types later if needed
-
-2. **Compression**: Should we compress large artifacts?
-   - **Resolution**: Not initially, can add transparent gzip compression in future
-
-3. **Size Limits**: What's the maximum artifact size we support?
-   - **Resolution**: Document 100MB soft limit, SQLite hard limit is 1GB
-
-4. **Streaming**: Do we need streaming for very large downloads?
-   - **Resolution**: Not initially, add if users request it
+1. **External Blob Storage**: For very large artifacts (>100MB), consider S3/filesystem storage with database metadata only
+2. **Content-Type Detection**: Auto-detect and set specific content types for common formats
+3. **Compression**: Add transparent gzip compression for large artifacts
+4. **Streaming Downloads**: Support streaming for very large artifacts to reduce memory usage
+5. **Size Limits**: Document 100MB soft limit (SQLite hard limit is 1GB), add validation
+6. **Download Permissions**: Fine-grained access control for downloads separate from GET permissions
 
 ## Security Considerations
 
