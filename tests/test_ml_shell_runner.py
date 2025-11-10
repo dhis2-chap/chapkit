@@ -1,5 +1,6 @@
 """Tests for ShellModelRunner implementation."""
 
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -367,3 +368,273 @@ async def test_shell_runner_cleanup_temp_files() -> None:
     # Check that temp dirs are cleaned up
     temp_dirs_after = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
     assert temp_dirs_after == temp_dirs_before
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_copies_project_directory(tmp_path: Path) -> None:
+    """Test that current working directory is copied to temp directory."""
+    # Create a test project structure
+    project_dir = tmp_path / "test_project"
+    project_dir.mkdir()
+
+    # Create a main script
+    train_script = project_dir / "train.py"
+    train_script.write_text("""
+import pickle
+import sys
+
+# Write a simple model
+with open('model.pickle', 'wb') as f:
+    pickle.dump('test_model', f)
+""")
+
+    # Create a utility file that the script might import
+    utils_file = project_dir / "utils.py"
+    utils_file.write_text("def helper(): return 'helper_result'")
+
+    # Change to project directory
+    import os
+
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(project_dir)
+
+        train_command = f"{sys.executable} train.py"
+        runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+            train_command=train_command,
+            predict_command="echo 'done' > {output_file}",
+        )
+
+        config = MockConfig()
+        data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+        # Train should copy project directory to temp
+        model = await runner.on_train(config, data)
+
+        # Model should be successfully created
+        assert model == "test_model"
+
+    finally:
+        os.chdir(original_cwd)
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_excludes_venv_and_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that .venv, .git, and other excluded directories are not copied."""
+    # Create a test project with excluded directories
+    project_dir = tmp_path / "test_project"
+    project_dir.mkdir()
+
+    # Create excluded directories
+    (project_dir / ".venv").mkdir()
+    (project_dir / ".git").mkdir()
+    (project_dir / "__pycache__").mkdir()
+    (project_dir / "node_modules").mkdir()
+
+    # Add files to excluded directories
+    (project_dir / ".venv" / "lib").mkdir()
+    (project_dir / ".venv" / "lib" / "package.py").write_text("# venv package")
+    (project_dir / ".git" / "config").write_text("# git config")
+
+    # Create a train script that checks if excluded dirs exist
+    train_script = project_dir / "check_excludes.py"
+    train_script.write_text("""
+import pickle
+import os
+from pathlib import Path
+
+# Check that excluded directories don't exist in current directory
+assert not Path('.venv').exists(), '.venv should not be copied'
+assert not Path('.git').exists(), '.git should not be copied'
+assert not Path('__pycache__').exists(), '__pycache__ should not be copied'
+assert not Path('node_modules').exists(), 'node_modules should not be copied'
+
+# Write model to confirm script ran
+with open('model.pickle', 'wb') as f:
+    pickle.dump('exclusion_test_passed', f)
+""")
+
+    # Change to project directory
+    import os
+
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(project_dir)
+
+        train_command = f"{sys.executable} check_excludes.py"
+        runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+            train_command=train_command,
+            predict_command="echo 'done' > {output_file}",
+        )
+
+        config = MockConfig()
+        data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+        # Train should copy project but exclude certain directories
+        model = await runner.on_train(config, data)
+
+        # Model should confirm exclusions worked
+        assert model == "exclusion_test_passed"
+
+    finally:
+        os.chdir(original_cwd)
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_relative_paths_work(tmp_path: Path) -> None:
+    """Test that scripts can use relative imports after directory copying."""
+    # Create a test project with module structure
+    project_dir = tmp_path / "test_project"
+    project_dir.mkdir()
+
+    # Create a helper module
+    helpers_file = project_dir / "helpers.py"
+    helpers_file.write_text("""
+def get_multiplier():
+    return 2.5
+""")
+
+    # Create a train script that imports the helper
+    train_script = project_dir / "train_with_import.py"
+    train_script.write_text("""
+import pickle
+import sys
+
+# Import from local module - this will only work if cwd contains the module
+from helpers import get_multiplier
+
+multiplier = get_multiplier()
+
+# Write model with the multiplier value
+with open('model.pickle', 'wb') as f:
+    pickle.dump({'multiplier': multiplier}, f)
+""")
+
+    # Change to project directory
+    import os
+
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(project_dir)
+
+        train_command = f"{sys.executable} train_with_import.py"
+        runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+            train_command=train_command,
+            predict_command="echo 'done' > {output_file}",
+        )
+
+        config = MockConfig()
+        data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+        # Train should successfully import local module
+        model = await runner.on_train(config, data)
+
+        # Model should contain the value from the imported module
+        assert isinstance(model, dict)
+        assert model["multiplier"] == 2.5
+
+    finally:
+        os.chdir(original_cwd)
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_cleanup_policy_always() -> None:
+    """Test that cleanup_policy='always' always deletes temp directory."""
+    train_command = f"{sys.executable} -c \"import pickle; pickle.dump('model', open('model.pickle', 'wb'))\""
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'done' > {output_file}",
+        cleanup_policy="always",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    # Track temp dirs before
+    temp_dirs_before = set(Path(tempfile.gettempdir()).glob("chapkit_ml_train_*"))
+
+    # Run training (success case)
+    await runner.on_train(config, data)
+
+    # Temp dir should be deleted
+    temp_dirs_after = set(Path(tempfile.gettempdir()).glob("chapkit_ml_train_*"))
+    assert temp_dirs_after == temp_dirs_before
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_cleanup_policy_never() -> None:
+    """Test that cleanup_policy='never' keeps temp directory."""
+    train_command = f"{sys.executable} -c \"import pickle; pickle.dump('model', open('model.pickle', 'wb'))\""
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'done' > {output_file}",
+        cleanup_policy="never",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    # Run training
+    await runner.on_train(config, data)
+
+    # Find the temp directory that was created
+    temp_dirs = list(Path(tempfile.gettempdir()).glob("chapkit_ml_train_*"))
+    assert len(temp_dirs) > 0, "Temp directory should be preserved"
+
+    # Cleanup manually
+    for temp_dir in temp_dirs:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_cleanup_policy_on_success_with_success() -> None:
+    """Test that cleanup_policy='on_success' deletes temp directory when operation succeeds."""
+    train_command = f"{sys.executable} -c \"import pickle; pickle.dump('model', open('model.pickle', 'wb'))\""
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'done' > {output_file}",
+        cleanup_policy="on_success",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    # Track temp dirs before
+    temp_dirs_before = set(Path(tempfile.gettempdir()).glob("chapkit_ml_train_*"))
+
+    # Run training (success case)
+    await runner.on_train(config, data)
+
+    # Temp dir should be deleted
+    temp_dirs_after = set(Path(tempfile.gettempdir()).glob("chapkit_ml_train_*"))
+    assert temp_dirs_after == temp_dirs_before
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_cleanup_policy_on_success_with_failure() -> None:
+    """Test that cleanup_policy='on_success' keeps temp directory when operation fails."""
+    train_command = "exit 1"
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'done' > {output_file}",
+        cleanup_policy="on_success",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    # Try to run training (will fail)
+    with pytest.raises(RuntimeError, match="Training script failed"):
+        await runner.on_train(config, data)
+
+    # Find the temp directory that was preserved
+    temp_dirs = list(Path(tempfile.gettempdir()).glob("chapkit_ml_train_*"))
+    assert len(temp_dirs) > 0, "Temp directory should be preserved on failure"
+
+    # Cleanup manually
+    for temp_dir in temp_dirs:
+        shutil.rmtree(temp_dir, ignore_errors=True)

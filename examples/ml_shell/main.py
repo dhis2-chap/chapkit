@@ -2,22 +2,17 @@
 
 This example demonstrates:
 - Using ShellModelRunner to execute external scripts
+- Isolated execution with project directory copied to temp directory
 - Command template variable substitution
 - Language-agnostic ML workflows (could use R, Julia, etc.)
 - File-based data interchange (CSV, YAML, pickle)
 - Integration with existing scripts without modification
 """
 
-import sys
-from pathlib import Path
-
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
-
-# Get absolute path to scripts directory
-SCRIPTS_DIR = Path(__file__).parent / "scripts"
 
 
 class DiseaseConfig(BaseConfig):
@@ -29,6 +24,8 @@ class DiseaseConfig(BaseConfig):
 
 
 # Create shell-based runner with command templates
+# ShellModelRunner copies the current working directory to a temp directory for isolated execution.
+# This enables scripts to use relative imports (e.g., source('utils.R') in R scripts).
 # Variables will be substituted with actual file paths at runtime:
 #   {config_file} - YAML config
 #   {data_file} - Training data CSV
@@ -38,16 +35,11 @@ class DiseaseConfig(BaseConfig):
 #   {output_file} - Predictions CSV
 
 # Training command template
-train_command = (
-    f"{sys.executable} {SCRIPTS_DIR}/train_model.py "
-    "--config {config_file} "
-    "--data {data_file} "
-    "--model {model_file}"
-)
+train_command = "python scripts/train_model.py --config {config_file} --data {data_file} --model {model_file}"
 
 # Prediction command template
 predict_command = (
-    f"{sys.executable} {SCRIPTS_DIR}/predict_model.py "
+    "python scripts/predict_model.py "
     "--config {config_file} "
     "--model {model_file} "
     "--historic {historic_file} "
@@ -96,4 +88,4 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    run_app("main:app")
+    run_app(app, reload=False)

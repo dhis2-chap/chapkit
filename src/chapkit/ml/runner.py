@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import pickle
+import shutil
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Generic, TypeVar
+from typing import Any, Awaitable, Callable, Generic, Literal, TypeVar
 
 import yaml
 from geojson_pydantic import FeatureCollection
@@ -17,6 +18,9 @@ from chapkit.data import DataFrame
 from chapkit.utils import run_shell
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
+
+# Type alias for cleanup policy
+type CleanupPolicy = Literal["never", "on_success", "always"]
 
 # Type aliases for ML runner functions
 type TrainFunction[ConfigT] = Callable[[ConfigT, DataFrame, FeatureCollection | None], Awaitable[Any]]
@@ -102,11 +106,57 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         train_command: str,
         predict_command: str,
         model_format: str = "pickle",
+        cleanup_policy: CleanupPolicy = "on_success",
     ) -> None:
-        """Initialize shell runner with command templates for train/predict operations."""
+        """Initialize shell runner with command templates for train/predict operations.
+
+        Args:
+            train_command: Command template for training
+            predict_command: Command template for prediction
+            model_format: File extension for model files (default: "pickle")
+            cleanup_policy: When to delete temp directories:
+                - "never": Keep all temp directories (useful for debugging)
+                - "on_success": Delete only if operation succeeds (default, keeps failed runs for inspection)
+                - "always": Always delete temp directories (saves disk space)
+        """
         self.train_command = train_command
         self.predict_command = predict_command
         self.model_format = model_format
+        self.cleanup_policy = cleanup_policy
+
+    def _detect_source_dir(self) -> Path:
+        """Detect source directory by finding where scripts referenced in commands are located."""
+        import re
+
+        cwd = Path.cwd()
+
+        # Extract script paths from train_command (look for .py, .R, .jl, .sh files)
+        script_pattern = r"(?:^|\s)([^\s{]+\.(?:py|R|jl|sh))(?:\s|$)"
+        match = re.search(script_pattern, self.train_command)
+
+        if match:
+            script_path = match.group(1).strip()
+            # Try to find this script relative to cwd
+            potential_script = cwd / script_path
+
+            if potential_script.exists():
+                # Found the script - determine the source directory
+                # If script is "scripts/train.py", we want to copy from cwd
+                # If script is "train.py", we want to copy from cwd
+                return cwd
+
+            # Script doesn't exist at that path - might be in a subdirectory
+            # Search for the script in cwd
+            for found_script in cwd.rglob(Path(script_path).name):
+                # Found a matching script name - use its parent's parent if it's in a scripts dir
+                # Or use cwd if it's at root
+                if "scripts" in str(found_script.parent):
+                    # Script is in a scripts/ directory - return parent of scripts/
+                    return found_script.parent.parent
+                return found_script.parent
+
+        # Fallback to cwd if can't detect
+        return cwd
 
     async def on_train(
         self,
@@ -116,8 +166,29 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
     ) -> Any:
         """Train a model by executing external training script (model file creation is optional)."""
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_train_"))
+        succeeded = False
 
         try:
+            # Copy source directory into temp directory for isolated execution
+            source_dir = self._detect_source_dir()
+            logger.info("copying_project_to_temp", source=str(source_dir), temp_dir=str(temp_dir))
+
+            shutil.copytree(
+                source_dir,
+                temp_dir,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(
+                    ".git",
+                    "__pycache__",
+                    "*.pyc",
+                    ".pytest_cache",
+                    ".venv",
+                    "venv",
+                    ".tox",
+                    "node_modules",
+                ),
+            )
+
             # Write config to YAML file
             config_file = temp_dir / "config.yml"
             config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
@@ -135,12 +206,12 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Model file path
             model_file = temp_dir / f"model.{self.model_format}"
 
-            # Substitute variables in command
+            # Substitute variables in command (using relative paths within temp_dir)
             command = self.train_command.format(
-                config_file=str(config_file),
-                data_file=str(data_file),
-                model_file=str(model_file),
-                geo_file=str(geo_file) if geo_file else "",
+                config_file="config.yml",
+                data_file="data.csv",
+                model_file=f"model.{self.model_format}",
+                geo_file="geo.json" if geo_file else "",
             )
 
             logger.info("executing_train_script", command=command, temp_dir=str(temp_dir))
@@ -160,10 +231,12 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             if model_file.exists():
                 with open(model_file, "rb") as f:
                     model = pickle.load(f)
+                succeeded = True
                 return model
             else:
                 # Return metadata placeholder when no model file is created
                 logger.info("train_script_no_model_file", model_file=str(model_file))
+                succeeded = True
                 return {
                     "model_type": "no_file",
                     "stdout": stdout,
@@ -172,10 +245,13 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 }
 
         finally:
-            # Cleanup temp files
-            import shutil
-
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            # Cleanup temp files based on policy
+            if self.cleanup_policy == "always":
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            elif self.cleanup_policy == "on_success" and succeeded:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            elif self.cleanup_policy == "never" or (self.cleanup_policy == "on_success" and not succeeded):
+                logger.info("temp_dir_preserved", temp_dir=str(temp_dir), reason=self.cleanup_policy)
 
     async def on_predict(
         self,
@@ -187,8 +263,29 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
     ) -> DataFrame:
         """Make predictions by executing external prediction script (skips model file if placeholder)."""
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
+        succeeded = False
 
         try:
+            # Copy source directory into temp directory for isolated execution
+            source_dir = self._detect_source_dir()
+            logger.info("copying_project_to_temp", source=str(source_dir), temp_dir=str(temp_dir))
+
+            shutil.copytree(
+                source_dir,
+                temp_dir,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(
+                    ".git",
+                    "__pycache__",
+                    "*.pyc",
+                    ".pytest_cache",
+                    ".venv",
+                    "venv",
+                    ".tox",
+                    "node_modules",
+                ),
+            )
+
             # Write config to YAML file
             config_file = temp_dir / "config.yml"
             config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
@@ -220,14 +317,14 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Output file path
             output_file = temp_dir / "predictions.csv"
 
-            # Substitute variables in command
+            # Substitute variables in command (using relative paths within temp_dir)
             command = self.predict_command.format(
-                config_file=str(config_file),
-                model_file=str(model_file) if model_file else "",
-                historic_file=str(historic_file),
-                future_file=str(future_file),
-                output_file=str(output_file),
-                geo_file=str(geo_file) if geo_file else "",
+                config_file="config.yml",
+                model_file=f"model.{self.model_format}" if not is_placeholder else "",
+                historic_file="historic.csv",
+                future_file="future.csv",
+                output_file="predictions.csv",
+                geo_file="geo.json" if geo_file else "",
             )
 
             logger.info("executing_predict_script", command=command, temp_dir=str(temp_dir))
@@ -248,10 +345,14 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 raise RuntimeError(f"Prediction script did not create output file at {output_file}")
 
             predictions = DataFrame.from_csv(output_file)
+            succeeded = True
             return predictions
 
         finally:
-            # Cleanup temp files
-            import shutil
-
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            # Cleanup temp files based on policy
+            if self.cleanup_policy == "always":
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            elif self.cleanup_policy == "on_success" and succeeded:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            elif self.cleanup_policy == "never" or (self.cleanup_policy == "on_success" and not succeeded):
+                logger.info("temp_dir_preserved", temp_dir=str(temp_dir), reason=self.cleanup_policy)
