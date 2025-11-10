@@ -826,6 +826,46 @@
                         "description": "Get single artifact with hierarchy metadata (level_label, hierarchy) but without children array. Returns lighter response than /$tree - useful when you only need one node's metadata without loading the entire tree. Response includes: id, data, parent_id, level, level_label, hierarchy, created_at, updated_at. The children field is always null."
                     },
                     "response": []
+                },
+                {
+                    "name": "Download Artifact Content",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{prediction_artifact_id}}/$download",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{prediction_artifact_id}}",
+                                "$download"
+                            ]
+                        },
+                        "description": "Download artifact content as binary file. Returns predictions as JSON array (orient=records). Content-Type header indicates format (application/x-pandas-dataframe for DataFrames). File extension determined by content type (json, csv, zip, png, etc.)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Artifact Metadata Only",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{model_artifact_id}}/$metadata",
+                            "host": ["{{baseUrl}}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{{model_artifact_id}}",
+                                "$metadata"
+                            ]
+                        },
+                        "description": "Get only JSON-serializable metadata without binary content. Returns metadata fields like status, config_id, timestamps, duration, etc. Useful for inspecting artifact information efficiently without downloading large files."
+                    },
+                    "response": []
                 }
             ],
             "description": "Artifact endpoints showing difference between basic GET and /$tree operation."

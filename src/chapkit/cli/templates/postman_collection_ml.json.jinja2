@@ -271,6 +271,46 @@
                             "path": ["api", "v1", "artifacts", "{%raw%}{{model_artifact_id}}{%endraw%}", "$tree"]
                         }
                     }
+                },
+                {
+                    "name": "Download Artifact Content",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{prediction_artifact_id}}{%endraw%}/$download",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{%raw%}{{prediction_artifact_id}}{%endraw%}",
+                                "$download"
+                            ]
+                        },
+                        "description": "Download artifact content as binary file. Returns predictions as JSON array (orient=records). Content-Type header indicates format (application/x-pandas-dataframe for DataFrames). File extension determined by content type (json, csv, zip, png, etc.)."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Artifact Metadata Only",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/artifacts/{%raw%}{{model_artifact_id}}{%endraw%}/$metadata",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": [
+                                "api",
+                                "v1",
+                                "artifacts",
+                                "{%raw%}{{model_artifact_id}}{%endraw%}",
+                                "$metadata"
+                            ]
+                        },
+                        "description": "Get only JSON-serializable metadata without binary content. Returns metadata fields like status, config_id, timestamps, duration, etc. Useful for inspecting artifact information efficiently without downloading large files."
+                    },
+                    "response": []
                 }
             ]
         },
