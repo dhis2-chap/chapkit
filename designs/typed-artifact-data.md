@@ -88,7 +88,6 @@ class MLTrainingMetadata(BaseModel):
 class MLPredictionMetadata(BaseModel):
     """Metadata for ML prediction artifacts."""
     config_id: str
-    training_artifact_id: str
     started_at: str
     completed_at: str
     duration_seconds: float
@@ -761,7 +760,6 @@ Store binary content in S3/filesystem, metadata in database.
     "type": "ml_prediction",
     "metadata": {
       "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
-      "training_artifact_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
       "started_at": "2025-01-10T11:00:00Z",
       "completed_at": "2025-01-10T11:00:05Z",
       "duration_seconds": 5.2,
