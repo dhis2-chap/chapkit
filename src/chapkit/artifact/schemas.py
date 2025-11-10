@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Mapping, Self
+from typing import Annotated, Any, ClassVar, Literal, Mapping, Self
 
 from pydantic import BaseModel, Field
 from servicekit.schemas import EntityIn, EntityOut
@@ -69,8 +69,6 @@ class ArtifactHierarchy(BaseModel):
 
 # Typed artifact data schemas
 
-from typing import Annotated, Literal
-
 
 class BaseArtifactData[MetadataT: BaseModel](BaseModel):
     """Base class for all artifact data types with typed metadata."""
@@ -103,21 +101,21 @@ class GenericMetadata(BaseModel):
 class MLTrainingArtifactData(BaseArtifactData[MLMetadata]):
     """Schema for ML training artifact data with trained model."""
 
-    type: Literal["ml_training"] = "ml_training"
+    type: Literal["ml_training"] = Field(default="ml_training", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
     metadata: MLMetadata
 
 
 class MLPredictionArtifactData(BaseArtifactData[MLMetadata]):
     """Schema for ML prediction artifact data with results."""
 
-    type: Literal["ml_prediction"] = "ml_prediction"
+    type: Literal["ml_prediction"] = Field(default="ml_prediction", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
     metadata: MLMetadata
 
 
 class GenericArtifactData(BaseArtifactData[GenericMetadata]):
     """Schema for generic artifact data with free-form metadata."""
 
-    type: Literal["generic"] = "generic"
+    type: Literal["generic"] = Field(default="generic", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
     metadata: GenericMetadata
 
 
@@ -132,7 +130,7 @@ def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
     """Validate artifact data against appropriate schema based on type field."""
     artifact_type = data.get("type", "generic")
 
-    schema_map = {
+    schema_map: dict[str, type[BaseArtifactData]] = {
         "ml_training": MLTrainingArtifactData,
         "ml_prediction": MLPredictionArtifactData,
         "generic": GenericArtifactData,

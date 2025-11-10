@@ -351,7 +351,7 @@ async def test_typed_metadata_validation(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
 ) -> None:
     """Test that artifact data follows typed schema structure."""
-    from chapkit.artifact.schemas import MLTrainingArtifactData, MLMetadata
+    from chapkit.artifact.schemas import MLMetadata, MLTrainingArtifactData
 
     # Create artifact data with typed structure
     metadata = MLMetadata(
@@ -378,7 +378,6 @@ async def test_typed_metadata_validation(
     assert artifact_data.content == {"test": "model"}
     assert artifact_data.content_type == "application/x-pickle"
     assert artifact_data.content_size is None
-
 
 
 async def test_typed_structure_present_in_artifact(

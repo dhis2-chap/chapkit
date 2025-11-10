@@ -114,7 +114,8 @@ class MLManager(Generic[ConfigT]):
                 duration_seconds=round(training_duration, 2),
             )
 
-            # Create and validate artifact data with Pydantic
+            # Create and validate artifact data structure with Pydantic
+            # Note: We validate but don't serialize to JSON because content contains Python objects
             artifact_data_model = MLTrainingArtifactData(
                 type="ml_training",
                 metadata=metadata,
@@ -123,10 +124,19 @@ class MLManager(Generic[ConfigT]):
                 content_size=None,
             )
 
+            # Construct dict manually to preserve Python objects (database uses PickleType)
+            artifact_data = {
+                "type": artifact_data_model.type,
+                "metadata": artifact_data_model.metadata.model_dump(),
+                "content": trained_model,  # Keep as Python object
+                "content_type": artifact_data_model.content_type,
+                "content_size": artifact_data_model.content_size,
+            }
+
             await artifact_manager.save(
                 ArtifactIn(
                     id=artifact_id,
-                    data=artifact_data_model.model_dump(),
+                    data=artifact_data,
                     parent_id=None,
                     level=0,
                 )
@@ -194,7 +204,8 @@ class MLManager(Generic[ConfigT]):
                 duration_seconds=round(prediction_duration, 2),
             )
 
-            # Create and validate artifact data with Pydantic
+            # Create and validate artifact data structure with Pydantic
+            # Note: We validate but don't serialize to JSON because content contains Python objects
             artifact_data_model = MLPredictionArtifactData(
                 type="ml_prediction",
                 metadata=metadata,
@@ -203,10 +214,19 @@ class MLManager(Generic[ConfigT]):
                 content_size=None,
             )
 
+            # Construct dict manually to preserve Python objects (database uses PickleType)
+            artifact_data = {
+                "type": artifact_data_model.type,
+                "metadata": artifact_data_model.metadata.model_dump(),
+                "content": predictions,  # Keep as Python object (DataFrame)
+                "content_type": artifact_data_model.content_type,
+                "content_size": artifact_data_model.content_size,
+            }
+
             await artifact_manager.save(
                 ArtifactIn(
                     id=artifact_id,
-                    data=artifact_data_model.model_dump(),
+                    data=artifact_data,
                     parent_id=request.training_artifact_id,
                     level=1,
                 )

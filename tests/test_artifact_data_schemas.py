@@ -4,8 +4,6 @@ import pytest
 from pydantic import ValidationError
 
 from chapkit.artifact.schemas import (
-    ArtifactData,
-    BaseArtifactData,
     GenericArtifactData,
     GenericMetadata,
     MLMetadata,
@@ -13,7 +11,6 @@ from chapkit.artifact.schemas import (
     MLTrainingArtifactData,
     validate_artifact_data,
 )
-
 
 # Tests for MLMetadata
 
@@ -50,7 +47,7 @@ def test_ml_metadata_invalid_status():
     """Test MLMetadata rejects invalid status."""
     with pytest.raises(ValidationError):
         MLMetadata(
-            status="pending",  # Invalid - must be success or failed
+            status="pending",  # type: ignore[arg-type]  # Testing invalid status
             config_id="01ARZ3NDEKTSV4RRFFQ69G5FAV",
             started_at="2025-01-10T10:00:00Z",
             completed_at="2025-01-10T10:00:15Z",
@@ -64,14 +61,14 @@ def test_ml_metadata_invalid_status():
 def test_generic_metadata_allows_extra_fields():
     """Test GenericMetadata allows arbitrary fields."""
     metadata = GenericMetadata(
-        experiment_name="test",
-        custom_field="value",
-        nested={"data": 123},
+        experiment_name="test",  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]  # Testing extra fields
+        custom_field="value",  # pyright: ignore[reportCallIssue]  # Testing extra fields
+        nested={"data": 123},  # pyright: ignore[reportCallIssue]  # Testing extra fields
     )
 
-    assert metadata.model_extra["experiment_name"] == "test"
-    assert metadata.model_extra["custom_field"] == "value"
-    assert metadata.model_extra["nested"] == {"data": 123}
+    assert metadata.model_extra["experiment_name"] == "test"  # type: ignore[index]  # model_extra is dict when extra="allow"
+    assert metadata.model_extra["custom_field"] == "value"  # type: ignore[index]  # model_extra is dict when extra="allow"
+    assert metadata.model_extra["nested"] == {"data": 123}  # type: ignore[index]  # model_extra is dict when extra="allow"
 
 
 def test_generic_metadata_empty():
@@ -120,7 +117,7 @@ def test_ml_training_artifact_data_wrong_type():
 
     with pytest.raises(ValidationError):
         MLTrainingArtifactData(
-            type="ml_prediction",  # Wrong type
+            type="ml_prediction",  # type: ignore[arg-type]  # Testing wrong type
             metadata=metadata,
             content=b"model bytes",
         )
@@ -179,8 +176,8 @@ def test_ml_prediction_artifact_data_valid():
 def test_generic_artifact_data_valid():
     """Test GenericArtifactData with custom metadata."""
     metadata = GenericMetadata(
-        experiment_name="rainfall-prediction",
-        dataset_version="2024-11-10",
+        experiment_name="rainfall-prediction",  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]  # Testing extra fields
+        dataset_version="2024-11-10",  # pyright: ignore[reportCallIssue]  # Testing extra fields
     )
 
     artifact_data = GenericArtifactData(
@@ -192,7 +189,7 @@ def test_generic_artifact_data_valid():
     )
 
     assert artifact_data.type == "generic"
-    assert artifact_data.metadata.model_extra["experiment_name"] == "rainfall-prediction"
+    assert artifact_data.metadata.model_extra["experiment_name"] == "rainfall-prediction"  # type: ignore[index]  # model_extra is dict when extra="allow"
     assert artifact_data.content_type == "application/zip"
 
 
@@ -366,7 +363,7 @@ def test_base_artifact_data_forbids_extra_fields():
             type="ml_training",
             metadata=metadata,
             content=b"model",
-            extra_field="not allowed",  # Should be forbidden
+            extra_field="not allowed",  # type: ignore[call-arg]  # Testing forbidden field
         )
 
 
@@ -403,8 +400,8 @@ def test_ml_training_artifact_data_serialization():
 def test_generic_artifact_data_serialization_with_extra():
     """Test GenericArtifactData serialization preserves extra metadata fields."""
     metadata = GenericMetadata(
-        experiment="test",
-        version="1.0",
+        experiment="test",  # type: ignore[call-arg]  # pyright: ignore[reportCallIssue]  # Testing extra fields
+        version="1.0",  # pyright: ignore[reportCallIssue]  # Testing extra fields
     )
 
     artifact_data = GenericArtifactData(
