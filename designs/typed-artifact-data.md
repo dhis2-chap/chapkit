@@ -519,10 +519,10 @@ artifact_data = GenericArtifactData(
         files=["data.csv", "metadata.json", "README.md"],
         created_by="data_pipeline_v2",
         dataset_version="2024-11-10",
-        total_size_bytes=len(zip_bytes),
     ),
     content=zip_bytes,
     content_type="application/zip",
+    content_size=len(zip_bytes),
 )
 
 # Save artifact
