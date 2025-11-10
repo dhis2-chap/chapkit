@@ -79,11 +79,11 @@ class BaseArtifactData[MetadataT: BaseModel](BaseModel):
 # Metadata schemas
 class MLMetadata(BaseModel):
     """Metadata for ML artifacts (training and prediction)."""
+    status: Literal["success", "failed"]
     config_id: str
     started_at: str  # ISO 8601 format
     completed_at: str
     duration_seconds: float
-    status: Literal["success", "failed"]
 
 class GenericMetadata(BaseModel):
     """Free-form metadata for generic artifacts."""
