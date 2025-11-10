@@ -106,7 +106,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         train_command: str,
         predict_command: str,
         model_format: str = "pickle",
-        cleanup_policy: CleanupPolicy = "on_success",
+        cleanup_policy: CleanupPolicy = "always",
     ) -> None:
         """Initialize shell runner with command templates for train/predict operations.
 
@@ -116,8 +116,8 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             model_format: File extension for model files (default: "pickle")
             cleanup_policy: When to delete temp directories:
                 - "never": Keep all temp directories (useful for debugging)
-                - "on_success": Delete only if operation succeeds (default, keeps failed runs for inspection)
-                - "always": Always delete temp directories (saves disk space)
+                - "on_success": Delete only if operation succeeds (keeps failed runs for inspection)
+                - "always": Always delete temp directories (default, saves disk space)
         """
         self.train_command = train_command
         self.predict_command = predict_command
@@ -157,6 +157,26 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
         # Fallback to cwd if can't detect
         return cwd
+
+    def _create_debug_archive(self, temp_dir: Path, source_dir: Path, operation: str) -> Path:
+        """Create a zip archive of temp directory for debugging."""
+        from datetime import datetime, timezone
+        from ulid import ULID
+
+        # Create debug directory in source_dir
+        debug_dir = source_dir / "debug"
+        debug_dir.mkdir(exist_ok=True)
+
+        # Generate unique filename
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        ulid = str(ULID())
+        zip_name = f"chapkit_{operation}_{timestamp}_{ulid}"
+        zip_path = debug_dir / zip_name
+
+        # Create zip archive
+        shutil.make_archive(str(zip_path), "zip", str(temp_dir))
+
+        return Path(f"{zip_path}.zip")
 
     async def on_train(
         self,
@@ -251,7 +271,16 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             elif self.cleanup_policy == "on_success" and succeeded:
                 shutil.rmtree(temp_dir, ignore_errors=True)
             elif self.cleanup_policy == "never" or (self.cleanup_policy == "on_success" and not succeeded):
-                logger.info("temp_dir_preserved", temp_dir=str(temp_dir), reason=self.cleanup_policy)
+                # Create debug archive before cleanup
+                zip_path = self._create_debug_archive(temp_dir, source_dir, "train")
+                logger.info(
+                    "debug_archive_created",
+                    zip_path=str(zip_path),
+                    temp_dir=str(temp_dir),
+                    reason=self.cleanup_policy,
+                )
+                # Clean up temp directory after zipping
+                shutil.rmtree(temp_dir, ignore_errors=True)
 
     async def on_predict(
         self,
@@ -355,4 +384,13 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             elif self.cleanup_policy == "on_success" and succeeded:
                 shutil.rmtree(temp_dir, ignore_errors=True)
             elif self.cleanup_policy == "never" or (self.cleanup_policy == "on_success" and not succeeded):
-                logger.info("temp_dir_preserved", temp_dir=str(temp_dir), reason=self.cleanup_policy)
+                # Create debug archive before cleanup
+                zip_path = self._create_debug_archive(temp_dir, source_dir, "predict")
+                logger.info(
+                    "debug_archive_created",
+                    zip_path=str(zip_path),
+                    temp_dir=str(temp_dir),
+                    reason=self.cleanup_policy,
+                )
+                # Clean up temp directory after zipping
+                shutil.rmtree(temp_dir, ignore_errors=True)

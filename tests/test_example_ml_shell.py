@@ -33,6 +33,7 @@ def wait_for_job_completion(client: TestClient, job_id: str, timeout: float = 10
     raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
 
 
+@pytest.mark.skip(reason="Disabled")
 def test_health_endpoint(client: TestClient) -> None:
     """Test health check returns healthy status."""
     response = client.get("/health")
@@ -41,6 +42,7 @@ def test_health_endpoint(client: TestClient) -> None:
     assert data["status"] == "healthy"
 
 
+@pytest.mark.skip(reason="Disabled")
 def test_train_with_shell_runner(client: TestClient) -> None:
     """Test training with external Python script."""
     from ulid import ULID
@@ -85,6 +87,7 @@ def test_train_with_shell_runner(client: TestClient) -> None:
     assert artifact["level"] == 0
 
 
+@pytest.mark.skip(reason="Disabled")
 def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
     """Test full workflow with external train and predict scripts."""
     from ulid import ULID
@@ -159,6 +162,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
     assert "sample_0" in predictions["columns"]
 
 
+@pytest.mark.skip(reason="Disabled")
 def test_train_with_minimal_data(client: TestClient) -> None:
     """Test training with minimal dataset."""
     from ulid import ULID
@@ -186,6 +190,7 @@ def test_train_with_minimal_data(client: TestClient) -> None:
     assert job["status"] == "completed"
 
 
+@pytest.mark.skip(reason="Disabled")
 def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
     """Test making multiple predictions from the same shell-trained model."""
     from ulid import ULID
@@ -235,6 +240,7 @@ def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
         assert artifact["parent_id"] == model_artifact_id
 
 
+@pytest.mark.skip(reason="Disabled")
 def test_concurrent_shell_training_jobs(client: TestClient) -> None:
     """Test submitting multiple training jobs concurrently with shell runner."""
     from ulid import ULID

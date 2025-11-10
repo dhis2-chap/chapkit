@@ -235,8 +235,8 @@ runner = ShellModelRunner(
 
 **Temp Directory Cleanup:**
 - `"never"` - Keep all temp directories (useful for debugging)
-- `"on_success"` - Delete only if operation succeeds (default, keeps failed runs for inspection)
-- `"always"` - Always delete temp directories (saves disk space)
+- `"on_success"` - Delete only if operation succeeds (keeps failed runs for inspection)
+- `"always"` - Always delete temp directories (default, saves disk space)
 
 **Variable Substitution:**
 - `{config_file}` - YAML config file (relative path: `config.yml`)
@@ -331,7 +331,7 @@ runner = ShellModelRunner(
 
 **Debugging Failed Runs:**
 
-When `cleanup_policy="on_success"` (default), failed runs preserve the temp directory for inspection:
+When temp directories are preserved, ShellModelRunner automatically creates a zip archive in the `debug/` directory:
 
 ```python
 runner = ShellModelRunner(
@@ -341,15 +341,21 @@ runner = ShellModelRunner(
 )
 ```
 
-Check logs for temp directory location:
+Check logs for debug archive location:
 ```
-INFO temp_dir_preserved temp_dir=/tmp/chapkit_ml_train_abc123 reason=on_success
+INFO debug_archive_created zip_path=/path/to/project/debug/chapkit_train_20250110_120530_01ABC123XYZ.zip
 ```
 
-Then inspect the failed run:
+The debug archive contains all files from the failed run:
+- Source code and scripts
+- Input data files (config.yml, data.csv, etc.)
+- Partial outputs (if any)
+- Execution environment
+
+Share the zip file with colleagues or extract it to reproduce the failure:
 ```bash
-cd /tmp/chapkit_ml_train_abc123
-ls -la  # See all files: scripts, config.yml, data.csv, etc.
+unzip debug/chapkit_train_20250110_120530_01ABC123XYZ.zip -d /tmp/reproduce
+cd /tmp/reproduce
 Rscript train.R config.yml data.csv model.rds  # Reproduce the failure
 ```
 
