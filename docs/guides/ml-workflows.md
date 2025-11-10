@@ -208,7 +208,13 @@ runner = FunctionalModelRunner(on_train=train_fn, on_predict=predict_fn)
 
 ### ShellModelRunner
 
-Executes external scripts for language-agnostic ML workflows.
+Executes external scripts for language-agnostic ML workflows with isolated execution.
+
+**Key Feature:** ShellModelRunner automatically copies the current working directory into a temporary execution directory for each run. This enables:
+- Scripts can use relative imports (e.g., `source('utils.R')` in R)
+- Complete reproducibility - temp directory contains full project snapshot
+- Easy debugging - inspect/zip temp directory on failure
+- Isolated execution - each run has its own environment
 
 ```python
 from chapkit.ml import ShellModelRunner
@@ -216,24 +222,37 @@ from chapkit.ml import ShellModelRunner
 runner = ShellModelRunner(
     train_command="python train.py --config {config_file} --data {data_file} --model {model_file}",
     predict_command="python predict.py --config {config_file} --model {model_file} --future {future_file} --output {output_file}",
-    model_format="pickle"  # or "joblib", "json", etc.
+    model_format="pickle",  # or "joblib", "json", etc.
+    cleanup_policy="on_success",  # "never", "on_success" (default), or "always"
 )
 ```
 
+**Isolated Execution:**
+- Current working directory is copied to temp directory before each run
+- Excludes: `.git`, `__pycache__`, `.venv`, `venv`, `.tox`, `node_modules`
+- Scripts execute with `cwd=temp_dir`
+- Dependencies (Python packages, R libraries) come from parent environment
+
+**Temp Directory Cleanup:**
+- `"never"` - Keep all temp directories (useful for debugging)
+- `"on_success"` - Delete only if operation succeeds (keeps failed runs for inspection)
+- `"always"` - Always delete temp directories (default, saves disk space)
+
 **Variable Substitution:**
-- `{config_file}` - JSON config file
-- `{data_file}` - Training data CSV
-- `{model_file}` - Model file (format specified)
-- `{future_file}` - Future data CSV
-- `{historic_file}` - Historic data CSV (required)
-- `{output_file}` - Predictions output CSV
-- `{geo_file}` - GeoJSON file (if provided)
+- `{config_file}` - YAML config file (relative path: `config.yml`)
+- `{data_file}` - Training data CSV (relative path: `data.csv`)
+- `{model_file}` - Model file (relative path: `model.pickle`)
+- `{future_file}` - Future data CSV (relative path: `future.csv`)
+- `{historic_file}` - Historic data CSV (relative path: `historic.csv`)
+- `{output_file}` - Predictions output CSV (relative path: `predictions.csv`)
+- `{geo_file}` - GeoJSON file (relative path: `geo.json` if provided)
 
 **Script Requirements:**
 - **Training script:** Read data/config, train model, save model to `{model_file}`
 - **Prediction script:** Read model/data/config, make predictions, save to `{output_file}`
 - Exit code 0 on success, non-zero on failure
 - Use stderr for logging
+- Can use relative imports/paths (current directory contains project files)
 
 **Example Training Script (Python):**
 ```python
@@ -266,11 +285,87 @@ with open(args.model, "wb") as f:
     pickle.dump(model, f)
 ```
 
+**Example with R and Relative Imports:**
+
+```r
+# utils.R - Helper functions
+preprocess_data <- function(df) {
+    # Remove NA values and normalize
+    df[complete.cases(df), ]
+}
+
+# train.R - Training script with relative import
+source('utils.R')  # Relative import works!
+
+library(yaml)
+library(randomForest)
+
+# Parse arguments
+args <- commandArgs(trailingOnly = TRUE)
+config_file <- args[1]
+data_file <- args[2]
+model_file <- args[3]
+
+# Load config
+config <- yaml.load_file(config_file)
+
+# Load and preprocess data
+data <- read.csv(data_file)
+clean_data <- preprocess_data(data)  # Use helper function
+
+# Train model
+model <- randomForest(disease_cases ~ rainfall + temperature, data = clean_data)
+
+# Save model
+saveRDS(model, model_file)
+```
+
+**Runner setup for R:**
+```python
+runner = ShellModelRunner(
+    train_command="Rscript train.R {config_file} {data_file} {model_file}",
+    predict_command="Rscript predict.R {config_file} {model_file} {future_file} {output_file}",
+    model_format="rds",
+)
+```
+
+**Debugging Failed Runs:**
+
+When temp directories are preserved, ShellModelRunner automatically creates a zip archive in the `debug/` directory:
+
+```python
+runner = ShellModelRunner(
+    train_command="Rscript train.R {config_file} {data_file} {model_file}",
+    predict_command="Rscript predict.R {config_file} {model_file} {future_file} {output_file}",
+    cleanup_policy="on_success",  # Keep temp dir on failure
+)
+```
+
+Check logs for debug archive location:
+```
+INFO debug_archive_created zip_path=/path/to/project/debug/chapkit_train_20250110_120530_01ABC123XYZ.zip
+```
+
+The debug archive contains all files from the failed run:
+- Source code and scripts
+- Input data files (config.yml, data.csv, etc.)
+- Partial outputs (if any)
+- Execution environment
+
+Share the zip file with colleagues or extract it to reproduce the failure:
+```bash
+unzip debug/chapkit_train_20250110_120530_01ABC123XYZ.zip -d /tmp/reproduce
+cd /tmp/reproduce
+Rscript train.R config.yml data.csv model.rds  # Reproduce the failure
+```
+
 **Use Cases:**
 - Integration with R, Julia, or other languages
+- Scripts with relative imports (R's `source()`, Python's local imports)
 - Legacy scripts without modification
 - Containerized ML pipelines
 - Team collaboration across languages
+- Reproducible debugging (inspect/zip temp directory on failure)
 
 ---
 
