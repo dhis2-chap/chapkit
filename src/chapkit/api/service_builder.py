@@ -27,7 +27,7 @@ from chapkit.artifact import (
 )
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigOut, ConfigRepository, ConfigRouter
 from chapkit.ml import MLManager, MLRouter, ModelRunnerProtocol
-from chapkit.scheduler import ChapkitScheduler, InMemoryScheduler
+from chapkit.scheduler import ChapkitScheduler, InMemoryChapkitScheduler
 
 from .dependencies import get_artifact_manager as default_get_artifact_manager
 from .dependencies import get_config_manager as default_get_config_manager
@@ -298,18 +298,18 @@ class ServiceBuilder(BaseServiceBuilder):
         return _dependency
 
     def _build_lifespan(self) -> LifespanFactory:
-        """Build lifespan context manager with InMemoryScheduler instead of AIOJobScheduler."""
+        """Build lifespan context manager with InMemoryChapkitScheduler."""
         # Get parent lifespan factory
         parent_lifespan = super()._build_lifespan()
 
         @asynccontextmanager
         async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-            """Override scheduler creation to use InMemoryScheduler."""
+            """Override scheduler creation to use InMemoryChapkitScheduler."""
             # Call parent lifespan which handles database and most setup
             async with parent_lifespan(app):
-                # Replace AIOJobScheduler with InMemoryScheduler if jobs are enabled
+                # Use InMemoryChapkitScheduler if jobs are enabled
                 if self._job_options is not None:
-                    scheduler = InMemoryScheduler(max_concurrency=self._job_options.max_concurrency)
+                    scheduler = InMemoryChapkitScheduler(max_concurrency=self._job_options.max_concurrency)
                     set_scheduler(scheduler)
                     app.state.scheduler = scheduler
 

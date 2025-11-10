@@ -53,7 +53,7 @@ from .ml import (
     TrainRequest,
     TrainResponse,
 )
-from .scheduler import ChapkitJobRecord, ChapkitScheduler, InMemoryScheduler
+from .scheduler import ChapkitJobRecord, ChapkitScheduler, InMemoryChapkitScheduler
 
 # Task feature
 from .task import (
@@ -86,7 +86,7 @@ __all__ = [
     # Scheduler
     "ChapkitJobRecord",
     "ChapkitScheduler",
-    "InMemoryScheduler",
+    "InMemoryChapkitScheduler",
     # Artifact
     "Artifact",
     "ArtifactHierarchy",

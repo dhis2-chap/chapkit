@@ -11,7 +11,7 @@ from typing import Any
 
 import ulid
 from pydantic import Field, PrivateAttr
-from servicekit.scheduler import AIOJobScheduler, JobExecutor, JobTarget
+from servicekit.scheduler import InMemoryScheduler, JobExecutor, JobTarget
 from servicekit.schemas import JobRecord, JobStatus
 
 ULID = ulid.ULID
@@ -23,7 +23,7 @@ class ChapkitJobRecord(JobRecord):
     artifact_id: ULID | None = Field(default=None, description="ID of artifact created by job (if job returns a ULID)")
 
 
-class ChapkitScheduler(AIOJobScheduler, ABC):
+class ChapkitScheduler(InMemoryScheduler, ABC):
     """Abstract base class for Chapkit job schedulers with artifact tracking."""
 
     async def get_record(self, job_id: ULID) -> ChapkitJobRecord:
@@ -37,7 +37,7 @@ class ChapkitScheduler(AIOJobScheduler, ABC):
         raise NotImplementedError
 
 
-class InMemoryScheduler(ChapkitScheduler):
+class InMemoryChapkitScheduler(ChapkitScheduler):
     """In-memory scheduler with automatic artifact tracking for jobs that return ULIDs."""
 
     # Override with ChapkitJobRecord type to support artifact_id tracking

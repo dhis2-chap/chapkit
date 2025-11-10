@@ -6,7 +6,7 @@ import pytest
 from servicekit import JobStatus
 from ulid import ULID
 
-from chapkit.scheduler import ChapkitScheduler, InMemoryScheduler
+from chapkit.scheduler import ChapkitScheduler, InMemoryChapkitScheduler
 
 
 async def test_abstract_base_class_methods() -> None:
@@ -36,7 +36,7 @@ async def test_abstract_base_class_methods() -> None:
 
 async def test_add_job_with_sync_function() -> None:
     """Test submitting a synchronous function (uses asyncio.to_thread)."""
-    scheduler = InMemoryScheduler()
+    scheduler = InMemoryChapkitScheduler()
 
     def sync_task(value: int) -> int:
         return value * 2
@@ -53,7 +53,7 @@ async def test_add_job_with_sync_function() -> None:
 
 async def test_add_job_with_semaphore() -> None:
     """Test job submission with concurrency semaphore."""
-    scheduler = InMemoryScheduler(max_concurrency=2)
+    scheduler = InMemoryChapkitScheduler(max_concurrency=2)
 
     async def slow_task(duration: float) -> str:
         await asyncio.sleep(duration)
@@ -75,7 +75,7 @@ async def test_add_job_with_semaphore() -> None:
 
 async def test_get_record_not_found_raises_key_error() -> None:
     """Test that getting a non-existent job record raises KeyError."""
-    scheduler = InMemoryScheduler()
+    scheduler = InMemoryChapkitScheduler()
 
     missing_id = ULID()
     with pytest.raises(KeyError, match=f"Job {missing_id} not found"):
@@ -84,7 +84,7 @@ async def test_get_record_not_found_raises_key_error() -> None:
 
 async def test_list_records_with_status_filter() -> None:
     """Test listing job records with status filtering."""
-    scheduler = InMemoryScheduler()
+    scheduler = InMemoryChapkitScheduler()
 
     async def success_task() -> str:
         return "ok"
@@ -116,7 +116,7 @@ async def test_list_records_with_status_filter() -> None:
 
 async def test_list_records_reverse() -> None:
     """Test listing job records in reverse order."""
-    scheduler = InMemoryScheduler()
+    scheduler = InMemoryChapkitScheduler()
 
     async def dummy() -> None:
         pass
@@ -137,7 +137,7 @@ async def test_list_records_reverse() -> None:
 
 async def test_cancelled_job_updates_status() -> None:
     """Test that cancelling a job updates its status to canceled."""
-    scheduler = InMemoryScheduler()
+    scheduler = InMemoryChapkitScheduler()
 
     async def long_task() -> None:
         await asyncio.sleep(10)  # Long running task
@@ -165,7 +165,7 @@ async def test_add_job_duplicate_id_raises_runtime_error() -> None:
     """Test that adding a job with duplicate ID raises RuntimeError."""
     import re
 
-    scheduler = InMemoryScheduler()
+    scheduler = InMemoryChapkitScheduler()
 
     # Create a job with a specific ID by manually inserting into _tasks
     duplicate_id = ULID()
@@ -197,7 +197,7 @@ async def test_add_job_duplicate_id_raises_runtime_error() -> None:
 
 async def test_add_job_with_awaitable_and_args_raises_type_error() -> None:
     """Test that submitting an awaitable with args/kwargs raises TypeError."""
-    scheduler = InMemoryScheduler()
+    scheduler = InMemoryChapkitScheduler()
 
     # Create a coroutine (awaitable object)
     async def some_coro() -> str:

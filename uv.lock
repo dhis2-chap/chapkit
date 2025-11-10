@@ -102,7 +102,7 @@ wheels = [
 
 [[package]]
 name = "chapkit"
-version = "0.7.0"
+version = "0.7.1"
 source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
@@ -139,7 +139,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.3.0" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "polars", specifier = ">=1.34.0" },
-    { name = "servicekit", specifier = ">=0.5.1" },
+    { name = "servicekit", specifier = "==0.5.2" },
     { name = "typer", specifier = ">=0.20.0" },
     { name = "xarray", specifier = ">=2025.10.1" },
 ]
@@ -1585,7 +1585,7 @@ wheels = [
 
 [[package]]
 name = "servicekit"
-version = "0.5.1"
+version = "0.5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1602,9 +1602,9 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "structlog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/08/89/4b536ef85b4cdafc849b456d5a4c6c7bc3a93fb4a12e595c2ec4f822b82a/servicekit-0.5.1.tar.gz", hash = "sha256:38a424f6c247991997ba0ec5896c0c0ee0ae8a9674e221b4d753488e33c90256", size = 40760, upload-time = "2025-11-03T09:15:37.906Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2f/50/64d74822c145fd6dc2b24a811620d7564cdeb4902e991fdd8c1fcd89bd06/servicekit-0.5.2.tar.gz", hash = "sha256:354d5d3bf7bfee6e03e54c2555314e49472721e43877a3d7f7fecac782019932", size = 40759, upload-time = "2025-11-10T17:20:58.034Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/9c/f4e99685b3233eddce7bf1c99b42dac67d83d6a3a7e8ac081ee2ea879673/servicekit-0.5.1-py3-none-any.whl", hash = "sha256:a502565f3626060b55b6447c2d668c1eb852dd439f3499e3d78f082916e74f2b", size = 53139, upload-time = "2025-11-03T09:15:36.607Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/83/d8dbc1af9efaa9e0721606ec32e863773e8e2dc862a18dd78737d9a190b3/servicekit-0.5.2-py3-none-any.whl", hash = "sha256:abfffc3086f28da650cb2205fe73f22faf7364e452ecf0ca1842bf90fb79f1f7", size = 53144, upload-time = "2025-11-10T17:20:56.742Z" },
 ]
 
 [[package]]
