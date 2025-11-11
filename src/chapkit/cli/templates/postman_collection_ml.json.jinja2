@@ -227,7 +227,7 @@
                         "header": [{"key": "Content-Type", "value": "application/json"}],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"model_artifact_id\": \"{%raw%}{{model_artifact_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+                            "raw": "{\n  \"artifact_id\": \"{%raw%}{{model_artifact_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
                         },
                         "url": {
                             "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$predict",

@@ -59,7 +59,7 @@ def test_download_prediction_artifact_as_csv(client: TestClient):
 
     # Predict
     predict_request = {
-        "training_artifact_id": model_artifact_id,
+        "artifact_id": model_artifact_id,
         "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
         "future": {"columns": ["rainfall", "mean_temperature"], "data": [[11.0, 25.5], [9.0, 24.5]]},
     }
@@ -167,7 +167,7 @@ def test_get_metadata_from_prediction_artifact(client: TestClient):
 
     # Predict
     predict_request = {
-        "training_artifact_id": model_artifact_id,
+        "artifact_id": model_artifact_id,
         "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
         "future": {"columns": ["rainfall", "mean_temperature"], "data": [[11.0, 25.5]]},
     }

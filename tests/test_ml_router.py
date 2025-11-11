@@ -63,7 +63,7 @@ def test_predict_value_error_returns_400() -> None:
     client = TestClient(app)
 
     predict_request = {
-        "training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001",
+        "artifact_id": "01K72P5N5KCRM6MD3BRE4P0001",
         "historic": {"columns": ["rainfall", "temperature"], "data": []},
         "future": {"columns": ["rainfall", "temperature"], "data": [[1.0, 2.0]]},
     }
@@ -191,7 +191,7 @@ def test_predict_successful_submission() -> None:
     client = TestClient(app)
 
     predict_request = {
-        "training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001",
+        "artifact_id": "01K72P5N5KCRM6MD3BRE4P0001",
         "historic": {"columns": ["rainfall", "temperature"], "data": []},
         "future": {"columns": ["rainfall", "temperature"], "data": [[1.0, 2.0]]},
     }
@@ -253,7 +253,7 @@ def test_predict_runtime_error_returns_409() -> None:
     client = TestClient(app)
 
     predict_request = {
-        "training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001",
+        "artifact_id": "01K72P5N5KCRM6MD3BRE4P0001",
         "historic": {"columns": ["rainfall", "temperature"], "data": []},
         "future": {"columns": ["rainfall", "temperature"], "data": [[1.0, 2.0]]},
     }

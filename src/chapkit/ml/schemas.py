@@ -51,7 +51,7 @@ class TrainResponse(BaseModel):
 class PredictRequest(BaseModel):
     """Request schema for making predictions."""
 
-    training_artifact_id: ULID = Field(description="ID of the artifact containing the trained model")
+    artifact_id: ULID = Field(description="ID of the artifact containing the trained model")
     historic: DataFrame = Field(description="Historic data as DataFrame")
     future: DataFrame = Field(description="Future/prediction data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")

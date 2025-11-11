@@ -414,7 +414,7 @@ Make predictions using a trained model.
 **Request:**
 ```json
 {
-  "training_artifact_id": "01MODEL456...",
+  "artifact_id": "01MODEL456...",
   "historic": {
     "columns": ["feature1", "feature2"],
     "data": []
@@ -445,7 +445,7 @@ Make predictions using a trained model.
 curl -X POST http://localhost:8000/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
-    "training_artifact_id": "'$MODEL_ARTIFACT_ID'",
+    "artifact_id": "'$MODEL_ARTIFACT_ID'",
     "historic": {
       "columns": ["rainfall", "temperature"],
       "data": []
@@ -675,7 +675,7 @@ curl http://localhost:8000/api/v1/artifacts/$MODEL_ARTIFACT_ID | jq
 PREDICT_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
-    "training_artifact_id": "'$MODEL_ARTIFACT_ID'",
+    "artifact_id": "'$MODEL_ARTIFACT_ID'",
     "historic": {
       "columns": ["rainfall", "mean_temperature"],
       "data": []
@@ -837,7 +837,7 @@ curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq '.status'
 
 # Predict
 PRED=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict -d '{
-  "training_artifact_id":"'$MODEL_ID'",
+  "artifact_id":"'$MODEL_ID'",
   "historic":{"columns":["a","b"],"data":[]},
   "future":{"columns":["a","b"],"data":[[1.5,2.5],[2.5,3.5]]}
 }')
@@ -900,7 +900,7 @@ def test_train_predict_workflow(client: TestClient):
 
     # Predict
     pred_resp = client.post("/api/v1/ml/$predict", json={
-        "training_artifact_id": model_id,
+        "artifact_id": model_id,
         "historic": {
             "columns": ["x1", "x2"],
             "data": []

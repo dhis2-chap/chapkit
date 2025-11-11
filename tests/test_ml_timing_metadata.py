@@ -171,7 +171,7 @@ async def test_prediction_timing_metadata_captured(
 
     # Submit prediction job
     predict_request = PredictRequest(
-        training_artifact_id=ULID.from_str(train_response.artifact_id),
+        artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -302,7 +302,7 @@ async def test_original_metadata_preserved(
 
     # Predict
     predict_request = PredictRequest(
-        training_artifact_id=ULID.from_str(train_response.artifact_id),
+        artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )
@@ -318,7 +318,7 @@ async def test_original_metadata_preserved(
     # Original fields should still exist
     assert predict_artifact is not None
     assert predict_artifact.data["type"] == "ml_prediction"
-    # training_artifact_id is now in parent_id, not in data
+    # artifact_id is now in parent_id, not in data
     assert predict_artifact.parent_id == ULID.from_str(train_response.artifact_id)
     assert predict_artifact.data["metadata"]["config_id"] == str(config_id)
     assert "content" in predict_artifact.data
@@ -446,7 +446,7 @@ async def test_predict_with_wrong_artifact_type_raises_error(ml_manager: MLManag
 
     # Try to predict using this wrong artifact
     predict_request = PredictRequest(
-        training_artifact_id=wrong_artifact_id,
+        artifact_id=wrong_artifact_id,
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
     )

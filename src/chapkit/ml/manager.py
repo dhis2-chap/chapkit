@@ -154,15 +154,15 @@ class MLManager(Generic[ConfigT]):
         async with self.database.session() as session:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
-            training_artifact = await artifact_manager.find_by_id(request.training_artifact_id)
+            training_artifact = await artifact_manager.find_by_id(request.artifact_id)
 
             if training_artifact is None:
-                raise ValueError(f"Training artifact {request.training_artifact_id} not found")
+                raise ValueError(f"Training artifact {request.artifact_id} not found")
 
         # Extract model and config_id from artifact
         training_data = training_artifact.data
         if not isinstance(training_data, dict) or training_data.get("type") != "ml_training":
-            raise ValueError(f"Artifact {request.training_artifact_id} is not a training artifact")
+            raise ValueError(f"Artifact {request.artifact_id} is not a training artifact")
 
         trained_model = training_data["content"]
         config_id = ULID.from_str(training_data["metadata"]["config_id"])
@@ -227,7 +227,7 @@ class MLManager(Generic[ConfigT]):
                 ArtifactIn(
                     id=artifact_id,
                     data=artifact_data,
-                    parent_id=request.training_artifact_id,
+                    parent_id=request.artifact_id,
                     level=1,
                 )
             )

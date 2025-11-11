@@ -170,7 +170,7 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
 
     # 3. Make predictions
     predict_request = {
-        "training_artifact_id": model_artifact_id,
+        "artifact_id": model_artifact_id,
         "historic": {
             "columns": ["rainfall", "mean_temperature"],
             "data": [],
@@ -245,7 +245,7 @@ def test_train_with_invalid_config_id(client: TestClient) -> None:
 def test_predict_with_invalid_model_artifact(client: TestClient) -> None:
     """Test prediction with non-existent model artifact."""
     predict_request = {
-        "training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0999",  # Non-existent
+        "artifact_id": "01K72P5N5KCRM6MD3BRE4P0999",  # Non-existent
         "historic": {
             "columns": ["rainfall", "mean_temperature"],
             "data": [],
@@ -284,7 +284,7 @@ def test_train_request_validation(client: TestClient) -> None:
 
 def test_predict_request_validation(client: TestClient) -> None:
     """Test predict request validation with missing fields."""
-    # Missing training_artifact_id
+    # Missing artifact_id
     response = client.post(
         "/api/v1/ml/$predict",
         json={"historic": {"columns": [], "data": []}, "future": {"columns": [], "data": []}},
@@ -294,14 +294,14 @@ def test_predict_request_validation(client: TestClient) -> None:
     # Missing historic
     response = client.post(
         "/api/v1/ml/$predict",
-        json={"training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "future": {"columns": [], "data": []}},
+        json={"artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "future": {"columns": [], "data": []}},
     )
     assert response.status_code == 422
 
     # Missing future
     response = client.post(
         "/api/v1/ml/$predict",
-        json={"training_artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "historic": {"columns": [], "data": []}},
+        json={"artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "historic": {"columns": [], "data": []}},
     )
     assert response.status_code == 422
 
@@ -336,7 +336,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
 
     for i in range(3):
         predict_request = {
-            "training_artifact_id": model_artifact_id,
+            "artifact_id": model_artifact_id,
             "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
             "future": {"columns": ["rainfall", "mean_temperature"], "data": [[10 + i, 25 + i]]},
         }
@@ -358,7 +358,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
         artifact = artifact_response.json()
 
         assert artifact["parent_id"] == model_artifact_id
-        # training_artifact_id is now stored as parent_id, not in data
+        # artifact_id is now stored as parent_id, not in data
 
 
 def test_artifact_hierarchy_levels(client: TestClient) -> None:
@@ -388,7 +388,7 @@ def test_artifact_hierarchy_levels(client: TestClient) -> None:
 
     # Make prediction
     predict_request = {
-        "training_artifact_id": model_artifact_id,
+        "artifact_id": model_artifact_id,
         "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
         "future": {"columns": ["rainfall", "mean_temperature"], "data": [[11.0, 26.0]]},
     }
