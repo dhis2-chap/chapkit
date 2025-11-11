@@ -319,7 +319,7 @@ Get artifact with hierarchy metadata but without children array.
 Download artifact content as a binary file.
 
 **Response Headers:**
-- `Content-Type`: Indicates format (e.g., `application/x-pandas-dataframe`, `text/csv`, `application/zip`)
+- `Content-Type`: Indicates format (e.g., `application/vnd.chapkit.dataframe+json`, `text/csv`, `application/zip`)
 - `Content-Disposition`: `attachment; filename=artifact_{id}.{ext}`
 
 **Supported Content Types:**

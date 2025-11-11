@@ -210,7 +210,7 @@ class MLManager(Generic[ConfigT]):
                 type="ml_prediction",
                 metadata=metadata,
                 content=predictions,
-                content_type="application/x-pandas-dataframe",
+                content_type="application/vnd.chapkit.dataframe+json",
                 content_size=None,
             )
 

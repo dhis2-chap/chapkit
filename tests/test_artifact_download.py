@@ -72,7 +72,7 @@ def test_download_prediction_artifact_as_csv(client: TestClient):
     assert predict_job["status"] == "completed"
     prediction_artifact_id = predict_data["artifact_id"]
 
-    # Test download endpoint - predictions are DataFrames with content_type application/x-pandas-dataframe
+    # Test download endpoint - predictions are DataFrames with content_type application/vnd.chapkit.dataframe+json
     # which defaults to JSON serialization
     download_response = client.get(f"/api/v1/artifacts/{prediction_artifact_id}/$download")
     if download_response.status_code != 200:
@@ -80,7 +80,7 @@ def test_download_prediction_artifact_as_csv(client: TestClient):
     assert download_response.status_code == 200
 
     # Should be JSON format (default for DataFrame)
-    assert download_response.headers["content-type"] == "application/x-pandas-dataframe"
+    assert download_response.headers["content-type"] == "application/vnd.chapkit.dataframe+json"
     assert "attachment" in download_response.headers["content-disposition"]
     assert f"artifact_{prediction_artifact_id}" in download_response.headers["content-disposition"]
 

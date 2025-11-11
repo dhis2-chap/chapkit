@@ -198,7 +198,7 @@ def test_download_artifact_with_dataframe_content() -> None:
     mock_artifact.id = ULID()
     mock_artifact.data = {
         "content": df_data.model_dump(),
-        "content_type": "application/x-pandas-dataframe",
+        "content_type": "application/vnd.chapkit.dataframe+json",
     }
 
     mock_manager = Mock(spec=ArtifactManager)
@@ -222,7 +222,7 @@ def test_download_artifact_with_dataframe_content() -> None:
     response = client.get(f"/api/v1/artifacts/{mock_artifact.id}/$download")
 
     assert response.status_code == 200
-    assert response.headers["content-type"] == "application/x-pandas-dataframe"
+    assert response.headers["content-type"] == "application/vnd.chapkit.dataframe+json"
     assert "attachment" in response.headers["content-disposition"]
 
     # Content should be JSON array format from DataFrame.to_json()

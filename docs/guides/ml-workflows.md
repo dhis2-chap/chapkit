@@ -581,7 +581,7 @@ Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training
     "columns": ["feature1", "feature2", "sample_0"],
     "data": [[1.5, 2.5, 12.3], [2.5, 3.5, 17.8]]
   },
-  "content_type": "application/x-pandas-dataframe",
+  "content_type": "application/vnd.chapkit.dataframe+json",
   "content_size": null
 }
 ```
@@ -590,7 +590,7 @@ Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training
 - `type`: Discriminator field - always `"ml_prediction"`
 - `metadata`: Structured execution metadata (same as training)
 - `content`: Prediction DataFrame with results
-- `content_type`: "application/x-pandas-dataframe"
+- `content_type`: "application/vnd.chapkit.dataframe+json"
 
 ### Accessing Artifact Data
 

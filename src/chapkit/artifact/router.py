@@ -170,7 +170,7 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                     binary = content.to_json().encode()
             elif isinstance(content, dict):
                 # DataFrame serialized to dict in database - reconstruct and serialize
-                if content_type == "application/x-pandas-dataframe":
+                if content_type == "application/vnd.chapkit.dataframe+json":
                     df = DataFrame.model_validate(content)
                     binary = df.to_json().encode()
                 else:
@@ -189,7 +189,7 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                 "application/zip": "zip",
                 "text/csv": "csv",
                 "application/json": "json",
-                "application/x-pandas-dataframe": "json",
+                "application/vnd.chapkit.dataframe+json": "json",
                 "image/png": "png",
             }
             ext = extension_map.get(content_type, "bin")

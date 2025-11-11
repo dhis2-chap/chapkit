@@ -184,7 +184,7 @@ Chapkit provides three main artifact data schemas:
 2. **MLPredictionArtifactData**: For prediction results
    - Required metadata: status, config_id, timestamps, duration
    - Content: Predictions DataFrame
-   - Content-Type: `application/x-pandas-dataframe`
+   - Content-Type: `application/vnd.chapkit.dataframe+json`
 
 3. **GenericArtifactData**: For custom artifacts
    - Flexible metadata: Any extra fields allowed

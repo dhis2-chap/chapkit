@@ -109,7 +109,7 @@ async def main() -> None:
                     duration_seconds=1.0,
                 ),
                 content=pred_df.model_dump(),
-                content_type="application/x-pandas-dataframe",
+                content_type="application/vnd.chapkit.dataframe+json",
             )
 
             prediction_artifact = await manager.save(
