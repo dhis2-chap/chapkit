@@ -153,9 +153,9 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
 
     # Check predictions data
     data = artifact["data"]
-    assert data["ml_type"] == "ml_prediction"
-    assert "predictions" in data
-    predictions = data["predictions"]
+    assert data["type"] == "ml_prediction"
+    assert "content" in data
+    predictions = data["content"]
     assert "sample_0" in predictions["columns"]
 
 

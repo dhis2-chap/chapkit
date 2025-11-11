@@ -44,12 +44,12 @@ from .data import DataFrame, GroupBy
 from .ml import (
     FunctionalModelRunner,
     MLManager,
+    MLPredictionArtifactData,
     MLRouter,
+    MLTrainingArtifactData,
     ModelRunnerProtocol,
-    PredictionArtifactData,
     PredictRequest,
     PredictResponse,
-    TrainedModelArtifactData,
     TrainRequest,
     TrainResponse,
 )
@@ -109,12 +109,12 @@ __all__ = [
     # ML
     "FunctionalModelRunner",
     "MLManager",
+    "MLPredictionArtifactData",
     "MLRouter",
+    "MLTrainingArtifactData",
     "ModelRunnerProtocol",
-    "PredictionArtifactData",
     "PredictRequest",
     "PredictResponse",
-    "TrainedModelArtifactData",
     "TrainRequest",
     "TrainResponse",
     # Task

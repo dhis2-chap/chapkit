@@ -1,13 +1,31 @@
-"""Pydantic schemas for ML train/predict operations."""
+"""Pydantic schemas for ML train/predict operations.
+
+Migration Note:
+    TrainedModelArtifactData and PredictionArtifactData have been replaced by
+    MLTrainingArtifactData and MLPredictionArtifactData from chapkit.artifact.data_schemas.
+
+    Key changes:
+    - ml_type field renamed to type
+    - model field moved to content
+    - predictions field moved to content
+    - Added nested metadata structure
+    - Added content_type and content_size fields
+    - Removed training_artifact_id (use parent_id instead)
+    - Removed model_type and model_size_bytes (metadata only)
+"""
 
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar
 
 from geojson_pydantic import FeatureCollection
 from pydantic import BaseModel, Field
 from ulid import ULID
 
+from chapkit.artifact.schemas import (
+    MLPredictionArtifactData,
+    MLTrainingArtifactData,
+)
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
 
@@ -47,33 +65,6 @@ class PredictResponse(BaseModel):
     message: str = Field(description="Human-readable message")
 
 
-class TrainedModelArtifactData(BaseModel):
-    """Schema for trained model artifact data stored in the artifact system."""
-
-    ml_type: Literal["ml_training"] = Field(description="Artifact type identifier")
-    config_id: str = Field(description="ID of the config used for training")
-    started_at: str = Field(description="ISO format timestamp when operation started")
-    completed_at: str = Field(description="ISO format timestamp when operation completed")
-    duration_seconds: float = Field(description="Operation duration in seconds (rounded to 2 decimals)")
-    model: Any = Field(description="The trained model object (must be pickleable)")
-    model_type: str | None = Field(default=None, description="Fully qualified class name of the model")
-    model_size_bytes: int | None = Field(default=None, description="Serialized pickle size of the model in bytes")
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-class PredictionArtifactData(BaseModel):
-    """Schema for prediction artifact data stored in the artifact system."""
-
-    ml_type: Literal["ml_prediction"] = Field(description="Artifact type identifier")
-    config_id: str = Field(description="ID of the config used for prediction")
-    training_artifact_id: str = Field(description="ID of the trained model artifact used for prediction")
-    started_at: str = Field(description="ISO format timestamp when operation started")
-    completed_at: str = Field(description="ISO format timestamp when operation completed")
-    duration_seconds: float = Field(description="Operation duration in seconds (rounded to 2 decimals)")
-    predictions: DataFrame = Field(description="Prediction results as structured DataFrame")
-
-
 class ModelRunnerProtocol(Protocol[ConfigT]):
     """Protocol defining the interface for model runners."""
 
@@ -96,3 +87,14 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
     ) -> DataFrame:
         """Make predictions using a trained model and return predictions as DataFrame."""
         ...
+
+
+__all__ = [
+    "TrainRequest",
+    "TrainResponse",
+    "PredictRequest",
+    "PredictResponse",
+    "ModelRunnerProtocol",
+    "MLTrainingArtifactData",
+    "MLPredictionArtifactData",
+]

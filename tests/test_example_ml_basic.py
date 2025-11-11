@@ -129,19 +129,11 @@ def test_train_model(client: TestClient) -> None:
     assert "data" in artifact
 
     # Check artifact data structure
-    # Note: data might be serialized as metadata if model is not JSON-serializable
     data = artifact["data"]
-    if isinstance(data, dict):
-        # Either it's the actual data dict or it's serialization metadata
-        if "ml_type" in data:
-            assert data["ml_type"] == "ml_training"
-            assert data["config_id"] == config_id
-            assert "model" in data
-        elif "_type" in data:
-            # Model was serialized as metadata (not JSON-serializable)
-            # This is expected for sklearn models
-            assert "_type" in data
-            assert "_serialization_error" in data
+    assert data["type"] == "ml_training"
+    assert data["metadata"]["config_id"] == config_id
+    assert "content" in data
+    # Content should be the trained model (Python object stored via PickleType)
 
 
 def test_train_and_predict_workflow(client: TestClient) -> None:
@@ -215,15 +207,14 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
     assert artifact["parent_id"] == model_artifact_id  # Linked to model
     assert artifact["level"] == 1  # Predictions are level 1
 
-    # Check prediction data
+    # Check prediction data structure
     data = artifact["data"]
-    assert data["ml_type"] == "ml_prediction"
-    assert data["training_artifact_id"] == model_artifact_id
-    assert data["config_id"] == config_id
-    assert "predictions" in data
+    assert data["type"] == "ml_prediction"
+    assert data["metadata"]["config_id"] == config_id
+    assert "content" in data
 
-    # Verify predictions structure
-    predictions = data["predictions"]
+    # Verify predictions structure (content is a DataFrame)
+    predictions = data["content"]
     assert "columns" in predictions
     assert "data" in predictions
     # Should have sample_0 column added by on_predict
@@ -367,7 +358,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
         artifact = artifact_response.json()
 
         assert artifact["parent_id"] == model_artifact_id
-        assert artifact["data"]["training_artifact_id"] == model_artifact_id
+        # training_artifact_id is now stored as parent_id, not in data
 
 
 def test_artifact_hierarchy_levels(client: TestClient) -> None:

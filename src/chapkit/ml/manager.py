@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-import pickle
 from typing import Generic, TypeVar
 
 from servicekit import Database
@@ -16,41 +15,13 @@ from chapkit.scheduler import ChapkitScheduler
 
 from .schemas import (
     ModelRunnerProtocol,
-    PredictionArtifactData,
     PredictRequest,
     PredictResponse,
-    TrainedModelArtifactData,
     TrainRequest,
     TrainResponse,
 )
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
-
-
-def _extract_model_type(model: object) -> str | None:
-    """Extract fully qualified type name from model object."""
-    try:
-        # Handle dict models (e.g., ml_class.py pattern with {"model": ..., "scaler": ...})
-        if isinstance(model, dict) and "model" in model:
-            obj = model["model"]
-        else:
-            obj = model
-
-        # Get fully qualified class name
-        module = type(obj).__module__
-        qualname = type(obj).__qualname__
-        return f"{module}.{qualname}"
-    except Exception:
-        return None
-
-
-def _calculate_model_size(model: object) -> int | None:
-    """Calculate serialized pickle size of model in bytes."""
-    try:
-        pickled = pickle.dumps(model, protocol=pickle.HIGHEST_PROTOCOL)
-        return len(pickled)
-    except Exception:
-        return None
 
 
 class MLManager(Generic[ConfigT]):
@@ -126,32 +97,46 @@ class MLManager(Generic[ConfigT]):
         training_completed_at = datetime.datetime.now(datetime.UTC)
         training_duration = (training_completed_at - training_started_at).total_seconds()
 
-        # Calculate model metrics
-        model_type = _extract_model_type(trained_model)
-        model_size_bytes = _calculate_model_size(trained_model)
-
         # Store trained model in artifact with metadata
         async with self.database.session() as session:
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
             config_repo = ConfigRepository(session)
 
-            # Create and validate artifact data with Pydantic
-            artifact_data_model = TrainedModelArtifactData(
-                ml_type="ml_training",
+            # Create metadata
+            from chapkit.artifact.schemas import MLMetadata, MLTrainingArtifactData
+
+            metadata = MLMetadata(
+                status="success",
                 config_id=str(request.config_id),
-                model=trained_model,
                 started_at=training_started_at.isoformat(),
                 completed_at=training_completed_at.isoformat(),
                 duration_seconds=round(training_duration, 2),
-                model_type=model_type,
-                model_size_bytes=model_size_bytes,
             )
+
+            # Create and validate artifact data structure with Pydantic
+            # Note: We validate but don't serialize to JSON because content contains Python objects
+            artifact_data_model = MLTrainingArtifactData(
+                type="ml_training",
+                metadata=metadata,
+                content=trained_model,
+                content_type="application/x-pickle",
+                content_size=None,
+            )
+
+            # Construct dict manually to preserve Python objects (database uses PickleType)
+            artifact_data = {
+                "type": artifact_data_model.type,
+                "metadata": artifact_data_model.metadata.model_dump(),
+                "content": trained_model,  # Keep as Python object
+                "content_type": artifact_data_model.content_type,
+                "content_size": artifact_data_model.content_size,
+            }
 
             await artifact_manager.save(
                 ArtifactIn(
                     id=artifact_id,
-                    data=artifact_data_model.model_dump(),
+                    data=artifact_data,
                     parent_id=None,
                     level=0,
                 )
@@ -176,11 +161,11 @@ class MLManager(Generic[ConfigT]):
 
         # Extract model and config_id from artifact
         training_data = training_artifact.data
-        if not isinstance(training_data, dict) or training_data.get("ml_type") != "ml_training":
+        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training":
             raise ValueError(f"Artifact {request.training_artifact_id} is not a training artifact")
 
-        trained_model = training_data["model"]
-        config_id = ULID.from_str(training_data["config_id"])
+        trained_model = training_data["content"]
+        config_id = ULID.from_str(training_data["metadata"]["config_id"])
 
         # Load config
         async with self.database.session() as session:
@@ -208,21 +193,40 @@ class MLManager(Generic[ConfigT]):
             artifact_repo = ArtifactRepository(session)
             artifact_manager = ArtifactManager(artifact_repo)
 
-            # Create and validate artifact data with Pydantic
-            artifact_data_model = PredictionArtifactData(
-                ml_type="ml_prediction",
-                training_artifact_id=str(request.training_artifact_id),
+            # Create metadata
+            from chapkit.artifact.schemas import MLMetadata, MLPredictionArtifactData
+
+            metadata = MLMetadata(
+                status="success",
                 config_id=str(config_id),
-                predictions=predictions,
                 started_at=prediction_started_at.isoformat(),
                 completed_at=prediction_completed_at.isoformat(),
                 duration_seconds=round(prediction_duration, 2),
             )
 
+            # Create and validate artifact data structure with Pydantic
+            # Note: We validate but don't serialize to JSON because content contains Python objects
+            artifact_data_model = MLPredictionArtifactData(
+                type="ml_prediction",
+                metadata=metadata,
+                content=predictions,
+                content_type="application/x-pandas-dataframe",
+                content_size=None,
+            )
+
+            # Construct dict manually to preserve Python objects (database uses PickleType)
+            artifact_data = {
+                "type": artifact_data_model.type,
+                "metadata": artifact_data_model.metadata.model_dump(),
+                "content": predictions,  # Keep as Python object (DataFrame)
+                "content_type": artifact_data_model.content_type,
+                "content_size": artifact_data_model.content_size,
+            }
+
             await artifact_manager.save(
                 ArtifactIn(
                     id=artifact_id,
-                    data=artifact_data_model.model_dump(),
+                    data=artifact_data,
                     parent_id=request.training_artifact_id,
                     level=1,
                 )
