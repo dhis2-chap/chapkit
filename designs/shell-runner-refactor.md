@@ -216,11 +216,11 @@ runner = ShellModelRunner(
 ```
 
 **Key Simplifications:**
-- No `script_dir` parameter - always copies from project root
+- No `script_dir` parameter - always copies from project root (CWD)
 - No `timeout` parameter - ML jobs are async and can run for hours
 - No `env` parameter - deferred to future enhancement
 - No `preserve_on_error` parameter - always cleanup
-- Project root determined automatically via `inspect.currentframe()`
+- Project root is current working directory (`Path.cwd()`)
 
 ### Implementation Details
 
@@ -231,13 +231,10 @@ def __init__(self, train_command: str, predict_command: str, ...) -> None:
     self.train_command = train_command
     self.predict_command = predict_command
 
-    # Determine project root automatically
-    # This will be the directory where the file instantiating ShellModelRunner is located
-    # Typically where main.py lives
-    frame = inspect.currentframe()
-    caller_frame = frame.f_back
-    caller_file = caller_frame.f_globals['__file__']
-    self.project_root = Path(caller_file).parent.resolve()
+    # Project root is current working directory
+    # Users run: fastapi dev main.py (from project dir)
+    # Docker sets WORKDIR to project root
+    self.project_root = Path.cwd()
 
     logger.info("shell_runner_initialized", project_root=str(self.project_root))
 ```
@@ -672,9 +669,12 @@ data = preprocess_features(data)
 
 ### 4. Project Root Detection
 
-**Question:** Use inspect to find caller's file location?
+**Question:** Use `inspect.currentframe()` or `Path.cwd()`?
 
-**Decision:** Yes, use `inspect.currentframe()` to detect the file where ShellModelRunner is instantiated. This is typically main.py.
+**Decision:** Use `Path.cwd()` (current working directory). This is simpler and matches the standard usage pattern:
+- Users run `fastapi dev main.py` from project directory
+- Docker containers set `WORKDIR` to project root
+- More straightforward than frame inspection
 
 ### 5. Cleanup on Failure
 
