@@ -221,7 +221,7 @@ runner = ShellModelRunner(
 ```
 
 **Variable Substitution:**
-- `{config_file}` - JSON config file
+- `{config_file}` - YAML config file
 - `{data_file}` - Training data CSV
 - `{model_file}` - Model file (format specified)
 - `{future_file}` - Future data CSV
@@ -229,17 +229,25 @@ runner = ShellModelRunner(
 - `{output_file}` - Predictions output CSV
 - `{geo_file}` - GeoJSON file (if provided)
 
+**Execution Environment:**
+- Runner copies entire project directory to isolated temp workspace
+- Commands execute with workspace as current directory
+- Scripts can use relative paths and imports
+- Excludes build artifacts (.venv, node_modules, __pycache__, .git, etc.)
+
 **Script Requirements:**
 - **Training script:** Read data/config, train model, save model to `{model_file}`
 - **Prediction script:** Read model/data/config, make predictions, save to `{output_file}`
 - Exit code 0 on success, non-zero on failure
 - Use stderr for logging
+- Can use relative imports from project modules
 
 **Example Training Script (Python):**
 ```python
 #!/usr/bin/env python3
-import argparse, json, pickle
+import argparse, pickle
 import pandas as pd
+import yaml
 from sklearn.linear_model import LinearRegression
 
 parser = argparse.ArgumentParser()
@@ -248,9 +256,9 @@ parser.add_argument("--data", required=True)
 parser.add_argument("--model", required=True)
 args = parser.parse_args()
 
-# Load config
+# Load config (YAML format)
 with open(args.config) as f:
-    config = json.load(f)
+    config = yaml.safe_load(f)
 
 # Load data
 data = pd.read_csv(args.data)
@@ -271,6 +279,40 @@ with open(args.model, "wb") as f:
 - Legacy scripts without modification
 - Containerized ML pipelines
 - Team collaboration across languages
+
+**Project Structure and Relative Imports:**
+
+The ShellModelRunner copies your entire project directory to an isolated workspace and executes scripts with the workspace as the current directory. This enables:
+
+1. **Relative script paths:** Reference scripts using simple relative paths
+   ```python
+   train_command="python scripts/train_model.py --config {config_file} ..."
+   ```
+
+2. **Relative imports:** Scripts can import from project modules
+   ```python
+   # In scripts/train_model.py
+   from lib.preprocessing import clean_data
+   from lib.models import CustomModel
+   ```
+
+3. **Project organization:**
+   ```
+   your_project/
+   ├── main.py              # FastAPI app with ShellModelRunner
+   ├── lib/                 # Shared utilities
+   │   ├── preprocessing.py
+   │   └── models.py
+   └── scripts/             # ML scripts
+       ├── train_model.py
+       └── predict_model.py
+   ```
+
+4. **What gets copied:** Entire project directory (excluding .venv, node_modules, __pycache__, .git, build artifacts)
+
+5. **What doesn't get copied:** Build artifacts, virtual environments, version control files
+
+**Note:** Run your app from the project root directory (where main.py is located) using `fastapi dev main.py` so the runner can correctly identify and copy your project files.
 
 ---
 
@@ -787,15 +829,15 @@ runner = ShellModelRunner(
 **External Script Example (R):**
 ```r
 #!/usr/bin/env Rscript
-library(jsonlite)
+library(yaml)
 
 args <- commandArgs(trailingOnly = TRUE)
 config_file <- args[which(args == "--config") + 1]
 data_file <- args[which(args == "--data") + 1]
 model_file <- args[which(args == "--model") + 1]
 
-# Load data
-config <- fromJSON(config_file)
+# Load config (YAML format)
+config <- yaml.load_file(config_file)
 data <- read.csv(data_file)
 
 # Train model
