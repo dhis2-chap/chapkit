@@ -53,9 +53,7 @@ But API response doesn't include size:
 ## Goals
 
 1. Expose `content_size` as top-level field in ArtifactOut schema
-2. Enable filtering artifacts by size
-3. Enable sorting artifacts by size
-4. Support storage monitoring queries
+2. Make artifact size visible in API responses without parsing nested data
 
 ---
 
@@ -104,7 +102,7 @@ def to_schema(artifact: Artifact) -> ArtifactOut:
     )
 ```
 
-### API Examples
+### API Example
 
 **Get artifact with size:**
 ```http
@@ -126,32 +124,9 @@ GET /api/v1/artifacts/01H2PKW...
 }
 ```
 
-**List artifacts sorted by size:**
-```http
-GET /api/v1/artifacts?sort_by=content_size&order=desc
-
-[
-    {"id": "...", "content_size": 524288000},  # 500MB
-    {"id": "...", "content_size": 314572800},  # 300MB
-    {"id": "...", "content_size": 104857600}   # 100MB
-]
-```
-
-**Filter large artifacts:**
-```http
-GET /api/v1/artifacts?min_size=100000000  # >100MB
-
-[
-    {"id": "...", "content_size": 524288000},
-    {"id": "...", "content_size": 314572800}
-]
-```
-
 ---
 
 ## Implementation
-
-### Phase 1: Add content_size to Schema
 
 **Files:**
 - `src/chapkit/artifact/schemas.py` - Add content_size field
@@ -162,25 +137,12 @@ GET /api/v1/artifacts?min_size=100000000  # >100MB
 2. Extract from `artifact.data.get("content_size")` when loading
 3. Update tests
 
-### Phase 2: Add Filtering/Sorting (Optional)
-
-**Files:**
-- `src/chapkit/artifact/repository.py` - Add size-based queries
-- `src/chapkit/artifact/router.py` - Add query parameters
-
-**Changes:**
-1. Add `min_size` and `max_size` query parameters
-2. Add `sort_by=content_size` support
-3. Update OpenAPI schema
-
 ---
 
 ## Testing
 
 - Unit tests for schema with content_size
 - Integration tests for API responses
-- Test filtering by size
-- Test sorting by size
 - Test null content_size (for artifacts without size)
 
 ---
@@ -201,6 +163,5 @@ GET /api/v1/artifacts?min_size=100000000  # >100MB
 **Files:**
 - `src/chapkit/artifact/schemas.py`
 - `src/chapkit/artifact/repository.py` or `manager.py`
-- `src/chapkit/artifact/router.py`
 
 **Related:** [workspace-artifact-storage.md](./workspace-artifact-storage.md) - Stores content_size in metadata
