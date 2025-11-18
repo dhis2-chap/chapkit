@@ -93,7 +93,7 @@ class AuthManager:
 - All linting must pass (`make lint`)
 - Code coverage should not decrease
 - Descriptive PR title and body
-- NEVER use emojis in PR titles or descriptions
+- **ABSOLUTELY NO EMOJIS in PR titles or descriptions** (when using `gh pr create`, `gh pr edit`, or any other gh command)
 
 ## Project Overview
 
