@@ -98,4 +98,4 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    run_app("main:app")
+    run_app("main:app", reload=False)
