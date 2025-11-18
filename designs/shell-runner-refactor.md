@@ -1,9 +1,30 @@
 # ShellModelRunner Refactoring - Full Isolation Design
 
-**Status:** Draft
+**Status:** Ready for Implementation
 **Created:** 2025-11-18
 **Branch:** `refactor/shell-runner-isolation`
-**Breaking Changes:** Yes
+
+---
+
+## Quick Reference
+
+**What:** Copy entire project directory to temp workspace for full isolation
+
+**Why:** Enable relative imports, easy debugging, better error messages
+
+**API Change:**
+```python
+# Simple - just 3 parameters!
+runner = ShellModelRunner(
+    train_command="python scripts/train.py --config {config_file} --data {data_file}",
+    predict_command="python scripts/predict.py --config {config_file} --model {model_file} --output {output_file}",
+    model_format="pickle",
+)
+```
+
+**Key Implementation:** `self.project_root = Path.cwd()` → copy to temp → execute with `cwd=temp_dir`
+
+---
 
 ## Executive Summary
 
@@ -18,6 +39,227 @@ This design proposes a major refactoring of the `ShellModelRunner` class to impl
 - Remove unnecessary `SCRIPTS_DIR` pattern
 
 **Note:** No migration needed - feature not yet in use.
+
+---
+
+## Implementation Phases
+
+### Phase 1: Core Isolation ⚡ CRITICAL
+
+**Goal:** Implement full project directory copying with proper isolation.
+
+**Files to Modify:**
+- `src/chapkit/ml/runner.py` - Update `ShellModelRunner` class
+
+**Tasks:**
+1. ✅ **Update `__init__` signature**
+   - Remove any old parameters
+   - Keep only: `train_command`, `predict_command`, `model_format`
+   - Add: `self.project_root = Path.cwd()`
+
+2. ✅ **Implement `_prepare_workspace()` method**
+   - Use `shutil.copytree()` to copy `self.project_root` to `temp_dir`
+   - Add comprehensive ignore patterns:
+     ```python
+     ignore=shutil.ignore_patterns(
+         '.venv', 'venv', '__pycache__', '*.pyc', '*.pyo',
+         '*.egg-info', '.pytest_cache', '.mypy_cache', '.ruff_cache',
+         'node_modules', '.git', '.gitignore', '.vscode', '.idea',
+         '.DS_Store', 'build', 'dist', '*.so', '*.dylib',
+     )
+     ```
+   - Log: `copied_project_directory` with src/dest paths
+
+3. ✅ **Update `on_train()` method**
+   - Call `_prepare_workspace(temp_dir)` BEFORE writing data files
+   - Write data files (config.yml, data.csv, geo.json) to `temp_dir` root
+   - Execute command with `cwd=temp_dir`
+   - Variable substitution uses relative paths only
+
+4. ✅ **Update `on_predict()` method**
+   - Same pattern as `on_train()`
+   - Copy workspace, write files, execute with `cwd=temp_dir`
+
+5. ✅ **Remove truncated logging**
+   - Change `stdout[:500]` to full `stdout`
+   - Change `stderr[:500]` to full `stderr`
+
+**Tests to Write:**
+- `tests/test_ml_shell_runner.py`:
+  - `test_copies_entire_project_directory()`
+  - `test_ignores_venv_directory()`
+  - `test_ignores_node_modules()`
+  - `test_ignores_pycache()`
+  - `test_project_structure_preserved()`
+  - `test_uses_relative_paths()`
+
+**Acceptance Criteria:**
+- [ ] Project directory fully copied to temp workspace
+- [ ] `.venv/` excluded from copy
+- [ ] `node_modules/` excluded from copy
+- [ ] Commands execute with `cwd=temp_dir`
+- [ ] All existing tests still pass
+- [ ] New tests pass
+
+**Deliverable:** Working prototype with full isolation
+
+---
+
+### Phase 2: Examples & Templates Update 📝
+
+**Goal:** Update all examples and templates to use new simplified pattern.
+
+**Files to Modify:**
+- `examples/ml_shell/main.py`
+- `src/chapkit/cli/templates/main_shell.py.jinja2`
+- `src/chapkit/cli/templates/scripts/train_model.py.jinja2`
+- `src/chapkit/cli/templates/scripts/predict_model.py.jinja2`
+
+**Tasks:**
+
+1. ✅ **Update `examples/ml_shell/main.py`** (Lines 12, 40-58)
+   ```diff
+   - SCRIPTS_DIR = Path(__file__).parent / "scripts"
+
+   - train_command = f"python {SCRIPTS_DIR}/train_model.py ..."
+   + train_command = "python scripts/train_model.py ..."
+
+   - predict_command = f"python {SCRIPTS_DIR}/predict_model.py ..."
+   + predict_command = "python scripts/predict_model.py ..."
+   ```
+
+2. ✅ **Add `examples/ml_shell/lib.py`**
+   - Create shared utility module to demonstrate relative imports
+   - Example functions: `validate_data()`, `preprocess_features()`
+
+3. ✅ **Update `examples/ml_shell/scripts/train_model.py`**
+   - Add: `from lib import validate_data, preprocess_features`
+   - Demonstrate that relative imports work
+
+4. ✅ **Update CLI template `main_shell.py.jinja2`** (Lines 12, 36-58)
+   ```diff
+   - # Get absolute path to scripts directory
+   - SCRIPTS_DIR = Path(__file__).parent / "scripts"
+
+   - train_command = f"python {SCRIPTS_DIR}/train_model.py ..."
+   + train_command = "python scripts/train_model.py ..."
+   ```
+
+5. ✅ **Update script templates**
+   - Ensure they work with relative paths
+   - Add comments about relative imports capability
+
+**Tests to Update:**
+- `tests/test_example_ml_shell.py`:
+  - Update all tests to work with new pattern
+  - Add `test_relative_imports_work()`
+  - Add `test_full_project_structure_available()`
+
+**Acceptance Criteria:**
+- [ ] All examples use simple string commands (no f-strings)
+- [ ] No `SCRIPTS_DIR` variables anywhere
+- [ ] `examples/ml_shell/` demonstrates relative imports
+- [ ] CLI templates generate correct code
+- [ ] All integration tests pass
+
+**Deliverable:** Updated examples demonstrating new patterns
+
+---
+
+### Phase 3: Documentation 📚
+
+**Goal:** Update documentation to reflect new design.
+
+**Files to Modify:**
+- `docs/guides/ml-workflows.md`
+
+**Tasks:**
+
+1. ✅ **Fix config format** (Line 224)
+   ```diff
+   - `{config_file}` - JSON config file
+   + `{config_file}` - YAML config file
+   ```
+
+2. ✅ **Add section: "Script Organization & Relative Imports"** (After line 274)
+   - Show project structure
+   - Demonstrate relative imports in Python/R/Julia
+   - Explain full isolation pattern
+   - Show debugging workflow
+
+3. ✅ **Update ShellModelRunner examples**
+   - Remove all `SCRIPTS_DIR` patterns
+   - Show simple string commands
+   - Emphasize simplicity
+
+4. ✅ **Add debugging section**
+   - How to read error messages with temp dir location
+   - How temp directory contains full project snapshot
+
+**Acceptance Criteria:**
+- [ ] Documentation accurate (YAML not JSON)
+- [ ] Relative imports documented with examples
+- [ ] No mention of `SCRIPTS_DIR` pattern
+- [ ] Debugging workflow clearly explained
+
+**Deliverable:** Complete, accurate documentation
+
+---
+
+### Phase 4: Final Testing & Cleanup ✅
+
+**Goal:** Ensure everything works end-to-end.
+
+**Tasks:**
+
+1. ✅ **Run full test suite**
+   ```bash
+   make test
+   make coverage
+   ```
+
+2. ✅ **Manual testing checklist**
+   - [ ] `chapkit init --template shell test-project`
+   - [ ] `cd test-project && uv sync`
+   - [ ] Add relative import to script
+   - [ ] `fastapi dev main.py`
+   - [ ] Submit training job via API
+   - [ ] Verify relative imports work
+   - [ ] Verify `.venv/` not copied to temp dir
+   - [ ] Check error messages show full output
+
+3. ✅ **Performance check**
+   - Measure directory copy overhead
+   - Ensure reasonable for typical projects
+
+4. ✅ **Update tests for full coverage**
+   - Ensure >95% coverage on modified code
+   - Add any missing edge case tests
+
+**Acceptance Criteria:**
+- [ ] All tests pass (`make test`)
+- [ ] All linting passes (`make lint`)
+- [ ] Coverage >95% on new code
+- [ ] Manual testing checklist complete
+- [ ] No performance regressions
+
+**Deliverable:** Production-ready implementation
+
+---
+
+## Table of Contents
+
+1. [Implementation Phases](#implementation-phases) ⭐ **START HERE**
+2. [Problem Statement](#problem-statement)
+3. [Goals](#goals)
+4. [Core Design](#core-design-full-isolation-pattern)
+5. [Technical Specification](#technical-specification)
+6. [API Design Summary](#api-design-summary)
+7. [Testing Strategy](#testing-strategy)
+8. [Documentation Updates](#documentation-updates)
+9. [Open Questions & Decisions](#open-questions--decisions)
+10. [Success Criteria](#success-criteria)
+11. [References](#references)
 
 ---
 
@@ -394,55 +636,6 @@ source("./lib.R")
 # Or in Julia:
 include("./utils.jl")
 ```
-
----
-
-## Implementation Phases
-
-### Phase 1: Core Isolation (Week 1)
-
-**Tasks:**
-1. Implement project root detection in `__init__`
-2. Implement `_prepare_workspace()` for full directory copying with ignore patterns
-3. Update `on_train()` and `on_predict()` to use new workspace
-4. Update path variable substitution (relative paths)
-5. Add basic tests for directory copying and ignore patterns
-
-**Deliverable:** Working prototype with full isolation
-
-### Phase 2: Error Handling (Week 1)
-
-**Tasks:**
-1. Improve error messages (full output, no truncation)
-2. Add tests for all error scenarios
-
-**Deliverable:** Robust error handling
-
-### Phase 3: Documentation Updates (Week 2)
-
-**Tasks:**
-1. Update `docs/guides/ml-workflows.md`:
-   - Fix "JSON config" → "YAML config"
-   - Add relative import examples
-   - Add debugging workflow
-2. Update CLI templates (`main_shell.py.jinja2`)
-3. Update script templates (train/predict)
-
-**Deliverable:** Complete documentation
-
-### Phase 4: Examples & Tests (Week 2)
-
-**Tasks:**
-1. Update `examples/ml_shell/`:
-   - Add `scripts/lib.py` for relative import demo
-   - Update `main.py` with new API
-   - Add debugging example
-2. Update all tests in `tests/test_ml_shell_runner.py`
-3. Add integration tests for relative imports
-4. Update `tests/test_example_ml_shell.py`
-5. Ensure 100% test coverage for new code
-
-**Deliverable:** All examples and tests updated
 
 ---
 
