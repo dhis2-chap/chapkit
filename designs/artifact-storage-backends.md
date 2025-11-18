@@ -9,10 +9,10 @@
 
 ## Summary
 
-Expose artifact content size in the artifact API responses. Currently size is stored in metadata but not surfaced.
+Expose artifact size in the artifact API responses. Currently size is stored in metadata but not surfaced.
 
 **Current:** Size stored in `artifact.data["content_size"]` but not in API schema
-**Proposed:** Add `content_size` field to ArtifactOut schema
+**Proposed:** Add `size` field to ArtifactOut schema
 
 ---
 
@@ -38,21 +38,20 @@ But API response doesn't include size:
     "data": {...},  # Includes content_size in nested data
     "created_at": "...",
     "updated_at": "..."
-    # No top-level content_size field
+    # No top-level size field
 }
 ```
 
 **Issues:**
 1. Can't see artifact size without parsing data field
-2. Can't sort/filter artifacts by size
-3. Can't monitor storage usage via API
-4. Can't display size in UI/dashboards
+2. Can't monitor storage usage via API
+3. Can't display size in UI/dashboards
 
 ---
 
 ## Goals
 
-1. Expose `content_size` as top-level field in ArtifactOut schema
+1. Expose `size` as top-level field in ArtifactOut schema
 2. Make artifact size visible in API responses without parsing nested data
 
 ---
@@ -79,7 +78,7 @@ class ArtifactOut(BaseModel):
     parent_id: str | None
     level: int
     data: dict
-    content_size: int | None  # NEW: Extracted from data
+    size: int | None  # NEW: Extracted from data["content_size"]
     created_at: datetime
     updated_at: datetime
 ```
@@ -96,7 +95,7 @@ def to_schema(artifact: Artifact) -> ArtifactOut:
         parent_id=artifact.parent_id,
         level=artifact.level,
         data=artifact.data,
-        content_size=artifact.data.get("content_size"),  # Extract from data
+        size=artifact.data.get("content_size"),  # Extract from data
         created_at=artifact.created_at,
         updated_at=artifact.updated_at,
     )
@@ -118,7 +117,7 @@ GET /api/v1/artifacts/01H2PKW...
         "content_size": 314572800,
         ...
     },
-    "content_size": 314572800,  # NEW: Top-level field
+    "size": 314572800,  # NEW: Top-level field
     "created_at": "2025-11-18T10:00:00Z",
     "updated_at": "2025-11-18T10:00:00Z"
 }
@@ -129,11 +128,11 @@ GET /api/v1/artifacts/01H2PKW...
 ## Implementation
 
 **Files:**
-- `src/chapkit/artifact/schemas.py` - Add content_size field
+- `src/chapkit/artifact/schemas.py` - Add size field
 - `src/chapkit/artifact/repository.py` or `manager.py` - Extract size when converting to schema
 
 **Changes:**
-1. Add `content_size: int | None` to ArtifactOut
+1. Add `size: int | None` to ArtifactOut
 2. Extract from `artifact.data.get("content_size")` when loading
 3. Update tests
 
@@ -141,18 +140,18 @@ GET /api/v1/artifacts/01H2PKW...
 
 ## Testing
 
-- Unit tests for schema with content_size
+- Unit tests for schema with size field
 - Integration tests for API responses
-- Test null content_size (for artifacts without size)
+- Test null size (for artifacts without size)
 
 ---
 
 ## Success Criteria
 
-- [ ] content_size exposed in ArtifactOut schema
-- [ ] GET /api/v1/artifacts/{id} returns content_size
-- [ ] GET /api/v1/artifacts returns content_size for all artifacts
-- [ ] Null content_size handled gracefully (old artifacts)
+- [ ] size exposed in ArtifactOut schema
+- [ ] GET /api/v1/artifacts/{id} returns size
+- [ ] GET /api/v1/artifacts returns size for all artifacts
+- [ ] Null size handled gracefully (old artifacts)
 - [ ] Documentation updated
 - [ ] Tests pass
 
