@@ -9,10 +9,10 @@
 
 ## Summary
 
-Expose artifact content metadata in the artifact API responses. Currently content_type and content_size are stored in data but not surfaced.
+Add content_type and content_size as direct fields on the Artifact model and expose in API responses. Currently stored only in nested data dict.
 
-**Current:** Stored in `artifact.data["content_type"]` and `artifact.data["content_size"]` but not in API schema
-**Proposed:** Add `content_type` and `content_size` fields to ArtifactOut schema
+**Current:** Stored in `artifact.data["content_type"]` and `artifact.data["content_size"]` (nested, not queryable)
+**Proposed:** Add `content_type` and `content_size` as direct database columns and expose in API
 
 ---
 
@@ -44,24 +44,62 @@ But API response doesn't include content metadata:
 
 **Issues:**
 1. Can't see artifact size/type without parsing data field
-2. Can't monitor storage usage via API
-3. Can't display size or content type in UI/dashboards
-4. Can't set proper Content-Type headers without parsing data
+2. Can't query/filter artifacts by size or type (not in SQL columns)
+3. Can't create database indexes for performance
+4. Can't monitor storage usage via API
+5. Can't display size or content type in UI/dashboards
+6. Need to deserialize pickled data just to get metadata
 
 ---
 
 ## Goals
 
-1. Expose `content_type` and `content_size` as top-level fields in ArtifactOut schema
-2. Make artifact content metadata visible in API responses without parsing nested data
+1. Add `content_type` and `content_size` as direct database columns on Artifact model
+2. Expose fields in ArtifactOut schema
+3. Enable SQL queries/filters on artifact size and type
+4. Make artifact metadata accessible without deserializing data
 
 ---
 
 ## Design
 
+### Artifact Model Changes
+
+**File:** `src/chapkit/artifact/models.py`
+
+Add direct columns for content metadata:
+
+```python
+# Current
+class Artifact(Entity):
+    id: Mapped[str] = mapped_column(primary_key=True)
+    parent_id: Mapped[str | None]
+    level: Mapped[int]
+    data: Mapped[Any] = mapped_column(PickleType)
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+
+# New
+class Artifact(Entity):
+    id: Mapped[str] = mapped_column(primary_key=True)
+    parent_id: Mapped[str | None]
+    level: Mapped[int]
+    data: Mapped[Any] = mapped_column(PickleType)
+    content_type: Mapped[str | None]  # NEW: Direct column
+    content_size: Mapped[int | None]  # NEW: Direct column
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime]
+```
+
+**Benefits:**
+- SQL queryable (WHERE content_size > 100000000)
+- Indexable for performance
+- No data deserialization needed
+- Clear schema
+
 ### Schema Changes
 
-**File:** `src/chapkit/artifact/schemas.py` (or wherever artifact schemas are)
+**File:** `src/chapkit/artifact/schemas.py`
 
 ```python
 # Current
@@ -79,15 +117,34 @@ class ArtifactOut(BaseModel):
     parent_id: str | None
     level: int
     data: dict
-    content_type: str | None  # NEW: Extracted from data["content_type"]
-    content_size: int | None  # NEW: Extracted from data["content_size"]
+    content_type: str | None  # NEW: Direct field
+    content_size: int | None  # NEW: Direct field
     created_at: datetime
     updated_at: datetime
 ```
 
 ### Repository/Manager Changes
 
-Extract content metadata when loading artifacts:
+**Creating artifacts** - Set fields directly:
+
+```python
+async def create(self, artifact_in: ArtifactIn) -> Artifact:
+    """Create artifact with content metadata in direct fields."""
+    artifact_data = artifact_in.data
+
+    artifact = Artifact(
+        id=str(ULID()),
+        parent_id=artifact_in.parent_id,
+        level=artifact_in.level or 0,
+        data=artifact_data,
+        content_type=artifact_data.get("content_type"),  # Set from data
+        content_size=artifact_data.get("content_size"),  # Set from data
+    )
+
+    return await super().create(artifact)
+```
+
+**Converting to schema** - Map directly from fields:
 
 ```python
 def to_schema(artifact: Artifact) -> ArtifactOut:
@@ -97,11 +154,41 @@ def to_schema(artifact: Artifact) -> ArtifactOut:
         parent_id=artifact.parent_id,
         level=artifact.level,
         data=artifact.data,
-        content_type=artifact.data.get("content_type"),  # Extract from data
-        content_size=artifact.data.get("content_size"),  # Extract from data
+        content_type=artifact.content_type,  # Direct field
+        content_size=artifact.content_size,  # Direct field
         created_at=artifact.created_at,
         updated_at=artifact.updated_at,
     )
+```
+
+### Database Migration
+
+**File:** `alembic/versions/xxxx_add_artifact_content_metadata.py`
+
+Add nullable columns for content metadata:
+
+```python
+def upgrade() -> None:
+    """Add content_type and content_size columns to artifacts table."""
+    op.add_column('artifacts', sa.Column('content_type', sa.String(), nullable=True))
+    op.add_column('artifacts', sa.Column('content_size', sa.Integer(), nullable=True))
+
+def downgrade() -> None:
+    """Remove content_type and content_size columns from artifacts table."""
+    op.drop_column('artifacts', 'content_size')
+    op.drop_column('artifacts', 'content_type')
+```
+
+**Optional Backfill:**
+Existing artifacts can be backfilled by extracting from data field:
+
+```python
+# Optional: Run after migration
+UPDATE artifacts
+SET
+    content_type = json_extract(data, '$.content_type'),
+    content_size = json_extract(data, '$.content_size')
+WHERE content_type IS NULL;
 ```
 
 ### API Example
@@ -132,14 +219,18 @@ GET /api/v1/artifacts/01H2PKW...
 ## Implementation
 
 **Files:**
+- `src/chapkit/artifact/models.py` - Add content_type and content_size columns
 - `src/chapkit/artifact/schemas.py` - Add content_type and content_size fields
-- `src/chapkit/artifact/repository.py` or `manager.py` - Extract fields when converting to schema
+- `src/chapkit/artifact/repository.py` - Set fields when creating artifacts
+- `alembic/versions/xxxx_add_artifact_content_metadata.py` - Database migration
 
-**Changes:**
-1. Add `content_type: str | None` to ArtifactOut
-2. Add `content_size: int | None` to ArtifactOut
-3. Extract both from `artifact.data` when loading
-4. Update tests
+**Steps:**
+1. Create Alembic migration to add content_type and content_size columns
+2. Update Artifact model with new Mapped fields
+3. Add content_type and content_size to ArtifactOut schema
+4. Update repository create() to set fields from data dict
+5. Update tests
+6. Optional: Backfill existing artifacts
 
 ---
 
@@ -153,19 +244,24 @@ GET /api/v1/artifacts/01H2PKW...
 
 ## Success Criteria
 
+- [ ] Database migration created and applied
+- [ ] Artifact model has content_type and content_size columns
 - [ ] content_type and content_size exposed in ArtifactOut schema
+- [ ] Repository sets fields when creating artifacts
 - [ ] GET /api/v1/artifacts/{id} returns both fields
 - [ ] GET /api/v1/artifacts returns both fields for all artifacts
 - [ ] Null values handled gracefully (old artifacts)
-- [ ] Documentation updated
 - [ ] Tests pass
+- [ ] Documentation updated
 
 ---
 
 ## References
 
 **Files:**
+- `src/chapkit/artifact/models.py`
 - `src/chapkit/artifact/schemas.py`
-- `src/chapkit/artifact/repository.py` or `manager.py`
+- `src/chapkit/artifact/repository.py`
+- `alembic/versions/xxxx_add_artifact_content_metadata.py`
 
 **Related:** [workspace-artifact-storage.md](./workspace-artifact-storage.md) - Stores content_type and content_size in metadata
