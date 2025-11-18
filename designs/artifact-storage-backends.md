@@ -9,10 +9,10 @@
 
 ## Summary
 
-Expose artifact size in the artifact API responses. Currently size is stored in metadata but not surfaced.
+Expose artifact content metadata in the artifact API responses. Currently content_type and content_size are stored in data but not surfaced.
 
-**Current:** Size stored in `artifact.data["content_size"]` but not in API schema
-**Proposed:** Add `size` field to ArtifactOut schema
+**Current:** Stored in `artifact.data["content_type"]` and `artifact.data["content_size"]` but not in API schema
+**Proposed:** Add `content_type` and `content_size` fields to ArtifactOut schema
 
 ---
 
@@ -28,31 +28,32 @@ Workspace artifacts (from workspace-artifact-storage.md) store size in metadata:
 }
 ```
 
-But API response doesn't include size:
+But API response doesn't include content metadata:
 ```python
 # GET /api/v1/artifacts/{id}
 {
     "id": "01H...",
     "parent_id": None,
     "level": 0,
-    "data": {...},  # Includes content_size in nested data
+    "data": {...},  # Includes content_type and content_size in nested data
     "created_at": "...",
     "updated_at": "..."
-    # No top-level size field
+    # No top-level content_type or content_size fields
 }
 ```
 
 **Issues:**
-1. Can't see artifact size without parsing data field
+1. Can't see artifact size/type without parsing data field
 2. Can't monitor storage usage via API
-3. Can't display size in UI/dashboards
+3. Can't display size or content type in UI/dashboards
+4. Can't set proper Content-Type headers without parsing data
 
 ---
 
 ## Goals
 
-1. Expose `size` as top-level field in ArtifactOut schema
-2. Make artifact size visible in API responses without parsing nested data
+1. Expose `content_type` and `content_size` as top-level fields in ArtifactOut schema
+2. Make artifact content metadata visible in API responses without parsing nested data
 
 ---
 
@@ -78,14 +79,15 @@ class ArtifactOut(BaseModel):
     parent_id: str | None
     level: int
     data: dict
-    size: int | None  # NEW: Extracted from data["content_size"]
+    content_type: str | None  # NEW: Extracted from data["content_type"]
+    content_size: int | None  # NEW: Extracted from data["content_size"]
     created_at: datetime
     updated_at: datetime
 ```
 
 ### Repository/Manager Changes
 
-Extract size when loading artifacts:
+Extract content metadata when loading artifacts:
 
 ```python
 def to_schema(artifact: Artifact) -> ArtifactOut:
@@ -95,7 +97,8 @@ def to_schema(artifact: Artifact) -> ArtifactOut:
         parent_id=artifact.parent_id,
         level=artifact.level,
         data=artifact.data,
-        size=artifact.data.get("content_size"),  # Extract from data
+        content_type=artifact.data.get("content_type"),  # Extract from data
+        content_size=artifact.data.get("content_size"),  # Extract from data
         created_at=artifact.created_at,
         updated_at=artifact.updated_at,
     )
@@ -103,7 +106,7 @@ def to_schema(artifact: Artifact) -> ArtifactOut:
 
 ### API Example
 
-**Get artifact with size:**
+**Get artifact with content metadata:**
 ```http
 GET /api/v1/artifacts/01H2PKW...
 
@@ -117,7 +120,8 @@ GET /api/v1/artifacts/01H2PKW...
         "content_size": 314572800,
         ...
     },
-    "size": 314572800,  # NEW: Top-level field
+    "content_type": "application/zip",  # NEW: Top-level field
+    "content_size": 314572800,  # NEW: Top-level field
     "created_at": "2025-11-18T10:00:00Z",
     "updated_at": "2025-11-18T10:00:00Z"
 }
@@ -128,30 +132,31 @@ GET /api/v1/artifacts/01H2PKW...
 ## Implementation
 
 **Files:**
-- `src/chapkit/artifact/schemas.py` - Add size field
-- `src/chapkit/artifact/repository.py` or `manager.py` - Extract size when converting to schema
+- `src/chapkit/artifact/schemas.py` - Add content_type and content_size fields
+- `src/chapkit/artifact/repository.py` or `manager.py` - Extract fields when converting to schema
 
 **Changes:**
-1. Add `size: int | None` to ArtifactOut
-2. Extract from `artifact.data.get("content_size")` when loading
-3. Update tests
+1. Add `content_type: str | None` to ArtifactOut
+2. Add `content_size: int | None` to ArtifactOut
+3. Extract both from `artifact.data` when loading
+4. Update tests
 
 ---
 
 ## Testing
 
-- Unit tests for schema with size field
+- Unit tests for schema with content_type and content_size fields
 - Integration tests for API responses
-- Test null size (for artifacts without size)
+- Test null values (for artifacts without content metadata)
 
 ---
 
 ## Success Criteria
 
-- [ ] size exposed in ArtifactOut schema
-- [ ] GET /api/v1/artifacts/{id} returns size
-- [ ] GET /api/v1/artifacts returns size for all artifacts
-- [ ] Null size handled gracefully (old artifacts)
+- [ ] content_type and content_size exposed in ArtifactOut schema
+- [ ] GET /api/v1/artifacts/{id} returns both fields
+- [ ] GET /api/v1/artifacts returns both fields for all artifacts
+- [ ] Null values handled gracefully (old artifacts)
 - [ ] Documentation updated
 - [ ] Tests pass
 
@@ -163,4 +168,4 @@ GET /api/v1/artifacts/01H2PKW...
 - `src/chapkit/artifact/schemas.py`
 - `src/chapkit/artifact/repository.py` or `manager.py`
 
-**Related:** [workspace-artifact-storage.md](./workspace-artifact-storage.md) - Stores content_size in metadata
+**Related:** [workspace-artifact-storage.md](./workspace-artifact-storage.md) - Stores content_type and content_size in metadata
