@@ -5,18 +5,15 @@ This example demonstrates:
 - Command template variable substitution
 - Language-agnostic ML workflows (could use R, Julia, etc.)
 - File-based data interchange (CSV, YAML, pickle)
-- Integration with existing scripts without modification
+- Full project isolation with relative imports support
+- Shared utility code (lib/) imported by both train and predict scripts
+- Realistic ML workflow with feature engineering and validation
 """
-
-from pathlib import Path
 
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
-
-# Get absolute path to scripts directory
-SCRIPTS_DIR = Path(__file__).parent / "scripts"
 
 
 class DiseaseConfig(BaseConfig):
@@ -28,6 +25,17 @@ class DiseaseConfig(BaseConfig):
 
 
 # Create shell-based runner with command templates
+# The runner copies the entire project directory to an isolated workspace
+# and executes commands with the workspace as the current directory.
+# This allows scripts to:
+#   1. Use relative paths to access files
+#   2. Import shared utilities via relative imports (e.g., from lib import ...)
+#   3. Access any project files needed for the workflow
+#
+# In this example, both train_model.py and predict_model.py import from lib/
+# to share preprocessing and validation utilities. This demonstrates how
+# ShellModelRunner enables proper project organization with reusable code.
+#
 # Variables will be substituted with actual file paths at runtime:
 #   {config_file} - YAML config
 #   {data_file} - Training data CSV
@@ -36,14 +44,12 @@ class DiseaseConfig(BaseConfig):
 #   {future_file} - Future data CSV
 #   {output_file} - Predictions CSV
 
-# Training command template
-train_command = (
-    f"python {SCRIPTS_DIR}/train_model.py --config {{config_file}} --data {{data_file}} --model {{model_file}}"
-)
+# Training command template (using relative path to script)
+train_command = "python scripts/train_model.py --config {config_file} --data {data_file} --model {model_file}"
 
-# Prediction command template
+# Prediction command template (using relative path to script)
 predict_command = (
-    f"python {SCRIPTS_DIR}/predict_model.py "
+    "python scripts/predict_model.py "
     "--config {config_file} "
     "--model {model_file} "
     "--historic {historic_file} "
@@ -92,4 +98,4 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    run_app("main:app")
+    run_app("main:app", reload=False)

@@ -1,20 +1,32 @@
 """Integration tests for ml_shell example with shell-based runner."""
 
+import os
 import time
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.ml_shell.main import app
-
 
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
-    with TestClient(app) as test_client:
-        yield test_client
+    # Change to example directory so Path.cwd() works correctly in ShellModelRunner
+    original_cwd = Path.cwd()
+    example_dir = Path(__file__).parent.parent / "examples" / "ml_shell"
+    os.chdir(example_dir)
+
+    try:
+        # Import app after changing directory
+        from examples.ml_shell.main import app
+
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        # Restore original directory
+        os.chdir(original_cwd)
 
 
 def wait_for_job_completion(client: TestClient, job_id: str, timeout: float = 10.0) -> dict[Any, Any]:

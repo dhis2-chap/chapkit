@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code when working with code in this repository.
 
+## NO EMOJIS EVER
+
+**CRITICAL RULE: ABSOLUTELY NO EMOJIS ANYWHERE**
+
+NO EMOJIS. EVER. EVER. EVER. EVER. EVER. EVER.
+
+This means:
+- NO emojis in commit messages
+- NO emojis in PR titles
+- NO emojis in PR descriptions
+- NO emojis in code comments
+- NO emojis in docstrings
+- NO emojis in documentation
+- NO emojis in design documents
+- NO emojis in any output whatsoever
+
+Do not use: ✅ ❌ 🎯 📝 ⚠️ ✓ ✗ or ANY other emoji characters.
+
+Use plain text instead:
+- "[x]" instead of ✅
+- "[ ]" instead of ❌
+- "CRITICAL" instead of 🎯
+- "Note:" instead of 📝
+- "WARNING:" instead of ⚠️
+
 ## Overall guidelines
 
 - Be concise and to the point
@@ -68,7 +93,7 @@ class AuthManager:
 - All linting must pass (`make lint`)
 - Code coverage should not decrease
 - Descriptive PR title and body
-- NEVER use emojis in PR titles or descriptions
+- **ABSOLUTELY NO EMOJIS in PR titles or descriptions** (when using `gh pr create`, `gh pr edit`, or any other gh command)
 
 ## Project Overview
 

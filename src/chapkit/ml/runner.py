@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle
+import shutil
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -103,10 +104,69 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         predict_command: str,
         model_format: str = "pickle",
     ) -> None:
-        """Initialize shell runner with command templates for train/predict operations."""
+        """Initialize shell runner with full isolation support.
+
+        The runner automatically copies the entire project directory (current working directory)
+        to a temporary workspace, excluding .venv, node_modules, __pycache__, .git, and other
+        build artifacts.
+
+        Args:
+            train_command: Command template for training (use relative paths)
+            predict_command: Command template for prediction (use relative paths)
+            model_format: File extension for model files (default: "pickle")
+        """
         self.train_command = train_command
         self.predict_command = predict_command
         self.model_format = model_format
+
+        # Project root is current working directory
+        # Users run: fastapi dev main.py (from project dir)
+        # Docker sets WORKDIR to project root
+        self.project_root = Path.cwd()
+
+        logger.info("shell_runner_initialized", project_root=str(self.project_root))
+
+    def _prepare_workspace(self, temp_dir: Path) -> None:
+        """Prepare isolated workspace with full project directory copy.
+
+        Copies the entire project directory to temp workspace, excluding build artifacts
+        and virtual environments.
+
+        Args:
+            temp_dir: Temporary directory to copy project files into
+        """
+        shutil.copytree(
+            self.project_root,
+            temp_dir,
+            ignore=shutil.ignore_patterns(
+                # Python
+                ".venv",
+                "venv",
+                "__pycache__",
+                "*.pyc",
+                "*.pyo",
+                "*.egg-info",
+                ".pytest_cache",
+                ".mypy_cache",
+                ".ruff_cache",
+                # JavaScript/Node
+                "node_modules",
+                # Version control
+                ".git",
+                ".gitignore",
+                # IDEs
+                ".vscode",
+                ".idea",
+                ".DS_Store",
+                # Build artifacts
+                "build",
+                "dist",
+                "*.so",
+                "*.dylib",
+            ),
+            dirs_exist_ok=True,
+        )
+        logger.info("copied_project_directory", src=str(self.project_root), dest=str(temp_dir))
 
     async def on_train(
         self,
@@ -118,6 +178,9 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_train_"))
 
         try:
+            # Copy entire project directory to temp workspace for full isolation
+            self._prepare_workspace(temp_dir)
+
             # Write config to YAML file
             config_file = temp_dir / "config.yml"
             config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
@@ -132,20 +195,20 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 assert geo_file is not None  # For type checker
                 geo_file.write_text(geo.model_dump_json(indent=2))
 
-            # Model file path
+            # Model file path (relative to temp_dir)
             model_file = temp_dir / f"model.{self.model_format}"
 
-            # Substitute variables in command
+            # Substitute variables in command (use relative paths)
             command = self.train_command.format(
-                config_file=str(config_file),
-                data_file=str(data_file),
-                model_file=str(model_file),
-                geo_file=str(geo_file) if geo_file else "",
+                config_file="config.yml",
+                data_file="data.csv",
+                model_file=f"model.{self.model_format}",
+                geo_file="geo.json" if geo_file else "",
             )
 
             logger.info("executing_train_script", command=command, temp_dir=str(temp_dir))
 
-            # Execute subprocess
+            # Execute subprocess with cwd=temp_dir (scripts can now use relative imports!)
             result = await run_shell(command, cwd=str(temp_dir))
             stdout = result["stdout"]
             stderr = result["stderr"]
@@ -154,7 +217,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 logger.error("train_script_failed", exit_code=result["returncode"], stderr=stderr)
                 raise RuntimeError(f"Training script failed with exit code {result['returncode']}: {stderr}")
 
-            logger.info("train_script_completed", stdout=stdout[:500], stderr=stderr[:500])
+            logger.info("train_script_completed", stdout=stdout, stderr=stderr)
 
             # Load trained model from file if it exists
             if model_file.exists():
@@ -173,8 +236,6 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
         finally:
             # Cleanup temp files
-            import shutil
-
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     async def on_predict(
@@ -189,6 +250,9 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
         try:
+            # Copy entire project directory to temp workspace for full isolation
+            self._prepare_workspace(temp_dir)
+
             # Write config to YAML file
             config_file = temp_dir / "config.yml"
             config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
@@ -220,19 +284,19 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Output file path
             output_file = temp_dir / "predictions.csv"
 
-            # Substitute variables in command
+            # Substitute variables in command (use relative paths)
             command = self.predict_command.format(
-                config_file=str(config_file),
-                model_file=str(model_file) if model_file else "",
-                historic_file=str(historic_file),
-                future_file=str(future_file),
-                output_file=str(output_file),
-                geo_file=str(geo_file) if geo_file else "",
+                config_file="config.yml",
+                model_file=f"model.{self.model_format}" if not is_placeholder else "",
+                historic_file="historic.csv",
+                future_file="future.csv",
+                output_file="predictions.csv",
+                geo_file="geo.json" if geo_file else "",
             )
 
             logger.info("executing_predict_script", command=command, temp_dir=str(temp_dir))
 
-            # Execute subprocess
+            # Execute subprocess with cwd=temp_dir (scripts can now use relative imports!)
             result = await run_shell(command, cwd=str(temp_dir))
             stdout = result["stdout"]
             stderr = result["stderr"]
@@ -241,7 +305,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 logger.error("predict_script_failed", exit_code=result["returncode"], stderr=stderr)
                 raise RuntimeError(f"Prediction script failed with exit code {result['returncode']}: {stderr}")
 
-            logger.info("predict_script_completed", stdout=stdout[:500], stderr=stderr[:500])
+            logger.info("predict_script_completed", stdout=stdout, stderr=stderr)
 
             # Load predictions from file
             if not output_file.exists():
@@ -252,6 +316,4 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
         finally:
             # Cleanup temp files
-            import shutil
-
             shutil.rmtree(temp_dir, ignore_errors=True)
