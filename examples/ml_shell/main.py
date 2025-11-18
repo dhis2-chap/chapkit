@@ -6,6 +6,8 @@ This example demonstrates:
 - Language-agnostic ML workflows (could use R, Julia, etc.)
 - File-based data interchange (CSV, YAML, pickle)
 - Full project isolation with relative imports support
+- Shared utility code (lib/) imported by both train and predict scripts
+- Realistic ML workflow with feature engineering and validation
 """
 
 from chapkit import BaseConfig
@@ -25,7 +27,14 @@ class DiseaseConfig(BaseConfig):
 # Create shell-based runner with command templates
 # The runner copies the entire project directory to an isolated workspace
 # and executes commands with the workspace as the current directory.
-# This allows scripts to use relative paths and imports.
+# This allows scripts to:
+#   1. Use relative paths to access files
+#   2. Import shared utilities via relative imports (e.g., from lib import ...)
+#   3. Access any project files needed for the workflow
+#
+# In this example, both train_model.py and predict_model.py import from lib/
+# to share preprocessing and validation utilities. This demonstrates how
+# ShellModelRunner enables proper project organization with reusable code.
 #
 # Variables will be substituted with actual file paths at runtime:
 #   {config_file} - YAML config
