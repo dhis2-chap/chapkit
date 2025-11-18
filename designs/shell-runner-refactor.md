@@ -361,106 +361,35 @@ if result["returncode"] != 0:
 
 ---
 
-## API Changes & Migration
+## API Design Summary
 
-### Breaking Changes
+### Command Template Pattern
 
-#### 1. Command Templates (Relative Paths)
+Use simple strings with relative paths:
 
-**Before:**
 ```python
-train_command = f"python {SCRIPTS_DIR}/train.py --config {{config_file}} --data {{data_file}}"
+train_command = "python scripts/train.py --config {config_file} --data {data_file}"
+predict_command = "python scripts/predict.py --config {config_file} --model {model_file} --future {future_file} --output {output_file}"
 ```
 
-**After:**
-```python
-train_command = "python scripts/train.py --config {{config_file}} --data {{data_file}}"
-# OR if scripts are in temp root:
-train_command = "python train.py --config {{config_file}} --data {{data_file}}"
-```
+**No f-strings needed.** No `SCRIPTS_DIR` variable needed.
 
-**Migration:** Update command templates to use relative paths.
+### Variable Substitution
 
-#### 2. Variable Substitution (Relative Paths)
+All variables are relative paths within the temp directory:
+- `{config_file}` = `"config.yml"`
+- `{data_file}` = `"data.csv"`
+- `{model_file}` = `"model.pkl"`
+- etc.
 
-**Before:**
-```python
-# {config_file} = "/tmp/chapkit_ml_train_ABC/config.yml"
-```
+### Relative Imports
 
-**After:**
-```python
-# {config_file} = "config.yml"
-```
-
-**Migration:** Scripts should work without changes (they just receive relative paths instead of absolute).
-
-#### 3. Automatic Project Root Detection
-
-**No parameter change needed!** The runner automatically detects the project root.
-
-Scripts now have access to the entire project structure, enabling relative imports.
-
-### Backwards Compatibility Strategy
-
-**Clean Break Approach:**
-- No backwards compatibility - simpler code
-- Update command templates to use relative paths
-- Provide comprehensive migration guide
-- Update all examples in same PR
-- User base is small enough for breaking change
-
-**Rationale:** Cleaner design, better long-term maintainability.
-
-### Migration Guide
-
-#### Step 1: Remove SCRIPTS_DIR and Update Command Templates
-
-**Before:**
-```python
-# Remove this line completely:
-SCRIPTS_DIR = Path(__file__).parent / "scripts"
-
-# Old command using f-string with SCRIPTS_DIR:
-train_command = f"python {SCRIPTS_DIR}/train_model.py --config {{config_file}} --data {{data_file}} --model {{model_file}}"
-```
-
-**After:**
-```python
-# Just use a simple string with relative path:
-train_command = "python scripts/train_model.py --config {config_file} --data {data_file} --model {model_file}"
-```
-
-**Key changes:**
-- ❌ Remove `SCRIPTS_DIR = Path(__file__).parent / "scripts"` line entirely
-- ❌ Remove `f"..."` f-string syntax
-- ✅ Use simple string with relative path `"python scripts/..."`
-- ✅ Runner automatically copies entire project
-
-#### Step 2: Update Scripts (If Using Absolute Paths)
-
-**Before (in train_model.py):**
-```python
-# Assumed absolute paths
-config_path = args.config  # "/tmp/chapkit_ml_train_ABC/config.yml"
-```
-
-**After:**
-```python
-# Works with relative paths
-config_path = args.config  # "config.yml" or "../config.yml"
-```
-
-Most scripts should work without changes (relative paths just work).
-
-#### Step 3: Enable Relative Imports
-
-**New capability** - scripts can now use:
+Scripts can now use:
 
 ```python
 # train_model.py
-from .lib import preprocess, validate
-from .utils import load_config
+from scripts.lib import preprocess, validate
+from lib.utils import load_config
 
 # Or in R:
 source("./lib.R")
