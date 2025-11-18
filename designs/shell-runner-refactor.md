@@ -17,7 +17,7 @@ This design proposes a major refactoring of the `ShellModelRunner` class to impl
 - Fix documentation: config format is YAML (not JSON)
 - Remove unnecessary `SCRIPTS_DIR` pattern
 
-**Migration Impact:** Breaking changes to `ShellModelRunner` command templates (use relative paths).
+**Note:** No migration needed - feature not yet in use.
 
 ---
 
@@ -327,7 +327,7 @@ The runner provides variables for generated files:
 # {geo_file} = "geo.json"  (if provided, else empty string)
 ```
 
-**Backwards Compatibility Note:** This is a **breaking change** - existing commands using absolute paths (f-strings with `SCRIPTS_DIR`) will need to use relative paths.
+**Note:** Uses relative paths instead of the old f-string pattern with `SCRIPTS_DIR`.
 
 #### Error Handling Enhancement
 
@@ -492,18 +492,15 @@ include("./utils.jl")
 
 **Deliverable:** Robust error handling
 
-### Phase 3: Documentation & Migration (Week 2)
+### Phase 3: Documentation Updates (Week 2)
 
 **Tasks:**
-1. Write migration guide
-2. Update `docs/guides/ml-workflows.md`:
+1. Update `docs/guides/ml-workflows.md`:
    - Fix "JSON config" → "YAML config"
-   - Document new parameters
    - Add relative import examples
    - Add debugging workflow
-3. Update CLI templates (`main_shell.py.jinja2`)
-4. Update script templates (train/predict)
-5. Create before/after examples
+2. Update CLI templates (`main_shell.py.jinja2`)
+3. Update script templates (train/predict)
 
 **Deliverable:** Complete documentation
 
@@ -785,7 +782,6 @@ These are valuable but not part of initial refactor:
 - [ ] All examples updated and working
 - [ ] All tests passing with >95% coverage
 - [ ] Documentation updated (YAML config, relative paths, no SCRIPTS_DIR)
-- [ ] Migration guide written
 
 ### Nice to Have
 - [ ] Output schema validation (sample_0 column check)
