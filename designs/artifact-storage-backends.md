@@ -125,7 +125,7 @@ class ArtifactOut(BaseModel):
 
 ### Repository/Manager Changes
 
-**Creating artifacts** - Set fields directly:
+**Creating artifacts** - Always set fields from data:
 
 ```python
 async def create(self, artifact_in: ArtifactIn) -> Artifact:
@@ -137,12 +137,14 @@ async def create(self, artifact_in: ArtifactIn) -> Artifact:
         parent_id=artifact_in.parent_id,
         level=artifact_in.level or 0,
         data=artifact_data,
-        content_type=artifact_data.get("content_type"),  # Set from data
-        content_size=artifact_data.get("content_size"),  # Set from data
+        content_type=artifact_data.get("content_type"),  # Always extract from data
+        content_size=artifact_data.get("content_size"),  # Always extract from data
     )
 
     return await super().create(artifact)
 ```
+
+**Note:** All artifact creation code (ML runner, etc.) should include content_type and content_size in data dict. Repository always extracts and sets direct fields.
 
 **Converting to schema** - Map directly from fields:
 
@@ -196,8 +198,9 @@ GET /api/v1/artifacts/01H2PKW...
 **Steps:**
 1. Update Artifact model with new Mapped fields
 2. Add content_type and content_size to ArtifactOut schema
-3. Update repository create() to set fields from data dict
-4. Update tests
+3. Update repository create() to always extract and set fields from data dict
+4. Ensure ML runner and other artifact creators include content_type and content_size in data
+5. Update tests
 
 ---
 
@@ -213,10 +216,10 @@ GET /api/v1/artifacts/01H2PKW...
 
 - [ ] Artifact model has content_type and content_size columns
 - [ ] content_type and content_size exposed in ArtifactOut schema
-- [ ] Repository sets fields when creating artifacts
+- [ ] Repository always extracts and sets fields when creating artifacts
+- [ ] ML runner includes content_type and content_size in artifact data
 - [ ] GET /api/v1/artifacts/{id} returns both fields
-- [ ] GET /api/v1/artifacts returns both fields for all artifacts
-- [ ] Null values handled gracefully
+- [ ] GET /api/v1/artifacts returns both fields for all artifacts (for listing in modeling-app)
 - [ ] Tests pass
 - [ ] Documentation updated
 
