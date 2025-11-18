@@ -366,3 +366,173 @@ async def test_shell_runner_cleanup_temp_files() -> None:
     # Check that temp dirs are cleaned up
     temp_dirs_after = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
     assert temp_dirs_after == temp_dirs_before
+
+
+@pytest.mark.asyncio
+async def test_copies_entire_project_directory() -> None:
+    """Test that entire project directory is copied to temp workspace."""
+    # Use Python inline command to verify project files and create model
+    train_command = (
+        'python -c "'
+        "import sys; "
+        "from pathlib import Path; "
+        "import pickle; "
+        "expected = ['pyproject.toml', 'src', 'tests']; "
+        "missing = [f for f in expected if not Path(f).exists()]; "
+        "sys.exit(1) if missing else None; "
+        "pickle.dump('success', open('{model_file}', 'wb'))"
+        '"'
+    )
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'predictions' > {output_file}",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    # Should succeed if project files are copied
+    model = await runner.on_train(config, data)
+    assert model == "success"
+
+
+@pytest.mark.asyncio
+async def test_ignores_venv_directory() -> None:
+    """Test that .venv directory is not copied to workspace."""
+    train_command = (
+        'python -c "'
+        "import sys; "
+        "from pathlib import Path; "
+        "import pickle; "
+        "sys.exit(1) if Path('.venv').exists() else None; "
+        "pickle.dump('venv_ignored', open('{model_file}', 'wb'))"
+        '"'
+    )
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'predictions' > {output_file}",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    model = await runner.on_train(config, data)
+    assert model == "venv_ignored"
+
+
+@pytest.mark.asyncio
+async def test_ignores_node_modules() -> None:
+    """Test that node_modules directory is not copied to workspace."""
+    train_command = (
+        'python -c "'
+        "import sys; "
+        "from pathlib import Path; "
+        "import pickle; "
+        "sys.exit(1) if Path('node_modules').exists() else None; "
+        "pickle.dump('node_modules_ignored', open('{model_file}', 'wb'))"
+        '"'
+    )
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'predictions' > {output_file}",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    model = await runner.on_train(config, data)
+    assert model == "node_modules_ignored"
+
+
+@pytest.mark.asyncio
+async def test_ignores_pycache() -> None:
+    """Test that __pycache__ directories are not copied to workspace."""
+    train_command = (
+        'python -c "'
+        "import sys; "
+        "from pathlib import Path; "
+        "import pickle; "
+        "pycache = list(Path('.').rglob('__pycache__')); "
+        "sys.exit(1) if pycache else None; "
+        "pickle.dump('pycache_ignored', open('{model_file}', 'wb'))"
+        '"'
+    )
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'predictions' > {output_file}",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    model = await runner.on_train(config, data)
+    assert model == "pycache_ignored"
+
+
+@pytest.mark.asyncio
+async def test_project_structure_preserved() -> None:
+    """Test that project directory structure is preserved in workspace."""
+    train_command = (
+        'python -c "'
+        "import sys; "
+        "from pathlib import Path; "
+        "import pickle; "
+        "missing = []; "
+        "missing.append('src') if not Path('src').exists() else None; "
+        "missing.append('src/chapkit') if not Path('src/chapkit').exists() else None; "
+        "sys.exit(1) if missing else None; "
+        "pickle.dump('structure_preserved', open('{model_file}', 'wb'))"
+        '"'
+    )
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=train_command,
+        predict_command="echo 'predictions' > {output_file}",
+    )
+
+    config = MockConfig()
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    model = await runner.on_train(config, data)
+    assert model == "structure_preserved"
+
+
+@pytest.mark.asyncio
+async def test_uses_relative_paths() -> None:
+    """Test that variable substitution uses relative paths and supports relative imports."""
+    # Create a helper module in the project root temporarily
+    lib_content = "def process_data(value):\n    return value * 2\n"
+    lib_file = Path.cwd() / "test_helper_lib.py"
+    lib_file.write_text(lib_content)
+
+    try:
+        # Command that imports the helper module and creates model
+        train_command = (
+            'python -c "'
+            "import pickle; "
+            "from test_helper_lib import process_data; "
+            "result = process_data(42); "
+            "pickle.dump(result, open('{model_file}', 'wb'))"
+            '"'
+        )
+
+        runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+            train_command=train_command,
+            predict_command="echo 'predictions' > {output_file}",
+        )
+
+        config = MockConfig()
+        data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+        # Should succeed with relative imports (lib file copied to workspace)
+        model = await runner.on_train(config, data)
+        assert model == 84  # 42 * 2
+
+    finally:
+        # Cleanup
+        if lib_file.exists():
+            lib_file.unlink()
