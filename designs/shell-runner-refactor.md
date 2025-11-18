@@ -44,7 +44,7 @@ This design proposes a major refactoring of the `ShellModelRunner` class to impl
 
 ## Implementation Phases
 
-### Phase 1: Core Isolation ⚡ CRITICAL
+### Phase 1: Core Isolation [CRITICAL]
 
 **Goal:** Implement full project directory copying with proper isolation.
 
@@ -105,7 +105,7 @@ This design proposes a major refactoring of the `ShellModelRunner` class to impl
 
 ---
 
-### Phase 2: Examples & Templates Update 📝
+### Phase 2: Examples & Templates Update
 
 **Goal:** Update all examples and templates to use new simplified pattern.
 
@@ -166,7 +166,7 @@ This design proposes a major refactoring of the `ShellModelRunner` class to impl
 
 ---
 
-### Phase 3: Documentation 📚
+### Phase 3: Documentation
 
 **Goal:** Update documentation to reflect new design.
 
@@ -206,7 +206,7 @@ This design proposes a major refactoring of the `ShellModelRunner` class to impl
 
 ---
 
-### Phase 4: Final Testing & Cleanup ✅
+### Phase 4: Final Testing & Cleanup
 
 **Goal:** Ensure everything works end-to-end.
 
@@ -249,7 +249,7 @@ This design proposes a major refactoring of the `ShellModelRunner` class to impl
 
 ## Table of Contents
 
-1. [Implementation Phases](#implementation-phases) ⭐ **START HERE**
+1. [Implementation Phases](#implementation-phases) **<-- START HERE**
 2. [Problem Statement](#problem-statement)
 3. [Goals](#goals)
 4. [Core Design](#core-design-full-isolation-pattern)
