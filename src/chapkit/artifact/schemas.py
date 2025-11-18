@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, ClassVar, Literal, Mapping, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from servicekit.schemas import EntityIn, EntityOut
 from servicekit.types import JsonSafe
 from ulid import ULID
@@ -24,6 +24,38 @@ class ArtifactOut(EntityOut):
     data: JsonSafe
     parent_id: ULID | None = None
     level: int
+    content_type: str | None = None
+    content_size: int | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_content_metadata(cls, values: Any) -> Any:
+        """Extract content_type and content_size from data dict to top-level fields."""
+        # Handle both dict (from API) and ORM object (from_attributes=True)
+        if isinstance(values, dict):
+            data = values.get("data")
+            if isinstance(data, dict):
+                if "content_type" not in values and "content_type" in data:
+                    values["content_type"] = data.get("content_type")
+                if "content_size" not in values and "content_size" in data:
+                    values["content_size"] = data.get("content_size")
+        else:
+            # ORM object - extract from data attribute
+            if hasattr(values, "data") and isinstance(values.data, dict):
+                data = values.data
+                # Need to convert to dict for Pydantic
+                values_dict = {
+                    "id": getattr(values, "id", None),
+                    "parent_id": getattr(values, "parent_id", None),
+                    "level": getattr(values, "level", None),
+                    "data": data,
+                    "created_at": getattr(values, "created_at", None),
+                    "updated_at": getattr(values, "updated_at", None),
+                    "content_type": data.get("content_type"),
+                    "content_size": data.get("content_size"),
+                }
+                return values_dict
+        return values
 
 
 class ArtifactTreeNode(ArtifactOut):

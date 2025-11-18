@@ -121,16 +121,15 @@ class MLManager(Generic[ConfigT]):
                 metadata=metadata,
                 content=trained_model,
                 content_type="application/x-pickle",
-                content_size=None,
             )
 
             # Construct dict manually to preserve Python objects (database uses PickleType)
+            # Note: content_size will be calculated automatically by ArtifactManager
             artifact_data = {
                 "type": artifact_data_model.type,
                 "metadata": artifact_data_model.metadata.model_dump(),
                 "content": trained_model,  # Keep as Python object
                 "content_type": artifact_data_model.content_type,
-                "content_size": artifact_data_model.content_size,
             }
 
             await artifact_manager.save(
@@ -211,16 +210,15 @@ class MLManager(Generic[ConfigT]):
                 metadata=metadata,
                 content=predictions,
                 content_type="application/vnd.chapkit.dataframe+json",
-                content_size=None,
             )
 
             # Construct dict manually to preserve Python objects (database uses PickleType)
+            # Note: content_size will be calculated automatically by ArtifactManager
             artifact_data = {
                 "type": artifact_data_model.type,
                 "metadata": artifact_data_model.metadata.model_dump(),
                 "content": predictions,  # Keep as Python object (DataFrame)
                 "content_type": artifact_data_model.content_type,
-                "content_size": artifact_data_model.content_size,
             }
 
             await artifact_manager.save(

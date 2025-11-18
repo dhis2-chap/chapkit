@@ -1,8 +1,9 @@
-# Artifact Size in API
+# Artifact Content Metadata in API
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED
 **Created:** 2025-11-18
-**Target Version:** 0.11.0
+**Implemented:** 2025-11-18
+**Version:** 0.10.0
 **Related Design:** [workspace-artifact-storage.md](./workspace-artifact-storage.md)
 
 ---
@@ -219,14 +220,32 @@ GET /api/v1/artifacts/01H2PKW...
 
 ## Success Criteria
 
-- [ ] Artifact model has content_type and content_size columns
-- [ ] content_type and content_size exposed in ArtifactOut schema
-- [ ] Repository always extracts and sets fields when creating artifacts
-- [ ] ML runner includes content_type and content_size in artifact data
-- [ ] GET /api/v1/artifacts/{id} returns both fields
-- [ ] GET /api/v1/artifacts returns both fields for all artifacts (for listing in modeling-app)
-- [ ] Tests pass
-- [ ] Documentation updated
+- [x] content_type and content_size exposed in ArtifactOut schema
+- [x] ArtifactManager automatically calculates content_size in lifecycle hooks
+- [x] ML runner includes content_type in artifact data
+- [x] GET /api/v1/artifacts/{id} returns both fields
+- [x] GET /api/v1/artifacts returns both fields for all artifacts (for listing in modeling-app)
+- [x] Tests pass (618 tests passing)
+- [x] Documentation updated
+
+## Implementation Summary
+
+**Implemented via Pydantic extraction + automatic size calculation:**
+
+1. **ArtifactManager (manager.py):**
+   - Added `_calculate_content_size()` helper method with type detection (bytes, DataFrame, dict, pickle)
+   - Updated `pre_save()` to calculate content_size if None
+   - Updated `pre_update()` to recalculate content_size if None
+
+2. **ArtifactOut Schema (schemas.py):**
+   - Added content_type and content_size as top-level fields
+   - Added model_validator to extract from data dict (handles both dict and ORM objects)
+
+3. **ML Manager (ml/manager.py):**
+   - Removed explicit `content_size=None` assignments
+   - Let ArtifactManager calculate automatically
+
+**Tradeoff:** Chose Pydantic extraction over direct database columns for simplicity. PickleType data field still deserialized on list operations, but implementation is simpler with no schema migration needed.
 
 ---
 

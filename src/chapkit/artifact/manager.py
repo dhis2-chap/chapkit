@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import pickle
 from collections import deque
 
 from servicekit.manager import BaseManager
@@ -80,16 +82,28 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
         return super()._should_assign_field(field, value)
 
     async def pre_save(self, entity: Artifact, data: ArtifactIn) -> None:
-        """Compute and set artifact level before saving."""
+        """Compute and set artifact level and content_size before saving."""
         entity.level = await self._compute_level(entity.parent_id)
 
+        # Calculate content_size if not already provided
+        if isinstance(entity.data, dict) and entity.data.get("content_size") is None:
+            calculated_size = self._calculate_content_size(entity.data)
+            if calculated_size is not None:
+                entity.data["content_size"] = calculated_size
+
     async def pre_update(self, entity: Artifact, data: ArtifactIn, old_values: dict[str, object]) -> None:
-        """Recalculate artifact level and cascade updates to descendants if parent changed."""
+        """Recalculate artifact level and content_size, cascade updates to descendants if parent changed."""
         previous_level = old_values.get("level", entity.level)
         entity.level = await self._compute_level(entity.parent_id)
         parent_changed = old_values.get("parent_id") != entity.parent_id
         if parent_changed or previous_level != entity.level:
             await self._recalculate_descendants(entity)
+
+        # Recalculate content_size if not already provided
+        if isinstance(entity.data, dict) and entity.data.get("content_size") is None:
+            calculated_size = self._calculate_content_size(entity.data)
+            if calculated_size is not None:
+                entity.data["content_size"] = calculated_size
 
     # Helper utilities ------------------------------------------------
 
@@ -101,6 +115,31 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
         if parent is None:
             return 0  # pragma: no cover
         return parent.level + 1
+
+    def _calculate_content_size(self, data: dict) -> int | None:
+        """Calculate size of artifact content in bytes."""
+        content = data.get("content")
+        if content is None:
+            return None
+
+        try:
+            # Handle bytes directly
+            if isinstance(content, bytes):
+                return len(content)
+
+            # Handle DataFrame (has to_json method)
+            if hasattr(content, "to_json"):
+                return len(content.to_json().encode("utf-8"))
+
+            # Handle dict/list as JSON
+            if isinstance(content, (dict, list)):
+                return len(json.dumps(content).encode("utf-8"))
+
+            # Handle other Python objects via pickle
+            return len(pickle.dumps(content))
+        except Exception:
+            # If calculation fails, return None rather than crashing
+            return None
 
     async def _recalculate_descendants(self, entity: Artifact) -> None:
         """Recalculate levels for all descendants of an artifact."""
