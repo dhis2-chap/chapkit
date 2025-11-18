@@ -12,30 +12,30 @@
 Add content_type and content_size as direct fields on the Artifact model and expose in API responses. Currently stored only in nested data dict.
 
 **Current:** Stored in `artifact.data["content_type"]` and `artifact.data["content_size"]` (nested, not queryable)
-**Proposed:** Add `content_type` and `content_size` as direct database columns and expose in API
+**Proposed:** Extract to direct database columns, remove from data dict (no duplication), expose in API
 
 ---
 
 ## Problem Statement
 
-Workspace artifacts (from workspace-artifact-storage.md) store size in metadata:
+Workspace artifacts (from workspace-artifact-storage.md) store size in nested data:
 ```python
 {
     "type": "ml_training",
     "content": bytes,  # Workspace zip
     "content_type": "application/zip",
-    "content_size": 314572800,  # 300MB - stored but not exposed
+    "content_size": 314572800,  # 300MB - nested in data dict
 }
 ```
 
-But API response doesn't include content metadata:
+But API response doesn't expose content metadata at top level:
 ```python
 # GET /api/v1/artifacts/{id}
 {
     "id": "01H...",
     "parent_id": None,
     "level": 0,
-    "data": {...},  # Includes content_type and content_size in nested data
+    "data": {...},  # content_type and content_size buried in pickled data
     "created_at": "...",
     "updated_at": "..."
     # No top-level content_type or content_size fields
@@ -94,7 +94,8 @@ class Artifact(Entity):
 **Benefits:**
 - SQL queryable (WHERE content_size > 100000000)
 - Indexable for performance
-- No data deserialization needed
+- No data deserialization needed for listing artifacts
+- No duplication (removed from data dict after extraction)
 - Clear schema
 
 ### Schema Changes
@@ -125,26 +126,30 @@ class ArtifactOut(BaseModel):
 
 ### Repository/Manager Changes
 
-**Creating artifacts** - Always set fields from data:
+**Creating artifacts** - Extract and remove from data dict:
 
 ```python
 async def create(self, artifact_in: ArtifactIn) -> Artifact:
     """Create artifact with content metadata in direct fields."""
-    artifact_data = artifact_in.data
+    artifact_data = artifact_in.data.copy()
+
+    # Extract and remove from data dict to avoid duplication
+    content_type = artifact_data.pop("content_type", None)
+    content_size = artifact_data.pop("content_size", None)
 
     artifact = Artifact(
         id=str(ULID()),
         parent_id=artifact_in.parent_id,
         level=artifact_in.level or 0,
-        data=artifact_data,
-        content_type=artifact_data.get("content_type"),  # Always extract from data
-        content_size=artifact_data.get("content_size"),  # Always extract from data
+        data=artifact_data,  # Now without content_type/content_size
+        content_type=content_type,  # Stored only in direct column
+        content_size=content_size,  # Stored only in direct column
     )
 
     return await super().create(artifact)
 ```
 
-**Note:** All artifact creation code (ML runner, etc.) should include content_type and content_size in data dict. Repository always extracts and sets direct fields.
+**Note:** ML runner includes content_type and content_size in data dict when creating artifacts. Repository extracts them and removes from data dict before storage, avoiding duplication.
 
 **Converting to schema** - Map directly from fields:
 
@@ -175,12 +180,12 @@ GET /api/v1/artifacts/01H2PKW...
     "level": 0,
     "data": {
         "type": "ml_training",
-        "content_type": "application/zip",
-        "content_size": 314572800,
-        ...
+        "metadata": {...},
+        "content": "..."
+        # Note: content_type and content_size removed from data dict
     },
-    "content_type": "application/zip",  # NEW: Top-level field
-    "content_size": 314572800,  # NEW: Top-level field
+    "content_type": "application/zip",  # NEW: Top-level field (single source of truth)
+    "content_size": 314572800,  # NEW: Top-level field (single source of truth)
     "created_at": "2025-11-18T10:00:00Z",
     "updated_at": "2025-11-18T10:00:00Z"
 }
@@ -198,9 +203,9 @@ GET /api/v1/artifacts/01H2PKW...
 **Steps:**
 1. Update Artifact model with new Mapped fields
 2. Add content_type and content_size to ArtifactOut schema
-3. Update repository create() to always extract and set fields from data dict
+3. Update repository create() to extract from data dict, remove from dict, and set direct fields
 4. Ensure ML runner and other artifact creators include content_type and content_size in data
-5. Update tests
+5. Update tests to verify fields removed from data dict
 
 ---
 
