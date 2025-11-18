@@ -161,36 +161,6 @@ def to_schema(artifact: Artifact) -> ArtifactOut:
     )
 ```
 
-### Database Migration
-
-**File:** `alembic/versions/xxxx_add_artifact_content_metadata.py`
-
-Add nullable columns for content metadata:
-
-```python
-def upgrade() -> None:
-    """Add content_type and content_size columns to artifacts table."""
-    op.add_column('artifacts', sa.Column('content_type', sa.String(), nullable=True))
-    op.add_column('artifacts', sa.Column('content_size', sa.Integer(), nullable=True))
-
-def downgrade() -> None:
-    """Remove content_type and content_size columns from artifacts table."""
-    op.drop_column('artifacts', 'content_size')
-    op.drop_column('artifacts', 'content_type')
-```
-
-**Optional Backfill:**
-Existing artifacts can be backfilled by extracting from data field:
-
-```python
-# Optional: Run after migration
-UPDATE artifacts
-SET
-    content_type = json_extract(data, '$.content_type'),
-    content_size = json_extract(data, '$.content_size')
-WHERE content_type IS NULL;
-```
-
 ### API Example
 
 **Get artifact with content metadata:**
@@ -222,15 +192,12 @@ GET /api/v1/artifacts/01H2PKW...
 - `src/chapkit/artifact/models.py` - Add content_type and content_size columns
 - `src/chapkit/artifact/schemas.py` - Add content_type and content_size fields
 - `src/chapkit/artifact/repository.py` - Set fields when creating artifacts
-- `alembic/versions/xxxx_add_artifact_content_metadata.py` - Database migration
 
 **Steps:**
-1. Create Alembic migration to add content_type and content_size columns
-2. Update Artifact model with new Mapped fields
-3. Add content_type and content_size to ArtifactOut schema
-4. Update repository create() to set fields from data dict
-5. Update tests
-6. Optional: Backfill existing artifacts
+1. Update Artifact model with new Mapped fields
+2. Add content_type and content_size to ArtifactOut schema
+3. Update repository create() to set fields from data dict
+4. Update tests
 
 ---
 
@@ -244,13 +211,12 @@ GET /api/v1/artifacts/01H2PKW...
 
 ## Success Criteria
 
-- [ ] Database migration created and applied
 - [ ] Artifact model has content_type and content_size columns
 - [ ] content_type and content_size exposed in ArtifactOut schema
 - [ ] Repository sets fields when creating artifacts
 - [ ] GET /api/v1/artifacts/{id} returns both fields
 - [ ] GET /api/v1/artifacts returns both fields for all artifacts
-- [ ] Null values handled gracefully (old artifacts)
+- [ ] Null values handled gracefully
 - [ ] Tests pass
 - [ ] Documentation updated
 
@@ -262,6 +228,5 @@ GET /api/v1/artifacts/01H2PKW...
 - `src/chapkit/artifact/models.py`
 - `src/chapkit/artifact/schemas.py`
 - `src/chapkit/artifact/repository.py`
-- `alembic/versions/xxxx_add_artifact_content_metadata.py`
 
 **Related:** [workspace-artifact-storage.md](./workspace-artifact-storage.md) - Stores content_type and content_size in metadata
