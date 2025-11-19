@@ -121,10 +121,11 @@ class MLManager(Generic[ConfigT]):
                 import tempfile
                 import zipfile
 
-                zip_file_path = Path(tempfile.mktemp(suffix=".zip"))
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+                    zip_file_path = Path(tmp.name)
 
                 with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-                    for root, dirs, files in os.walk(workspace_dir):
+                    for root, _, files in os.walk(workspace_dir):
                         for file in files:
                             file_path = Path(root) / file
                             arcname = file_path.relative_to(workspace_dir)
