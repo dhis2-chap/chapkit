@@ -90,9 +90,9 @@ class MLMetadata(BaseModel):
     started_at: str = Field(description="ISO 8601 timestamp when operation started")
     completed_at: str = Field(description="ISO 8601 timestamp when operation completed")
     duration_seconds: float = Field(description="Operation duration in seconds")
-    exit_code: int | None = Field(default=None, description="Script exit code (ShellModelRunner only)")
-    stdout: str | None = Field(default=None, description="Script stdout (ShellModelRunner only)")
-    stderr: str | None = Field(default=None, description="Script stderr (ShellModelRunner only)")
+    exit_code: int | None = Field(default=None, description="Execution exit code (if applicable)")
+    stdout: str | None = Field(default=None, description="Standard output from execution (if applicable)")
+    stderr: str | None = Field(default=None, description="Standard error from execution (if applicable)")
 
 
 class GenericMetadata(BaseModel):
