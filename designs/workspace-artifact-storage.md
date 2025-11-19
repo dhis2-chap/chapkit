@@ -263,6 +263,18 @@ Add section "Training Workspace Artifacts (ShellModelRunner v0.10.0+)":
 - Storage considerations (sizes, limits, monitoring)
 - Breaking change migration guide
 
+**Postman Collection (`examples/ml_shell/postman_collection.json`):**
+
+Add artifact exploration endpoints:
+- `GET /api/v1/artifacts` - List all artifacts (filter by type, view training artifacts)
+- `GET /api/v1/artifacts/{id}` - Download specific training artifact (workspace zip)
+
+Demonstrates:
+- Listing training artifacts after train operations
+- Downloading workspace zips for local debugging
+- Inspecting workspace contents (model, logs, plots, metrics)
+- Artifact retrieval workflow
+
 ---
 
 ## Success Criteria
@@ -276,6 +288,7 @@ Add section "Training Workspace Artifacts (ShellModelRunner v0.10.0+)":
 - [ ] All unit/integration tests pass
 - [ ] test_shell_runner_cleanup_temp_files updated
 - [ ] docs/guides/ml-workflows.md updated with migration guide
+- [ ] examples/ml_shell/postman_collection.json updated with artifact endpoints
 - [ ] Version bumped to 0.10.0
 
 ---
