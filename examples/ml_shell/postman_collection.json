@@ -585,22 +585,22 @@
                     "response": []
                 },
                 {
-                    "name": "Download Artifact Content",
+                    "name": "Download Training Workspace Artifact",
                     "request": {
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{baseUrl}}/api/v1/artifacts/{{prediction_artifact_id}}/$download",
+                            "raw": "{{baseUrl}}/api/v1/artifacts/{{model_artifact_id}}/$download",
                             "host": ["{{baseUrl}}"],
                             "path": [
                                 "api",
                                 "v1",
                                 "artifacts",
-                                "{{prediction_artifact_id}}",
+                                "{{model_artifact_id}}",
                                 "$download"
                             ]
                         },
-                        "description": "Download artifact content as binary file. Returns predictions as JSON array (orient=records). Content-Type header indicates format (application/x-pandas-dataframe for DataFrames). File extension determined by content type (json, csv, zip, png, etc.)."
+                        "description": "Download training workspace artifact as zip file (v0.10.0+). Contains entire training workspace including model files, logs, plots, metrics, config, and data. Content-Type: application/zip. Useful for debugging training issues and inspecting workspace contents locally."
                     },
                     "response": []
                 },
