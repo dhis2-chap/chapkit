@@ -70,11 +70,6 @@ try:
     # Read zip for storage
     workspace_content = zip_file_path.read_bytes()
 
-    # Check if model file exists
-    model_format = config.model_format
-    model_path = temp_dir / f"model.{model_format}"
-    model_exists = model_path.exists()
-
 finally:
     # Cleanup
     if zip_file_path.exists():
@@ -85,8 +80,6 @@ return {
     "workspace_content": workspace_content,
     "content_type": "application/zip",
     "content_size": len(workspace_content),
-    "model_format": model_format,
-    "model_exists": model_exists,
     "exit_code": result.returncode,
     "stdout": result.stdout,
     "stderr": result.stderr,
@@ -103,24 +96,15 @@ zip_buffer = BytesIO(artifact_data["content"])
 with zipfile.ZipFile(zip_buffer, 'r') as zf:
     zf.extractall(temp_dir)
 
-# Validate model exists
-training_metadata = artifact_data.get("metadata", {})
-model_format = training_metadata.get("model_format", "pkl")
-model_exists = training_metadata.get("model_exists", False)
-
-if not model_exists:
-    raise ValueError("Training artifact contains no model file. Cannot predict.")
-
-model_path = temp_dir / f"model.{model_format}"
-if not model_path.exists():
-    raise ValueError(f"Model file not found in workspace: model.{model_format}")
-
-# Write prediction data and run script
+# Write prediction data
 historic_data.to_csv(temp_dir / "historic.csv", index=False)
 future_data.to_csv(temp_dir / "future.csv", index=False)
+
+# Run prediction script
+# Script handles model loading from workspace (framework doesn't validate)
 result = subprocess.run(command, cwd=temp_dir, capture_output=True, text=True)
 
-# Return DataFrame
+# Read and return predictions
 output_file = temp_dir / "predictions.csv"
 if not output_file.exists():
     raise ValueError("Prediction script did not create predictions.csv")
@@ -141,13 +125,7 @@ if training_status == "failed":
     exit_code = training_metadata.get("exit_code", "unknown")
     raise ValueError(
         f"Cannot predict using failed training artifact {artifact_id}. "
-        f"Training exited with code {exit_code}."
-    )
-
-if not training_metadata.get("model_exists", False):
-    raise ValueError(
-        f"Cannot predict using training artifact {artifact_id}. "
-        f"No model file was created during training."
+        f"Training script exited with code {exit_code}."
     )
 ```
 
@@ -167,13 +145,11 @@ if not training_metadata.get("model_exists", False):
 {
     "type": "ml_training",
     "metadata": {
-        "status": "success" | "failed",
+        "status": "success" | "failed",  # Reflects script exit code only
         "exit_code": int,
         "stdout": str,
         "stderr": str,
         "config_id": str,
-        "model_format": str,      # NEW: e.g., "pkl", "joblib", "h5"
-        "model_exists": bool,     # NEW: model file present in workspace
         "started_at": str,
         "completed_at": str,
         "duration_seconds": float,
@@ -184,12 +160,17 @@ if not training_metadata.get("model_exists", False):
 }
 ```
 
+**Status semantics:**
+- `status="success"` means script exited with code 0
+- `status="failed"` means script exited with non-zero code
+- Status does NOT indicate whether model was created (script's responsibility)
+
 ### Prediction Artifact
 ```python
 {
     "type": "ml_prediction",
     "metadata": {
-        "status": "success" | "failed",
+        "status": "success" | "failed",  # Reflects script exit code only
         "config_id": str,
         "started_at": str,
         "completed_at": str,
@@ -210,10 +191,12 @@ if not training_metadata.get("model_exists", False):
 3. **Compression level 9** - Maximum compression for minimal storage
 4. **Stream to temp file** - Avoid in-memory buffering for large workspaces
 5. **Zip integrity validation** - Prevent corrupted artifacts
-6. **Failed training blocks prediction** - ValueError if status="failed" or model_exists=False
-7. **Cleanup via artifact API** - DELETE /api/v1/artifacts/{id} removes workspace
-8. **No size limits** - Users manage workspace sizes (SQLite 2GB BLOB hard limit)
-9. **Breaking change** - No backward compatibility for simplicity
+6. **Failed training blocks prediction** - ValueError if status="failed" (exit_code != 0)
+7. **No model validation** - Script handles model format/structure (framework agnostic)
+8. **Status reflects script execution** - success/failed based on exit code, not model creation
+9. **Cleanup via artifact API** - DELETE /api/v1/artifacts/{id} removes workspace
+10. **No size limits** - Users manage workspace sizes (SQLite 2GB BLOB hard limit)
+11. **Breaking change** - No backward compatibility for simplicity
 
 ---
 
@@ -252,17 +235,16 @@ ORDER BY CAST(data->>'$.content_size' AS REAL) DESC;
 - Workspace zip creation and structure validation
 - Zip integrity validation (testzip)
 - Workspace extraction during prediction
-- Metadata fields (model_format, model_exists)
-- Failed training blocking (status="failed")
-- Workspace-only training blocking (model_exists=False)
+- Failed training blocking (status="failed", exit_code != 0)
 - Corrupted zip handling
 - temp_dir cleanup after zip creation
 - Update test_shell_runner_cleanup_temp_files
 
 **Integration Tests:**
 - End-to-end train/predict with workspace artifacts
-- Multi-file models (TensorFlow SavedModel)
+- Multi-file models (TensorFlow SavedModel directories)
 - Failed training blocking via API (HTTP 400)
+- Prediction script failure when model missing (natural failure)
 - Large workspace (100MB+) performance
 - Compression level 9 impact on training time
 
@@ -287,10 +269,9 @@ Add section "Training Workspace Artifacts (ShellModelRunner v0.10.0+)":
 
 - [ ] Training creates workspace zip (compression level 9, streamed to temp file)
 - [ ] Zip integrity validated before storage
-- [ ] Prediction extracts workspace and validates model file exists
-- [ ] Failed training blocks prediction (ValueError)
-- [ ] Workspace-only training blocks prediction (ValueError)
-- [ ] Metadata includes model_format and model_exists
+- [ ] Prediction extracts workspace and runs script
+- [ ] Failed training blocks prediction (status="failed" raises ValueError)
+- [ ] Status reflects script exit code only (not model creation)
 - [ ] temp_dir cleanup after zip creation
 - [ ] All unit/integration tests pass
 - [ ] test_shell_runner_cleanup_temp_files updated
