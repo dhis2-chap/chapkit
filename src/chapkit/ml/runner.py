@@ -195,9 +195,6 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 assert geo_file is not None  # For type checker
                 geo_file.write_text(geo.model_dump_json(indent=2))
 
-            # Model file path (relative to temp_dir)
-            model_file = temp_dir / f"model.{self.model_format}"
-
             # Substitute variables in command (use relative paths)
             command = self.train_command.format(
                 config_file="config.yml",

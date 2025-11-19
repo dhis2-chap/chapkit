@@ -6,7 +6,7 @@ import datetime
 import os
 import shutil
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Generic, Literal, TypeVar
 
 from servicekit import Database
 from ulid import ULID
@@ -115,11 +115,11 @@ class MLManager(Generic[ConfigT]):
                 stderr = training_result.get("stderr", "")
 
                 # Determine status from exit code
-                status = "success" if exit_code == 0 else "failed"
+                status: Literal["success", "failed"] = "success" if exit_code == 0 else "failed"
 
                 # Create workspace zip (compression level 9, stream to temp file)
-                import zipfile
                 import tempfile
+                import zipfile
 
                 zip_file_path = Path(tempfile.mktemp(suffix=".zip"))
 
@@ -252,8 +252,8 @@ class MLManager(Generic[ConfigT]):
         try:
             if is_workspace:
                 # Extract workspace from zip
-                import zipfile
                 import tempfile
+                import zipfile
                 from io import BytesIO
 
                 workspace_content = training_data["content"]
