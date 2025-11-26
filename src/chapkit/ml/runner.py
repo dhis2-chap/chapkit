@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pickle
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
@@ -242,37 +241,19 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
         try:
-            # Check if model is workspace artifact (ShellModelRunner training result)
-            is_workspace = isinstance(model, dict) and "workspace_dir" in model
+            # Model must be workspace artifact from ShellModelRunner.on_train()
+            if not (isinstance(model, dict) and "workspace_dir" in model):
+                raise ValueError(
+                    "ShellModelRunner.on_predict() requires workspace artifact from ShellModelRunner.on_train(). "
+                    f"Got: {type(model)}"
+                )
 
-            if is_workspace:
-                # Extract workspace from training artifact
-                workspace_dir = Path(model["workspace_dir"])
-                logger.info("predict_using_workspace", workspace_dir=str(workspace_dir))
+            # Extract and restore workspace from training artifact
+            workspace_dir = Path(model["workspace_dir"])
+            logger.info("predict_using_workspace", workspace_dir=str(workspace_dir))
 
-                # Copy workspace contents to temp_dir
-                # Use copytree with dirs_exist_ok=True to merge contents
-                shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
-
-                # Workspace copied as-is (may contain config, model files, etc.)
-                # Predict script is responsible for checking file existence
-            else:
-                # Pickled model handling (FunctionalModelRunner or legacy artifacts)
-                # Copy entire project directory to temp workspace for full isolation
-                self._prepare_workspace(temp_dir)
-
-                # Write config to YAML file
-                config_file = temp_dir / "config.yml"
-                config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
-
-                # Write model to file only if it's not a placeholder
-                is_placeholder = isinstance(model, dict) and model.get("model_type") == "no_file"
-                if is_placeholder:
-                    logger.info("predict_script_no_model_file", reason="model is placeholder")
-                else:
-                    model_file = temp_dir / f"model.{self.model_format}"
-                    with open(model_file, "wb") as f:
-                        pickle.dump(model, f)
+            # Copy workspace contents to temp_dir (preserves all training artifacts)
+            shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
 
             # Write historic data (always fresh for each prediction)
             historic_file = temp_dir / "historic.csv"
@@ -291,15 +272,10 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Output file path
             output_file = temp_dir / "predictions.csv"
 
-            # Determine model file parameter for predict command
-            # Workspace mode: always pass model filename (predict script checks existence)
-            # Traditional mode: only pass filename if we wrote the file (not placeholder)
-            is_placeholder = isinstance(model, dict) and model.get("model_type") == "no_file"
-            model_file_param = f"model.{self.model_format}" if (is_workspace or not is_placeholder) else ""
-
+            # Execute prediction command (workspace may contain model files, config, etc.)
             command = self.predict_command.format(
                 config_file="config.yml",
-                model_file=model_file_param,
+                model_file=f"model.{self.model_format}",
                 historic_file="historic.csv",
                 future_file="future.csv",
                 output_file="predictions.csv",

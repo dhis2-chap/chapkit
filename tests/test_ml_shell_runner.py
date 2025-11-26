@@ -3,6 +3,7 @@
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
 
@@ -16,6 +17,26 @@ class MockConfig(BaseConfig):
 
     threshold: float = 0.5
     features: list[str] = ["feature1", "feature2"]
+
+
+class WorkspaceArtifact(TypedDict):
+    """Type for workspace artifact returned by ShellModelRunner.on_train()."""
+
+    workspace_dir: str
+    exit_code: int
+    stdout: str
+    stderr: str
+
+
+def create_mock_workspace() -> WorkspaceArtifact:
+    """Create a mock workspace artifact for testing on_predict()."""
+    temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_test_workspace_"))
+    return {
+        "workspace_dir": str(temp_dir),
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "",
+    }
 
 
 @pytest.mark.asyncio
@@ -67,17 +88,21 @@ async def test_shell_runner_predict_basic() -> None:
     )
 
     config = MockConfig()
-    model = "mock_model"
+    model = create_mock_workspace()  # Use workspace artifact
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    # Predict should execute command and load results
-    predictions = await runner.on_predict(config, model, historic, future)
+    try:
+        # Predict should execute command and load results
+        predictions = await runner.on_predict(config, model, historic, future)
 
-    assert len(predictions.data) == 2
-    assert "prediction" in predictions.columns
-    pred_idx = predictions.columns.index("prediction")
-    assert float(predictions.data[0][pred_idx]) == 0.5
+        assert len(predictions.data) == 2
+        assert "prediction" in predictions.columns
+        pred_idx = predictions.columns.index("prediction")
+        assert float(predictions.data[0][pred_idx]) == 0.5
+    finally:
+        # Cleanup mock workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
 @pytest.mark.asyncio
@@ -195,7 +220,16 @@ print("Prediction completed")
         )
 
         config = MockConfig()
-        model = 100  # Model is just a number
+        model = create_mock_workspace()  # Create workspace artifact
+
+        # Create model file in workspace (script expects to load it)
+        import pickle
+
+        workspace_dir = Path(model["workspace_dir"])
+        model_file = workspace_dir / "model.pickle"
+        with open(model_file, "wb") as f:
+            pickle.dump(100, f)  # Model is just a number
+
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
@@ -205,6 +239,9 @@ print("Prediction completed")
         assert "prediction" in predictions.columns
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 101  # 1 + 100
+
+        # Cleanup workspace
+        shutil.rmtree(workspace_dir, ignore_errors=True)
 
     finally:
         Path(script_path).unlink()
@@ -246,12 +283,16 @@ async def test_shell_runner_predict_failure() -> None:
     )
 
     config = MockConfig()
-    model = "mock_model"
+    model = create_mock_workspace()  # Use workspace artifact
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    with pytest.raises(RuntimeError, match="Prediction script failed with exit code 2"):
-        await runner.on_predict(config, model, historic, future)
+    try:
+        with pytest.raises(RuntimeError, match="Prediction script failed with exit code 2"):
+            await runner.on_predict(config, model, historic, future)
+    finally:
+        # Cleanup mock workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
 @pytest.mark.asyncio
@@ -286,7 +327,7 @@ async def test_shell_runner_missing_model_file() -> None:
 
 @pytest.mark.asyncio
 async def test_shell_runner_predict_with_placeholder_model() -> None:
-    """Test prediction with placeholder model (no model file created during training)."""
+    """Test prediction without model file (workspace contains no model.pickle)."""
     # Create a predict script that doesn't need a model file
     predict_script = """
 import sys
@@ -325,13 +366,13 @@ print("Prediction completed without model file")
 
         config = MockConfig()
 
-        # Simulate placeholder model from training without model file
-        placeholder_model = {"model_type": "no_file", "stdout": "training log"}
+        # Create workspace artifact without model file (simulates training that didn't create one)
+        model = create_mock_workspace()
 
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[5], [10]])
 
-        predictions = await runner.on_predict(config, placeholder_model, historic, future)
+        predictions = await runner.on_predict(config, model, historic, future)
 
         # Should successfully predict without model file
         assert len(predictions.data) == 2
@@ -339,6 +380,9 @@ print("Prediction completed without model file")
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 10  # 5 * 2
         assert float(predictions.data[1][pred_idx]) == 20  # 10 * 2
+
+        # Cleanup workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
     finally:
         Path(script_path).unlink()
@@ -356,12 +400,16 @@ async def test_shell_runner_missing_output_file() -> None:
     )
 
     config = MockConfig()
-    model = "mock_model"
+    model = create_mock_workspace()  # Use workspace artifact
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
-        await runner.on_predict(config, model, historic, future)
+    try:
+        with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
+            await runner.on_predict(config, model, historic, future)
+    finally:
+        # Cleanup mock workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
 @pytest.mark.asyncio
@@ -392,11 +440,10 @@ async def test_shell_runner_variable_substitution() -> None:
     assert model_file.exists()
 
     # Predict - this will verify {output_file} substitution works
-    # Use traditional model for prediction (not workspace)
-    model = "model"
+    # Use workspace from training
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1]])
-    predictions = await runner.on_predict(config, model, historic, future)
+    predictions = await runner.on_predict(config, result, historic, future)
     assert len(predictions.data) == 1
     assert "prediction" in predictions.columns
 
