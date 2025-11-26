@@ -100,7 +100,7 @@ class MLManager(Generic[ConfigT]):
         training_completed_at = datetime.datetime.now(datetime.UTC)
         training_duration = (training_completed_at - training_started_at).total_seconds()
 
-        # Check if result is workspace (ShellModelRunner v0.10.0+)
+        # Check if result is workspace (ShellModelRunner) or pickled model (FunctionalModelRunner)
         is_workspace = isinstance(training_result, dict) and "workspace_dir" in training_result
 
         workspace_dir = None
@@ -158,7 +158,7 @@ class MLManager(Generic[ConfigT]):
                     duration_seconds=round(training_duration, 2),
                 )
             else:
-                # Traditional model handling (FunctionalModelRunner or old artifacts)
+                # Pickled model handling (FunctionalModelRunner)
                 artifact_content = training_result
                 content_type = "application/x-pickle"
                 content_size = None
@@ -246,7 +246,7 @@ class MLManager(Generic[ConfigT]):
                 f"Training script exited with code {exit_code}."
             )
 
-        # Check if artifact is workspace (v0.10.0+ ShellModelRunner)
+        # Check if artifact is workspace (ShellModelRunner) or pickled model (FunctionalModelRunner)
         is_workspace = training_data.get("content_type") == "application/zip"
         extracted_workspace = None
 
@@ -270,7 +270,7 @@ class MLManager(Generic[ConfigT]):
                     "workspace_dir": str(extracted_workspace),
                 }
             else:
-                # Traditional model handling (pickle object)
+                # Pickled model handling (FunctionalModelRunner)
                 trained_model = training_data["content"]
 
             config_id = ULID.from_str(training_metadata["config_id"])
