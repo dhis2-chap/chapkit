@@ -9,7 +9,7 @@ This script demonstrates language-agnostic ML training by:
 - Using relative imports from shared lib/ utilities
 
 Usage:
-    python train_model.py --config config.yml --data data.csv --model model.pickle
+    python train_model.py --data data.csv
 """
 
 import argparse
@@ -33,16 +33,14 @@ from lib.validation import validate_training_data  # type: ignore[import-not-fou
 def main() -> None:
     """Main training function."""
     parser = argparse.ArgumentParser(description="Train ML model from external script")
-    parser.add_argument("--config", required=True, help="Path to config YAML file")
     parser.add_argument("--data", required=True, help="Path to training data CSV")
-    parser.add_argument("--model", required=True, help="Path to save trained model")
     parser.add_argument("--geo", default="", help="Path to GeoJSON file (optional)")
 
     args = parser.parse_args()
 
     try:
         # Load config
-        with open(args.config) as f:
+        with open("config.yml") as f:
             config = yaml.safe_load(f)
 
         print(f"Training with config: {config}", file=sys.stderr)
@@ -87,10 +85,10 @@ def main() -> None:
             "config": config,
         }
 
-        with open(args.model, "wb") as f:
+        with open("model.pickle", "wb") as f:
             pickle.dump(model_data, f)
 
-        print(f"Model saved to {args.model}", file=sys.stderr)
+        print("Model saved to model.pickle", file=sys.stderr)
         print("SUCCESS: Training completed")
 
     except Exception as e:

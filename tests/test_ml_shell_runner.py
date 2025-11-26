@@ -43,7 +43,7 @@ def create_mock_workspace() -> WorkspaceArtifact:
 async def test_shell_runner_train_basic() -> None:
     """Test basic training with shell runner using echo command."""
     # Create a pickled model file using python
-    train_command = "python -c \"import pickle; pickle.dump('trained_model', open('{model_file}', 'wb'))\""
+    train_command = "python -c \"import pickle; pickle.dump('trained_model', open('model.pickle', 'wb'))\""
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
@@ -83,7 +83,7 @@ async def test_shell_runner_predict_basic() -> None:
     predict_command = 'echo "feature1,prediction\\n1,0.5\\n2,0.6" > {output_file}'
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
-        train_command="echo 'model' > {model_file}",
+        train_command="echo 'model' > model.pickle",
         predict_command=predict_command,
     )
 
@@ -116,11 +116,11 @@ import csv
 import yaml
 
 # Read config
-with open(sys.argv[1]) as f:
+with open("config.yml") as f:
     config = yaml.safe_load(f)
 
 # Read data from CSV
-with open(sys.argv[2]) as f:
+with open(sys.argv[1]) as f:
     reader = csv.DictReader(f)
     feature1_values = [float(row['feature1']) for row in reader]
 
@@ -129,7 +129,7 @@ mean_value = sum(feature1_values) / len(feature1_values)
 model = {"mean": mean_value, "config": config}
 
 # Save model
-with open(sys.argv[3], "wb") as f:
+with open("model.pickle", "wb") as f:
     pickle.dump(model, f)
 
 print("Training completed")
@@ -140,7 +140,7 @@ print("Training completed")
         script_path = f.name
 
     try:
-        train_command = f"python {script_path} {{config_file}} {{data_file}} {{model_file}}"
+        train_command = f"python {script_path} {{data_file}}"
 
         runner: ShellModelRunner[MockConfig] = ShellModelRunner(
             train_command=train_command,
@@ -186,16 +186,16 @@ import pickle
 import csv
 
 # Load model
-with open(sys.argv[1], "rb") as f:
+with open("model.pickle", "rb") as f:
     model = pickle.load(f)
 
 # Read future data
-with open(sys.argv[2]) as f:
+with open(sys.argv[1]) as f:
     reader = csv.DictReader(f)
     rows = list(reader)
 
 # Make predictions (just add model value to feature1)
-with open(sys.argv[3], "w", newline='') as f:
+with open(sys.argv[2], "w", newline='') as f:
     writer = csv.DictWriter(f, fieldnames=["feature1", "prediction"])
     writer.writeheader()
     for row in rows:
@@ -212,10 +212,10 @@ print("Prediction completed")
         script_path = f.name
 
     try:
-        predict_command = f"python {script_path} {{model_file}} {{future_file}} {{output_file}}"
+        predict_command = f"python {script_path} {{future_file}} {{output_file}}"
 
         runner: ShellModelRunner[MockConfig] = ShellModelRunner(
-            train_command="echo 'model' > {model_file}",
+            train_command="echo 'model' > model.pickle",
             predict_command=predict_command,
         )
 
@@ -278,7 +278,7 @@ async def test_shell_runner_predict_failure() -> None:
     predict_command = "exit 2"
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
-        train_command="echo 'model' > {model_file}",
+        train_command="echo 'model' > model.pickle",
         predict_command=predict_command,
     )
 
@@ -395,7 +395,7 @@ async def test_shell_runner_missing_output_file() -> None:
     predict_command = "echo 'no predictions created'"
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
-        train_command="echo 'model' > {model_file}",
+        train_command="echo 'model' > model.pickle",
         predict_command=predict_command,
     )
 
@@ -418,7 +418,7 @@ async def test_shell_runner_variable_substitution() -> None:
     # Test that the runner creates the expected files with substituted paths
     # This is implicitly tested by the other tests, but we verify explicitly here
 
-    train_command = "python -c \"import pickle; pickle.dump('model', open('{model_file}', 'wb'))\""
+    train_command = "python -c \"import pickle; pickle.dump('model', open('model.pickle', 'wb'))\""
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
@@ -457,7 +457,7 @@ async def test_shell_runner_cleanup_temp_files() -> None:
 
     temp_dirs_before = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
 
-    train_command = "python -c \"import pickle; pickle.dump('model', open('{model_file}', 'wb'))\""
+    train_command = "python -c \"import pickle; pickle.dump('model', open('model.pickle', 'wb'))\""
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command="echo 'predictions' > {output_file}",
@@ -494,7 +494,7 @@ async def test_copies_entire_project_directory() -> None:
         "expected = ['pyproject.toml', 'src', 'tests']; "
         "missing = [f for f in expected if not Path(f).exists()]; "
         "sys.exit(1) if missing else None; "
-        "pickle.dump('success', open('{model_file}', 'wb'))"
+        "pickle.dump('success', open('model.pickle', 'wb'))"
         '"'
     )
 
@@ -522,7 +522,7 @@ async def test_ignores_venv_directory() -> None:
         "from pathlib import Path; "
         "import pickle; "
         "sys.exit(1) if Path('.venv').exists() else None; "
-        "pickle.dump('venv_ignored', open('{model_file}', 'wb'))"
+        "pickle.dump('venv_ignored', open('model.pickle', 'wb'))"
         '"'
     )
 
@@ -549,7 +549,7 @@ async def test_ignores_node_modules() -> None:
         "from pathlib import Path; "
         "import pickle; "
         "sys.exit(1) if Path('node_modules').exists() else None; "
-        "pickle.dump('node_modules_ignored', open('{model_file}', 'wb'))"
+        "pickle.dump('node_modules_ignored', open('model.pickle', 'wb'))"
         '"'
     )
 
@@ -577,7 +577,7 @@ async def test_ignores_pycache() -> None:
         "import pickle; "
         "pycache = list(Path('.').rglob('__pycache__')); "
         "sys.exit(1) if pycache else None; "
-        "pickle.dump('pycache_ignored', open('{model_file}', 'wb'))"
+        "pickle.dump('pycache_ignored', open('model.pickle', 'wb'))"
         '"'
     )
 
@@ -607,7 +607,7 @@ async def test_project_structure_preserved() -> None:
         "missing.append('src') if not Path('src').exists() else None; "
         "missing.append('src/chapkit') if not Path('src/chapkit').exists() else None; "
         "sys.exit(1) if missing else None; "
-        "pickle.dump('structure_preserved', open('{model_file}', 'wb'))"
+        "pickle.dump('structure_preserved', open('model.pickle', 'wb'))"
         '"'
     )
 
@@ -640,7 +640,7 @@ async def test_uses_relative_paths() -> None:
             "import pickle; "
             "from test_helper_lib import process_data; "
             "result = process_data(42); "
-            "pickle.dump(result, open('{model_file}', 'wb'))"
+            "pickle.dump(result, open('model.pickle', 'wb'))"
             '"'
         )
 
