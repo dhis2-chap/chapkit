@@ -254,8 +254,8 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 # Use copytree with dirs_exist_ok=True to merge contents
                 shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
 
-                # Workspace already contains config, model files, etc.
-                # No need to write model file or prepare workspace
+                # Workspace copied as-is (may contain config, model files, etc.)
+                # Predict script is responsible for checking file existence
             else:
                 # Traditional model handling (pre-0.10.0 or FunctionalModelRunner)
                 # Copy entire project directory to temp workspace for full isolation
@@ -291,14 +291,11 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Output file path
             output_file = temp_dir / "predictions.csv"
 
-            # Substitute variables in command (use relative paths)
-            # For workspace models: config and model already exist in workspace
-            # For traditional models: model_file is empty if placeholder
-            if is_workspace:
-                model_file_param = f"model.{self.model_format}"
-            else:
-                is_placeholder = isinstance(model, dict) and model.get("model_type") == "no_file"
-                model_file_param = f"model.{self.model_format}" if not is_placeholder else ""
+            # Determine model file parameter for predict command
+            # Workspace mode: always pass model filename (predict script checks existence)
+            # Traditional mode: only pass filename if we wrote the file (not placeholder)
+            is_placeholder = isinstance(model, dict) and model.get("model_type") == "no_file"
+            model_file_param = f"model.{self.model_format}" if (is_workspace or not is_placeholder) else ""
 
             command = self.predict_command.format(
                 config_file="config.yml",
