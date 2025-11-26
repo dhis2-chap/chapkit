@@ -242,7 +242,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
         try:
-            # Check if model is workspace (from v0.10.0+ training artifacts)
+            # Check if model is workspace artifact (ShellModelRunner training result)
             is_workspace = isinstance(model, dict) and "workspace_dir" in model
 
             if is_workspace:
@@ -257,7 +257,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 # Workspace copied as-is (may contain config, model files, etc.)
                 # Predict script is responsible for checking file existence
             else:
-                # Traditional model handling (pre-0.10.0 or FunctionalModelRunner)
+                # Pickled model handling (FunctionalModelRunner or legacy artifacts)
                 # Copy entire project directory to temp workspace for full isolation
                 self._prepare_workspace(temp_dir)
 
