@@ -101,7 +101,6 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         self,
         train_command: str,
         predict_command: str,
-        model_format: str = "pickle",
     ) -> None:
         """Initialize shell runner with full isolation support.
 
@@ -112,11 +111,9 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         Args:
             train_command: Command template for training (use relative paths)
             predict_command: Command template for prediction (use relative paths)
-            model_format: File extension for model files (default: "pickle")
         """
         self.train_command = train_command
         self.predict_command = predict_command
-        self.model_format = model_format
 
         # Project root is current working directory
         # Users run: fastapi dev main.py (from project dir)
@@ -196,9 +193,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
             # Substitute variables in command (use relative paths)
             command = self.train_command.format(
-                config_file="config.yml",
                 data_file="data.csv",
-                model_file=f"model.{self.model_format}",
                 geo_file="geo.json" if geo_file else "",
             )
 
@@ -274,8 +269,6 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
             # Execute prediction command (workspace may contain model files, config, etc.)
             command = self.predict_command.format(
-                config_file="config.yml",
-                model_file=f"model.{self.model_format}",
                 historic_file="historic.csv",
                 future_file="future.csv",
                 output_file="predictions.csv",

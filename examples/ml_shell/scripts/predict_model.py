@@ -11,7 +11,7 @@ This script demonstrates language-agnostic ML prediction by:
 - Using relative imports from shared lib/ utilities
 
 Usage:
-    python predict_model.py --config config.yml --model model.pickle --future future.csv --output predictions.csv
+    python predict_model.py --historic historic.csv --future future.csv --output predictions.csv
 """
 
 import argparse
@@ -34,8 +34,6 @@ from lib.validation import validate_predictions  # type: ignore[import-not-found
 def main() -> None:
     """Main prediction function."""
     parser = argparse.ArgumentParser(description="Make predictions using trained model")
-    parser.add_argument("--config", required=True, help="Path to config YAML file")
-    parser.add_argument("--model", required=True, help="Path to trained model file")
     parser.add_argument("--historic", required=True, help="Path to historic data CSV")
     parser.add_argument("--future", required=True, help="Path to future data CSV")
     parser.add_argument("--output", required=True, help="Path to save predictions CSV")
@@ -45,13 +43,13 @@ def main() -> None:
 
     try:
         # Load config
-        with open(args.config) as f:
+        with open("config.yml") as f:
             config = yaml.safe_load(f)
 
         print(f"Predicting with config: {config}", file=sys.stderr)
 
         # Load model
-        with open(args.model, "rb") as f:
+        with open("model.pickle", "rb") as f:
             model_data = pickle.load(f)
 
         # Handle both old and new model format for backward compatibility

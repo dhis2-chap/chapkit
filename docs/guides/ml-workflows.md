@@ -81,21 +81,16 @@ runner = CustomModelRunner()
 from chapkit.ml import ShellModelRunner
 
 # Use any command - python, Rscript, julia, or custom binaries
-train_command = (
-    "python scripts/train.py "
-    "--config {config_file} --data {data_file} --model {model_file}"
-)
+train_command = "python scripts/train.py --data {data_file}"
 
 predict_command = (
     "python scripts/predict.py "
-    "--config {config_file} --model {model_file} "
     "--future {future_file} --output {output_file}"
 )
 
 runner = ShellModelRunner(
     train_command=train_command,
     predict_command=predict_command,
-    model_format="pickle"
 )
 # Use same MLServiceBuilder setup as above
 ```
@@ -214,18 +209,15 @@ Executes external scripts for language-agnostic ML workflows.
 from chapkit.ml import ShellModelRunner
 
 runner = ShellModelRunner(
-    train_command="python train.py --config {config_file} --data {data_file} --model {model_file}",
-    predict_command="python predict.py --config {config_file} --model {model_file} --future {future_file} --output {output_file}",
-    model_format="pickle"  # or "joblib", "json", etc.
+    train_command="python train.py --data {data_file}",
+    predict_command="python predict.py --future {future_file} --output {output_file}",
 )
 ```
 
 **Variable Substitution:**
-- `{config_file}` - YAML config file
 - `{data_file}` - Training data CSV
-- `{model_file}` - Model file (format specified)
 - `{future_file}` - Future data CSV
-- `{historic_file}` - Historic data CSV (required)
+- `{historic_file}` - Historic data CSV
 - `{output_file}` - Predictions output CSV
 - `{geo_file}` - GeoJSON file (if provided)
 
@@ -234,12 +226,14 @@ runner = ShellModelRunner(
 - Commands execute with workspace as current directory
 - Scripts can use relative paths and imports
 - Excludes build artifacts (.venv, node_modules, __pycache__, .git, etc.)
+- Config always written to `config.yml` in workspace
+- Scripts can directly access `config.yml` and create/use model files (e.g. `model.pickle`)
 
 **Script Requirements:**
-- **Training script:** Read data/config, train model, optionally save model to `{model_file}`
+- **Training script:** Read data from arguments, read config from `config.yml`, train model, optionally save to `model.pickle`
   - Model file creation is optional - workspace is preserved regardless of exit code
   - Training artifacts store the entire workspace (files, logs, intermediate results)
-- **Prediction script:** Read model/data/config, make predictions, save to `{output_file}`
+- **Prediction script:** Read data from arguments, read config from `config.yml`, load model from `model.pickle`, make predictions, save to `{output_file}`
 - Exit code 0 on success, non-zero on failure
 - Use stderr for logging
 - Can use relative imports from project modules
@@ -253,13 +247,11 @@ import yaml
 from sklearn.linear_model import LinearRegression
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--config", required=True)
 parser.add_argument("--data", required=True)
-parser.add_argument("--model", required=True)
 args = parser.parse_args()
 
-# Load config (YAML format)
-with open(args.config) as f:
+# Load config (always available as config.yml)
+with open("config.yml") as f:
     config = yaml.safe_load(f)
 
 # Load data
@@ -271,8 +263,8 @@ y = data["target"]
 model = LinearRegression()
 model.fit(X, y)
 
-# Save
-with open(args.model, "wb") as f:
+# Save (use any filename, model.pickle is conventional)
+with open("model.pickle", "wb") as f:
     pickle.dump(model, f)
 ```
 
@@ -290,7 +282,7 @@ The ShellModelRunner copies your entire project directory to an isolated workspa
 
 1. **Relative script paths:** Reference scripts using simple relative paths
    ```python
-   train_command="python scripts/train_model.py --config {config_file} ..."
+   train_command="python scripts/train_model.py --data {data_file}"
    ```
 
 2. **Relative imports:** Scripts can import from project modules
@@ -864,16 +856,14 @@ from chapkit.ml import ShellModelRunner
 
 # Python example - just use "python"
 runner = ShellModelRunner(
-    train_command="python scripts/train_model.py --config {config_file} --data {data_file} --model {model_file}",
-    predict_command="python scripts/predict_model.py --config {config_file} --model {model_file} --future {future_file} --output {output_file}",
-    model_format="pickle"
+    train_command="python scripts/train_model.py --data {data_file}",
+    predict_command="python scripts/predict_model.py --future {future_file} --output {output_file}",
 )
 
 # Or use any other language - Rscript, julia, etc.
 # runner = ShellModelRunner(
-#     train_command="Rscript scripts/train.R --config {config_file} --data {data_file} --model {model_file}",
-#     predict_command="Rscript scripts/predict.R --config {config_file} --model {model_file} --future {future_file} --output {output_file}",
-#     model_format="rds"
+#     train_command="Rscript scripts/train.R --data {data_file}",
+#     predict_command="Rscript scripts/predict.R --future {future_file} --output {output_file}",
 # )
 ```
 
@@ -883,19 +873,17 @@ runner = ShellModelRunner(
 library(yaml)
 
 args <- commandArgs(trailingOnly = TRUE)
-config_file <- args[which(args == "--config") + 1]
 data_file <- args[which(args == "--data") + 1]
-model_file <- args[which(args == "--model") + 1]
 
-# Load config (YAML format)
-config <- yaml.load_file(config_file)
+# Load config (always available as config.yml)
+config <- yaml.load_file("config.yml")
 data <- read.csv(data_file)
 
 # Train model
 model <- lm(disease_cases ~ rainfall + mean_temperature, data = data)
 
-# Save model
-saveRDS(model, model_file)
+# Save model (use any filename, model.rds is conventional)
+saveRDS(model, "model.rds")
 cat("SUCCESS: Model trained\n")
 ```
 

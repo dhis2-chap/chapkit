@@ -37,31 +37,27 @@ class DiseaseConfig(BaseConfig):
 # ShellModelRunner enables proper project organization with reusable code.
 #
 # Variables will be substituted with actual file paths at runtime:
-#   {config_file} - YAML config
 #   {data_file} - Training data CSV
-#   {model_file} - Model pickle file
 #   {historic_file} - Historic data CSV
 #   {future_file} - Future data CSV
 #   {output_file} - Predictions CSV
+#
+# Files available in workspace (scripts can access directly):
+#   config.yml - YAML config (always available)
+#   model.pickle - Model file (create/use as needed)
 
 # Training command template (using relative path to script)
-train_command = "python scripts/train_model.py --config {config_file} --data {data_file} --model {model_file}"
+train_command = "python scripts/train_model.py --data {data_file}"
 
 # Prediction command template (using relative path to script)
 predict_command = (
-    "python scripts/predict_model.py "
-    "--config {config_file} "
-    "--model {model_file} "
-    "--historic {historic_file} "
-    "--future {future_file} "
-    "--output {output_file}"
+    "python scripts/predict_model.py --historic {historic_file} --future {future_file} --output {output_file}"
 )
 
 # Create shell model runner
 runner: ShellModelRunner[DiseaseConfig] = ShellModelRunner(
     train_command=train_command,
     predict_command=predict_command,
-    model_format="pickle",
 )
 
 # Create ML service info with metadata
