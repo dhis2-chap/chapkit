@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import datetime
-import os
 import shutil
 from pathlib import Path
-from typing import Generic, Literal, TypeVar
+from typing import Generic, TypeVar
 
 from servicekit import Database
 from ulid import ULID
@@ -100,107 +99,37 @@ class MLManager(Generic[ConfigT]):
         training_completed_at = datetime.datetime.now(datetime.UTC)
         training_duration = (training_completed_at - training_started_at).total_seconds()
 
-        # Check if result is workspace (ShellModelRunner) or pickled model (FunctionalModelRunner)
-        is_workspace = isinstance(training_result, dict) and "workspace_dir" in training_result
-
         workspace_dir = None
-        zip_file_path = None
 
         try:
-            if is_workspace:
-                # Extract workspace info
+            # Let runner create artifact structure
+            artifact_data_dict = await self.runner.create_training_artifact(
+                training_result=training_result,
+                config_id=str(request.config_id),
+                started_at=training_started_at,
+                completed_at=training_completed_at,
+                duration_seconds=round(training_duration, 2),
+            )
+
+            # Validate artifact structure with Pydantic
+            from chapkit.artifact.schemas import MLTrainingArtifactData
+
+            MLTrainingArtifactData.model_validate(artifact_data_dict)
+
+            # Extract workspace_dir if present (for cleanup)
+            if isinstance(training_result, dict) and "workspace_dir" in training_result:
                 workspace_dir = Path(training_result["workspace_dir"])
-                exit_code = training_result["exit_code"]
-                stdout = training_result.get("stdout", "")
-                stderr = training_result.get("stderr", "")
 
-                # Determine status from exit code
-                status: Literal["success", "failed"] = "success" if exit_code == 0 else "failed"
-
-                # Create workspace zip (compression level 9, stream to temp file)
-                import tempfile
-                import zipfile
-
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
-                    zip_file_path = Path(tmp.name)
-
-                with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
-                    for root, _, files in os.walk(workspace_dir):
-                        for file in files:
-                            file_path = Path(root) / file
-                            arcname = file_path.relative_to(workspace_dir)
-                            zf.write(file_path, arcname)
-
-                # Validate zip integrity
-                with zipfile.ZipFile(zip_file_path, "r") as zf:
-                    bad_file = zf.testzip()
-                    if bad_file is not None:
-                        raise ValueError(f"Corrupted file in workspace zip: {bad_file}")
-
-                # Read zip into bytes for storage
-                workspace_content = zip_file_path.read_bytes()
-
-                artifact_content = workspace_content
-                content_type = "application/zip"
-                content_size = len(workspace_content)
-
-                # Create metadata with exit_code, stdout, stderr
-                from chapkit.artifact.schemas import MLMetadata, MLTrainingArtifactData
-
-                metadata = MLMetadata(
-                    status=status,
-                    exit_code=exit_code,
-                    stdout=stdout,
-                    stderr=stderr,
-                    config_id=str(request.config_id),
-                    started_at=training_started_at.isoformat(),
-                    completed_at=training_completed_at.isoformat(),
-                    duration_seconds=round(training_duration, 2),
-                )
-            else:
-                # Pickled model handling (FunctionalModelRunner)
-                artifact_content = training_result
-                content_type = "application/x-pickle"
-                content_size = None
-
-                from chapkit.artifact.schemas import MLMetadata, MLTrainingArtifactData
-
-                metadata = MLMetadata(
-                    status="success",
-                    config_id=str(request.config_id),
-                    started_at=training_started_at.isoformat(),
-                    completed_at=training_completed_at.isoformat(),
-                    duration_seconds=round(training_duration, 2),
-                )
-
-            # Store artifact with metadata
+            # Store artifact
             async with self.database.session() as session:
                 artifact_repo = ArtifactRepository(session)
                 artifact_manager = ArtifactManager(artifact_repo)
                 config_repo = ConfigRepository(session)
 
-                # Create and validate artifact data structure with Pydantic
-                artifact_data_model = MLTrainingArtifactData(
-                    type="ml_training",
-                    metadata=metadata,
-                    content=artifact_content,
-                    content_type=content_type,
-                    content_size=content_size,
-                )
-
-                # Construct dict manually to preserve Python objects (database uses PickleType)
-                artifact_data = {
-                    "type": artifact_data_model.type,
-                    "metadata": artifact_data_model.metadata.model_dump(),
-                    "content": artifact_content,
-                    "content_type": artifact_data_model.content_type,
-                    "content_size": artifact_data_model.content_size,
-                }
-
                 await artifact_manager.save(
                     ArtifactIn(
                         id=artifact_id,
-                        data=artifact_data,
+                        data=artifact_data_dict,  # Use dict directly (PickleType)
                         parent_id=None,
                         level=0,
                     )
@@ -211,11 +140,9 @@ class MLManager(Generic[ConfigT]):
                 await config_repo.commit()
 
         finally:
-            # Cleanup workspace and temp zip file
+            # Cleanup workspace if created by ShellModelRunner
             if workspace_dir and workspace_dir.exists():
                 shutil.rmtree(workspace_dir, ignore_errors=True)
-            if zip_file_path and zip_file_path.exists():
-                zip_file_path.unlink()
 
         return artifact_id
 

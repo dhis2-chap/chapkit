@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import datetime
+import os
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Generic, TypeVar
+from typing import Any, Awaitable, Callable, Generic, Literal, TypeVar
 
 import yaml
 from geojson_pydantic import FeatureCollection
@@ -37,6 +39,39 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
     async def on_cleanup(self) -> None:
         """Optional cleanup hook called after training or prediction."""
         pass
+
+    async def create_training_artifact(
+        self,
+        training_result: Any,
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact data structure from training result.
+
+        Default implementation assumes training_result is a pickleable object.
+        Runners can override to customize artifact creation (e.g., workspace zipping).
+
+        Returns dict compatible with MLTrainingArtifactData structure.
+        """
+        from chapkit.artifact.schemas import MLMetadata
+
+        metadata = MLMetadata(
+            status="success",
+            config_id=config_id,
+            started_at=started_at.isoformat(),
+            completed_at=completed_at.isoformat(),
+            duration_seconds=duration_seconds,
+        )
+
+        return {
+            "type": "ml_training",
+            "metadata": metadata.model_dump(),
+            "content": training_result,  # Pickled model
+            "content_type": "application/x-pickle",
+            "content_size": None,
+        }
 
     @abstractmethod
     async def on_train(
@@ -163,6 +198,81 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             dirs_exist_ok=True,
         )
         logger.info("copied_project_directory", src=str(self.project_root), dest=str(temp_dir))
+
+    async def create_training_artifact(
+        self,
+        training_result: Any,
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact with workspace zip from training result."""
+        import zipfile
+
+        from chapkit.artifact.schemas import MLMetadata
+
+        # Validate training_result is workspace dict from on_train()
+        if not isinstance(training_result, dict) or "workspace_dir" not in training_result:
+            raise ValueError(
+                "ShellModelRunner.create_training_artifact() requires workspace dict from on_train(). "
+                f"Got: {type(training_result)}"
+            )
+
+        # Extract workspace info from training_result dict
+        workspace_dir = Path(training_result["workspace_dir"])
+        exit_code = training_result["exit_code"]
+        stdout = training_result.get("stdout", "")
+        stderr = training_result.get("stderr", "")
+
+        # Determine status from exit code
+        status: Literal["success", "failed"] = "success" if exit_code == 0 else "failed"
+
+        # Create workspace zip (compression level 9, stream to temp file)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+            zip_file_path = Path(tmp.name)
+
+        try:
+            with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+                for root, _, files in os.walk(workspace_dir):
+                    for file in files:
+                        file_path = Path(root) / file
+                        arcname = file_path.relative_to(workspace_dir)
+                        zf.write(file_path, arcname)
+
+            # Validate zip integrity
+            with zipfile.ZipFile(zip_file_path, "r") as zf:
+                bad_file = zf.testzip()
+                if bad_file is not None:
+                    raise ValueError(f"Corrupted file in workspace zip: {bad_file}")
+
+            # Read zip into bytes
+            workspace_content = zip_file_path.read_bytes()
+
+            # Create metadata with exit_code, stdout, stderr
+            metadata = MLMetadata(
+                status=status,
+                exit_code=exit_code,
+                stdout=stdout,
+                stderr=stderr,
+                config_id=config_id,
+                started_at=started_at.isoformat(),
+                completed_at=completed_at.isoformat(),
+                duration_seconds=duration_seconds,
+            )
+
+            return {
+                "type": "ml_training",
+                "metadata": metadata.model_dump(),
+                "content": workspace_content,
+                "content_type": "application/zip",
+                "content_size": len(workspace_content),
+            }
+
+        finally:
+            # Cleanup temp zip file
+            if zip_file_path.exists():
+                zip_file_path.unlink()
 
     async def on_train(
         self,

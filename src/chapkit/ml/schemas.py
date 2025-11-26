@@ -16,6 +16,7 @@ Migration Note:
 
 from __future__ import annotations
 
+import datetime
 from typing import Any, Protocol, TypeVar
 
 from geojson_pydantic import FeatureCollection
@@ -75,6 +76,17 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object (must be pickleable)."""
+        ...
+
+    async def create_training_artifact(
+        self,
+        training_result: Any,
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact data structure from training result."""
         ...
 
     async def on_predict(
