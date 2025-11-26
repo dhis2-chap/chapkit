@@ -1,7 +1,9 @@
 """Tests for ShellModelRunner implementation."""
 
+import shutil
 import tempfile
 from pathlib import Path
+from typing import TypedDict
 
 import pytest
 
@@ -15,6 +17,26 @@ class MockConfig(BaseConfig):
 
     threshold: float = 0.5
     features: list[str] = ["feature1", "feature2"]
+
+
+class WorkspaceArtifact(TypedDict):
+    """Type for workspace artifact returned by ShellModelRunner.on_train()."""
+
+    workspace_dir: str
+    exit_code: int
+    stdout: str
+    stderr: str
+
+
+def create_mock_workspace() -> WorkspaceArtifact:
+    """Create a mock workspace artifact for testing on_predict()."""
+    temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_test_workspace_"))
+    return {
+        "workspace_dir": str(temp_dir),
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": "",
+    }
 
 
 @pytest.mark.asyncio
@@ -31,11 +53,27 @@ async def test_shell_runner_train_basic() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1", "target"], data=[[1, 0], [2, 1], [3, 0]])
 
-    # Train should execute command and load model
-    model = await runner.on_train(config, data)
+    # Train should execute command and return workspace info
+    result = await runner.on_train(config, data)
 
-    # Model should be a string "trained_model" from the pickled data
-    assert model == "trained_model"
+    # Result should be workspace dict (v0.10.0+)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert "exit_code" in result
+    assert result["exit_code"] == 0
+    assert Path(result["workspace_dir"]).exists()
+
+    # Verify model file exists in workspace
+    workspace_dir = Path(result["workspace_dir"])
+    model_file = workspace_dir / "model.pickle"
+    assert model_file.exists()
+
+    # Verify model content is correct
+    with open(model_file, "rb") as f:
+        import pickle
+
+        model = pickle.load(f)
+        assert model == "trained_model"
 
 
 @pytest.mark.asyncio
@@ -50,17 +88,21 @@ async def test_shell_runner_predict_basic() -> None:
     )
 
     config = MockConfig()
-    model = "mock_model"
+    model = create_mock_workspace()  # Use workspace artifact
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    # Predict should execute command and load results
-    predictions = await runner.on_predict(config, model, historic, future)
+    try:
+        # Predict should execute command and load results
+        predictions = await runner.on_predict(config, model, historic, future)
 
-    assert len(predictions.data) == 2
-    assert "prediction" in predictions.columns
-    pred_idx = predictions.columns.index("prediction")
-    assert float(predictions.data[0][pred_idx]) == 0.5
+        assert len(predictions.data) == 2
+        assert "prediction" in predictions.columns
+        pred_idx = predictions.columns.index("prediction")
+        assert float(predictions.data[0][pred_idx]) == 0.5
+    finally:
+        # Cleanup mock workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
 @pytest.mark.asyncio
@@ -108,7 +150,22 @@ print("Training completed")
         config = MockConfig()
         data = DataFrame(columns=["feature1", "target"], data=[[10, 1], [20, 2], [30, 3]])
 
-        model = await runner.on_train(config, data)
+        result = await runner.on_train(config, data)
+
+        # Check result is workspace dict (v0.10.0+)
+        assert isinstance(result, dict)
+        assert "workspace_dir" in result
+        assert result["exit_code"] == 0
+
+        # Load model from workspace
+        workspace_dir = Path(result["workspace_dir"])
+        model_file = workspace_dir / "model.pickle"
+        assert model_file.exists()
+
+        with open(model_file, "rb") as f:
+            import pickle
+
+            model = pickle.load(f)
 
         # Check model contains expected data
         assert isinstance(model, dict)
@@ -163,7 +220,16 @@ print("Prediction completed")
         )
 
         config = MockConfig()
-        model = 100  # Model is just a number
+        model = create_mock_workspace()  # Create workspace artifact
+
+        # Create model file in workspace (script expects to load it)
+        import pickle
+
+        workspace_dir = Path(model["workspace_dir"])
+        model_file = workspace_dir / "model.pickle"
+        with open(model_file, "wb") as f:
+            pickle.dump(100, f)  # Model is just a number
+
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
@@ -174,13 +240,16 @@ print("Prediction completed")
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 101  # 1 + 100
 
+        # Cleanup workspace
+        shutil.rmtree(workspace_dir, ignore_errors=True)
+
     finally:
         Path(script_path).unlink()
 
 
 @pytest.mark.asyncio
 async def test_shell_runner_train_failure() -> None:
-    """Test handling of training script failure."""
+    """Test handling of training script failure (v0.10.0+: preserves workspace on failure)."""
     # Command that will fail
     train_command = "exit 1"
 
@@ -192,8 +261,14 @@ async def test_shell_runner_train_failure() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-    with pytest.raises(RuntimeError, match="Training script failed with exit code 1"):
-        await runner.on_train(config, data)
+    # v0.10.0+: Failed training returns workspace dict (doesn't raise)
+    result = await runner.on_train(config, data)
+
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert "exit_code" in result
+    assert result["exit_code"] == 1  # Non-zero exit code
+    assert Path(result["workspace_dir"]).exists()  # Workspace preserved for debugging
 
 
 @pytest.mark.asyncio
@@ -208,17 +283,21 @@ async def test_shell_runner_predict_failure() -> None:
     )
 
     config = MockConfig()
-    model = "mock_model"
+    model = create_mock_workspace()  # Use workspace artifact
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    with pytest.raises(RuntimeError, match="Prediction script failed with exit code 2"):
-        await runner.on_predict(config, model, historic, future)
+    try:
+        with pytest.raises(RuntimeError, match="Prediction script failed with exit code 2"):
+            await runner.on_predict(config, model, historic, future)
+    finally:
+        # Cleanup mock workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
 @pytest.mark.asyncio
 async def test_shell_runner_missing_model_file() -> None:
-    """Test handling when training script doesn't create model file."""
+    """Test handling when training script doesn't create model file (v0.10.0+: still creates workspace)."""
     # Command that doesn't create model file
     train_command = "echo 'no model created'"
 
@@ -230,17 +309,25 @@ async def test_shell_runner_missing_model_file() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-    # Should return placeholder dict instead of raising error
-    model = await runner.on_train(config, data)
-    assert isinstance(model, dict)
-    assert model["model_type"] == "no_file"
-    assert "stdout" in model
-    assert "stderr" in model
+    # v0.10.0+: Returns workspace dict even without model file
+    result = await runner.on_train(config, data)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert "exit_code" in result
+    assert result["exit_code"] == 0
+    assert "stdout" in result
+    assert "stderr" in result
+
+    # Workspace exists but no model file
+    workspace_dir = Path(result["workspace_dir"])
+    assert workspace_dir.exists()
+    model_file = workspace_dir / "model.pickle"
+    assert not model_file.exists()  # No model file created
 
 
 @pytest.mark.asyncio
 async def test_shell_runner_predict_with_placeholder_model() -> None:
-    """Test prediction with placeholder model (no model file created during training)."""
+    """Test prediction without model file (workspace contains no model.pickle)."""
     # Create a predict script that doesn't need a model file
     predict_script = """
 import sys
@@ -279,13 +366,13 @@ print("Prediction completed without model file")
 
         config = MockConfig()
 
-        # Simulate placeholder model from training without model file
-        placeholder_model = {"model_type": "no_file", "stdout": "training log"}
+        # Create workspace artifact without model file (simulates training that didn't create one)
+        model = create_mock_workspace()
 
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[5], [10]])
 
-        predictions = await runner.on_predict(config, placeholder_model, historic, future)
+        predictions = await runner.on_predict(config, model, historic, future)
 
         # Should successfully predict without model file
         assert len(predictions.data) == 2
@@ -293,6 +380,9 @@ print("Prediction completed without model file")
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 10  # 5 * 2
         assert float(predictions.data[1][pred_idx]) == 20  # 10 * 2
+
+        # Cleanup workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
     finally:
         Path(script_path).unlink()
@@ -310,12 +400,16 @@ async def test_shell_runner_missing_output_file() -> None:
     )
 
     config = MockConfig()
-    model = "mock_model"
+    model = create_mock_workspace()  # Use workspace artifact
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
-        await runner.on_predict(config, model, historic, future)
+    try:
+        with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
+            await runner.on_predict(config, model, historic, future)
+    finally:
+        # Cleanup mock workspace
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
 @pytest.mark.asyncio
@@ -335,20 +429,31 @@ async def test_shell_runner_variable_substitution() -> None:
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
     # Train - this will verify {model_file} substitution works
-    model = await runner.on_train(config, data)
-    assert model == "model"
+    result = await runner.on_train(config, data)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert result["exit_code"] == 0
+
+    # Verify model was created
+    workspace_dir = Path(result["workspace_dir"])
+    model_file = workspace_dir / "model.pickle"
+    assert model_file.exists()
 
     # Predict - this will verify {output_file} substitution works
+    # Use workspace from training
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1]])
-    predictions = await runner.on_predict(config, model, historic, future)
+    predictions = await runner.on_predict(config, result, historic, future)
     assert len(predictions.data) == 1
     assert "prediction" in predictions.columns
+
+    # Cleanup workspace
+    shutil.rmtree(workspace_dir, ignore_errors=True)
 
 
 @pytest.mark.asyncio
 async def test_shell_runner_cleanup_temp_files() -> None:
-    """Test that temporary files are cleaned up after execution."""
+    """Test workspace preservation (v0.10.0+: workspace NOT cleaned up by runner)."""
 
     temp_dirs_before = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
 
@@ -361,11 +466,20 @@ async def test_shell_runner_cleanup_temp_files() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-    await runner.on_train(config, data)
+    result = await runner.on_train(config, data)
 
-    # Check that temp dirs are cleaned up
+    # v0.10.0+: Workspace is NOT cleaned up by runner (manager will cleanup after storing artifact)
     temp_dirs_after = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
-    assert temp_dirs_after == temp_dirs_before
+    assert temp_dirs_after == temp_dirs_before + 1  # One workspace dir exists
+
+    # Verify workspace exists and contains model
+    workspace_dir = Path(result["workspace_dir"])
+    assert workspace_dir.exists()
+    model_file = workspace_dir / "model.pickle"
+    assert model_file.exists()
+
+    # Manual cleanup for test
+    shutil.rmtree(workspace_dir, ignore_errors=True)
 
 
 @pytest.mark.asyncio
@@ -393,8 +507,10 @@ async def test_copies_entire_project_directory() -> None:
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
     # Should succeed if project files are copied
-    model = await runner.on_train(config, data)
-    assert model == "success"
+    result = await runner.on_train(config, data)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert result["exit_code"] == 0  # Should succeed
 
 
 @pytest.mark.asyncio
@@ -418,8 +534,10 @@ async def test_ignores_venv_directory() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    model = await runner.on_train(config, data)
-    assert model == "venv_ignored"
+    result = await runner.on_train(config, data)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert result["exit_code"] == 0  # Should succeed (.venv not copied)
 
 
 @pytest.mark.asyncio
@@ -443,8 +561,10 @@ async def test_ignores_node_modules() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    model = await runner.on_train(config, data)
-    assert model == "node_modules_ignored"
+    result = await runner.on_train(config, data)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert result["exit_code"] == 0  # Should succeed (node_modules not copied)
 
 
 @pytest.mark.asyncio
@@ -469,8 +589,10 @@ async def test_ignores_pycache() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    model = await runner.on_train(config, data)
-    assert model == "pycache_ignored"
+    result = await runner.on_train(config, data)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert result["exit_code"] == 0  # Should succeed (__pycache__ not copied)
 
 
 @pytest.mark.asyncio
@@ -497,8 +619,10 @@ async def test_project_structure_preserved() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    model = await runner.on_train(config, data)
-    assert model == "structure_preserved"
+    result = await runner.on_train(config, data)
+    assert isinstance(result, dict)
+    assert "workspace_dir" in result
+    assert result["exit_code"] == 0  # Should succeed (structure preserved)
 
 
 @pytest.mark.asyncio
@@ -529,8 +653,21 @@ async def test_uses_relative_paths() -> None:
         data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
         # Should succeed with relative imports (lib file copied to workspace)
-        model = await runner.on_train(config, data)
-        assert model == 84  # 42 * 2
+        result = await runner.on_train(config, data)
+        assert isinstance(result, dict)
+        assert "workspace_dir" in result
+        assert result["exit_code"] == 0  # Should succeed
+
+        # Verify model file was created with correct value
+        workspace_dir = Path(result["workspace_dir"])
+        model_file = workspace_dir / "model.pickle"
+        assert model_file.exists()
+
+        with open(model_file, "rb") as f:
+            import pickle
+
+            model = pickle.load(f)
+            assert model == 84  # 42 * 2
 
     finally:
         # Cleanup

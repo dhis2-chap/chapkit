@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pickle
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
@@ -195,9 +194,6 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 assert geo_file is not None  # For type checker
                 geo_file.write_text(geo.model_dump_json(indent=2))
 
-            # Model file path (relative to temp_dir)
-            model_file = temp_dir / f"model.{self.model_format}"
-
             # Substitute variables in command (use relative paths)
             command = self.train_command.format(
                 config_file="config.yml",
@@ -212,31 +208,26 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             result = await run_shell(command, cwd=str(temp_dir))
             stdout = result["stdout"]
             stderr = result["stderr"]
+            exit_code = result["returncode"]
 
-            if result["returncode"] != 0:
-                logger.error("train_script_failed", exit_code=result["returncode"], stderr=stderr)
-                raise RuntimeError(f"Training script failed with exit code {result['returncode']}: {stderr}")
-
-            logger.info("train_script_completed", stdout=stdout, stderr=stderr)
-
-            # Load trained model from file if it exists
-            if model_file.exists():
-                with open(model_file, "rb") as f:
-                    model = pickle.load(f)
-                return model
+            if exit_code != 0:
+                logger.error("train_script_failed", exit_code=exit_code, stderr=stderr)
             else:
-                # Return metadata placeholder when no model file is created
-                logger.info("train_script_no_model_file", model_file=str(model_file))
-                return {
-                    "model_type": "no_file",
-                    "stdout": stdout,
-                    "stderr": stderr,
-                    "temp_dir": str(temp_dir),
-                }
+                logger.info("train_script_completed", stdout=stdout, stderr=stderr)
 
-        finally:
-            # Cleanup temp files
+            # Return workspace directory for artifact storage
+            # Workspace preserved for both success and failure (manager will store artifact)
+            return {
+                "workspace_dir": str(temp_dir),
+                "exit_code": exit_code,
+                "stdout": stdout,
+                "stderr": stderr,
+            }
+
+        except Exception:
+            # Cleanup only on Python exception (not script failure)
             shutil.rmtree(temp_dir, ignore_errors=True)
+            raise
 
     async def on_predict(
         self,
@@ -246,36 +237,33 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         future: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
-        """Make predictions by executing external prediction script (skips model file if placeholder)."""
+        """Make predictions by executing external prediction script."""
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
         try:
-            # Copy entire project directory to temp workspace for full isolation
-            self._prepare_workspace(temp_dir)
+            # Model must be workspace artifact from ShellModelRunner.on_train()
+            if not (isinstance(model, dict) and "workspace_dir" in model):
+                raise ValueError(
+                    "ShellModelRunner.on_predict() requires workspace artifact from ShellModelRunner.on_train(). "
+                    f"Got: {type(model)}"
+                )
 
-            # Write config to YAML file
-            config_file = temp_dir / "config.yml"
-            config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
+            # Extract and restore workspace from training artifact
+            workspace_dir = Path(model["workspace_dir"])
+            logger.info("predict_using_workspace", workspace_dir=str(workspace_dir))
 
-            # Write model to file only if it's not a placeholder
-            is_placeholder = isinstance(model, dict) and model.get("model_type") == "no_file"
-            if is_placeholder:
-                logger.info("predict_script_no_model_file", reason="model is placeholder")
-                model_file = None
-            else:
-                model_file = temp_dir / f"model.{self.model_format}"
-                with open(model_file, "wb") as f:
-                    pickle.dump(model, f)
+            # Copy workspace contents to temp_dir (preserves all training artifacts)
+            shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
 
-            # Write historic data
+            # Write historic data (always fresh for each prediction)
             historic_file = temp_dir / "historic.csv"
             historic.to_csv(historic_file)
 
-            # Write future data to CSV
+            # Write future data to CSV (always fresh for each prediction)
             future_file = temp_dir / "future.csv"
             future.to_csv(future_file)
 
-            # Write geo data if provided
+            # Write geo data if provided (always fresh for each prediction)
             geo_file = temp_dir / "geo.json" if geo else None
             if geo:
                 assert geo_file is not None  # For type checker
@@ -284,10 +272,10 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Output file path
             output_file = temp_dir / "predictions.csv"
 
-            # Substitute variables in command (use relative paths)
+            # Execute prediction command (workspace may contain model files, config, etc.)
             command = self.predict_command.format(
                 config_file="config.yml",
-                model_file=f"model.{self.model_format}" if not is_placeholder else "",
+                model_file=f"model.{self.model_format}",
                 historic_file="historic.csv",
                 future_file="future.csv",
                 output_file="predictions.csv",
