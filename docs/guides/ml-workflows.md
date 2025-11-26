@@ -236,7 +236,9 @@ runner = ShellModelRunner(
 - Excludes build artifacts (.venv, node_modules, __pycache__, .git, etc.)
 
 **Script Requirements:**
-- **Training script:** Read data/config, train model, save model to `{model_file}`
+- **Training script:** Read data/config, train model, optionally save model to `{model_file}`
+  - Model file creation is optional - workspace is preserved regardless of exit code
+  - Training artifacts store the entire workspace (files, logs, intermediate results)
 - **Prediction script:** Read model/data/config, make predictions, save to `{output_file}`
 - Exit code 0 on success, non-zero on failure
 - Use stderr for logging
@@ -273,6 +275,8 @@ model.fit(X, y)
 with open(args.model, "wb") as f:
     pickle.dump(model, f)
 ```
+
+**Note:** Model file creation is optional for ShellModelRunner. The training workspace (including all files, logs, and artifacts created during training) is automatically preserved as a compressed artifact. Training scripts can create model files, multiple files, directories, or rely entirely on generated artifacts in the workspace.
 
 **Use Cases:**
 - Integration with R, Julia, or other languages
@@ -576,7 +580,11 @@ Chapkit uses typed artifact data schemas for consistent ML artifact storage with
 
 ### ML Training Artifact
 
-Stored at hierarchy level 0 using `MLTrainingArtifactData`:
+Stored at hierarchy level 0 using `MLTrainingArtifactData`. The artifact structure differs based on the runner type:
+
+#### FunctionalModelRunner / BaseModelRunner
+
+Stores pickled Python model objects:
 
 ```json
 {
@@ -597,13 +605,56 @@ Stored at hierarchy level 0 using `MLTrainingArtifactData`:
 **Schema Structure:**
 - `type`: Discriminator field - always `"ml_training"`
 - `metadata`: Structured execution metadata
-  - `status`: "success" or "failed"
+  - `status`: "success" (always success for FunctionalModelRunner)
   - `config_id`: Config used for training
   - `started_at`, `completed_at`: ISO 8601 timestamps
   - `duration_seconds`: Training duration
 - `content`: Trained model (Python object, stored as PickleType)
-- `content_type`: MIME type (e.g., "application/x-pickle")
+- `content_type`: "application/x-pickle"
 - `content_size`: Size in bytes (optional)
+
+#### ShellModelRunner
+
+Stores compressed workspace as zip artifact:
+
+```json
+{
+  "type": "ml_training",
+  "metadata": {
+    "status": "success",
+    "exit_code": 0,
+    "stdout": "Training completed successfully\\n",
+    "stderr": "",
+    "config_id": "01CONFIG...",
+    "started_at": "2025-10-14T10:00:00Z",
+    "completed_at": "2025-10-14T10:00:15Z",
+    "duration_seconds": 15.23
+  },
+  "content": "<Zip file bytes>",
+  "content_type": "application/zip",
+  "content_size": 5242880
+}
+```
+
+**Schema Structure:**
+- `type`: Discriminator field - always `"ml_training"`
+- `metadata`: Structured execution metadata
+  - `status`: "success" or "failed" (based on exit code)
+  - `exit_code`: Training script exit code (0 = success)
+  - `stdout`: Standard output from training script
+  - `stderr`: Standard error from training script
+  - `config_id`: Config used for training
+  - `started_at`, `completed_at`: ISO 8601 timestamps
+  - `duration_seconds`: Training duration
+- `content`: Compressed workspace (all files, logs, artifacts created during training)
+- `content_type`: "application/zip"
+- `content_size`: Zip file size in bytes
+
+**Workspace Contents:**
+- All files created by training script (model files, logs, checkpoints, etc.)
+- Data files (config.yml, data.csv, geo.json if provided)
+- Any intermediate artifacts or debug output
+- Complete project directory structure preserved
 
 ### ML Prediction Artifact
 
