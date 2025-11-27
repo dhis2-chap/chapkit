@@ -12,7 +12,7 @@ from servicekit.api.service_builder import ServiceInfo
 from chapkit import ArtifactHierarchy, BaseConfig, get_alembic_dir
 from chapkit.api import MLServiceBuilder, ServiceBuilder
 from chapkit.data import DataFrame
-from chapkit.ml import ModelRunnerProtocol
+from chapkit.ml import BaseModelRunner
 
 
 class DummyConfig(BaseConfig):
@@ -21,7 +21,7 @@ class DummyConfig(BaseConfig):
     test_value: str = Field(default="test")
 
 
-class DummyRunner(ModelRunnerProtocol[DummyConfig]):
+class DummyRunner(BaseModelRunner[DummyConfig]):
     """Dummy ML runner for testing."""
 
     async def on_train(
