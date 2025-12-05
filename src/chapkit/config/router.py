@@ -1,7 +1,5 @@
 """Config CRUD router with artifact linking operations."""
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from typing import Any
 

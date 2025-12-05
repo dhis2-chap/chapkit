@@ -1,7 +1,5 @@
 """Artifact CRUD router with hierarchical tree operations."""
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 from typing import Any
 
