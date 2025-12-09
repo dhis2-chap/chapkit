@@ -89,6 +89,17 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         """Create artifact data structure from training result."""
         ...
 
+    async def create_prediction_workspace_artifact(
+        self,
+        prediction_result: dict[str, Any],
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact data structure from prediction workspace (ShellModelRunner only)."""
+        ...
+
     async def on_predict(
         self,
         config: ConfigT,
@@ -96,8 +107,11 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         historic: DataFrame,
         future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> DataFrame:
-        """Make predictions using a trained model and return predictions as DataFrame."""
+    ) -> DataFrame | dict[str, Any]:
+        """Make predictions using a trained model.
+
+        Returns DataFrame (FunctionalModelRunner) or dict with predictions and workspace info (ShellModelRunner).
+        """
         ...
 
 

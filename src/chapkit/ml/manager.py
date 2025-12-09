@@ -174,11 +174,12 @@ class MLManager(Generic[ConfigT]):
             )
 
         # Check if artifact is workspace (ShellModelRunner) or pickled model (FunctionalModelRunner)
-        is_workspace = training_data.get("content_type") == "application/zip"
+        is_shell_runner = training_data.get("content_type") == "application/zip"
         extracted_workspace = None
+        prediction_workspace_dir = None
 
         try:
-            if is_workspace:
+            if is_shell_runner:
                 # Extract workspace from zip
                 import tempfile
                 import zipfile
@@ -213,7 +214,7 @@ class MLManager(Generic[ConfigT]):
 
             # Make predictions with timing
             prediction_started_at = datetime.datetime.now(datetime.UTC)
-            predictions = await self.runner.on_predict(
+            prediction_result = await self.runner.on_predict(
                 config=config.data,
                 model=trained_model,
                 historic=request.historic,
@@ -223,10 +224,64 @@ class MLManager(Generic[ConfigT]):
             prediction_completed_at = datetime.datetime.now(datetime.UTC)
             prediction_duration = (prediction_completed_at - prediction_started_at).total_seconds()
 
+            # Handle ShellModelRunner result (dict with workspace) vs FunctionalModelRunner (DataFrame)
+            if is_shell_runner and isinstance(prediction_result, dict) and "workspace_dir" in prediction_result:
+                # ShellModelRunner: store workspace artifact first
+                from chapkit.artifact.schemas import MLPredictionWorkspaceArtifactData
+
+                prediction_workspace_dir = Path(prediction_result["workspace_dir"])
+
+                # Create workspace artifact
+                workspace_artifact_id = ULID()
+                workspace_artifact_data = await self.runner.create_prediction_workspace_artifact(
+                    prediction_result=prediction_result,
+                    config_id=str(config_id),
+                    started_at=prediction_started_at,
+                    completed_at=prediction_completed_at,
+                    duration_seconds=round(prediction_duration, 2),
+                )
+
+                # Validate workspace artifact structure
+                MLPredictionWorkspaceArtifactData.model_validate(workspace_artifact_data)
+
+                # Store workspace artifact (child of training artifact)
+                async with self.database.session() as session:
+                    artifact_repo = ArtifactRepository(session)
+                    artifact_manager = ArtifactManager(artifact_repo)
+
+                    await artifact_manager.save(
+                        ArtifactIn(
+                            id=workspace_artifact_id,
+                            data=workspace_artifact_data,
+                            parent_id=request.artifact_id,
+                            level=1,
+                        )
+                    )
+
+                # Now check for errors (after workspace is stored)
+                exit_code = prediction_result.get("exit_code", 0)
+                error_msg = prediction_result.get("error")
+
+                if exit_code != 0:
+                    stderr = prediction_result.get("stderr", "")
+                    raise RuntimeError(f"Prediction script failed with exit code {exit_code}: {stderr}")
+
+                if error_msg:
+                    raise RuntimeError(error_msg)
+
+                # Extract predictions from result
+                predictions = prediction_result["predictions"]
+            else:
+                # FunctionalModelRunner: prediction_result is the DataFrame directly
+                predictions = prediction_result
+
         finally:
-            # Cleanup extracted workspace
+            # Cleanup extracted training workspace
             if extracted_workspace and extracted_workspace.exists():
                 shutil.rmtree(extracted_workspace, ignore_errors=True)
+            # Cleanup prediction workspace
+            if prediction_workspace_dir and prediction_workspace_dir.exists():
+                shutil.rmtree(prediction_workspace_dir, ignore_errors=True)
 
         # Store predictions in artifact with parent linkage
         async with self.database.session() as session:

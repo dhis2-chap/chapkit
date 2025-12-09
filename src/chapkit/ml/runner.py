@@ -73,6 +73,20 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
             "content_size": None,
         }
 
+    async def create_prediction_workspace_artifact(
+        self,
+        prediction_result: dict[str, Any],
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact data structure from prediction workspace.
+
+        Only implemented by ShellModelRunner. Default raises NotImplementedError.
+        """
+        raise NotImplementedError("create_prediction_workspace_artifact is only available for ShellModelRunner")
+
     @abstractmethod
     async def on_train(
         self,
@@ -91,8 +105,11 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
         historic: DataFrame,
         future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> DataFrame:
-        """Make predictions using a trained model and return predictions as DataFrame."""
+    ) -> DataFrame | dict[str, Any]:
+        """Make predictions using a trained model.
+
+        Returns DataFrame (FunctionalModelRunner) or dict with predictions and workspace info (ShellModelRunner).
+        """
         ...
 
 
@@ -274,6 +291,83 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             if zip_file_path.exists():
                 zip_file_path.unlink()
 
+    async def create_prediction_workspace_artifact(
+        self,
+        prediction_result: dict[str, Any],
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact with workspace zip from prediction result."""
+        import zipfile
+
+        from chapkit.artifact.schemas import MLMetadata
+
+        # Validate prediction_result is workspace dict from on_predict()
+        if not isinstance(prediction_result, dict) or "workspace_dir" not in prediction_result:
+            raise ValueError(
+                "ShellModelRunner.create_prediction_workspace_artifact() requires workspace dict from on_predict(). "
+                f"Got: {type(prediction_result)}"
+            )
+
+        # Extract workspace info from prediction_result dict
+        workspace_dir = Path(prediction_result["workspace_dir"])
+        exit_code = prediction_result["exit_code"]
+        stdout = prediction_result.get("stdout", "")
+        stderr = prediction_result.get("stderr", "")
+        error = prediction_result.get("error")
+
+        # Determine status from exit code and error
+        status: Literal["success", "failed"] = "failed" if exit_code != 0 or error else "success"
+
+        # Create workspace zip (compression level 9, stream to temp file)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+            zip_file_path = Path(tmp.name)
+
+        try:
+            with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+                for root, _, files in os.walk(workspace_dir):
+                    for file in files:
+                        file_path = Path(root) / file
+                        arcname = file_path.relative_to(workspace_dir)
+                        zf.write(file_path, arcname)
+
+            # Validate zip integrity
+            with zipfile.ZipFile(zip_file_path, "r") as zf:
+                bad_file = zf.testzip()
+                if bad_file is not None:
+                    raise ValueError(f"Corrupted file in workspace zip: {bad_file}")
+
+            # Read zip into bytes
+            workspace_content = zip_file_path.read_bytes()
+
+            # Create metadata with exit_code, stdout, stderr
+            metadata = MLMetadata(
+                status=status,
+                exit_code=exit_code,
+                stdout=stdout,
+                stderr=stderr,
+                error=error,
+                config_id=config_id,
+                started_at=started_at.isoformat(),
+                completed_at=completed_at.isoformat(),
+                duration_seconds=duration_seconds,
+            )
+
+            return {
+                "type": "ml_prediction_workspace",
+                "metadata": metadata.model_dump(),
+                "content": workspace_content,
+                "content_type": "application/zip",
+                "content_size": len(workspace_content),
+            }
+
+        finally:
+            # Cleanup temp zip file
+            if zip_file_path.exists():
+                zip_file_path.unlink()
+
     async def on_train(
         self,
         config: ConfigT,
@@ -341,70 +435,93 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         historic: DataFrame,
         future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> DataFrame:
-        """Make predictions by executing external prediction script."""
+    ) -> dict[str, Any]:
+        """Make predictions by executing external prediction script.
+
+        Returns dict with predictions, workspace path, and exit status.
+        Does not raise on script failure - caller handles error after storing workspace.
+        """
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
-        try:
-            # Model must be workspace artifact from ShellModelRunner.on_train()
-            if not (isinstance(model, dict) and "workspace_dir" in model):
-                raise ValueError(
-                    "ShellModelRunner.on_predict() requires workspace artifact from ShellModelRunner.on_train(). "
-                    f"Got: {type(model)}"
-                )
-
-            # Extract and restore workspace from training artifact
-            workspace_dir = Path(model["workspace_dir"])
-            logger.info("predict_using_workspace", workspace_dir=str(workspace_dir))
-
-            # Copy workspace contents to temp_dir (preserves all training artifacts)
-            shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
-
-            # Write historic data (always fresh for each prediction)
-            historic_file = temp_dir / "historic.csv"
-            historic.to_csv(historic_file)
-
-            # Write future data to CSV (always fresh for each prediction)
-            future_file = temp_dir / "future.csv"
-            future.to_csv(future_file)
-
-            # Write geo data if provided (always fresh for each prediction)
-            geo_file = temp_dir / "geo.json" if geo else None
-            if geo:
-                assert geo_file is not None  # For type checker
-                geo_file.write_text(geo.model_dump_json(indent=2))
-
-            # Output file path
-            output_file = temp_dir / "predictions.csv"
-
-            # Execute prediction command (workspace may contain model files, config, etc.)
-            command = self.predict_command.format(
-                historic_file="historic.csv",
-                future_file="future.csv",
-                output_file="predictions.csv",
-                geo_file="geo.json" if geo_file else "",
+        # Model must be workspace artifact from ShellModelRunner.on_train()
+        if not (isinstance(model, dict) and "workspace_dir" in model):
+            raise ValueError(
+                "ShellModelRunner.on_predict() requires workspace artifact from ShellModelRunner.on_train(). "
+                f"Got: {type(model)}"
             )
 
-            logger.info("executing_predict_script", command=command, temp_dir=str(temp_dir))
+        # Extract and restore workspace from training artifact
+        workspace_dir = Path(model["workspace_dir"])
+        logger.info("predict_using_workspace", workspace_dir=str(workspace_dir))
 
-            # Execute subprocess with cwd=temp_dir (scripts can now use relative imports!)
-            result = await run_shell(command, cwd=str(temp_dir))
-            stdout = result["stdout"]
-            stderr = result["stderr"]
+        # Copy workspace contents to temp_dir (preserves all training artifacts)
+        shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
 
-            if result["returncode"] != 0:
-                logger.error("predict_script_failed", exit_code=result["returncode"], stderr=stderr)
-                raise RuntimeError(f"Prediction script failed with exit code {result['returncode']}: {stderr}")
+        # Write historic data (always fresh for each prediction)
+        historic_file = temp_dir / "historic.csv"
+        historic.to_csv(historic_file)
 
-            logger.info("predict_script_completed", stdout=stdout, stderr=stderr)
+        # Write future data to CSV (always fresh for each prediction)
+        future_file = temp_dir / "future.csv"
+        future.to_csv(future_file)
 
-            # Load predictions from file
-            if not output_file.exists():
-                raise RuntimeError(f"Prediction script did not create output file at {output_file}")
+        # Write geo data if provided (always fresh for each prediction)
+        geo_file = temp_dir / "geo.json" if geo else None
+        if geo:
+            assert geo_file is not None  # For type checker
+            geo_file.write_text(geo.model_dump_json(indent=2))
 
-            predictions = DataFrame.from_csv(output_file)
-            return predictions
+        # Output file path
+        output_file = temp_dir / "predictions.csv"
 
-        finally:
-            # Cleanup temp files
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        # Execute prediction command (workspace may contain model files, config, etc.)
+        command = self.predict_command.format(
+            historic_file="historic.csv",
+            future_file="future.csv",
+            output_file="predictions.csv",
+            geo_file="geo.json" if geo_file else "",
+        )
+
+        logger.info("executing_predict_script", command=command, temp_dir=str(temp_dir))
+
+        # Execute subprocess with cwd=temp_dir (scripts can now use relative imports!)
+        result = await run_shell(command, cwd=str(temp_dir))
+        stdout = result["stdout"]
+        stderr = result["stderr"]
+        exit_code = result["returncode"]
+
+        if exit_code != 0:
+            logger.error("predict_script_failed", exit_code=exit_code, stderr=stderr)
+            # Don't raise - return status so caller can store workspace before raising
+            return {
+                "predictions": None,
+                "workspace_dir": str(temp_dir),
+                "exit_code": exit_code,
+                "stdout": stdout,
+                "stderr": stderr,
+            }
+
+        logger.info("predict_script_completed", stdout=stdout, stderr=stderr)
+
+        # Load predictions from file
+        if not output_file.exists():
+            # Script succeeded but didn't create output - treat as error
+            return {
+                "predictions": None,
+                "workspace_dir": str(temp_dir),
+                "exit_code": 0,
+                "stdout": stdout,
+                "stderr": stderr,
+                "error": f"Prediction script did not create output file at {output_file}",
+            }
+
+        predictions = DataFrame.from_csv(output_file)
+
+        # Return workspace info for artifact storage (cleanup handled by caller)
+        return {
+            "predictions": predictions,
+            "workspace_dir": str(temp_dir),
+            "exit_code": exit_code,
+            "stdout": stdout,
+            "stderr": stderr,
+        }
