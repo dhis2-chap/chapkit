@@ -93,6 +93,7 @@ class MLMetadata(BaseModel):
     exit_code: int | None = Field(default=None, description="Execution exit code (if applicable)")
     stdout: str | None = Field(default=None, description="Standard output from execution (if applicable)")
     stderr: str | None = Field(default=None, description="Standard error from execution (if applicable)")
+    error: str | None = Field(default=None, description="Error message (if applicable)")
 
 
 class GenericMetadata(BaseModel):
@@ -115,6 +116,13 @@ class MLPredictionArtifactData(BaseArtifactData[MLMetadata]):
     metadata: MLMetadata
 
 
+class MLPredictionWorkspaceArtifactData(BaseArtifactData[MLMetadata]):
+    """Schema for ML prediction workspace artifact data with zipped workspace."""
+
+    type: Literal["ml_prediction_workspace"] = Field(default="ml_prediction_workspace", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
+    metadata: MLMetadata
+
+
 class GenericArtifactData(BaseArtifactData[GenericMetadata]):
     """Schema for generic artifact data with free-form metadata."""
 
@@ -123,7 +131,7 @@ class GenericArtifactData(BaseArtifactData[GenericMetadata]):
 
 
 ArtifactData = Annotated[
-    MLTrainingArtifactData | MLPredictionArtifactData | GenericArtifactData,
+    MLTrainingArtifactData | MLPredictionArtifactData | MLPredictionWorkspaceArtifactData | GenericArtifactData,
     Field(discriminator="type"),
 ]
 """Discriminated union type for all artifact data types."""
@@ -136,6 +144,7 @@ def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
     schema_map: dict[str, type[BaseArtifactData]] = {
         "ml_training": MLTrainingArtifactData,
         "ml_prediction": MLPredictionArtifactData,
+        "ml_prediction_workspace": MLPredictionWorkspaceArtifactData,
         "generic": GenericArtifactData,
     }
 

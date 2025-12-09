@@ -94,14 +94,24 @@ async def test_shell_runner_predict_basic() -> None:
 
     try:
         # Predict should execute command and load results
-        predictions = await runner.on_predict(config, model, historic, future)
+        result = await runner.on_predict(config, model, historic, future)
 
+        # Result is now a dict with predictions and workspace info
+        assert isinstance(result, dict)
+        assert "predictions" in result
+        assert "workspace_dir" in result
+        assert result["exit_code"] == 0
+
+        predictions = result["predictions"]
         assert len(predictions.data) == 2
         assert "prediction" in predictions.columns
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 0.5
+
+        # Cleanup prediction workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
     finally:
-        # Cleanup mock workspace
+        # Cleanup mock training workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
@@ -233,14 +243,22 @@ print("Prediction completed")
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-        predictions = await runner.on_predict(config, model, historic, future)
+        result = await runner.on_predict(config, model, historic, future)
 
+        # Result is now a dict with predictions and workspace info
+        assert isinstance(result, dict)
+        assert result["exit_code"] == 0
+
+        predictions = result["predictions"]
         assert len(predictions.data) == 3
         assert "prediction" in predictions.columns
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 101  # 1 + 100
 
-        # Cleanup workspace
+        # Cleanup prediction workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
+
+        # Cleanup training workspace
         shutil.rmtree(workspace_dir, ignore_errors=True)
 
     finally:
@@ -273,7 +291,7 @@ async def test_shell_runner_train_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_shell_runner_predict_failure() -> None:
-    """Test handling of prediction script failure."""
+    """Test handling of prediction script failure (returns error status, doesn't raise)."""
     # Command that will fail
     predict_command = "exit 2"
 
@@ -288,10 +306,18 @@ async def test_shell_runner_predict_failure() -> None:
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
     try:
-        with pytest.raises(RuntimeError, match="Prediction script failed with exit code 2"):
-            await runner.on_predict(config, model, historic, future)
+        # on_predict now returns error status instead of raising
+        result = await runner.on_predict(config, model, historic, future)
+
+        assert isinstance(result, dict)
+        assert result["exit_code"] == 2
+        assert result["predictions"] is None
+        assert "workspace_dir" in result
+
+        # Cleanup prediction workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
     finally:
-        # Cleanup mock workspace
+        # Cleanup mock training workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
@@ -372,8 +398,13 @@ print("Prediction completed without model file")
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[5], [10]])
 
-        predictions = await runner.on_predict(config, model, historic, future)
+        result = await runner.on_predict(config, model, historic, future)
 
+        # Result is now a dict with predictions and workspace info
+        assert isinstance(result, dict)
+        assert result["exit_code"] == 0
+
+        predictions = result["predictions"]
         # Should successfully predict without model file
         assert len(predictions.data) == 2
         assert "prediction" in predictions.columns
@@ -381,7 +412,10 @@ print("Prediction completed without model file")
         assert float(predictions.data[0][pred_idx]) == 10  # 5 * 2
         assert float(predictions.data[1][pred_idx]) == 20  # 10 * 2
 
-        # Cleanup workspace
+        # Cleanup prediction workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
+
+        # Cleanup training workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
     finally:
@@ -390,7 +424,7 @@ print("Prediction completed without model file")
 
 @pytest.mark.asyncio
 async def test_shell_runner_missing_output_file() -> None:
-    """Test error when prediction script doesn't create output file."""
+    """Test error when prediction script doesn't create output file (returns error status)."""
     # Command that doesn't create output file
     predict_command = "echo 'no predictions created'"
 
@@ -405,10 +439,19 @@ async def test_shell_runner_missing_output_file() -> None:
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
     try:
-        with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
-            await runner.on_predict(config, model, historic, future)
+        # on_predict now returns error status instead of raising
+        result = await runner.on_predict(config, model, historic, future)
+
+        assert isinstance(result, dict)
+        assert result["exit_code"] == 0  # Script succeeded but no output
+        assert result["predictions"] is None
+        assert "error" in result
+        assert "did not create output file" in result["error"]
+
+        # Cleanup prediction workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
     finally:
-        # Cleanup mock workspace
+        # Cleanup mock training workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
 
@@ -443,11 +486,20 @@ async def test_shell_runner_variable_substitution() -> None:
     # Use workspace from training
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1]])
-    predictions = await runner.on_predict(config, result, historic, future)
+    predict_result = await runner.on_predict(config, result, historic, future)
+
+    # Result is now a dict with predictions and workspace info
+    assert isinstance(predict_result, dict)
+    assert predict_result["exit_code"] == 0
+
+    predictions = predict_result["predictions"]
     assert len(predictions.data) == 1
     assert "prediction" in predictions.columns
 
-    # Cleanup workspace
+    # Cleanup prediction workspace
+    shutil.rmtree(predict_result["workspace_dir"], ignore_errors=True)
+
+    # Cleanup training workspace
     shutil.rmtree(workspace_dir, ignore_errors=True)
 
 
