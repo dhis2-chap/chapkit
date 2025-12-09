@@ -2,14 +2,14 @@
 """External prediction script for ML model inference via ShellModelRunner.
 
 This script demonstrates language-agnostic ML prediction by:
-- Reading config from YAML
-- Loading trained model from disk
+- Reading config from YAML (config.yml in workspace)
+- Loading trained model from disk (model.pickle in workspace)
 - Loading future data from CSV
 - Making predictions (using the mean values from training)
 - Saving predictions to CSV
 
 Usage:
-    python predict_model.py --config config.yml --model model.pickle --future future.csv --output predictions.csv
+    python predict_model.py --historic historic.csv --future future.csv --output predictions.csv --geo geo.json
 """
 
 import argparse
@@ -23,8 +23,6 @@ import yaml
 def main() -> None:
     """Main prediction function."""
     parser = argparse.ArgumentParser(description="Make predictions using trained model")
-    parser.add_argument("--config", required=True, help="Path to config YAML file")
-    parser.add_argument("--model", required=True, help="Path to trained model file")
     parser.add_argument("--historic", required=True, help="Path to historic data CSV")
     parser.add_argument("--future", required=True, help="Path to future data CSV")
     parser.add_argument("--output", required=True, help="Path to save predictions CSV")
@@ -33,17 +31,17 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        # Load config
-        with open(args.config) as f:
+        # Load config (fixed path in workspace)
+        with open("config.yml") as f:
             config = yaml.safe_load(f)
 
         print(f"Predicting with config: {config}", file=sys.stderr)
 
-        # Load model
-        with open(args.model, "rb") as f:
+        # Load model (fixed path in workspace)
+        with open("model.pickle", "rb") as f:
             model = pickle.load(f)
 
-        print(f"Model loaded from {args.model}", file=sys.stderr)
+        print("Model loaded from model.pickle", file=sys.stderr)
 
         # Load future data
         future = pd.read_csv(args.future)
