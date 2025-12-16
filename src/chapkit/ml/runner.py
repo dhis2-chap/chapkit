@@ -73,6 +73,39 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
             "content_size": None,
         }
 
+    async def create_prediction_artifact(
+        self,
+        prediction_result: Any,
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact data structure from prediction result.
+
+        Default implementation assumes prediction_result is a DataFrame.
+        Runners can override to customize artifact creation (e.g., workspace zipping).
+
+        Returns dict compatible with MLPredictionArtifactData structure.
+        """
+        from chapkit.artifact.schemas import MLMetadata
+
+        metadata = MLMetadata(
+            status="success",
+            config_id=config_id,
+            started_at=started_at.isoformat(),
+            completed_at=completed_at.isoformat(),
+            duration_seconds=duration_seconds,
+        )
+
+        return {
+            "type": "ml_prediction",
+            "metadata": metadata.model_dump(),
+            "content": prediction_result,  # DataFrame
+            "content_type": "application/vnd.chapkit.dataframe+json",
+            "content_size": None,
+        }
+
     @abstractmethod
     async def on_train(
         self,

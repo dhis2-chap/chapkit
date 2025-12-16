@@ -96,8 +96,19 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         historic: DataFrame,
         future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> DataFrame:
-        """Make predictions using a trained model and return predictions as DataFrame."""
+    ) -> Any:
+        """Make predictions using a trained model and return predictions."""
+        ...
+
+    async def create_prediction_artifact(
+        self,
+        prediction_result: Any,
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact data structure from prediction result."""
         ...
 
 

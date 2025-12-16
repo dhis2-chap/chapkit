@@ -227,7 +227,8 @@ class MLManager(Generic[ConfigT]):
             # Handle ShellModelRunner workspace artifact vs FunctionalModelRunner DataFrame
             if is_workspace and isinstance(prediction_result, dict) and "workspace_dir" in prediction_result:
                 # ShellModelRunner: extract predictions and workspace
-                prediction_workspace_dir = Path(prediction_result["workspace_dir"])
+                workspace_dir_str = str(prediction_result["workspace_dir"])
+                prediction_workspace_dir = Path(workspace_dir_str)
                 predictions = prediction_result["predictions"]
 
                 # Create workspace artifact data (zips workspace)
