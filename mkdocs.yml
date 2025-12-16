@@ -101,5 +101,3 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/dhis2-chap/chapkit
-  version:
-    provider: mike
