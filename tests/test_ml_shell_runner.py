@@ -93,13 +93,24 @@ async def test_shell_runner_predict_basic() -> None:
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
     try:
-        # Predict should execute command and load results
-        predictions = await runner.on_predict(config, model, historic, future)
+        # Predict should execute command and return workspace with predictions
+        result = await runner.on_predict(config, model, historic, future)
 
+        # Result should be workspace dict with predictions
+        assert isinstance(result, dict)
+        assert "workspace_dir" in result
+        assert "exit_code" in result
+        assert "predictions" in result
+        assert result["exit_code"] == 0
+
+        predictions = result["predictions"]
         assert len(predictions.data) == 2
         assert "prediction" in predictions.columns
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 0.5
+
+        # Cleanup prediction workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
     finally:
         # Cleanup mock workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
@@ -233,14 +244,21 @@ print("Prediction completed")
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-        predictions = await runner.on_predict(config, model, historic, future)
+        result = await runner.on_predict(config, model, historic, future)
 
+        # Result should be workspace dict with predictions
+        assert isinstance(result, dict)
+        assert "workspace_dir" in result
+        assert result["exit_code"] == 0
+
+        predictions = result["predictions"]
         assert len(predictions.data) == 3
         assert "prediction" in predictions.columns
         pred_idx = predictions.columns.index("prediction")
         assert float(predictions.data[0][pred_idx]) == 101  # 1 + 100
 
-        # Cleanup workspace
+        # Cleanup prediction workspace and training workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
         shutil.rmtree(workspace_dir, ignore_errors=True)
 
     finally:
@@ -273,8 +291,8 @@ async def test_shell_runner_train_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_shell_runner_predict_failure() -> None:
-    """Test handling of prediction script failure."""
-    # Command that will fail
+    """Test handling of prediction script failure (fails to create output file)."""
+    # Command that will fail and not create output file
     predict_command = "exit 2"
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
@@ -288,7 +306,8 @@ async def test_shell_runner_predict_failure() -> None:
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
     try:
-        with pytest.raises(RuntimeError, match="Prediction script failed with exit code 2"):
+        # Script fails and doesn't create output file -> raises RuntimeError
+        with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
             await runner.on_predict(config, model, historic, future)
     finally:
         # Cleanup mock workspace
@@ -372,8 +391,14 @@ print("Prediction completed without model file")
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[5], [10]])
 
-        predictions = await runner.on_predict(config, model, historic, future)
+        result = await runner.on_predict(config, model, historic, future)
 
+        # Result should be workspace dict with predictions
+        assert isinstance(result, dict)
+        assert "workspace_dir" in result
+        assert result["exit_code"] == 0
+
+        predictions = result["predictions"]
         # Should successfully predict without model file
         assert len(predictions.data) == 2
         assert "prediction" in predictions.columns
@@ -381,7 +406,8 @@ print("Prediction completed without model file")
         assert float(predictions.data[0][pred_idx]) == 10  # 5 * 2
         assert float(predictions.data[1][pred_idx]) == 20  # 10 * 2
 
-        # Cleanup workspace
+        # Cleanup prediction workspace and training workspace
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
 
     finally:
@@ -443,11 +469,19 @@ async def test_shell_runner_variable_substitution() -> None:
     # Use workspace from training
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1]])
-    predictions = await runner.on_predict(config, result, historic, future)
+    predict_result = await runner.on_predict(config, result, historic, future)
+
+    # Result should be workspace dict with predictions
+    assert isinstance(predict_result, dict)
+    assert "workspace_dir" in predict_result
+    assert predict_result["exit_code"] == 0
+
+    predictions = predict_result["predictions"]
     assert len(predictions.data) == 1
     assert "prediction" in predictions.columns
 
-    # Cleanup workspace
+    # Cleanup workspaces
+    shutil.rmtree(predict_result["workspace_dir"], ignore_errors=True)
     shutil.rmtree(workspace_dir, ignore_errors=True)
 
 

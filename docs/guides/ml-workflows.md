@@ -234,6 +234,8 @@ runner = ShellModelRunner(
   - Model file creation is optional - workspace is preserved regardless of exit code
   - Training artifacts store the entire workspace (files, logs, intermediate results)
 - **Prediction script:** Read data from arguments, read config from `config.yml`, load model from `model.pickle`, make predictions, save to `{output_file}`
+  - Prediction artifacts store the entire workspace (like training)
+  - Includes all prediction outputs, logs, and intermediate files
 - Exit code 0 on success, non-zero on failure
 - Use stderr for logging
 - Can use relative imports from project modules
@@ -650,7 +652,11 @@ Stores compressed workspace as zip artifact:
 
 ### ML Prediction Artifact
 
-Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training artifact):
+Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training artifact). The artifact structure differs based on the runner type:
+
+#### FunctionalModelRunner / BaseModelRunner
+
+Stores prediction DataFrame directly:
 
 ```json
 {
@@ -676,6 +682,49 @@ Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training
 - `metadata`: Structured execution metadata (same as training)
 - `content`: Prediction DataFrame with results
 - `content_type`: "application/vnd.chapkit.dataframe+json"
+
+#### ShellModelRunner
+
+Stores compressed prediction workspace as zip artifact (like training):
+
+```json
+{
+  "type": "ml_prediction",
+  "metadata": {
+    "status": "success",
+    "exit_code": 0,
+    "stdout": "Prediction completed successfully\\n",
+    "stderr": "",
+    "config_id": "01CONFIG...",
+    "started_at": "2025-10-14T10:05:00Z",
+    "completed_at": "2025-10-14T10:05:02Z",
+    "duration_seconds": 2.15
+  },
+  "content": "<Zip file bytes>",
+  "content_type": "application/zip",
+  "content_size": 1048576
+}
+```
+
+**Schema Structure:**
+- `type`: Discriminator field - always `"ml_prediction"`
+- `metadata`: Structured execution metadata
+  - `status`: "success" or "failed" (based on exit code)
+  - `exit_code`: Prediction script exit code (0 = success)
+  - `stdout`: Standard output from prediction script
+  - `stderr`: Standard error from prediction script
+  - `config_id`: Config used for prediction
+  - `started_at`, `completed_at`: ISO 8601 timestamps
+  - `duration_seconds`: Prediction duration
+- `content`: Compressed workspace (all files, logs, artifacts created during prediction)
+- `content_type`: "application/zip"
+- `content_size`: Zip file size in bytes
+
+**Workspace Contents:**
+- All files created by prediction script (predictions.csv, logs, intermediate results)
+- Training workspace files (model files, config, etc.)
+- Data files (historic.csv, future.csv, geo.json if provided)
+- Any intermediate artifacts or debug output
 
 ### Accessing Artifact Data
 

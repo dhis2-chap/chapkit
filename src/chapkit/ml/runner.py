@@ -334,6 +334,81 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise
 
+    async def create_prediction_artifact(
+        self,
+        prediction_result: Any,
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact with workspace zip from prediction result."""
+        import zipfile
+
+        from chapkit.artifact.schemas import MLMetadata
+
+        # Validate prediction_result is workspace dict from on_predict()
+        if not isinstance(prediction_result, dict) or "workspace_dir" not in prediction_result:
+            raise ValueError(
+                "ShellModelRunner.create_prediction_artifact() requires workspace dict from on_predict(). "
+                f"Got: {type(prediction_result)}"
+            )
+
+        # Extract workspace info from prediction_result dict
+        workspace_dir = Path(prediction_result["workspace_dir"])
+        exit_code = prediction_result["exit_code"]
+        stdout = prediction_result.get("stdout", "")
+        stderr = prediction_result.get("stderr", "")
+
+        # Determine status from exit code
+        status: Literal["success", "failed"] = "success" if exit_code == 0 else "failed"
+
+        # Create workspace zip (compression level 9, stream to temp file)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+            zip_file_path = Path(tmp.name)
+
+        try:
+            with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+                for root, _, files in os.walk(workspace_dir):
+                    for file in files:
+                        file_path = Path(root) / file
+                        arcname = file_path.relative_to(workspace_dir)
+                        zf.write(file_path, arcname)
+
+            # Validate zip integrity
+            with zipfile.ZipFile(zip_file_path, "r") as zf:
+                bad_file = zf.testzip()
+                if bad_file is not None:
+                    raise ValueError(f"Corrupted file in workspace zip: {bad_file}")
+
+            # Read zip into bytes
+            workspace_content = zip_file_path.read_bytes()
+
+            # Create metadata with exit_code, stdout, stderr
+            metadata = MLMetadata(
+                status=status,
+                exit_code=exit_code,
+                stdout=stdout,
+                stderr=stderr,
+                config_id=config_id,
+                started_at=started_at.isoformat(),
+                completed_at=completed_at.isoformat(),
+                duration_seconds=duration_seconds,
+            )
+
+            return {
+                "type": "ml_prediction",
+                "metadata": metadata.model_dump(),
+                "content": workspace_content,
+                "content_type": "application/zip",
+                "content_size": len(workspace_content),
+            }
+
+        finally:
+            # Cleanup temp zip file
+            if zip_file_path.exists():
+                zip_file_path.unlink()
+
     async def on_predict(
         self,
         config: ConfigT,
@@ -341,7 +416,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         historic: DataFrame,
         future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> DataFrame:
+    ) -> Any:
         """Make predictions by executing external prediction script."""
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
 
@@ -391,20 +466,30 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             result = await run_shell(command, cwd=str(temp_dir))
             stdout = result["stdout"]
             stderr = result["stderr"]
+            exit_code = result["returncode"]
 
-            if result["returncode"] != 0:
-                logger.error("predict_script_failed", exit_code=result["returncode"], stderr=stderr)
-                raise RuntimeError(f"Prediction script failed with exit code {result['returncode']}: {stderr}")
-
-            logger.info("predict_script_completed", stdout=stdout, stderr=stderr)
+            if exit_code != 0:
+                logger.error("predict_script_failed", exit_code=exit_code, stderr=stderr)
+            else:
+                logger.info("predict_script_completed", stdout=stdout, stderr=stderr)
 
             # Load predictions from file
             if not output_file.exists():
                 raise RuntimeError(f"Prediction script did not create output file at {output_file}")
 
             predictions = DataFrame.from_csv(output_file)
-            return predictions
 
-        finally:
-            # Cleanup temp files
+            # Return workspace directory for artifact storage (like on_train)
+            # Workspace preserved for both success and failure (manager will store artifact)
+            return {
+                "workspace_dir": str(temp_dir),
+                "exit_code": exit_code,
+                "stdout": stdout,
+                "stderr": stderr,
+                "predictions": predictions,
+            }
+
+        except Exception:
+            # Cleanup only on Python exception (not script failure)
             shutil.rmtree(temp_dir, ignore_errors=True)
+            raise
