@@ -255,12 +255,12 @@ class TestDataFrameCSV:
     """Test DataFrame CSV methods."""
 
     def test_from_csv_string_basic(self) -> None:
-        """Create DataFrame from CSV string."""
+        """Create DataFrame from CSV string with type inference."""
         csv_string = "name,age\nAlice,25\nBob,30"
         df = DataFrame.from_csv(csv_string=csv_string)
 
         assert df.columns == ["name", "age"]
-        assert df.data == [["Alice", "25"], ["Bob", "30"]]
+        assert df.data == [["Alice", 25], ["Bob", 30]]
 
     def test_from_csv_string_no_header(self) -> None:
         """Create DataFrame from CSV string without header."""
@@ -268,7 +268,7 @@ class TestDataFrameCSV:
         df = DataFrame.from_csv(csv_string=csv_string, has_header=False)
 
         assert df.columns == ["col_0", "col_1"]
-        assert df.data == [["Alice", "25"], ["Bob", "30"]]
+        assert df.data == [["Alice", 25], ["Bob", 30]]
 
     def test_from_csv_string_custom_delimiter(self) -> None:
         """Create DataFrame from CSV string with custom delimiter."""
@@ -276,7 +276,7 @@ class TestDataFrameCSV:
         df = DataFrame.from_csv(csv_string=csv_string, delimiter=";")
 
         assert df.columns == ["name", "age"]
-        assert df.data == [["Alice", "25"], ["Bob", "30"]]
+        assert df.data == [["Alice", 25], ["Bob", 30]]
 
     def test_from_csv_string_empty(self) -> None:
         """Create DataFrame from empty CSV string."""
@@ -286,14 +286,14 @@ class TestDataFrameCSV:
         assert df.data == []
 
     def test_from_csv_file_basic(self, tmp_path: Path) -> None:
-        """Create DataFrame from CSV file."""
+        """Create DataFrame from CSV file with type inference."""
         csv_file = tmp_path / "test.csv"
         csv_file.write_text("name,age\nAlice,25\nBob,30")
 
         df = DataFrame.from_csv(path=csv_file)
 
         assert df.columns == ["name", "age"]
-        assert df.data == [["Alice", "25"], ["Bob", "30"]]
+        assert df.data == [["Alice", 25], ["Bob", 30]]
 
     def test_from_csv_file_not_found(self) -> None:
         """from_csv raises FileNotFoundError for missing file."""
@@ -387,27 +387,150 @@ class TestDataFrameCSV:
         assert "Zürich" in content
 
     def test_csv_roundtrip_string(self) -> None:
-        """Round-trip DataFrame through CSV string."""
+        """Round-trip DataFrame through CSV string preserves types via inference."""
         original = DataFrame(columns=["name", "age"], data=[["Alice", 25], ["Bob", 30]])
 
         csv_string = original.to_csv()
         restored = DataFrame.from_csv(csv_string=csv_string)
 
-        # Note: CSV conversion makes all values strings
         assert restored.columns == original.columns
-        assert restored.data == [["Alice", "25"], ["Bob", "30"]]
+        assert restored.data == [["Alice", 25], ["Bob", 30]]
 
     def test_csv_roundtrip_file(self, tmp_path: Path) -> None:
-        """Round-trip DataFrame through CSV file."""
+        """Round-trip DataFrame through CSV file preserves types via inference."""
         original = DataFrame(columns=["x", "y"], data=[[1, 2], [3, 4]])
         csv_file = tmp_path / "roundtrip.csv"
 
         original.to_csv(path=csv_file)
         restored = DataFrame.from_csv(path=csv_file)
 
-        # CSV conversion makes all values strings
         assert restored.columns == original.columns
-        assert restored.data == [["1", "2"], ["3", "4"]]
+        assert restored.data == [[1, 2], [3, 4]]
+
+
+class TestDataFrameCSVTypeInference:
+    """Test DataFrame CSV type inference."""
+
+    def test_infer_integers(self) -> None:
+        """Type inference converts integer strings to int."""
+        csv_string = "id,count\n1,100\n2,200\n3,300"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[1, 100], [2, 200], [3, 300]]
+        assert df.infer_types() == {"id": "int", "count": "int"}
+
+    def test_infer_floats(self) -> None:
+        """Type inference converts float strings to float."""
+        csv_string = "price,discount\n19.99,0.15\n29.99,0.20"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[19.99, 0.15], [29.99, 0.20]]
+        assert df.infer_types() == {"price": "float", "discount": "float"}
+
+    def test_infer_mixed_int_float(self) -> None:
+        """Type inference promotes int+float column to float."""
+        csv_string = "value\n1\n2.5\n3"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[1.0], [2.5], [3.0]]
+        assert df.infer_types() == {"value": "float"}
+
+    def test_infer_booleans_true_false(self) -> None:
+        """Type inference converts true/false to bool."""
+        csv_string = "active\ntrue\nfalse\nTrue\nFalse"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[True], [False], [True], [False]]
+        assert df.infer_types() == {"active": "bool"}
+
+    def test_infer_booleans_yes_no(self) -> None:
+        """Type inference converts yes/no to bool."""
+        csv_string = "enabled\nyes\nno\nYes\nNo"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[True], [False], [True], [False]]
+        assert df.infer_types() == {"enabled": "bool"}
+
+    def test_infer_empty_to_none(self) -> None:
+        """Type inference converts empty strings to None."""
+        csv_string = "name,age\nAlice,25\n,30\nBob,"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [["Alice", 25], [None, 30], ["Bob", None]]
+
+    def test_infer_whitespace_to_none(self) -> None:
+        """Type inference converts whitespace-only strings to None."""
+        csv_string = "value\n1\n   \n3"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[1], [None], [3]]
+
+    def test_infer_mixed_types_fallback_string(self) -> None:
+        """Type inference falls back to string for mixed types."""
+        csv_string = "data\n1\nhello\n3"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [["1"], ["hello"], ["3"]]
+        assert df.infer_types() == {"data": "str"}
+
+    def test_infer_types_disabled(self) -> None:
+        """Type inference can be disabled."""
+        csv_string = "id,active\n1,true"
+        df = DataFrame.from_csv(csv_string=csv_string, infer_types=False)
+
+        assert df.data == [["1", "true"]]
+        assert df.infer_types() == {"id": "str", "active": "str"}
+
+    def test_infer_all_none_column(self) -> None:
+        """Type inference handles all-empty columns."""
+        csv_string = "a,b\n1,\n2,"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[1, None], [2, None]]
+
+    def test_infer_scientific_notation(self) -> None:
+        """Type inference handles scientific notation as float."""
+        csv_string = "value\n1e10\n2.5e-3"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[1e10], [2.5e-3]]
+        assert df.infer_types() == {"value": "float"}
+
+    def test_infer_negative_numbers(self) -> None:
+        """Type inference handles negative numbers."""
+        csv_string = "value\n-1\n-2.5\n3"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [[-1.0], [-2.5], [3.0]]
+
+    def test_infer_preserves_strings(self) -> None:
+        """Type inference preserves string columns."""
+        csv_string = "name,city\nAlice,NYC\nBob,LA"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [["Alice", "NYC"], ["Bob", "LA"]]
+        assert df.infer_types() == {"name": "str", "city": "str"}
+
+    def test_infer_with_none_in_numeric(self) -> None:
+        """Type inference handles None mixed with numbers."""
+        csv_string = "a,value\nx,1\ny,\nz,3"
+        df = DataFrame.from_csv(csv_string=csv_string)
+
+        assert df.data == [["x", 1], ["y", None], ["z", 3]]
+        assert df.infer_types() == {"a": "str", "value": "int"}
+
+    def test_infer_empty_dataframe(self) -> None:
+        """Type inference handles empty CSV."""
+        df = DataFrame.from_csv(csv_string="")
+        assert df.columns == []
+        assert df.data == []
+
+    def test_infer_header_only(self) -> None:
+        """Type inference handles CSV with only headers."""
+        csv_string = "a,b,c"
+        df = DataFrame.from_csv(csv_string=csv_string)
+        assert df.columns == ["a", "b", "c"]
+        assert df.data == []
 
 
 class TestDataFrameInspection:

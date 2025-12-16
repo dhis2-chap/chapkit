@@ -10,6 +10,75 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel
 
 
+def _try_convert_value(value: str) -> tuple[Any, str]:
+    """Attempt to convert a string value to its inferred type."""
+    if value == "" or value.strip() == "":
+        return (None, "none")
+
+    value_lower = value.lower()
+    if value_lower in ("true", "yes"):
+        return (True, "bool")
+    if value_lower in ("false", "no"):
+        return (False, "bool")
+
+    try:
+        if "." not in value and "e" not in value_lower:
+            return (int(value), "int")
+    except ValueError:
+        pass
+
+    try:
+        return (float(value), "float")
+    except ValueError:
+        pass
+
+    return (value, "str")
+
+
+def _infer_column_type(values: list[str]) -> str:
+    """Determine the unified type for a column based on all its values."""
+    types_found: set[str] = set()
+
+    for value in values:
+        _, type_name = _try_convert_value(value)
+        types_found.add(type_name)
+
+    types_found.discard("none")
+
+    if not types_found:
+        return "none"
+
+    if len(types_found) == 1:
+        return types_found.pop()
+
+    if types_found == {"int", "float"}:
+        return "float"
+
+    return "str"
+
+
+def _convert_column(values: list[str], target_type: str) -> list[Any]:
+    """Convert all values in a column to the target type."""
+    if target_type == "str":
+        return [None if v == "" or v.strip() == "" else v for v in values]
+
+    result: list[Any] = []
+    for value in values:
+        if value == "" or value.strip() == "":
+            result.append(None)
+        elif target_type == "bool":
+            result.append(value.lower() in ("true", "yes"))
+        elif target_type == "int":
+            result.append(int(value))
+        elif target_type == "float":
+            result.append(float(value))
+        elif target_type == "none":
+            result.append(None)
+        else:
+            result.append(value)
+    return result
+
+
 class DataFrame(BaseModel):
     """Universal interchange format for tabular data from pandas, polars, xarray, and other libraries."""
 
@@ -102,6 +171,7 @@ class DataFrame(BaseModel):
         delimiter: str = ",",
         has_header: bool = True,
         encoding: str = "utf-8",
+        infer_types: bool = True,
     ) -> Self:
         """Create DataFrame from CSV file or string."""
         # Validate mutually exclusive parameters
@@ -137,6 +207,21 @@ class DataFrame(BaseModel):
             num_cols = len(rows[0]) if rows else 0
             columns = [f"col_{i}" for i in range(num_cols)]
             data = rows
+
+        # Apply type inference if enabled
+        if infer_types and data:
+            num_cols = len(columns)
+            converted_columns: list[list[Any]] = []
+
+            for col_idx in range(num_cols):
+                col_values = [row[col_idx] for row in data]
+                target_type = _infer_column_type(col_values)
+                converted_values = _convert_column(col_values, target_type)
+                converted_columns.append(converted_values)
+
+            data = [
+                [converted_columns[col_idx][row_idx] for col_idx in range(num_cols)] for row_idx in range(len(data))
+            ]
 
         return cls(columns=columns, data=data)
 

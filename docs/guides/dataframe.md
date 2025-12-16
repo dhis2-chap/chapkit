@@ -106,12 +106,13 @@ df = DataFrame.from_records([
 ### From CSV
 
 ```python
-# From file
+# From file (with automatic type inference)
 df = DataFrame.from_csv("data.csv")
 
-# From string
-csv_string = "name,age\nAlice,25\nBob,30"
+# From string - values are automatically converted to int, float, bool, or None
+csv_string = "name,age,active\nAlice,25,true\nBob,30,false"
 df = DataFrame.from_csv(csv_string=csv_string)
+# Result: [["Alice", 25, True], ["Bob", 30, False]]
 
 # Custom delimiter
 df = DataFrame.from_csv("data.tsv", delimiter="\t")
@@ -119,6 +120,9 @@ df = DataFrame.from_csv("data.tsv", delimiter="\t")
 # Without header
 df = DataFrame.from_csv("data.csv", has_header=False)
 # Generates columns: col_0, col_1, ...
+
+# Disable type inference (keep all values as strings)
+df = DataFrame.from_csv("data.csv", infer_types=False)
 ```
 
 ### From Other Libraries
@@ -341,6 +345,50 @@ print(types)
 # - "bool": All booleans
 # - "null": All None values
 # - "mixed": Multiple different types
+```
+
+### CSV Type Inference
+
+When loading CSV files with `from_csv()`, values are automatically inferred and converted:
+
+```python
+csv_string = """name,age,score,active
+Alice,25,95.5,true
+Bob,30,87.0,false
+,35,,yes"""
+
+df = DataFrame.from_csv(csv_string=csv_string)
+
+# Types are automatically inferred:
+# - name: str (text values)
+# - age: int (integer values)
+# - score: float (decimal values)
+# - active: bool (true/false/yes/no)
+
+# Empty strings become None
+print(df.data[2])  # [None, 35, None, True]
+```
+
+**Supported Type Conversions:**
+
+| CSV Value | Python Type | Example |
+|-----------|-------------|---------|
+| Empty/whitespace | `None` | `""`, `"   "` |
+| `true`, `false`, `yes`, `no` (case-insensitive) | `bool` | `"true"` -> `True` |
+| Integer strings (no decimal) | `int` | `"42"` -> `42` |
+| Decimal/scientific notation | `float` | `"3.14"`, `"1e10"` |
+| Other text | `str` | `"hello"` -> `"hello"` |
+
+**Type Promotion Rules:**
+- Columns with mixed int/float values become `float`
+- Columns with mixed types (e.g., int and str) remain `str`
+- `None` values are compatible with any type
+
+**Disabling Type Inference:**
+
+```python
+# Keep all values as strings (original behavior)
+df = DataFrame.from_csv("data.csv", infer_types=False)
 ```
 
 ### Null Detection
