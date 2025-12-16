@@ -53,7 +53,7 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
         Default implementation assumes training_result is a pickleable object.
         Runners can override to customize artifact creation (e.g., workspace zipping).
 
-        Returns dict compatible with MLTrainingArtifactData structure.
+        Returns dict compatible with MLTrainingWorkspaceArtifactData structure.
         """
         from chapkit.artifact.schemas import MLMetadata
 
@@ -66,7 +66,7 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
         )
 
         return {
-            "type": "ml_training",
+            "type": "ml_training_workspace",
             "metadata": metadata.model_dump(),
             "content": training_result,  # Pickled model
             "content_type": "application/x-pickle",
@@ -295,7 +295,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             )
 
             return {
-                "type": "ml_training",
+                "type": "ml_training_workspace",
                 "metadata": metadata.model_dump(),
                 "content": workspace_content,
                 "content_type": "application/zip",

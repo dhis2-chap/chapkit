@@ -2,7 +2,7 @@
 
 Migration Note:
     TrainedModelArtifactData and PredictionArtifactData have been replaced by
-    MLTrainingArtifactData and MLPredictionArtifactData from chapkit.artifact.data_schemas.
+    MLTrainingWorkspaceArtifactData and MLPredictionArtifactData from chapkit.artifact.schemas.
 
     Key changes:
     - ml_type field renamed to type
@@ -25,7 +25,7 @@ from ulid import ULID
 
 from chapkit.artifact.schemas import (
     MLPredictionArtifactData,
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
 )
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
@@ -118,6 +118,6 @@ __all__ = [
     "PredictRequest",
     "PredictResponse",
     "ModelRunnerProtocol",
-    "MLTrainingArtifactData",
+    "MLTrainingWorkspaceArtifactData",
     "MLPredictionArtifactData",
 ]

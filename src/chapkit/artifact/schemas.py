@@ -101,10 +101,10 @@ class GenericMetadata(BaseModel):
     model_config = {"extra": "allow"}
 
 
-class MLTrainingArtifactData(BaseArtifactData[MLMetadata]):
-    """Schema for ML training artifact data with trained model."""
+class MLTrainingWorkspaceArtifactData(BaseArtifactData[MLMetadata]):
+    """Schema for ML training workspace artifact data."""
 
-    type: Literal["ml_training"] = Field(default="ml_training", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
+    type: Literal["ml_training_workspace"] = Field(default="ml_training_workspace", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
     metadata: MLMetadata
 
 
@@ -115,10 +115,10 @@ class MLPredictionArtifactData(BaseArtifactData[MLMetadata]):
     metadata: MLMetadata
 
 
-class MLWorkspaceArtifactData(BaseArtifactData[MLMetadata]):
-    """Schema for ML workspace artifact data (debug/inspection)."""
+class MLPredictionWorkspaceArtifactData(BaseArtifactData[MLMetadata]):
+    """Schema for ML prediction workspace artifact data (debug/inspection)."""
 
-    type: Literal["ml_workspace"] = Field(default="ml_workspace", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
+    type: Literal["ml_prediction_workspace"] = Field(default="ml_prediction_workspace", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
     metadata: MLMetadata
 
 
@@ -130,7 +130,10 @@ class GenericArtifactData(BaseArtifactData[GenericMetadata]):
 
 
 ArtifactData = Annotated[
-    MLTrainingArtifactData | MLPredictionArtifactData | MLWorkspaceArtifactData | GenericArtifactData,
+    MLTrainingWorkspaceArtifactData
+    | MLPredictionArtifactData
+    | MLPredictionWorkspaceArtifactData
+    | GenericArtifactData,
     Field(discriminator="type"),
 ]
 """Discriminated union type for all artifact data types."""
@@ -141,9 +144,9 @@ def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
     artifact_type = data.get("type", "generic")
 
     schema_map: dict[str, type[BaseArtifactData]] = {
-        "ml_training": MLTrainingArtifactData,
+        "ml_training_workspace": MLTrainingWorkspaceArtifactData,
         "ml_prediction": MLPredictionArtifactData,
-        "ml_workspace": MLWorkspaceArtifactData,
+        "ml_prediction_workspace": MLPredictionWorkspaceArtifactData,
         "generic": GenericArtifactData,
     }
 

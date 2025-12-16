@@ -36,7 +36,7 @@ app = (
     MLServiceBuilder(
         info=MLServiceInfo(display_name="My ML Service"),
         config_schema=ModelConfig,
-        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training", 1: "ml_prediction"}),
+        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training_workspace", 1: "ml_prediction"}),
         runner=runner,
     )
     .build()
@@ -341,7 +341,7 @@ info = MLServiceInfo(
 
 hierarchy = ArtifactHierarchy(
     name="ml_pipeline",
-    level_labels={0: "ml_training", 1: "ml_prediction"},
+    level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
 )
 
 app = (
@@ -578,7 +578,7 @@ Chapkit uses typed artifact data schemas for consistent ML artifact storage with
 
 ### ML Training Artifact
 
-Stored at hierarchy level 0 using `MLTrainingArtifactData`. The artifact structure differs based on the runner type:
+Stored at hierarchy level 0 using `MLTrainingWorkspaceArtifactData`. The artifact structure differs based on the runner type:
 
 #### FunctionalModelRunner / BaseModelRunner
 
@@ -586,7 +586,7 @@ Stores pickled Python model objects:
 
 ```json
 {
-  "type": "ml_training",
+  "type": "ml_training_workspace",
   "metadata": {
     "status": "success",
     "config_id": "01CONFIG...",
@@ -601,7 +601,7 @@ Stores pickled Python model objects:
 ```
 
 **Schema Structure:**
-- `type`: Discriminator field - always `"ml_training"`
+- `type`: Discriminator field - always `"ml_training_workspace"`
 - `metadata`: Structured execution metadata
   - `status`: "success" (always success for FunctionalModelRunner)
   - `config_id`: Config used for training
@@ -617,7 +617,7 @@ Stores compressed workspace as zip artifact:
 
 ```json
 {
-  "type": "ml_training",
+  "type": "ml_training_workspace",
   "metadata": {
     "status": "success",
     "exit_code": 0,
@@ -635,7 +635,7 @@ Stores compressed workspace as zip artifact:
 ```
 
 **Schema Structure:**
-- `type`: Discriminator field - always `"ml_training"`
+- `type`: Discriminator field - always `"ml_training_workspace"`
 - `metadata`: Structured execution metadata
   - `status`: "success" or "failed" (based on exit code)
   - `exit_code`: Training script exit code (0 = success)
@@ -697,7 +697,7 @@ ShellModelRunner stores predictions the same way as FunctionalModelRunner (DataF
 
 ```json
 {
-  "type": "ml_workspace",
+  "type": "ml_prediction_workspace",
   "metadata": {
     "status": "success",
     "exit_code": 0,
@@ -715,7 +715,7 @@ ShellModelRunner stores predictions the same way as FunctionalModelRunner (DataF
 ```
 
 **Workspace Artifact Schema:**
-- `type`: Discriminator field - always `"ml_workspace"`
+- `type`: Discriminator field - always `"ml_prediction_workspace"`
 - `metadata`: Structured execution metadata
   - `status`: "success" or "failed" (based on exit code)
   - `exit_code`: Prediction script exit code (0 = success)
@@ -743,7 +743,7 @@ ShellModelRunner stores predictions the same way as FunctionalModelRunner (DataF
 artifact = await artifact_manager.find_by_id(model_artifact_id)
 
 # Access typed data
-assert artifact.data["type"] == "ml_training"
+assert artifact.data["type"] == "ml_training_workspace"
 metadata = artifact.data["metadata"]
 trained_model = artifact.data["content"]
 
@@ -1035,7 +1035,7 @@ def test_train_predict_workflow(client: TestClient):
 
     # Verify model artifact
     model_artifact = client.get(f"/api/v1/artifacts/{model_id}").json()
-    assert model_artifact["data"]["type"] == "ml_training"
+    assert model_artifact["data"]["type"] == "ml_training_workspace"
     assert model_artifact["level"] == 0
 
     # Predict

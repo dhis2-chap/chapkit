@@ -75,7 +75,7 @@ info = MLServiceInfo(
 # Create artifact hierarchy for ML artifacts
 HIERARCHY = ArtifactHierarchy(
     name="shell_ml_pipeline",
-    level_labels={0: "ml_training", 1: "ml_prediction"},
+    level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
 )
 
 # Build the FastAPI application

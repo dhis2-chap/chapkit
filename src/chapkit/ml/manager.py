@@ -112,9 +112,9 @@ class MLManager(Generic[ConfigT]):
             )
 
             # Validate artifact structure with Pydantic
-            from chapkit.artifact.schemas import MLTrainingArtifactData
+            from chapkit.artifact.schemas import MLTrainingWorkspaceArtifactData
 
-            MLTrainingArtifactData.model_validate(artifact_data_dict)
+            MLTrainingWorkspaceArtifactData.model_validate(artifact_data_dict)
 
             # Extract workspace_dir if present (for cleanup)
             if isinstance(training_result, dict) and "workspace_dir" in training_result:
@@ -159,7 +159,7 @@ class MLManager(Generic[ConfigT]):
 
         # Extract model and config_id from artifact
         training_data = training_artifact.data
-        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training":
+        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training_workspace":
             raise ValueError(f"Artifact {request.artifact_id} is not a training artifact")
 
         # Check training status - block prediction on failed training
@@ -239,8 +239,8 @@ class MLManager(Generic[ConfigT]):
                     completed_at=prediction_completed_at,
                     duration_seconds=round(prediction_duration, 2),
                 )
-                # Change type to ml_workspace (it's for debugging, not the primary prediction)
-                workspace_artifact_dict["type"] = "ml_workspace"
+                # Change type to ml_prediction_workspace (it's for debugging, not the primary prediction)
+                workspace_artifact_dict["type"] = "ml_prediction_workspace"
 
             else:
                 # FunctionalModelRunner: prediction_result is DataFrame
