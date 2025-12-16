@@ -226,61 +226,61 @@ class MLManager(Generic[ConfigT]):
 
             # Handle ShellModelRunner workspace artifact vs FunctionalModelRunner DataFrame
             if is_workspace and isinstance(prediction_result, dict) and "workspace_dir" in prediction_result:
-                # ShellModelRunner: create workspace artifact
+                # ShellModelRunner: extract predictions and workspace
                 prediction_workspace_dir = Path(prediction_result["workspace_dir"])
                 predictions = prediction_result["predictions"]
 
-                # Let runner create artifact structure (zips workspace)
-                artifact_data_dict = await self.runner.create_prediction_artifact(
+                # Create workspace artifact data (zips workspace)
+                workspace_artifact_dict = await self.runner.create_prediction_artifact(
                     prediction_result=prediction_result,
                     config_id=str(config_id),
                     started_at=prediction_started_at,
                     completed_at=prediction_completed_at,
                     duration_seconds=round(prediction_duration, 2),
                 )
-
-                # Validate artifact structure with Pydantic
-                from chapkit.artifact.schemas import MLPredictionArtifactData
-
-                MLPredictionArtifactData.model_validate(artifact_data_dict)
+                # Change type to ml_workspace (it's for debugging, not the primary prediction)
+                workspace_artifact_dict["type"] = "ml_workspace"
 
             else:
                 # FunctionalModelRunner: prediction_result is DataFrame
                 predictions = prediction_result
+                workspace_artifact_dict = None
 
-                from chapkit.artifact.schemas import MLMetadata, MLPredictionArtifactData
+            # Create prediction artifact with DataFrame (same for both runners)
+            from chapkit.artifact.schemas import MLMetadata, MLPredictionArtifactData
 
-                metadata = MLMetadata(
-                    status="success",
-                    config_id=str(config_id),
-                    started_at=prediction_started_at.isoformat(),
-                    completed_at=prediction_completed_at.isoformat(),
-                    duration_seconds=round(prediction_duration, 2),
-                )
+            metadata = MLMetadata(
+                status="success",
+                config_id=str(config_id),
+                started_at=prediction_started_at.isoformat(),
+                completed_at=prediction_completed_at.isoformat(),
+                duration_seconds=round(prediction_duration, 2),
+            )
 
-                # Create and validate artifact data structure with Pydantic
-                artifact_data_model = MLPredictionArtifactData(
-                    type="ml_prediction",
-                    metadata=metadata,
-                    content=predictions,
-                    content_type="application/vnd.chapkit.dataframe+json",
-                    content_size=None,
-                )
+            # Create and validate artifact data structure with Pydantic
+            artifact_data_model = MLPredictionArtifactData(
+                type="ml_prediction",
+                metadata=metadata,
+                content=predictions,
+                content_type="application/vnd.chapkit.dataframe+json",
+                content_size=None,
+            )
 
-                # Construct dict manually to preserve Python objects (database uses PickleType)
-                artifact_data_dict = {
-                    "type": artifact_data_model.type,
-                    "metadata": artifact_data_model.metadata.model_dump(),
-                    "content": predictions,  # Keep as Python object (DataFrame)
-                    "content_type": artifact_data_model.content_type,
-                    "content_size": artifact_data_model.content_size,
-                }
+            # Construct dict manually to preserve Python objects (database uses PickleType)
+            artifact_data_dict = {
+                "type": artifact_data_model.type,
+                "metadata": artifact_data_model.metadata.model_dump(),
+                "content": predictions,  # Keep as Python object (DataFrame)
+                "content_type": artifact_data_model.content_type,
+                "content_size": artifact_data_model.content_size,
+            }
 
-            # Store artifact
+            # Store artifacts
             async with self.database.session() as session:
                 artifact_repo = ArtifactRepository(session)
                 artifact_manager = ArtifactManager(artifact_repo)
 
+                # 1. Store prediction artifact (level 1, parent = training artifact)
                 await artifact_manager.save(
                     ArtifactIn(
                         id=artifact_id,
@@ -289,6 +289,18 @@ class MLManager(Generic[ConfigT]):
                         level=1,
                     )
                 )
+
+                # 2. Store workspace artifact if ShellModelRunner (level 2, parent = prediction artifact)
+                if workspace_artifact_dict is not None:
+                    workspace_artifact_id = ULID()
+                    await artifact_manager.save(
+                        ArtifactIn(
+                            id=workspace_artifact_id,
+                            data=workspace_artifact_dict,
+                            parent_id=artifact_id,
+                            level=2,
+                        )
+                    )
 
         finally:
             # Cleanup extracted training workspace

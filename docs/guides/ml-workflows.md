@@ -117,8 +117,11 @@ runner = ShellModelRunner(
 Config
   └─> Trained Model (level 0)
        ├─> Predictions 1 (level 1)
+       │    └─> Workspace 1 (level 2, ShellModelRunner only)
        ├─> Predictions 2 (level 1)
+       │    └─> Workspace 2 (level 2, ShellModelRunner only)
        └─> Predictions 3 (level 1)
+            └─> Workspace 3 (level 2, ShellModelRunner only)
 ```
 
 **Benefits:**
@@ -126,6 +129,7 @@ Config
 - Multiple predictions from same model
 - Config linked to all model artifacts
 - Immutable model versioning
+- Debug workspaces linked to predictions (ShellModelRunner)
 
 ### Job Scheduling
 
@@ -685,11 +689,15 @@ Stores prediction DataFrame directly:
 
 #### ShellModelRunner
 
-Stores compressed prediction workspace as zip artifact (like training):
+ShellModelRunner stores predictions the same way as FunctionalModelRunner (DataFrame in level 1 artifact), plus an additional workspace artifact (level 2) for debugging:
+
+**Prediction Artifact (level 1):** Same structure as FunctionalModelRunner - DataFrame content.
+
+**Workspace Artifact (level 2):** Child of prediction artifact, contains compressed workspace ZIP:
 
 ```json
 {
-  "type": "ml_prediction",
+  "type": "ml_workspace",
   "metadata": {
     "status": "success",
     "exit_code": 0,
@@ -706,8 +714,8 @@ Stores compressed prediction workspace as zip artifact (like training):
 }
 ```
 
-**Schema Structure:**
-- `type`: Discriminator field - always `"ml_prediction"`
+**Workspace Artifact Schema:**
+- `type`: Discriminator field - always `"ml_workspace"`
 - `metadata`: Structured execution metadata
   - `status`: "success" or "failed" (based on exit code)
   - `exit_code`: Prediction script exit code (0 = success)
@@ -725,6 +733,8 @@ Stores compressed prediction workspace as zip artifact (like training):
 - Training workspace files (model files, config, etc.)
 - Data files (historic.csv, future.csv, geo.json if provided)
 - Any intermediate artifacts or debug output
+
+**Accessing workspace:** Use `GET /api/v1/artifacts/{prediction_id}/$tree` to find the workspace artifact ID, then retrieve it directly.
 
 ### Accessing Artifact Data
 

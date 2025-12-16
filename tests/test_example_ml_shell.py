@@ -163,15 +163,16 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
     assert artifact["parent_id"] == model_artifact_id
     assert artifact["level"] == 1
 
-    # Check predictions data (ShellModelRunner stores workspace ZIP)
+    # Check predictions data (DataFrame content, same as FunctionalModelRunner)
     data = artifact["data"]
     assert data["type"] == "ml_prediction"
-    assert data["content_type"] == "application/zip"
-    assert "content" in data  # Workspace ZIP bytes
-    assert isinstance(data.get("content_size"), int)
+    assert data["content_type"] == "application/vnd.chapkit.dataframe+json"
+    assert "content" in data
+    # Verify predictions DataFrame has expected columns
+    predictions = data["content"]
+    assert "sample_0" in predictions["columns"]
     # Verify metadata
     assert data["metadata"]["status"] == "success"
-    assert data["metadata"]["exit_code"] == 0
 
 
 def test_train_with_minimal_data(client: TestClient) -> None:

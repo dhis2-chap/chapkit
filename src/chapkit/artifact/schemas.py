@@ -115,6 +115,13 @@ class MLPredictionArtifactData(BaseArtifactData[MLMetadata]):
     metadata: MLMetadata
 
 
+class MLWorkspaceArtifactData(BaseArtifactData[MLMetadata]):
+    """Schema for ML workspace artifact data (debug/inspection)."""
+
+    type: Literal["ml_workspace"] = Field(default="ml_workspace", frozen=True)  # pyright: ignore[reportIncompatibleVariableOverride]
+    metadata: MLMetadata
+
+
 class GenericArtifactData(BaseArtifactData[GenericMetadata]):
     """Schema for generic artifact data with free-form metadata."""
 
@@ -123,7 +130,7 @@ class GenericArtifactData(BaseArtifactData[GenericMetadata]):
 
 
 ArtifactData = Annotated[
-    MLTrainingArtifactData | MLPredictionArtifactData | GenericArtifactData,
+    MLTrainingArtifactData | MLPredictionArtifactData | MLWorkspaceArtifactData | GenericArtifactData,
     Field(discriminator="type"),
 ]
 """Discriminated union type for all artifact data types."""
@@ -136,6 +143,7 @@ def validate_artifact_data(data: dict[str, Any]) -> BaseArtifactData:
     schema_map: dict[str, type[BaseArtifactData]] = {
         "ml_training": MLTrainingArtifactData,
         "ml_prediction": MLPredictionArtifactData,
+        "ml_workspace": MLWorkspaceArtifactData,
         "generic": GenericArtifactData,
     }
 
