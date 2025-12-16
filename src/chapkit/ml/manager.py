@@ -117,8 +117,9 @@ class MLManager(Generic[ConfigT]):
             MLTrainingWorkspaceArtifactData.model_validate(artifact_data_dict)
 
             # Extract workspace_dir if present (for cleanup)
-            if isinstance(training_result, dict) and "workspace_dir" in training_result:
-                workspace_dir = Path(training_result["workspace_dir"])
+            workspace_dir_str = training_result.get("workspace_dir") if isinstance(training_result, dict) else None
+            if workspace_dir_str:
+                workspace_dir = Path(workspace_dir_str)
 
             # Store artifact
             async with self.database.session() as session:
@@ -173,7 +174,7 @@ class MLManager(Generic[ConfigT]):
                 f"Training script exited with code {exit_code}."
             )
 
-        # Check if artifact is workspace (ShellModelRunner) or pickled model (FunctionalModelRunner)
+        # Check if artifact is workspace (ZIP) or pickled model
         is_workspace = training_data.get("content_type") == "application/zip"
         extracted_workspace = None
         prediction_workspace_dir = None
@@ -181,6 +182,7 @@ class MLManager(Generic[ConfigT]):
         try:
             if is_workspace:
                 # Extract workspace from zip
+                import pickle
                 import tempfile
                 import zipfile
                 from io import BytesIO
@@ -193,12 +195,25 @@ class MLManager(Generic[ConfigT]):
                 with zipfile.ZipFile(zip_buffer, "r") as zf:
                     zf.extractall(extracted_workspace)
 
-                # Create model dict with workspace info for runner
-                trained_model = {
-                    "workspace_dir": str(extracted_workspace),
-                }
+                # Determine how to pass model based on runner type
+                from .runner import ShellModelRunner
+
+                if isinstance(self.runner, ShellModelRunner):
+                    # ShellModelRunner: pass workspace directory to runner
+                    trained_model = {
+                        "workspace_dir": str(extracted_workspace),
+                    }
+                else:
+                    # FunctionalModelRunner with workspace: load pickled model from workspace
+                    model_pickle_path = extracted_workspace / "model.pickle"
+                    if model_pickle_path.exists():
+                        trained_model = pickle.loads(model_pickle_path.read_bytes())
+                    else:
+                        raise ValueError(
+                            f"Training artifact workspace missing model.pickle file at {model_pickle_path}"
+                        )
             else:
-                # Pickled model handling (FunctionalModelRunner)
+                # Pickled model handling (FunctionalModelRunner without workspace)
                 trained_model = training_data["content"]
 
             config_id = ULID.from_str(training_metadata["config_id"])
@@ -224,12 +239,19 @@ class MLManager(Generic[ConfigT]):
             prediction_completed_at = datetime.datetime.now(datetime.UTC)
             prediction_duration = (prediction_completed_at - prediction_started_at).total_seconds()
 
-            # Handle ShellModelRunner workspace artifact vs FunctionalModelRunner DataFrame
-            if is_workspace and isinstance(prediction_result, dict) and "workspace_dir" in prediction_result:
-                # ShellModelRunner: extract predictions and workspace
-                workspace_dir_str = str(prediction_result["workspace_dir"])
+            # Extract predictions from result (handles both new dict format and legacy DataFrame)
+            if isinstance(prediction_result, dict) and "content" in prediction_result:
+                # New unified format: {content, workspace_dir, exit_code, stdout, stderr}
+                predictions = prediction_result["content"]
+                workspace_dir_str = prediction_result.get("workspace_dir")
+            else:
+                # Legacy format: BaseModelRunner subclasses return DataFrame directly
+                predictions = prediction_result
+                workspace_dir_str = None
+
+            # Create workspace artifact if workspace was created (both runners can produce workspace)
+            if workspace_dir_str:
                 prediction_workspace_dir = Path(workspace_dir_str)
-                predictions = prediction_result["predictions"]
 
                 # Create workspace artifact data (zips workspace)
                 workspace_artifact_dict = await self.runner.create_prediction_artifact(
@@ -241,10 +263,7 @@ class MLManager(Generic[ConfigT]):
                 )
                 # Change type to ml_prediction_workspace (it's for debugging, not the primary prediction)
                 workspace_artifact_dict["type"] = "ml_prediction_workspace"
-
             else:
-                # FunctionalModelRunner: prediction_result is DataFrame
-                predictions = prediction_result
                 workspace_artifact_dict = None
 
             # Create prediction artifact with DataFrame (same for both runners)
@@ -291,7 +310,7 @@ class MLManager(Generic[ConfigT]):
                     )
                 )
 
-                # 2. Store workspace artifact if ShellModelRunner (level 2, parent = prediction artifact)
+                # 2. Store workspace artifact if workspace was created (level 2, parent = prediction artifact)
                 if workspace_artifact_dict is not None:
                     workspace_artifact_id = ULID()
                     await artifact_manager.save(

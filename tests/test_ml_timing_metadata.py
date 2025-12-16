@@ -77,7 +77,8 @@ async def ml_manager() -> AsyncIterator[MLManager]:
 
     scheduler = InMemoryChapkitScheduler()
 
-    runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
+    # Disable workspace to test pickled model artifacts (workspace tested separately)
+    runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict, enable_workspace=False)
 
     manager = MLManager(runner, scheduler, database, SimpleConfig)
     yield manager

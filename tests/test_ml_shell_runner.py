@@ -22,6 +22,7 @@ class MockConfig(BaseConfig):
 class WorkspaceArtifact(TypedDict):
     """Type for workspace artifact returned by ShellModelRunner.on_train()."""
 
+    content: object | None  # Model content (None for ShellModelRunner train, DataFrame for predict)
     workspace_dir: str
     exit_code: int
     stdout: str
@@ -32,6 +33,7 @@ def create_mock_workspace() -> WorkspaceArtifact:
     """Create a mock workspace artifact for testing on_predict()."""
     temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_test_workspace_"))
     return {
+        "content": None,  # ShellModelRunner train returns None for content
         "workspace_dir": str(temp_dir),
         "exit_code": 0,
         "stdout": "",
@@ -100,10 +102,10 @@ async def test_shell_runner_predict_basic() -> None:
         assert isinstance(result, dict)
         assert "workspace_dir" in result
         assert "exit_code" in result
-        assert "predictions" in result
+        assert "content" in result
         assert result["exit_code"] == 0
 
-        predictions = result["predictions"]
+        predictions = result["content"]
         assert len(predictions.data) == 2
         assert "prediction" in predictions.columns
         pred_idx = predictions.columns.index("prediction")
@@ -251,7 +253,7 @@ print("Prediction completed")
         assert "workspace_dir" in result
         assert result["exit_code"] == 0
 
-        predictions = result["predictions"]
+        predictions = result["content"]
         assert len(predictions.data) == 3
         assert "prediction" in predictions.columns
         pred_idx = predictions.columns.index("prediction")
@@ -398,7 +400,7 @@ print("Prediction completed without model file")
         assert "workspace_dir" in result
         assert result["exit_code"] == 0
 
-        predictions = result["predictions"]
+        predictions = result["content"]
         # Should successfully predict without model file
         assert len(predictions.data) == 2
         assert "prediction" in predictions.columns
@@ -476,7 +478,7 @@ async def test_shell_runner_variable_substitution() -> None:
     assert "workspace_dir" in predict_result
     assert predict_result["exit_code"] == 0
 
-    predictions = predict_result["predictions"]
+    predictions = predict_result["content"]
     assert len(predictions.data) == 1
     assert "prediction" in predictions.columns
 

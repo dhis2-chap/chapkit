@@ -117,11 +117,11 @@ runner = ShellModelRunner(
 Config
   └─> Trained Model (level 0)
        ├─> Predictions 1 (level 1)
-       │    └─> Workspace 1 (level 2, ShellModelRunner only)
+       │    └─> Workspace 1 (level 2)
        ├─> Predictions 2 (level 1)
-       │    └─> Workspace 2 (level 2, ShellModelRunner only)
+       │    └─> Workspace 2 (level 2)
        └─> Predictions 3 (level 1)
-            └─> Workspace 3 (level 2, ShellModelRunner only)
+            └─> Workspace 3 (level 2)
 ```
 
 **Benefits:**
@@ -129,7 +129,7 @@ Config
 - Multiple predictions from same model
 - Config linked to all model artifacts
 - Immutable model versioning
-- Debug workspaces linked to predictions (ShellModelRunner)
+- Debug workspaces linked to predictions (all runners with workspace enabled)
 
 ### Job Scheduling
 
@@ -197,13 +197,28 @@ async def predict_fn(config, model, historic, future, geo=None):
     # Prediction logic
     return predictions
 
+# Workspace enabled by default (stores all inputs and outputs as ZIP)
 runner = FunctionalModelRunner(on_train=train_fn, on_predict=predict_fn)
+
+# Disable workspace for smaller artifacts (stores only pickled model)
+runner = FunctionalModelRunner(
+    on_train=train_fn,
+    on_predict=predict_fn,
+    enable_workspace=False,
+)
 ```
+
+**Workspace Feature:**
+- **Enabled by default**: Training and prediction artifacts include complete workspace ZIPs
+- Workspace contains: config.yml, data.csv, geo.json (if provided), model.pickle, predictions.csv
+- Enables debugging by inspecting exact inputs and outputs
+- Set `enable_workspace=False` for smaller artifacts (pickled model only)
 
 **Use Cases:**
 - Simple models without state
 - Quick prototypes
 - Pure function workflows
+- Full traceability with workspace enabled
 
 ### ShellModelRunner
 
@@ -578,11 +593,11 @@ Chapkit uses typed artifact data schemas for consistent ML artifact storage with
 
 ### ML Training Artifact
 
-Stored at hierarchy level 0 using `MLTrainingWorkspaceArtifactData`. The artifact structure differs based on the runner type:
+Stored at hierarchy level 0 using `MLTrainingWorkspaceArtifactData`. The artifact structure differs based on the runner configuration:
 
-#### FunctionalModelRunner / BaseModelRunner
+#### FunctionalModelRunner with `enable_workspace=False`
 
-Stores pickled Python model objects:
+Stores pickled Python model objects directly:
 
 ```json
 {
@@ -611,9 +626,9 @@ Stores pickled Python model objects:
 - `content_type`: "application/x-pickle"
 - `content_size`: Size in bytes (optional)
 
-#### ShellModelRunner
+#### FunctionalModelRunner (default) / ShellModelRunner
 
-Stores compressed workspace as zip artifact:
+Stores compressed workspace as zip artifact (workspace enabled by default for FunctionalModelRunner):
 
 ```json
 {
@@ -656,9 +671,9 @@ Stores compressed workspace as zip artifact:
 
 ### ML Prediction Artifact
 
-Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training artifact). The artifact structure differs based on the runner type:
+Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training artifact). All runners store the prediction DataFrame the same way:
 
-#### FunctionalModelRunner / BaseModelRunner
+#### Prediction Artifact (level 1, all runners)
 
 Stores prediction DataFrame directly:
 
@@ -687,13 +702,9 @@ Stores prediction DataFrame directly:
 - `content`: Prediction DataFrame with results
 - `content_type`: "application/vnd.chapkit.dataframe+json"
 
-#### ShellModelRunner
+#### Workspace Artifact (level 2, when workspace enabled)
 
-ShellModelRunner stores predictions the same way as FunctionalModelRunner (DataFrame in level 1 artifact), plus an additional workspace artifact (level 2) for debugging:
-
-**Prediction Artifact (level 1):** Same structure as FunctionalModelRunner - DataFrame content.
-
-**Workspace Artifact (level 2):** Child of prediction artifact, contains compressed workspace ZIP:
+Both FunctionalModelRunner (default) and ShellModelRunner create an additional workspace artifact (level 2) as a child of the prediction artifact for debugging:
 
 ```json
 {
@@ -717,10 +728,10 @@ ShellModelRunner stores predictions the same way as FunctionalModelRunner (DataF
 **Workspace Artifact Schema:**
 - `type`: Discriminator field - always `"ml_prediction_workspace"`
 - `metadata`: Structured execution metadata
-  - `status`: "success" or "failed" (based on exit code)
-  - `exit_code`: Prediction script exit code (0 = success)
-  - `stdout`: Standard output from prediction script
-  - `stderr`: Standard error from prediction script
+  - `status`: "success" or "failed" (based on exit code for ShellModelRunner)
+  - `exit_code`: Script exit code (ShellModelRunner only, null for FunctionalModelRunner)
+  - `stdout`: Standard output (ShellModelRunner only, null for FunctionalModelRunner)
+  - `stderr`: Standard error (ShellModelRunner only, null for FunctionalModelRunner)
   - `config_id`: Config used for prediction
   - `started_at`, `completed_at`: ISO 8601 timestamps
   - `duration_seconds`: Prediction duration
@@ -729,10 +740,12 @@ ShellModelRunner stores predictions the same way as FunctionalModelRunner (DataF
 - `content_size`: Zip file size in bytes
 
 **Workspace Contents:**
-- All files created by prediction script (predictions.csv, logs, intermediate results)
-- Training workspace files (model files, config, etc.)
-- Data files (historic.csv, future.csv, geo.json if provided)
-- Any intermediate artifacts or debug output
+- predictions.csv (output predictions)
+- config.yml (configuration used)
+- historic.csv, future.csv (input data)
+- geo.json (if provided)
+- model.pickle (trained model, FunctionalModelRunner)
+- Additional files created during execution (logs, intermediate results)
 
 **Accessing workspace:** Use `GET /api/v1/artifacts/{prediction_id}/$tree` to find the workspace artifact ID, then retrieve it directly.
 
