@@ -44,8 +44,6 @@ nav:
 markdown_extensions:
   - admonition
   - attr_list
-  - codehilite:
-      guess_lang: false
   - def_list
   - footnotes
   - meta
