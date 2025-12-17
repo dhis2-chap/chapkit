@@ -1183,6 +1183,145 @@ model_training_duration = Histogram(
 # Query via artifact API
 ```
 
+### Artifact Retention Strategies
+
+ML artifacts, especially workspace ZIPs from `ShellModelRunner` and `FunctionalModelRunner` (when workspace is enabled), can consume significant storage. Implement retention policies to manage disk space while preserving important artifacts.
+
+**Artifact Size Considerations:**
+- Training workspace ZIPs: 1-100+ MB (depends on project size)
+- Prediction workspace ZIPs: 0.5-50+ MB
+- Prediction DataFrames: Typically small (KB range)
+- Models (pickled): Varies widely (KB to GB)
+
+**Retention Strategies:**
+
+1. **Time-based cleanup**: Delete artifacts older than N days
+
+```python
+import asyncio
+from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+async def cleanup_old_artifacts(app: FastAPI, days: int = 30) -> None:
+    """Delete artifacts older than specified days."""
+    from chapkit.artifact import ArtifactRepository, ArtifactManager
+
+    cutoff = datetime.now() - timedelta(days=days)
+
+    async with app.state.database.session() as session:
+        artifact_repository = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repository)
+
+        # Find old artifacts (implement find_older_than in repository)
+        old_artifacts = await artifact_manager.find_all()
+
+        deleted_count = 0
+        for artifact in old_artifacts:
+            if artifact.created_at < cutoff:
+                await artifact_manager.delete(artifact.id)
+                deleted_count += 1
+
+        await artifact_repository.commit()
+
+    print(f"Deleted {deleted_count} artifacts older than {days} days")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Run cleanup on startup (optional)
+    await cleanup_old_artifacts(app, days=30)
+    yield
+```
+
+2. **Level-based retention**: Keep training artifacts longer than prediction workspaces
+
+```python
+async def cleanup_by_level(app: FastAPI) -> None:
+    """Different retention periods by artifact level."""
+    retention_days = {
+        0: 365,   # Training artifacts: keep 1 year
+        1: 90,    # Prediction results: keep 90 days
+        2: 7,     # Workspace ZIPs: keep 7 days (debug only)
+    }
+
+    async with app.state.database.session() as session:
+        artifact_repository = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repository)
+
+        for artifact in await artifact_manager.find_all():
+            days = retention_days.get(artifact.level, 30)
+            cutoff = datetime.now() - timedelta(days=days)
+            if artifact.created_at < cutoff:
+                await artifact_manager.delete(artifact.id)
+
+        await artifact_repository.commit()
+```
+
+3. **Type-based retention**: Keep predictions, delete workspaces
+
+```python
+async def cleanup_workspace_artifacts(app: FastAPI, days: int = 7) -> None:
+    """Delete workspace artifacts older than N days, keep predictions."""
+    cutoff = datetime.now() - timedelta(days=days)
+
+    async with app.state.database.session() as session:
+        artifact_repository = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repository)
+
+        for artifact in await artifact_manager.find_all():
+            artifact_type = artifact.data.get("type", "")
+            # Only delete workspace artifacts, not predictions
+            if artifact_type in ("ml_training_workspace", "ml_prediction_workspace"):
+                if artifact.data.get("content_type") == "application/zip":
+                    if artifact.created_at < cutoff:
+                        await artifact_manager.delete(artifact.id)
+
+        await artifact_repository.commit()
+```
+
+4. **Disable workspace for smaller footprint**:
+
+```python
+# FunctionalModelRunner: disable workspace to store only pickled models
+runner = FunctionalModelRunner(
+    on_train=train_fn,
+    on_predict=predict_fn,
+    enable_workspace=False,  # Only store pickled model, no ZIP
+)
+```
+
+**Scheduled cleanup with APScheduler:**
+
+```python
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+scheduler = AsyncIOScheduler()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Schedule daily cleanup at 3 AM
+    scheduler.add_job(
+        cleanup_old_artifacts,
+        CronTrigger(hour=3, minute=0),
+        args=[app, 30],
+        id="artifact_cleanup",
+    )
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+```
+
+**Best Practices:**
+- Keep training artifacts (level 0) longer than prediction workspaces (level 2)
+- Prediction DataFrames (level 1) are small - retain longer for audit trails
+- Workspace ZIPs (level 2) are primarily for debugging - short retention OK
+- Monitor database size with alerts (e.g., when exceeding 80% capacity)
+- Consider external storage (S3, GCS) for large models instead of SQLite
+- Back up critical artifacts before cleanup runs
+
 ### Docker Deployment
 
 **Dockerfile:**
