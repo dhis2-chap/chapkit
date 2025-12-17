@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import pickle
 import shutil
 import tempfile
 import zipfile
@@ -295,8 +296,6 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
 
         if self.enable_workspace:
             # Write model.pickle
-            import pickle
-
             assert workspace_dir is not None  # For type checker
             (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
 
@@ -332,8 +331,6 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
             # Write prediction input files
             write_prediction_inputs(workspace_dir, historic, future, geo)
             # Write model.pickle (input model for prediction)
-            import pickle
-
             (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
 
         # Execute prediction function

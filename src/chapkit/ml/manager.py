@@ -207,7 +207,13 @@ class MLManager(Generic[ConfigT]):
                     # FunctionalModelRunner with workspace: load pickled model from workspace
                     model_pickle_path = extracted_workspace / "model.pickle"
                     if model_pickle_path.exists():
-                        trained_model = pickle.loads(model_pickle_path.read_bytes())
+                        try:
+                            trained_model = pickle.loads(model_pickle_path.read_bytes())
+                        except (pickle.UnpicklingError, EOFError, TypeError) as e:
+                            raise ValueError(
+                                f"Failed to load model from {model_pickle_path}: "
+                                f"corrupted or incompatible pickle file. {e}"
+                            ) from e
                     else:
                         raise ValueError(
                             f"Training artifact workspace missing model.pickle file at {model_pickle_path}"
