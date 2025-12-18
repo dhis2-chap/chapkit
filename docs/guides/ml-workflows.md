@@ -352,6 +352,7 @@ info = MLServiceInfo(
     author="ML Team",
     author_assessed_status=AssessedStatus.green,
     contact_email="ml-team@example.com",
+    requires_geo=True,  # Model requires GeoJSON spatial data
 )
 
 hierarchy = ArtifactHierarchy(
@@ -413,6 +414,25 @@ MLServiceBuilder(
     database_url="ml.db",    # Persistent storage (default: in-memory)
 )
 ```
+
+### MLServiceInfo Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | str | Service display name (required) |
+| `version` | str | Service version |
+| `summary` | str | Short description |
+| `description` | str | Detailed description |
+| `author` | str | Model author or team |
+| `author_note` | str | Additional author notes |
+| `author_assessed_status` | AssessedStatus | Model maturity (red/orange/yellow/green) |
+| `contact_email` | str | Contact email address |
+| `organization` | str | Organization name |
+| `organization_logo_url` | str | URL to organization logo |
+| `citation_info` | str | How to cite this model |
+| `required_covariates` | list[str] | Required input covariate names |
+| `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |
+| `requires_geo` | bool | Whether the model requires GeoJSON spatial data for training/prediction |
 
 ---
 
