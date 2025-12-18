@@ -21,7 +21,7 @@ from chapkit.artifact import (
     ArtifactRepository,
     MLMetadata,
     MLPredictionArtifactData,
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
 )
 from chapkit.data import DataFrame
 
@@ -61,8 +61,8 @@ async def main() -> None:
         print("\n1. Trained model")
 
         # Create training artifact
-        training_data_model = MLTrainingArtifactData(
-            type="ml_training",
+        training_data_model = MLTrainingWorkspaceArtifactData(
+            type="ml_training_workspace",
             metadata=MLMetadata(
                 status="success",
                 config_id="01CONFIG123...",

@@ -130,7 +130,7 @@ def test_train_model(client: TestClient) -> None:
 
     # Check artifact data structure
     data = artifact["data"]
-    assert data["type"] == "ml_training"
+    assert data["type"] == "ml_training_workspace"
     assert data["metadata"]["config_id"] == config_id
     assert "content" in data
     # Content should be the trained model (Python object stored via PickleType)

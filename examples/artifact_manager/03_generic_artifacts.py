@@ -7,8 +7,6 @@ This example demonstrates:
 - Mixing different artifact types
 """
 
-# type: ignore  # Skip type checking for example code
-
 import asyncio
 from datetime import datetime
 
@@ -54,10 +52,10 @@ async def main() -> None:
         project_data = GenericArtifactData(
             type="generic",
             metadata=GenericMetadata(
-                project_name="Documentation",  # type: ignore[call-arg]
-                owner="Engineering Team",  # type: ignore[call-arg]
-                created_date=datetime.now().isoformat(),  # type: ignore[call-arg]
-                tags=["docs", "api", "public"],  # type: ignore[call-arg]
+                project_name="Documentation",
+                owner="Engineering Team",
+                created_date=datetime.now().isoformat(),
+                tags=["docs", "api", "public"],
             ),
             content={
                 "description": "API documentation project",
@@ -80,9 +78,9 @@ async def main() -> None:
         document_data = GenericArtifactData(
             type="generic",
             metadata=GenericMetadata(
-                document_title="Authentication Guide",  # type: ignore[call-arg]
-                author="Alice",  # type: ignore[call-arg]
-                category="security",  # type: ignore[call-arg]
+                document_title="Authentication Guide",
+                author="Alice",
+                category="security",
             ),
             content={
                 "sections": 5,
@@ -124,8 +122,8 @@ async def main() -> None:
             version_data = GenericArtifactData(
                 type="generic",
                 metadata=GenericMetadata(
-                    version_number=ver["version"],  # type: ignore[call-arg]
-                    release_date=ver["published"],  # type: ignore[call-arg]
+                    version_number=ver["version"],
+                    release_date=ver["published"],
                 ),
                 content={
                     "changes": ver["changes"],
@@ -144,19 +142,19 @@ async def main() -> None:
         tree = await manager.build_tree(project.id)
 
         if tree:
-            project_name: str = tree.data["metadata"]["project_name"]  # type: ignore[index]
+            project_name: str = tree.data["metadata"]["project_name"]
             print(f"   {project_name} (level {tree.level})")
 
             if tree.children:
                 for doc in tree.children:
-                    doc_title: str = doc.data["metadata"]["document_title"]  # type: ignore[index]
+                    doc_title: str = doc.data["metadata"]["document_title"]
                     print(f"     └── {doc_title} (level {doc.level})")
 
                     if doc.children:
-                        for ver in doc.children:
-                            ver_num: str = ver.data["metadata"]["version_number"]  # type: ignore[index]
-                            changes: str = ver.data["content"]["changes"]  # type: ignore[index]
-                            print(f"         └── v{ver_num}: {changes} (level {ver.level})")
+                        for version_node in doc.children:
+                            ver_num: str = version_node.data["metadata"]["version_number"]
+                            changes: str = version_node.data["content"]["changes"]
+                            print(f"         └── v{ver_num}: {changes} (level {version_node.level})")
 
         # Query by level
         print("\n5. Querying artifacts by level")

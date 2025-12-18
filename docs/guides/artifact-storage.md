@@ -134,15 +134,15 @@ Chapkit provides strongly-typed schemas for artifact data to ensure consistency 
 
 ```python
 from chapkit.artifact import (
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
     MLPredictionArtifactData,
     GenericArtifactData,
     MLMetadata
 )
 
 # ML training artifact with typed metadata
-training_data = MLTrainingArtifactData(
-    type="ml_training",
+training_data = MLTrainingWorkspaceArtifactData(
+    type="ml_training_workspace",
     metadata=MLMetadata(
         status="success",
         config_id="01ABC123...",
@@ -161,7 +161,7 @@ artifact = await manager.save(ArtifactIn(data=artifact_data))
 ```
 
 **Available Schemas:**
-- `MLTrainingArtifactData`: For trained ML models with execution metadata
+- `MLTrainingWorkspaceArtifactData`: For trained ML models with execution metadata
 - `MLPredictionArtifactData`: For prediction results with execution metadata
 - `GenericArtifactData`: For custom artifacts with flexible metadata
 
@@ -415,12 +415,12 @@ artifact = await manager.save(ArtifactIn(
 Use typed schemas for ML artifacts with PickleType storage:
 
 ```python
-from chapkit.artifact import MLTrainingArtifactData, MLMetadata
+from chapkit.artifact import MLTrainingWorkspaceArtifactData, MLMetadata
 from datetime import datetime
 
 # Create typed artifact data
-training_data = MLTrainingArtifactData(
-    type="ml_training",
+training_data = MLTrainingWorkspaceArtifactData(
+    type="ml_training_workspace",
     metadata=MLMetadata(
         status="success",
         config_id=config_id,

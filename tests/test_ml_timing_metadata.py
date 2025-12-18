@@ -77,7 +77,8 @@ async def ml_manager() -> AsyncIterator[MLManager]:
 
     scheduler = InMemoryChapkitScheduler()
 
-    runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
+    # Disable workspace to test pickled model artifacts (workspace tested separately)
+    runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict, enable_workspace=False)
 
     manager = MLManager(runner, scheduler, database, SimpleConfig)
     yield manager
@@ -126,7 +127,7 @@ async def test_training_timing_metadata_captured(
         artifact = await artifact_manager.find_by_id(ULID.from_str(response.artifact_id))
 
     assert artifact is not None
-    assert artifact.data["type"] == "ml_training"
+    assert artifact.data["type"] == "ml_training_workspace"
 
     # Verify timing metadata exists
     assert "started_at" in artifact.data["metadata"]
@@ -296,7 +297,7 @@ async def test_original_metadata_preserved(
 
     # Original fields should still exist
     assert train_artifact is not None
-    assert train_artifact.data["type"] == "ml_training"
+    assert train_artifact.data["type"] == "ml_training_workspace"
     assert train_artifact.data["metadata"]["config_id"] == str(config_id)
     assert "content" in train_artifact.data
 
@@ -351,7 +352,7 @@ async def test_typed_metadata_validation(
     ml_manager: MLManager, setup_data: tuple[ULID, pd.DataFrame, pd.DataFrame]
 ) -> None:
     """Test that artifact data follows typed schema structure."""
-    from chapkit.artifact.schemas import MLMetadata, MLTrainingArtifactData
+    from chapkit.artifact.schemas import MLMetadata, MLTrainingWorkspaceArtifactData
 
     # Create artifact data with typed structure
     metadata = MLMetadata(
@@ -363,8 +364,8 @@ async def test_typed_metadata_validation(
     )
 
     # Create typed artifact data
-    artifact_data = MLTrainingArtifactData(
-        type="ml_training",
+    artifact_data = MLTrainingWorkspaceArtifactData(
+        type="ml_training_workspace",
         metadata=metadata,
         content={"test": "model"},
         content_type="application/x-pickle",
@@ -372,7 +373,7 @@ async def test_typed_metadata_validation(
     )
 
     # Verify typed structure
-    assert artifact_data.type == "ml_training"
+    assert artifact_data.type == "ml_training_workspace"
     assert artifact_data.metadata.status == "success"
     assert artifact_data.metadata.config_id == "01K72P5N5KCRM6MD3BRE4P0001"
     assert artifact_data.content == {"test": "model"}
@@ -408,7 +409,7 @@ async def test_typed_structure_present_in_artifact(
     assert "content_type" in data
 
     # Verify type is correct
-    assert data["type"] == "ml_training"
+    assert data["type"] == "ml_training_workspace"
 
     # Verify metadata fields exist
     assert "started_at" in data["metadata"]
@@ -434,7 +435,7 @@ async def test_predict_with_wrong_artifact_type_raises_error(ml_manager: MLManag
         artifact_repo = ArtifactRepository(session)
         artifact_manager = ArtifactManager(artifact_repo)
 
-        # Create artifact with ml_type="ml_prediction" instead of "ml_training"
+        # Create artifact with ml_type="ml_prediction" instead of "ml_training_workspace"
         await artifact_manager.save(
             ArtifactIn(
                 id=wrong_artifact_id,

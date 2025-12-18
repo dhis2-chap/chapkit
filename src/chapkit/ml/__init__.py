@@ -5,7 +5,7 @@ from .router import MLRouter
 from .runner import BaseModelRunner, FunctionalModelRunner, ShellModelRunner
 from .schemas import (
     MLPredictionArtifactData,
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
     ModelRunnerProtocol,
     PredictRequest,
     PredictResponse,
@@ -25,5 +25,5 @@ __all__ = [
     "ShellModelRunner",
     "TrainRequest",
     "TrainResponse",
-    "MLTrainingArtifactData",
+    "MLTrainingWorkspaceArtifactData",
 ]

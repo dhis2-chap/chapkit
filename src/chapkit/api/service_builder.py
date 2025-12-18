@@ -59,6 +59,7 @@ class MLServiceInfo(ServiceInfo):
     citation_info: str | None = None
     allow_free_additional_continuous_covariates: bool = False
     required_covariates: List[str] = field(default_factory=list)
+    requires_geo: bool = False
 
 
 @dataclass(slots=True)

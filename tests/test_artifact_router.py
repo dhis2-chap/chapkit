@@ -126,7 +126,7 @@ def test_download_artifact_with_no_content_field() -> None:
     """Test that download returns 404 when artifact has no content field."""
     mock_artifact = Mock(spec=ArtifactOut)
     mock_artifact.id = ULID()
-    mock_artifact.data = {"type": "ml_training", "metadata": {}}
+    mock_artifact.data = {"type": "ml_training_workspace", "metadata": {}}
 
     mock_manager = Mock(spec=ArtifactManager)
     mock_manager.find_by_id = AsyncMock(return_value=mock_artifact)
@@ -443,7 +443,7 @@ def test_get_metadata_returns_metadata_only() -> None:
     mock_artifact = Mock(spec=ArtifactOut)
     mock_artifact.id = ULID()
     mock_artifact.data = {
-        "type": "ml_training",
+        "type": "ml_training_workspace",
         "metadata": metadata,
         "content": b"large binary content that should not be included",
         "content_type": "application/x-pickle",

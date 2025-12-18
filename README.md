@@ -74,7 +74,7 @@ app = (
     ServiceBuilder(info=ServiceInfo(display_name="ML Service"))
     .with_health()
     .with_config(MyConfig)
-    .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training", 1: "ml_prediction"}))
+    .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training_workspace", 1: "ml_prediction"}))
     .with_jobs()
     .build()
 )

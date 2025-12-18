@@ -20,7 +20,7 @@ from chapkit.artifact import (
     ArtifactManager,
     ArtifactRepository,
     MLMetadata,
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
 )
 
 
@@ -63,8 +63,8 @@ async def main() -> None:
         started_at = datetime(2025, 10, 18, 10, 0, 0)
         completed_at = datetime(2025, 10, 18, 10, 5, 30)
 
-        training_data_model = MLTrainingArtifactData(
-            type="ml_training",
+        training_data_model = MLTrainingWorkspaceArtifactData(
+            type="ml_training_workspace",
             metadata=MLMetadata(
                 status="success",
                 config_id="01CONFIG123...",
@@ -101,7 +101,7 @@ async def main() -> None:
             print(f"\n3. Retrieved artifact: {retrieved.id}")
 
             # Access typed data
-            assert retrieved.data["type"] == "ml_training"
+            assert retrieved.data["type"] == "ml_training_workspace"
             metadata = retrieved.data["metadata"]
             trained_model = retrieved.data["content"]
 

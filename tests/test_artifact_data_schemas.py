@@ -8,7 +8,7 @@ from chapkit.artifact.schemas import (
     GenericMetadata,
     MLMetadata,
     MLPredictionArtifactData,
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
     validate_artifact_data,
 )
 
@@ -77,11 +77,11 @@ def test_generic_metadata_empty():
     assert metadata.model_dump() == {}
 
 
-# Tests for MLTrainingArtifactData
+# Tests for MLTrainingWorkspaceArtifactData
 
 
-def test_ml_training_artifact_data_valid():
-    """Test MLTrainingArtifactData with valid data."""
+def test_ml_training_workspace_artifact_data_valid():
+    """Test MLTrainingWorkspaceArtifactData with valid data."""
     metadata = MLMetadata(
         status="success",
         config_id="01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -90,23 +90,23 @@ def test_ml_training_artifact_data_valid():
         duration_seconds=42.5,
     )
 
-    artifact_data = MLTrainingArtifactData(
-        type="ml_training",
+    artifact_data = MLTrainingWorkspaceArtifactData(
+        type="ml_training_workspace",
         metadata=metadata,
         content=b"model bytes",
         content_type="application/zip",
         content_size=1024,
     )
 
-    assert artifact_data.type == "ml_training"
+    assert artifact_data.type == "ml_training_workspace"
     assert artifact_data.metadata.status == "success"
     assert artifact_data.content == b"model bytes"
     assert artifact_data.content_type == "application/zip"
     assert artifact_data.content_size == 1024
 
 
-def test_ml_training_artifact_data_wrong_type():
-    """Test MLTrainingArtifactData rejects wrong type value."""
+def test_ml_training_workspace_artifact_data_wrong_type():
+    """Test MLTrainingWorkspaceArtifactData rejects wrong type value."""
     metadata = MLMetadata(
         status="success",
         config_id="01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -116,15 +116,15 @@ def test_ml_training_artifact_data_wrong_type():
     )
 
     with pytest.raises(ValidationError):
-        MLTrainingArtifactData(
+        MLTrainingWorkspaceArtifactData(
             type="ml_prediction",  # type: ignore[arg-type]  # Testing wrong type
             metadata=metadata,
             content=b"model bytes",
         )
 
 
-def test_ml_training_artifact_data_optional_fields():
-    """Test MLTrainingArtifactData with optional fields as None."""
+def test_ml_training_workspace_artifact_data_optional_fields():
+    """Test MLTrainingWorkspaceArtifactData with optional fields as None."""
     metadata = MLMetadata(
         status="success",
         config_id="01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -133,7 +133,7 @@ def test_ml_training_artifact_data_optional_fields():
         duration_seconds=42.5,
     )
 
-    artifact_data = MLTrainingArtifactData(
+    artifact_data = MLTrainingWorkspaceArtifactData(
         metadata=metadata,
         content=b"model bytes",
         content_type=None,
@@ -196,10 +196,10 @@ def test_generic_artifact_data_valid():
 # Tests for Discriminated Union
 
 
-def test_discriminated_union_ml_training():
-    """Test discriminated union routes to MLTrainingArtifactData."""
+def test_discriminated_union_ml_training_workspace():
+    """Test discriminated union routes to MLTrainingWorkspaceArtifactData."""
     data_dict = {
-        "type": "ml_training",
+        "type": "ml_training_workspace",
         "metadata": {
             "status": "success",
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -213,9 +213,9 @@ def test_discriminated_union_ml_training():
     }
 
     # Pydantic's discriminated union should route to correct type
-    artifact_data = MLTrainingArtifactData.model_validate(data_dict)
-    assert isinstance(artifact_data, MLTrainingArtifactData)
-    assert artifact_data.type == "ml_training"
+    artifact_data = MLTrainingWorkspaceArtifactData.model_validate(data_dict)
+    assert isinstance(artifact_data, MLTrainingWorkspaceArtifactData)
+    assert artifact_data.type == "ml_training_workspace"
 
 
 def test_discriminated_union_ml_prediction():
@@ -254,10 +254,10 @@ def test_discriminated_union_generic():
 # Tests for validate_artifact_data helper
 
 
-def test_validate_artifact_data_ml_training():
-    """Test validate_artifact_data with ml_training type."""
+def test_validate_artifact_data_ml_training_workspace():
+    """Test validate_artifact_data with ml_training_workspace type."""
     data_dict = {
-        "type": "ml_training",
+        "type": "ml_training_workspace",
         "metadata": {
             "status": "success",
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -269,7 +269,7 @@ def test_validate_artifact_data_ml_training():
     }
 
     result = validate_artifact_data(data_dict)
-    assert isinstance(result, MLTrainingArtifactData)
+    assert isinstance(result, MLTrainingWorkspaceArtifactData)
     assert result.metadata.status == "success"
 
 
@@ -330,7 +330,7 @@ def test_validate_artifact_data_unknown_type_raises_error():
 def test_validate_artifact_data_invalid_raises_error():
     """Test validate_artifact_data raises ValidationError for invalid data."""
     data_dict = {
-        "type": "ml_training",
+        "type": "ml_training_workspace",
         "metadata": {
             "status": "invalid_status",  # Invalid
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -359,8 +359,8 @@ def test_base_artifact_data_forbids_extra_fields():
     )
 
     with pytest.raises(ValidationError):
-        MLTrainingArtifactData(
-            type="ml_training",
+        MLTrainingWorkspaceArtifactData(
+            type="ml_training_workspace",
             metadata=metadata,
             content=b"model",
             extra_field="not allowed",  # type: ignore[call-arg]  # Testing forbidden field
@@ -370,8 +370,8 @@ def test_base_artifact_data_forbids_extra_fields():
 # Tests for serialization
 
 
-def test_ml_training_artifact_data_serialization():
-    """Test MLTrainingArtifactData serialization to dict."""
+def test_ml_training_workspace_artifact_data_serialization():
+    """Test MLTrainingWorkspaceArtifactData serialization to dict."""
     metadata = MLMetadata(
         status="success",
         config_id="01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -380,7 +380,7 @@ def test_ml_training_artifact_data_serialization():
         duration_seconds=42.5,
     )
 
-    artifact_data = MLTrainingArtifactData(
+    artifact_data = MLTrainingWorkspaceArtifactData(
         metadata=metadata,
         content="simple content",
         content_type="text/plain",
@@ -389,7 +389,7 @@ def test_ml_training_artifact_data_serialization():
 
     data_dict = artifact_data.model_dump()
 
-    assert data_dict["type"] == "ml_training"
+    assert data_dict["type"] == "ml_training_workspace"
     assert data_dict["metadata"]["status"] == "success"
     assert data_dict["metadata"]["config_id"] == "01ARZ3NDEKTSV4RRFFQ69G5FAV"
     assert data_dict["content"] == "simple content"

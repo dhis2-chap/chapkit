@@ -36,7 +36,7 @@ app = (
     MLServiceBuilder(
         info=MLServiceInfo(display_name="My ML Service"),
         config_schema=ModelConfig,
-        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training", 1: "ml_prediction"}),
+        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training_workspace", 1: "ml_prediction"}),
         runner=runner,
     )
     .build()
@@ -117,8 +117,11 @@ runner = ShellModelRunner(
 Config
   └─> Trained Model (level 0)
        ├─> Predictions 1 (level 1)
+       │    └─> Workspace 1 (level 2)
        ├─> Predictions 2 (level 1)
+       │    └─> Workspace 2 (level 2)
        └─> Predictions 3 (level 1)
+            └─> Workspace 3 (level 2)
 ```
 
 **Benefits:**
@@ -126,6 +129,7 @@ Config
 - Multiple predictions from same model
 - Config linked to all model artifacts
 - Immutable model versioning
+- Debug workspaces linked to predictions (all runners with workspace enabled)
 
 ### Job Scheduling
 
@@ -193,13 +197,28 @@ async def predict_fn(config, model, historic, future, geo=None):
     # Prediction logic
     return predictions
 
+# Workspace enabled by default (stores all inputs and outputs as ZIP)
 runner = FunctionalModelRunner(on_train=train_fn, on_predict=predict_fn)
+
+# Disable workspace for smaller artifacts (stores only pickled model)
+runner = FunctionalModelRunner(
+    on_train=train_fn,
+    on_predict=predict_fn,
+    enable_workspace=False,
+)
 ```
+
+**Workspace Feature:**
+- **Enabled by default**: Training and prediction artifacts include complete workspace ZIPs
+- Workspace contains: config.yml, data.csv, geo.json (if provided), model.pickle, predictions.csv
+- Enables debugging by inspecting exact inputs and outputs
+- Set `enable_workspace=False` for smaller artifacts (pickled model only)
 
 **Use Cases:**
 - Simple models without state
 - Quick prototypes
 - Pure function workflows
+- Full traceability with workspace enabled
 
 ### ShellModelRunner
 
@@ -234,6 +253,8 @@ runner = ShellModelRunner(
   - Model file creation is optional - workspace is preserved regardless of exit code
   - Training artifacts store the entire workspace (files, logs, intermediate results)
 - **Prediction script:** Read data from arguments, read config from `config.yml`, load model from `model.pickle`, make predictions, save to `{output_file}`
+  - Prediction artifacts store the entire workspace (like training)
+  - Includes all prediction outputs, logs, and intermediate files
 - Exit code 0 on success, non-zero on failure
 - Use stderr for logging
 - Can use relative imports from project modules
@@ -331,11 +352,12 @@ info = MLServiceInfo(
     author="ML Team",
     author_assessed_status=AssessedStatus.green,
     contact_email="ml-team@example.com",
+    requires_geo=True,  # Model requires GeoJSON spatial data
 )
 
 hierarchy = ArtifactHierarchy(
     name="ml_pipeline",
-    level_labels={0: "ml_training", 1: "ml_prediction"},
+    level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
 )
 
 app = (
@@ -392,6 +414,25 @@ MLServiceBuilder(
     database_url="ml.db",    # Persistent storage (default: in-memory)
 )
 ```
+
+### MLServiceInfo Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | str | Service display name (required) |
+| `version` | str | Service version |
+| `summary` | str | Short description |
+| `description` | str | Detailed description |
+| `author` | str | Model author or team |
+| `author_note` | str | Additional author notes |
+| `author_assessed_status` | AssessedStatus | Model maturity (red/orange/yellow/green) |
+| `contact_email` | str | Contact email address |
+| `organization` | str | Organization name |
+| `organization_logo_url` | str | URL to organization logo |
+| `citation_info` | str | How to cite this model |
+| `required_covariates` | list[str] | Required input covariate names |
+| `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |
+| `requires_geo` | bool | Whether the model requires GeoJSON spatial data for training/prediction |
 
 ---
 
@@ -572,15 +613,15 @@ Chapkit uses typed artifact data schemas for consistent ML artifact storage with
 
 ### ML Training Artifact
 
-Stored at hierarchy level 0 using `MLTrainingArtifactData`. The artifact structure differs based on the runner type:
+Stored at hierarchy level 0 using `MLTrainingWorkspaceArtifactData`. The artifact structure differs based on the runner configuration:
 
-#### FunctionalModelRunner / BaseModelRunner
+#### FunctionalModelRunner with `enable_workspace=False`
 
-Stores pickled Python model objects:
+Stores pickled Python model objects directly:
 
 ```json
 {
-  "type": "ml_training",
+  "type": "ml_training_workspace",
   "metadata": {
     "status": "success",
     "config_id": "01CONFIG...",
@@ -595,7 +636,7 @@ Stores pickled Python model objects:
 ```
 
 **Schema Structure:**
-- `type`: Discriminator field - always `"ml_training"`
+- `type`: Discriminator field - always `"ml_training_workspace"`
 - `metadata`: Structured execution metadata
   - `status`: "success" (always success for FunctionalModelRunner)
   - `config_id`: Config used for training
@@ -605,13 +646,13 @@ Stores pickled Python model objects:
 - `content_type`: "application/x-pickle"
 - `content_size`: Size in bytes (optional)
 
-#### ShellModelRunner
+#### FunctionalModelRunner (default) / ShellModelRunner
 
-Stores compressed workspace as zip artifact:
+Stores compressed workspace as zip artifact (workspace enabled by default for FunctionalModelRunner):
 
 ```json
 {
-  "type": "ml_training",
+  "type": "ml_training_workspace",
   "metadata": {
     "status": "success",
     "exit_code": 0,
@@ -629,7 +670,7 @@ Stores compressed workspace as zip artifact:
 ```
 
 **Schema Structure:**
-- `type`: Discriminator field - always `"ml_training"`
+- `type`: Discriminator field - always `"ml_training_workspace"`
 - `metadata`: Structured execution metadata
   - `status`: "success" or "failed" (based on exit code)
   - `exit_code`: Training script exit code (0 = success)
@@ -650,7 +691,11 @@ Stores compressed workspace as zip artifact:
 
 ### ML Prediction Artifact
 
-Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training artifact):
+Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training artifact). All runners store the prediction DataFrame the same way:
+
+#### Prediction Artifact (level 1, all runners)
+
+Stores prediction DataFrame directly:
 
 ```json
 {
@@ -677,6 +722,53 @@ Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training
 - `content`: Prediction DataFrame with results
 - `content_type`: "application/vnd.chapkit.dataframe+json"
 
+#### Workspace Artifact (level 2, when workspace enabled)
+
+Both FunctionalModelRunner (default) and ShellModelRunner create an additional workspace artifact (level 2) as a child of the prediction artifact for debugging:
+
+```json
+{
+  "type": "ml_prediction_workspace",
+  "metadata": {
+    "status": "success",
+    "exit_code": 0,
+    "stdout": "Prediction completed successfully\\n",
+    "stderr": "",
+    "config_id": "01CONFIG...",
+    "started_at": "2025-10-14T10:05:00Z",
+    "completed_at": "2025-10-14T10:05:02Z",
+    "duration_seconds": 2.15
+  },
+  "content": "<Zip file bytes>",
+  "content_type": "application/zip",
+  "content_size": 1048576
+}
+```
+
+**Workspace Artifact Schema:**
+- `type`: Discriminator field - always `"ml_prediction_workspace"`
+- `metadata`: Structured execution metadata
+  - `status`: "success" or "failed" (based on exit code for ShellModelRunner)
+  - `exit_code`: Script exit code (ShellModelRunner only, null for FunctionalModelRunner)
+  - `stdout`: Standard output (ShellModelRunner only, null for FunctionalModelRunner)
+  - `stderr`: Standard error (ShellModelRunner only, null for FunctionalModelRunner)
+  - `config_id`: Config used for prediction
+  - `started_at`, `completed_at`: ISO 8601 timestamps
+  - `duration_seconds`: Prediction duration
+- `content`: Compressed workspace (all files, logs, artifacts created during prediction)
+- `content_type`: "application/zip"
+- `content_size`: Zip file size in bytes
+
+**Workspace Contents:**
+- predictions.csv (output predictions)
+- config.yml (configuration used)
+- historic.csv, future.csv (input data)
+- geo.json (if provided)
+- model.pickle (trained model, FunctionalModelRunner)
+- Additional files created during execution (logs, intermediate results)
+
+**Accessing workspace:** Use `GET /api/v1/artifacts/{prediction_id}/$tree` to find the workspace artifact ID, then retrieve it directly.
+
 ### Accessing Artifact Data
 
 ```python
@@ -684,7 +776,7 @@ Stored at hierarchy level 1 using `MLPredictionArtifactData` (linked to training
 artifact = await artifact_manager.find_by_id(model_artifact_id)
 
 # Access typed data
-assert artifact.data["type"] == "ml_training"
+assert artifact.data["type"] == "ml_training_workspace"
 metadata = artifact.data["metadata"]
 trained_model = artifact.data["content"]
 
@@ -976,7 +1068,7 @@ def test_train_predict_workflow(client: TestClient):
 
     # Verify model artifact
     model_artifact = client.get(f"/api/v1/artifacts/{model_id}").json()
-    assert model_artifact["data"]["type"] == "ml_training"
+    assert model_artifact["data"]["type"] == "ml_training_workspace"
     assert model_artifact["level"] == 0
 
     # Predict
@@ -1110,6 +1202,145 @@ model_training_duration = Histogram(
 # Training durations already tracked in artifact metadata
 # Query via artifact API
 ```
+
+### Artifact Retention Strategies
+
+ML artifacts, especially workspace ZIPs from `ShellModelRunner` and `FunctionalModelRunner` (when workspace is enabled), can consume significant storage. Implement retention policies to manage disk space while preserving important artifacts.
+
+**Artifact Size Considerations:**
+- Training workspace ZIPs: 1-100+ MB (depends on project size)
+- Prediction workspace ZIPs: 0.5-50+ MB
+- Prediction DataFrames: Typically small (KB range)
+- Models (pickled): Varies widely (KB to GB)
+
+**Retention Strategies:**
+
+1. **Time-based cleanup**: Delete artifacts older than N days
+
+```python
+import asyncio
+from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+async def cleanup_old_artifacts(app: FastAPI, days: int = 30) -> None:
+    """Delete artifacts older than specified days."""
+    from chapkit.artifact import ArtifactRepository, ArtifactManager
+
+    cutoff = datetime.now() - timedelta(days=days)
+
+    async with app.state.database.session() as session:
+        artifact_repository = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repository)
+
+        # Find old artifacts (implement find_older_than in repository)
+        old_artifacts = await artifact_manager.find_all()
+
+        deleted_count = 0
+        for artifact in old_artifacts:
+            if artifact.created_at < cutoff:
+                await artifact_manager.delete(artifact.id)
+                deleted_count += 1
+
+        await artifact_repository.commit()
+
+    print(f"Deleted {deleted_count} artifacts older than {days} days")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Run cleanup on startup (optional)
+    await cleanup_old_artifacts(app, days=30)
+    yield
+```
+
+2. **Level-based retention**: Keep training artifacts longer than prediction workspaces
+
+```python
+async def cleanup_by_level(app: FastAPI) -> None:
+    """Different retention periods by artifact level."""
+    retention_days = {
+        0: 365,   # Training artifacts: keep 1 year
+        1: 90,    # Prediction results: keep 90 days
+        2: 7,     # Workspace ZIPs: keep 7 days (debug only)
+    }
+
+    async with app.state.database.session() as session:
+        artifact_repository = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repository)
+
+        for artifact in await artifact_manager.find_all():
+            days = retention_days.get(artifact.level, 30)
+            cutoff = datetime.now() - timedelta(days=days)
+            if artifact.created_at < cutoff:
+                await artifact_manager.delete(artifact.id)
+
+        await artifact_repository.commit()
+```
+
+3. **Type-based retention**: Keep predictions, delete workspaces
+
+```python
+async def cleanup_workspace_artifacts(app: FastAPI, days: int = 7) -> None:
+    """Delete workspace artifacts older than N days, keep predictions."""
+    cutoff = datetime.now() - timedelta(days=days)
+
+    async with app.state.database.session() as session:
+        artifact_repository = ArtifactRepository(session)
+        artifact_manager = ArtifactManager(artifact_repository)
+
+        for artifact in await artifact_manager.find_all():
+            artifact_type = artifact.data.get("type", "")
+            # Only delete workspace artifacts, not predictions
+            if artifact_type in ("ml_training_workspace", "ml_prediction_workspace"):
+                if artifact.data.get("content_type") == "application/zip":
+                    if artifact.created_at < cutoff:
+                        await artifact_manager.delete(artifact.id)
+
+        await artifact_repository.commit()
+```
+
+4. **Disable workspace for smaller footprint**:
+
+```python
+# FunctionalModelRunner: disable workspace to store only pickled models
+runner = FunctionalModelRunner(
+    on_train=train_fn,
+    on_predict=predict_fn,
+    enable_workspace=False,  # Only store pickled model, no ZIP
+)
+```
+
+**Scheduled cleanup with APScheduler:**
+
+```python
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+scheduler = AsyncIOScheduler()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Schedule daily cleanup at 3 AM
+    scheduler.add_job(
+        cleanup_old_artifacts,
+        CronTrigger(hour=3, minute=0),
+        args=[app, 30],
+        id="artifact_cleanup",
+    )
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+```
+
+**Best Practices:**
+- Keep training artifacts (level 0) longer than prediction workspaces (level 2)
+- Prediction DataFrames (level 1) are small - retain longer for audit trails
+- Workspace ZIPs (level 2) are primarily for debugging - short retention OK
+- Monitor database size with alerts (e.g., when exceeding 80% capacity)
+- Consider external storage (S3, GCS) for large models instead of SQLite
+- Back up critical artifacts before cleanup runs
 
 ### Docker Deployment
 

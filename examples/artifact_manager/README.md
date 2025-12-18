@@ -9,7 +9,7 @@ These examples demonstrate how to use `ArtifactManager` directly with typed arti
 **Basic artifact creation and querying with typed schemas**
 
 Shows how to:
-- Create ML training artifacts with `MLTrainingArtifactData`
+- Create ML training artifacts with `MLTrainingWorkspaceArtifactData`
 - Store trained models with structured metadata
 - Query artifacts by ID
 - Access and use stored models
@@ -69,11 +69,11 @@ python examples/artifact_manager/03_generic_artifacts.py
 ### Creating Typed Artifacts
 
 ```python
-from chapkit.artifact import MLTrainingArtifactData, MLMetadata
+from chapkit.artifact import MLTrainingWorkspaceArtifactData, MLMetadata
 
 # Create typed data model
-training_data_model = MLTrainingArtifactData(
-    type="ml_training",
+training_data_model = MLTrainingWorkspaceArtifactData(
+    type="ml_training_workspace",
     metadata=MLMetadata(
         status="success",
         config_id="01CONFIG...",
@@ -176,7 +176,7 @@ engine = create_async_engine("postgresql+asyncpg://user:pass@localhost/db")
 
 Chapkit provides three main artifact data schemas:
 
-1. **MLTrainingArtifactData**: For trained ML models
+1. **MLTrainingWorkspaceArtifactData**: For trained ML models
    - Required metadata: status, config_id, timestamps, duration
    - Content: Trained model (Python object)
    - Content-Type: `application/x-pickle`
