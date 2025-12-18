@@ -400,14 +400,14 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
             workspace_dir = None
 
         if workspace_dir and self.enable_workspace:
-            # Zip workspace like ShellModelRunner
+            # Zip workspace like ShellModelRunner (workspace artifact for debugging)
             return await self._create_workspace_artifact(
                 workspace_dir=Path(workspace_dir),
                 config_id=config_id,
                 started_at=started_at,
                 completed_at=completed_at,
                 duration_seconds=duration_seconds,
-                artifact_type="ml_prediction",
+                artifact_type="ml_prediction_workspace",
             )
         else:
             # Default: store predictions directly

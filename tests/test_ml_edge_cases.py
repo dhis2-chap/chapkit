@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import datetime
+import io
 import shutil
 import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from geojson_pydantic import Feature, FeatureCollection, Point
@@ -634,3 +635,180 @@ async def test_functional_runner_predict_with_geo() -> None:
 
     # Cleanup
     shutil.rmtree(workspace_dir, ignore_errors=True)
+
+
+# --- Tests for corrupted pickle handling in MLManager ---
+
+
+def _create_workspace_zip_with_corrupted_pickle() -> bytes:
+    """Create a workspace ZIP with a corrupted model.pickle file."""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Add config.yml
+        zf.writestr("config.yml", "threshold: 0.5\n")
+        # Add corrupted model.pickle (invalid pickle data)
+        zf.writestr("model.pickle", b"this is not valid pickle data")
+    return zip_buffer.getvalue()
+
+
+def _create_workspace_zip_with_empty_pickle() -> bytes:
+    """Create a workspace ZIP with an empty model.pickle file (causes EOFError)."""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("config.yml", "threshold: 0.5\n")
+        zf.writestr("model.pickle", b"")  # Empty file causes EOFError
+    return zip_buffer.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_mlmanager_predict_with_corrupted_pickle() -> None:
+    """Test MLManager._predict_task raises ValueError for corrupted pickle files."""
+    from ulid import ULID
+
+    from chapkit.ml.manager import MLManager
+    from chapkit.ml.schemas import PredictRequest
+
+    # Create mock runner (FunctionalModelRunner, not ShellModelRunner)
+    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
+        return "model"
+
+    async def predict_fn(
+        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
+    ) -> DataFrame:
+        return future
+
+    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
+        on_train=train_fn,
+        on_predict=predict_fn,
+        enable_workspace=True,
+    )
+
+    # Create mock database and scheduler
+    mock_database = MagicMock()
+    mock_scheduler = MagicMock()
+
+    manager: MLManager[MockConfig] = MLManager(
+        runner=runner,
+        scheduler=mock_scheduler,
+        database=mock_database,
+        config_schema=MockConfig,
+    )
+
+    # Create training artifact with corrupted pickle
+    training_artifact_id = ULID()
+    config_id = ULID()
+    corrupted_workspace = _create_workspace_zip_with_corrupted_pickle()
+
+    training_artifact = MagicMock()
+    training_artifact.data = {
+        "type": "ml_training_workspace",
+        "metadata": {
+            "status": "success",
+            "config_id": str(config_id),
+            "started_at": "2025-01-01T00:00:00",
+            "completed_at": "2025-01-01T00:01:00",
+            "duration_seconds": 60.0,
+        },
+        "content": corrupted_workspace,
+        "content_type": "application/zip",
+    }
+
+    # Mock artifact manager to return our training artifact
+    mock_artifact_manager = AsyncMock()
+    mock_artifact_manager.find_by_id = AsyncMock(return_value=training_artifact)
+
+    # Mock session context manager
+    mock_session = MagicMock()
+    mock_database.session = MagicMock(
+        return_value=MagicMock(__aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock())
+    )
+
+    # Patch ArtifactManager and ArtifactRepository
+    with (
+        patch("chapkit.ml.manager.ArtifactRepository"),
+        patch("chapkit.ml.manager.ArtifactManager", return_value=mock_artifact_manager),
+    ):
+        request = PredictRequest(
+            artifact_id=training_artifact_id,
+            historic=DataFrame(columns=["x"], data=[]),
+            future=DataFrame(columns=["x"], data=[[1.0]]),
+        )
+        prediction_artifact_id = ULID()
+
+        # Should raise ValueError due to corrupted pickle
+        with pytest.raises(ValueError, match="corrupted or incompatible pickle file"):
+            await manager._predict_task(request, prediction_artifact_id)
+
+
+@pytest.mark.asyncio
+async def test_mlmanager_predict_with_empty_pickle() -> None:
+    """Test MLManager._predict_task raises ValueError for empty pickle files (EOFError)."""
+    from ulid import ULID
+
+    from chapkit.ml.manager import MLManager
+    from chapkit.ml.schemas import PredictRequest
+
+    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
+        return "model"
+
+    async def predict_fn(
+        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
+    ) -> DataFrame:
+        return future
+
+    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
+        on_train=train_fn,
+        on_predict=predict_fn,
+        enable_workspace=True,
+    )
+
+    mock_database = MagicMock()
+    mock_scheduler = MagicMock()
+
+    manager: MLManager[MockConfig] = MLManager(
+        runner=runner,
+        scheduler=mock_scheduler,
+        database=mock_database,
+        config_schema=MockConfig,
+    )
+
+    training_artifact_id = ULID()
+    config_id = ULID()
+    empty_pickle_workspace = _create_workspace_zip_with_empty_pickle()
+
+    training_artifact = MagicMock()
+    training_artifact.data = {
+        "type": "ml_training_workspace",
+        "metadata": {
+            "status": "success",
+            "config_id": str(config_id),
+            "started_at": "2025-01-01T00:00:00",
+            "completed_at": "2025-01-01T00:01:00",
+            "duration_seconds": 60.0,
+        },
+        "content": empty_pickle_workspace,
+        "content_type": "application/zip",
+    }
+
+    mock_artifact_manager = AsyncMock()
+    mock_artifact_manager.find_by_id = AsyncMock(return_value=training_artifact)
+
+    mock_session = MagicMock()
+    mock_database.session = MagicMock(
+        return_value=MagicMock(__aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock())
+    )
+
+    with (
+        patch("chapkit.ml.manager.ArtifactRepository"),
+        patch("chapkit.ml.manager.ArtifactManager", return_value=mock_artifact_manager),
+    ):
+        request = PredictRequest(
+            artifact_id=training_artifact_id,
+            historic=DataFrame(columns=["x"], data=[]),
+            future=DataFrame(columns=["x"], data=[[1.0]]),
+        )
+        prediction_artifact_id = ULID()
+
+        # Should raise ValueError due to empty pickle (EOFError)
+        with pytest.raises(ValueError, match="corrupted or incompatible pickle file"):
+            await manager._predict_task(request, prediction_artifact_id)

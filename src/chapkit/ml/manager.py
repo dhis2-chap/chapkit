@@ -260,6 +260,7 @@ class MLManager(Generic[ConfigT]):
                 prediction_workspace_dir = Path(workspace_dir_str)
 
                 # Create workspace artifact data (zips workspace)
+                # Runner returns ml_prediction_workspace type for debugging artifacts
                 workspace_artifact_dict = await self.runner.create_prediction_artifact(
                     prediction_result=prediction_result,
                     config_id=str(config_id),
@@ -267,8 +268,6 @@ class MLManager(Generic[ConfigT]):
                     completed_at=prediction_completed_at,
                     duration_seconds=round(prediction_duration, 2),
                 )
-                # Change type to ml_prediction_workspace (it's for debugging, not the primary prediction)
-                workspace_artifact_dict["type"] = "ml_prediction_workspace"
             else:
                 workspace_artifact_dict = None
 
