@@ -154,7 +154,7 @@ ignore_errors = true
 
 [tool.pyright]
 include = ["src", "tests", "examples"]
-exclude = ["examples/artifact_manager"]
+exclude = ["examples/artifact_manager", "**/.venv"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
