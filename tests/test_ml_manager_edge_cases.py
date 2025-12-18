@@ -2,22 +2,34 @@
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
 from ulid import ULID
 
-from examples.ml_shell.main import app as shell_app
-
 
 @pytest.fixture(scope="module")
 def shell_client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for shell runner testing."""
-    with TestClient(shell_app) as test_client:
-        yield test_client
+    # Change to example directory so Path.cwd() works correctly in ShellModelRunner
+    original_cwd = Path.cwd()
+    example_dir = Path(__file__).parent.parent / "examples" / "ml_shell"
+    os.chdir(example_dir)
+
+    try:
+        # Import app after changing directory
+        from examples.ml_shell.main import app as shell_app
+
+        with TestClient(shell_app) as test_client:
+            yield test_client
+    finally:
+        # Restore original directory
+        os.chdir(original_cwd)
 
 
 def wait_for_job(client: TestClient, job_id: str, timeout: float = 10.0) -> dict[Any, Any]:
