@@ -47,6 +47,15 @@ class AssessedStatus(StrEnum):
     green = "green"  # Validated and ready for production use
 
 
+class PeriodType(StrEnum):
+    """Supported time period types for the model."""
+
+    any = "any"  # Model supports any period type
+    week = "week"  # Model only supports weekly data
+    month = "month"  # Model only supports monthly data
+    year = "year"  # Model only supports yearly data
+
+
 class MLServiceInfo(ServiceInfo):
     """Extended service metadata for ML services with author, organization, and assessment info."""
 
@@ -59,6 +68,7 @@ class MLServiceInfo(ServiceInfo):
     citation_info: str | None = None
     allow_free_additional_continuous_covariates: bool = False
     required_covariates: List[str] = field(default_factory=list)
+    supported_period_type: PeriodType = PeriodType.any
 
 
 @dataclass(slots=True)
