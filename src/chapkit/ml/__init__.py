@@ -3,6 +3,12 @@
 from .manager import MLManager
 from .router import MLRouter
 from .runner import BaseModelRunner, FunctionalModelRunner, RunInfo, ShellModelRunner
+from .schema_discovery import (
+    ModelInfo,
+    create_config_from_schema,
+    discover_model_info,
+    discover_model_info_async,
+)
 from .schemas import (
     MLPredictionArtifactData,
     MLTrainingArtifactData,
@@ -18,6 +24,7 @@ __all__ = [
     "FunctionalModelRunner",
     "MLManager",
     "MLRouter",
+    "ModelInfo",
     "ModelRunnerProtocol",
     "PredictRequest",
     "PredictResponse",
@@ -27,4 +34,7 @@ __all__ = [
     "TrainRequest",
     "TrainResponse",
     "MLTrainingArtifactData",
+    "create_config_from_schema",
+    "discover_model_info",
+    "discover_model_info_async",
 ]

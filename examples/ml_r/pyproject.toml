@@ -2,7 +2,7 @@
 name = "ml-r-example"
 version = "0.1.0"
 description = "R model integration example for chapkit"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = ["chapkit"]
 
 [tool.uv]

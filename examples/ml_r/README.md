@@ -1,6 +1,6 @@
 # R Model Integration Example
 
-This example demonstrates how to integrate R models with chapkit using the `chap.r.sdk` package.
+This example demonstrates how to integrate R models with chapkit using the `chap.r.sdk` package, including **automatic schema discovery** from R models.
 
 ## Prerequisites
 
@@ -18,11 +18,34 @@ This example demonstrates how to integrate R models with chapkit using the `chap
 
 ```
 ml_r/
-├── main.py      # Chapkit service definition
+├── main.py      # Chapkit service definition with schema discovery
 ├── model.R      # R model implementation using chap.r.sdk
 ├── pyproject.toml
 └── README.md
 ```
+
+## Key Feature: Automatic Schema Discovery
+
+Instead of duplicating the configuration schema in both R and Python, chapkit can **discover the schema from your R model** at startup:
+
+```python
+from chapkit.ml import ShellModelRunner, discover_model_info
+
+# Discover schema and service info from R model
+model_info = discover_model_info("Rscript model.R info --format json")
+
+# Use the discovered config class
+app = MLServiceBuilder(
+    info=info,
+    config_schema=model_info.config_class,  # Dynamically created from R schema!
+    ...
+)
+```
+
+This means you only define your schema once (in R) and chapkit automatically:
+- Creates a Pydantic model with the correct fields
+- Exposes it via `GET /api/v1/configs/$schema`
+- Uses it for validation
 
 ## How It Works
 
@@ -33,31 +56,48 @@ The R model uses `chap.r.sdk::create_chapkit_cli()` which provides:
 - YAML configuration parsing with schema validation
 - run_info handling for runtime parameters
 - Prediction output in chapkit-compatible format
+- **`info --format json` command for schema discovery**
 
 ```r
 library(chap.r.sdk)
 
-# Define your model functions
-train_fn <- function(training_data, model_configuration, run_info) {
-  # training_data is already a tsibble
-  # Return model object (will be saved as RDS)
-}
+# Define config schema (source of truth)
+config_schema <- create_config_schema(
+  title = "My Model Configuration",
+  properties = list(
+    smoothing = schema_number(default = 0.5, minimum = 0, maximum = 1),
+    min_observations = schema_integer(default = 1, minimum = 1)
+  )
+)
 
-predict_fn <- function(historic_data, future_data, saved_model,
-                       model_configuration, run_info) {
-  # Return tibble with 'samples' list-column
-}
+# Define model info
+model_info <- list(
+  period_type = "month",
+  required_covariates = c("rainfall"),
+  allows_additional_continuous_covariates = TRUE
+)
 
-# Create CLI with one line
+# Create CLI - enables info, train, and predict commands
 create_chapkit_cli(train_fn, predict_fn, config_schema, model_info)
 ```
 
 ### 2. Python Service (`main.py`)
 
-Uses `ShellModelRunner` to execute R scripts:
+Uses `discover_model_info()` to get the schema from R:
 
 ```python
-from chapkit.ml import ShellModelRunner
+from chapkit.ml import ShellModelRunner, discover_model_info
+
+# Discover schema from R model
+model_info = discover_model_info(
+    "Rscript model.R info --format json",
+    model_name="MeanModelConfig"
+)
+
+# model_info contains:
+# - config_class: Pydantic BaseConfig subclass
+# - service_info: Dict with period_type, required_covariates, etc.
+# - period_type, required_covariates, allows_additional_continuous_covariates
 
 runner = ShellModelRunner(
     train_command="Rscript model.R train --data {data_file} --run-info {run_info_file}",
@@ -67,7 +107,7 @@ runner = ShellModelRunner(
 
 ### 3. Model Metadata Discovery
 
-The R SDK's `info` command provides structured JSON output for chapkit:
+The R SDK's `info` command provides structured JSON output:
 
 ```bash
 Rscript model.R info --format json

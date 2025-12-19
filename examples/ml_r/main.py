@@ -2,9 +2,9 @@
 
 This example demonstrates:
 - Using ShellModelRunner to execute R scripts via Rscript
+- **Automatic schema discovery** from R model's `info --format json` command
 - Integration with the chap.r.sdk R package
 - File-based data interchange (CSV, YAML)
-- The info command for model metadata and schema discovery
 
 Prerequisites:
 - R installed with Rscript available in PATH
@@ -15,39 +15,38 @@ The R model script uses chap.r.sdk's create_chapkit_cli() which provides:
 - tsibble conversion for time series data
 - Configuration schema validation
 - run_info handling
+- `info --format json` for schema discovery
 """
 
-from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, PeriodType
 from chapkit.artifact import ArtifactHierarchy
-from chapkit.ml import ShellModelRunner
-from pydantic import Field
+from chapkit.ml import ShellModelRunner, discover_model_info
+
+# ============================================================================
+# Schema Discovery from R Model
+# ============================================================================
+# Instead of duplicating the config schema in Python, we discover it from
+# the R model's `info --format json` command. This ensures the Python service
+# always uses the same schema as the R model.
+
+model_info = discover_model_info(
+    "Rscript model.R info --format json",
+    model_name="MeanModelConfig",
+)
+
+# The discovered model_info contains:
+# - model_info.config_class: Pydantic BaseConfig subclass for configuration
+# - model_info.service_info: Dict with period_type, required_covariates, etc.
+# - model_info.period_type: Shortcut to service_info["period_type"]
+# - model_info.required_covariates: Shortcut to service_info["required_covariates"]
+
+print(f"Discovered config schema: {model_info.config_class.model_json_schema()}")
 
 
-class MeanModelConfig(BaseConfig):
-    """Configuration for mean prediction model."""
-
-    smoothing: float = Field(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Smoothing factor for exponential smoothing (0 = no smoothing)",
-    )
-    min_observations: int = Field(
-        default=1,
-        ge=1,
-        description="Minimum observations required per location",
-    )
-
-
-# Create shell-based runner for R scripts
+# ============================================================================
+# Shell Model Runner
+# ============================================================================
 # Uses chap.r.sdk's create_chapkit_cli() interface with named arguments
-#
-# The R SDK handles:
-#   - Loading CSV data as tsibbles
-#   - Parsing YAML configuration
-#   - Loading run_info from YAML
-#   - Saving predictions in the correct format
 #
 # Variables substituted at runtime:
 #   {data_file} - Training data CSV
@@ -70,25 +69,34 @@ predict_command = (
     "--run-info {run_info_file}"
 )
 
-# Create shell model runner for R
-runner: ShellModelRunner[MeanModelConfig] = ShellModelRunner(
+runner = ShellModelRunner(
     train_command=train_command,
     predict_command=predict_command,
 )
 
-# Create ML service info with metadata
+
+# ============================================================================
+# Service Configuration
+# ============================================================================
+# Use discovered model_info to populate service metadata
+
 info = MLServiceInfo(
     display_name="R Mean Model Service",
     version="1.0.0",
     summary="Simple mean-based prediction model implemented in R",
     description=(
         "Demonstrates R model integration with chapkit using chap.r.sdk. "
-        "Predicts future values based on historical mean per location."
+        "Predicts future values based on historical mean per location. "
+        "Configuration schema is automatically discovered from the R model."
     ),
     author="CHAP Team",
-    author_note="Example R integration using chap.r.sdk package",
+    author_note="Example R integration with automatic schema discovery",
     author_assessed_status=AssessedStatus.yellow,
     contact_email="chap@example.com",
+    # Use discovered service info
+    supported_period_type=PeriodType(model_info.period_type),
+    required_covariates=model_info.required_covariates,
+    allow_free_additional_continuous_covariates=model_info.allows_additional_continuous_covariates,
 )
 
 # Create artifact hierarchy for ML artifacts
@@ -97,11 +105,11 @@ HIERARCHY = ArtifactHierarchy(
     level_labels={0: "ml_training", 1: "ml_prediction"},
 )
 
-# Build the FastAPI application
+# Build the FastAPI application using the discovered config schema
 app = (
     MLServiceBuilder(
         info=info,
-        config_schema=MeanModelConfig,
+        config_schema=model_info.config_class,  # Use discovered schema!
         hierarchy=HIERARCHY,
         runner=runner,
     )

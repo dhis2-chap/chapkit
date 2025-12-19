@@ -171,6 +171,20 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
     Files always available in workspace:
         config.yml: Model configuration in YAML format
         run_info.yml: Runtime information (prediction_length, additional_covariates, etc.)
+
+    Schema Discovery:
+        If info_command is provided, call discover_model_info() to get the config schema
+        and service info from the external script. This enables R models (or any language)
+        to define their own configuration schema.
+
+    Example with R SDK:
+        >>> from chapkit.ml.schema_discovery import discover_model_info
+        >>> model_info = discover_model_info("Rscript model.R info --format json")
+        >>> runner = ShellModelRunner(
+        ...     train_command="Rscript model.R train --data {data_file} --run-info {run_info_file}",
+        ...     predict_command="Rscript model.R predict --historic {historic_file} ...",
+        ... )
+        >>> # Use model_info.config_class as the config_schema in MLServiceBuilder
     """
 
     def __init__(
