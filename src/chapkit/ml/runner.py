@@ -152,7 +152,26 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
 
 
 class ShellModelRunner(BaseModelRunner[ConfigT]):
-    """Shell-based model runner that executes external scripts for train/predict operations."""
+    """Shell-based model runner that executes external scripts for train/predict operations.
+
+    Command templates support the following variables:
+
+    Training command variables:
+        {data_file}: Path to training data CSV (data.csv)
+        {run_info_file}: Path to run info YAML (run_info.yml)
+        {geo_file}: Path to geospatial data JSON (geo.json, empty if not provided)
+
+    Prediction command variables:
+        {historic_file}: Path to historic data CSV (historic.csv)
+        {future_file}: Path to future data CSV (future.csv)
+        {output_file}: Path where predictions should be written (predictions.csv)
+        {run_info_file}: Path to run info YAML (run_info.yml)
+        {geo_file}: Path to geospatial data JSON (geo.json, empty if not provided)
+
+    Files always available in workspace:
+        config.yml: Model configuration in YAML format
+        run_info.yml: Runtime information (prediction_length, additional_covariates, etc.)
+    """
 
     def __init__(
         self,
@@ -166,8 +185,11 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         build artifacts.
 
         Args:
-            train_command: Command template for training (use relative paths)
-            predict_command: Command template for prediction (use relative paths)
+            train_command: Command template for training (use relative paths).
+                Available variables: {data_file}, {run_info_file}, {geo_file}
+            predict_command: Command template for prediction (use relative paths).
+                Available variables: {historic_file}, {future_file}, {output_file},
+                {run_info_file}, {geo_file}
         """
         self.train_command = train_command
         self.predict_command = predict_command
@@ -314,6 +336,10 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             config_file = temp_dir / "config.yml"
             config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
 
+            # Write run_info to YAML file
+            run_info_file = temp_dir / "run_info.yml"
+            run_info_file.write_text(yaml.safe_dump(run_info.model_dump(), indent=2))
+
             # Write training data to CSV
             data_file = temp_dir / "data.csv"
             data.to_csv(data_file)
@@ -327,6 +353,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Substitute variables in command (use relative paths)
             command = self.train_command.format(
                 data_file="data.csv",
+                run_info_file="run_info.yml",
                 geo_file="geo.json" if geo_file else "",
             )
 
@@ -384,6 +411,10 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Copy workspace contents to temp_dir (preserves all training artifacts)
             shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
 
+            # Write run_info to YAML file (fresh for each prediction)
+            run_info_file = temp_dir / "run_info.yml"
+            run_info_file.write_text(yaml.safe_dump(run_info.model_dump(), indent=2))
+
             # Write historic data (always fresh for each prediction)
             historic_file = temp_dir / "historic.csv"
             historic.to_csv(historic_file)
@@ -406,6 +437,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 historic_file="historic.csv",
                 future_file="future.csv",
                 output_file="predictions.csv",
+                run_info_file="run_info.yml",
                 geo_file="geo.json" if geo_file else "",
             )
 
