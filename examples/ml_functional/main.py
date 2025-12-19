@@ -18,7 +18,7 @@ from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
-from chapkit.ml import FunctionalModelRunner
+from chapkit.ml import FunctionalModelRunner, RunInfo
 
 log = structlog.get_logger()
 
@@ -33,6 +33,7 @@ class DiseaseConfig(BaseConfig):
 async def on_train(
     config: DiseaseConfig,
     data: DataFrame,
+    run_info: RunInfo,
     geo: FeatureCollection | None = None,
 ) -> Any:
     """Train a linear regression model for disease prediction."""
@@ -57,6 +58,7 @@ async def on_predict(
     model: Any,
     historic: DataFrame,
     future: DataFrame,
+    run_info: RunInfo,
     geo: FeatureCollection | None = None,
 ) -> DataFrame:
     """Make predictions using the trained model."""

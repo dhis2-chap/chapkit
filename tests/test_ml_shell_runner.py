@@ -9,7 +9,7 @@ import pytest
 
 from chapkit import BaseConfig
 from chapkit.data import DataFrame
-from chapkit.ml import ShellModelRunner
+from chapkit.ml import RunInfo, ShellModelRunner
 
 
 class MockConfig(BaseConfig):
@@ -54,7 +54,7 @@ async def test_shell_runner_train_basic() -> None:
     data = DataFrame(columns=["feature1", "target"], data=[[1, 0], [2, 1], [3, 0]])
 
     # Train should execute command and return workspace info
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
 
     # Result should be workspace dict (v0.10.0+)
     assert isinstance(result, dict)
@@ -94,7 +94,7 @@ async def test_shell_runner_predict_basic() -> None:
 
     try:
         # Predict should execute command and load results
-        predictions = await runner.on_predict(config, model, historic, future)
+        predictions = await runner.on_predict(config, model, historic, future, RunInfo(prediction_length=3))
 
         assert len(predictions.data) == 2
         assert "prediction" in predictions.columns
@@ -150,7 +150,7 @@ print("Training completed")
         config = MockConfig()
         data = DataFrame(columns=["feature1", "target"], data=[[10, 1], [20, 2], [30, 3]])
 
-        result = await runner.on_train(config, data)
+        result = await runner.on_train(config, data, RunInfo(prediction_length=3))
 
         # Check result is workspace dict (v0.10.0+)
         assert isinstance(result, dict)
@@ -233,7 +233,7 @@ print("Prediction completed")
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-        predictions = await runner.on_predict(config, model, historic, future)
+        predictions = await runner.on_predict(config, model, historic, future, RunInfo(prediction_length=3))
 
         assert len(predictions.data) == 3
         assert "prediction" in predictions.columns
@@ -262,7 +262,7 @@ async def test_shell_runner_train_failure() -> None:
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
     # v0.10.0+: Failed training returns workspace dict (doesn't raise)
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
 
     assert isinstance(result, dict)
     assert "workspace_dir" in result
@@ -289,7 +289,7 @@ async def test_shell_runner_predict_failure() -> None:
 
     try:
         with pytest.raises(RuntimeError, match="Prediction script failed with exit code 2"):
-            await runner.on_predict(config, model, historic, future)
+            await runner.on_predict(config, model, historic, future, RunInfo(prediction_length=3))
     finally:
         # Cleanup mock workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
@@ -310,7 +310,7 @@ async def test_shell_runner_missing_model_file() -> None:
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
     # v0.10.0+: Returns workspace dict even without model file
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
     assert isinstance(result, dict)
     assert "workspace_dir" in result
     assert "exit_code" in result
@@ -372,7 +372,7 @@ print("Prediction completed without model file")
         historic = DataFrame(columns=["feature1"], data=[])
         future = DataFrame(columns=["feature1"], data=[[5], [10]])
 
-        predictions = await runner.on_predict(config, model, historic, future)
+        predictions = await runner.on_predict(config, model, historic, future, RunInfo(prediction_length=3))
 
         # Should successfully predict without model file
         assert len(predictions.data) == 2
@@ -406,7 +406,7 @@ async def test_shell_runner_missing_output_file() -> None:
 
     try:
         with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
-            await runner.on_predict(config, model, historic, future)
+            await runner.on_predict(config, model, historic, future, RunInfo(prediction_length=3))
     finally:
         # Cleanup mock workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
@@ -429,7 +429,7 @@ async def test_shell_runner_variable_substitution() -> None:
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
     # Train - this will verify {model_file} substitution works
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
     assert isinstance(result, dict)
     assert "workspace_dir" in result
     assert result["exit_code"] == 0
@@ -443,7 +443,7 @@ async def test_shell_runner_variable_substitution() -> None:
     # Use workspace from training
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1]])
-    predictions = await runner.on_predict(config, result, historic, future)
+    predictions = await runner.on_predict(config, result, historic, future, RunInfo(prediction_length=3))
     assert len(predictions.data) == 1
     assert "prediction" in predictions.columns
 
@@ -466,7 +466,7 @@ async def test_shell_runner_cleanup_temp_files() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
 
     # v0.10.0+: Workspace is NOT cleaned up by runner (manager will cleanup after storing artifact)
     temp_dirs_after = len(list(Path(tempfile.gettempdir()).glob("chapkit_ml_*")))
@@ -507,7 +507,7 @@ async def test_copies_entire_project_directory() -> None:
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
     # Should succeed if project files are copied
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
     assert isinstance(result, dict)
     assert "workspace_dir" in result
     assert result["exit_code"] == 0  # Should succeed
@@ -534,7 +534,7 @@ async def test_ignores_venv_directory() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
     assert isinstance(result, dict)
     assert "workspace_dir" in result
     assert result["exit_code"] == 0  # Should succeed (.venv not copied)
@@ -561,7 +561,7 @@ async def test_ignores_node_modules() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
     assert isinstance(result, dict)
     assert "workspace_dir" in result
     assert result["exit_code"] == 0  # Should succeed (node_modules not copied)
@@ -589,7 +589,7 @@ async def test_ignores_pycache() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
     assert isinstance(result, dict)
     assert "workspace_dir" in result
     assert result["exit_code"] == 0  # Should succeed (__pycache__ not copied)
@@ -619,7 +619,7 @@ async def test_project_structure_preserved() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
-    result = await runner.on_train(config, data)
+    result = await runner.on_train(config, data, RunInfo(prediction_length=3))
     assert isinstance(result, dict)
     assert "workspace_dir" in result
     assert result["exit_code"] == 0  # Should succeed (structure preserved)
@@ -653,7 +653,7 @@ async def test_uses_relative_paths() -> None:
         data = DataFrame(columns=["feature1"], data=[[1], [2]])
 
         # Should succeed with relative imports (lib file copied to workspace)
-        result = await runner.on_train(config, data)
+        result = await runner.on_train(config, data, RunInfo(prediction_length=3))
         assert isinstance(result, dict)
         assert "workspace_dir" in result
         assert result["exit_code"] == 0  # Should succeed

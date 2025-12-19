@@ -435,6 +435,7 @@ def test_get_metadata_returns_metadata_only() -> None:
     metadata = {
         "status": "success",
         "config_id": "01CONFIG123",
+            "run_info": {"prediction_length": 3},
         "started_at": "2025-10-18T10:00:00",
         "completed_at": "2025-10-18T10:05:00",
         "duration_seconds": 300.0,

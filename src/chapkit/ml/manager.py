@@ -94,6 +94,7 @@ class MLManager(Generic[ConfigT]):
         training_result = await self.runner.on_train(
             config=config.data,
             data=request.data,
+            run_info=request.run_info,
             geo=request.geo,
         )
         training_completed_at = datetime.datetime.now(datetime.UTC)
@@ -218,6 +219,7 @@ class MLManager(Generic[ConfigT]):
                 model=trained_model,
                 historic=request.historic,
                 future=request.future,
+                run_info=request.run_info,
                 geo=request.geo,
             )
             prediction_completed_at = datetime.datetime.now(datetime.UTC)

@@ -203,6 +203,7 @@ def test_discriminated_union_ml_training():
         "metadata": {
             "status": "success",
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "run_info": {"prediction_length": 3},
             "started_at": "2025-01-10T10:00:00Z",
             "completed_at": "2025-01-10T10:00:42Z",
             "duration_seconds": 42.5,
@@ -225,6 +226,7 @@ def test_discriminated_union_ml_prediction():
         "metadata": {
             "status": "success",
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "run_info": {"prediction_length": 3},
             "started_at": "2025-01-10T11:00:00Z",
             "completed_at": "2025-01-10T11:00:05Z",
             "duration_seconds": 5.2,
@@ -261,6 +263,7 @@ def test_validate_artifact_data_ml_training():
         "metadata": {
             "status": "success",
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "run_info": {"prediction_length": 3},
             "started_at": "2025-01-10T10:00:00Z",
             "completed_at": "2025-01-10T10:00:42Z",
             "duration_seconds": 42.5,
@@ -280,6 +283,7 @@ def test_validate_artifact_data_ml_prediction():
         "metadata": {
             "status": "success",
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "run_info": {"prediction_length": 3},
             "started_at": "2025-01-10T11:00:00Z",
             "completed_at": "2025-01-10T11:00:05Z",
             "duration_seconds": 5.2,
@@ -334,6 +338,7 @@ def test_validate_artifact_data_invalid_raises_error():
         "metadata": {
             "status": "invalid_status",  # Invalid
             "config_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "run_info": {"prediction_length": 3},
             "started_at": "2025-01-10T10:00:00Z",
             "completed_at": "2025-01-10T10:00:42Z",
             "duration_seconds": 42.5,

@@ -19,7 +19,7 @@ from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
-from chapkit.ml import BaseModelRunner
+from chapkit.ml import BaseModelRunner, RunInfo
 
 log = structlog.get_logger()
 
@@ -55,6 +55,7 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
         self,
         config: WeatherConfig,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model with preprocessing and feature engineering.
@@ -62,6 +63,7 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
         Args:
             config: Model configuration with training parameters
             data: Training data with features and target
+            run_info: Runtime information from CHAP
             geo: Optional geospatial data
 
         Returns:
@@ -124,6 +126,7 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions with preprocessing.
@@ -133,6 +136,7 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
             model: Trained model artifacts (dict with model, scaler, etc.)
             historic: Historic data (not used in this example)
             future: Future data to make predictions on
+            run_info: Runtime information from CHAP
             geo: Optional geospatial data
 
         Returns:

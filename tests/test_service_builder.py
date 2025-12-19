@@ -12,7 +12,7 @@ from servicekit.api.service_builder import ServiceInfo
 from chapkit import ArtifactHierarchy, BaseConfig, get_alembic_dir
 from chapkit.api import MLServiceBuilder, ServiceBuilder
 from chapkit.data import DataFrame
-from chapkit.ml import BaseModelRunner
+from chapkit.ml import BaseModelRunner, RunInfo
 
 
 class DummyConfig(BaseConfig):
@@ -28,6 +28,7 @@ class DummyRunner(BaseModelRunner[DummyConfig]):
         self,
         config: DummyConfig,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model."""
@@ -37,8 +38,9 @@ class DummyRunner(BaseModelRunner[DummyConfig]):
         self,
         config: DummyConfig,
         model: Any,
-        historic: DataFrame | None,
+        historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions."""

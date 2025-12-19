@@ -7,7 +7,7 @@ from geojson_pydantic import FeatureCollection
 
 from chapkit import BaseConfig
 from chapkit.data import DataFrame
-from chapkit.ml import BaseModelRunner
+from chapkit.ml import BaseModelRunner, RunInfo
 
 
 class MockConfig(BaseConfig):
@@ -38,6 +38,7 @@ class SimpleRunner(BaseModelRunner[MockConfig]):
         self,
         config: MockConfig,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Simple training implementation."""
@@ -49,8 +50,9 @@ class SimpleRunner(BaseModelRunner[MockConfig]):
         self,
         config: MockConfig,
         model: Any,
-        historic: DataFrame | None,
+        historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Simple prediction implementation."""
@@ -71,6 +73,7 @@ class StatefulRunner(BaseModelRunner[MockConfig]):
         self,
         config: MockConfig,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train and store feature info."""
@@ -89,8 +92,9 @@ class StatefulRunner(BaseModelRunner[MockConfig]):
         self,
         config: MockConfig,
         model: Any,
-        historic: DataFrame | None,
+        historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Predict using stored state."""
@@ -120,7 +124,7 @@ async def test_simple_runner_train() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1", "target"], data=[[1, 0], [2, 1], [3, 0]])
 
-    model = await runner.on_train(config, data)
+    model = await runner.on_train(config, data, RunInfo(prediction_length=3))
 
     assert isinstance(model, dict)
     assert model["model_id"] == "model_0"
@@ -136,7 +140,7 @@ async def test_simple_runner_predict() -> None:
     model = {"model_id": "model_0"}
     future = DataFrame(columns=["feature1"], data=[[4], [5], [6]])
 
-    result = await runner.on_predict(config, model, None, future)
+    result = await runner.on_predict(config, model, DataFrame(columns=[], data=[]), future, RunInfo(prediction_length=3))
 
     assert "prediction" in result.columns
     assert len(result.data) == 3
@@ -156,7 +160,7 @@ async def test_lifecycle_hooks_called() -> None:
     runner.init_called = False
     runner.cleanup_called = False
     await runner.on_init()
-    model = await runner.on_train(config, data)
+    model = await runner.on_train(config, data, RunInfo(prediction_length=3))
     await runner.on_cleanup()
 
     assert runner.init_called
@@ -167,7 +171,7 @@ async def test_lifecycle_hooks_called() -> None:
     runner.cleanup_called = False
     await runner.on_init()
     future = DataFrame(columns=["feature1"], data=[[4], [5], [6]])
-    await runner.on_predict(config, model, None, future)
+    await runner.on_predict(config, model, DataFrame(columns=[], data=[]), future, RunInfo(prediction_length=3))
     await runner.on_cleanup()
 
     assert runner.init_called
@@ -184,7 +188,7 @@ async def test_stateful_runner_shares_state() -> None:
     train_data = DataFrame(
         columns=["temp", "humidity", "target"], data=[[20.0, 60.0, 0], [25.0, 70.0, 1], [30.0, 80.0, 0]]
     )
-    model = await runner.on_train(config, train_data)
+    model = await runner.on_train(config, train_data, RunInfo(prediction_length=3))
 
     # Check state was stored
     assert len(runner.feature_names) == 3
@@ -195,7 +199,7 @@ async def test_stateful_runner_shares_state() -> None:
 
     # Predict uses stored state
     predict_data = DataFrame(columns=["temp", "humidity"], data=[[22.0, 65.0], [28.0, 75.0]])
-    result = await runner.on_predict(config, model, None, predict_data)
+    result = await runner.on_predict(config, model, DataFrame(columns=[], data=[]), predict_data, RunInfo(prediction_length=3))
 
     # Check normalized columns were added using stored params
     assert "temp_normalized" in result.columns
@@ -214,15 +218,15 @@ async def test_multiple_train_predict_cycles() -> None:
 
     # First train-predict cycle
     data1 = DataFrame(columns=["feature1", "target"], data=[[1, 0], [2, 1], [3, 0]])
-    model1 = await runner.on_train(config, data1)
+    model1 = await runner.on_train(config, data1, RunInfo(prediction_length=3))
     future1 = DataFrame(columns=["feature1"], data=[[4], [5]])
-    await runner.on_predict(config, model1, None, future1)
+    await runner.on_predict(config, model1, DataFrame(columns=[], data=[]), future1, RunInfo(prediction_length=3))
 
     # Second train-predict cycle
     data2 = DataFrame(columns=["feature1", "target"], data=[[10, 1], [20, 0], [30, 1], [40, 0]])
-    model2 = await runner.on_train(config, data2)
+    model2 = await runner.on_train(config, data2, RunInfo(prediction_length=3))
     future2 = DataFrame(columns=["feature1"], data=[[50], [60], [70]])
-    await runner.on_predict(config, model2, None, future2)
+    await runner.on_predict(config, model2, DataFrame(columns=[], data=[]), future2, RunInfo(prediction_length=3))
 
     # Verify both cycles tracked
     assert len(runner.trained_models) == 2
@@ -242,9 +246,9 @@ async def test_runner_with_geo_data() -> None:
     geo: FeatureCollection = FeatureCollection(type="FeatureCollection", features=[])
 
     # Should work with geo data
-    model = await runner.on_train(config, data, geo)
+    model = await runner.on_train(config, data, RunInfo(prediction_length=3), geo)
     future = DataFrame(columns=["feature1"], data=[[4], [5]])
-    result = await runner.on_predict(config, model, None, future, geo)
+    result = await runner.on_predict(config, model, DataFrame(columns=[], data=[]), future, RunInfo(prediction_length=3), geo)
 
     assert model is not None
     assert len(result.data) == 2
@@ -261,7 +265,7 @@ async def test_runner_with_historic_data() -> None:
     historic = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
     future = DataFrame(columns=["feature1"], data=[[4], [5]])
 
-    result = await runner.on_predict(config, model, historic, future)
+    result = await runner.on_predict(config, model, historic, future, RunInfo(prediction_length=3))
 
     assert len(result.data) == 2
     assert "prediction" in result.columns
@@ -278,6 +282,7 @@ async def test_default_lifecycle_hooks_do_nothing() -> None:
             self,
             config: MockConfig,
             data: DataFrame,
+            run_info: RunInfo,
             geo: FeatureCollection | None = None,
         ) -> Any:
             """Minimal train."""
@@ -287,8 +292,9 @@ async def test_default_lifecycle_hooks_do_nothing() -> None:
             self,
             config: MockConfig,
             model: Any,
-            historic: DataFrame | None,
+            historic: DataFrame,
             future: DataFrame,
+            run_info: RunInfo,
             geo: FeatureCollection | None = None,
         ) -> DataFrame:
             """Minimal predict."""
@@ -303,9 +309,9 @@ async def test_default_lifecycle_hooks_do_nothing() -> None:
     # Should work without explicitly calling hooks
     config = MockConfig()
     data = DataFrame(columns=["col1"], data=[[1], [2]])
-    model = await runner.on_train(config, data)
+    model = await runner.on_train(config, data, RunInfo(prediction_length=3))
     future = DataFrame(columns=["col1"], data=[[3], [4]])
-    result = await runner.on_predict(config, model, None, future)
+    result = await runner.on_predict(config, model, DataFrame(columns=[], data=[]), future, RunInfo(prediction_length=3))
 
     assert model == "model"
     assert len(result.data) == 2

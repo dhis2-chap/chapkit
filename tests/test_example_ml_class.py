@@ -56,6 +56,7 @@ def test_train_with_class_runner(client: TestClient) -> None:
     # Train with normalized features
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [
@@ -99,6 +100,7 @@ def test_train_and_predict_with_preprocessing(client: TestClient) -> None:
     # Train model
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [
@@ -121,6 +123,7 @@ def test_train_and_predict_with_preprocessing(client: TestClient) -> None:
     # Make predictions
     predict_request = {
         "artifact_id": model_artifact_id,
+        "run_info": {"prediction_length": 3},
         "historic": {
             "columns": ["rainfall", "mean_temperature", "humidity"],
             "data": [],
@@ -165,6 +168,7 @@ def test_train_with_insufficient_samples(client: TestClient) -> None:
     # Try to train with too few samples
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [
@@ -198,6 +202,7 @@ def test_train_without_normalization(client: TestClient) -> None:
     # Train model
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [
@@ -232,6 +237,7 @@ def test_multiple_models_from_same_config(client: TestClient) -> None:
     for i in range(2):
         train_request = {
             "config_id": config_id,
+            "run_info": {"prediction_length": 3},
             "data": {
                 "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
                 "data": [[10.0 + i, 25.0 + i, 60.0 + i, 5.0 + i]],
