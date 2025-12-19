@@ -12,6 +12,7 @@ from typing import Any, Awaitable, Callable, Generic, Literal, TypeVar
 
 import yaml
 from geojson_pydantic import FeatureCollection
+from pydantic import BaseModel, Field
 from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
@@ -20,10 +21,27 @@ from chapkit.utils import run_shell
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
+
+class RunInfo(BaseModel):
+    """Runtime information passed from CHAP to models."""
+
+    prediction_length: int = Field(description="Number of periods to predict")
+    additional_continuous_covariates: list[str] = Field(
+        default_factory=list,
+        description="User-specified additional covariates present in the data",
+    )
+    future_covariate_origin: str | None = Field(
+        default=None,
+        description="Origin/source of future covariate forecasts",
+    )
+
+
 # Type aliases for ML runner functions
-type TrainFunction[ConfigT] = Callable[[ConfigT, DataFrame, FeatureCollection | None], Awaitable[Any]]
+type TrainFunction[ConfigT] = Callable[
+    [ConfigT, DataFrame, RunInfo, FeatureCollection | None], Awaitable[Any]
+]
 type PredictFunction[ConfigT] = Callable[
-    [ConfigT, Any, DataFrame, DataFrame, FeatureCollection | None], Awaitable[DataFrame]
+    [ConfigT, Any, DataFrame, DataFrame, RunInfo, FeatureCollection | None], Awaitable[DataFrame]
 ]
 
 logger = get_logger(__name__)
@@ -78,6 +96,7 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
         self,
         config: ConfigT,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object (must be pickleable)."""
@@ -90,6 +109,7 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions using a trained model and return predictions as DataFrame."""
@@ -112,10 +132,11 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         self,
         config: ConfigT,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object."""
-        return await self._on_train(config, data, geo)
+        return await self._on_train(config, data, run_info, geo)
 
     async def on_predict(
         self,
@@ -123,10 +144,11 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions using a trained model."""
-        return await self._on_predict(config, model, historic, future, geo)
+        return await self._on_predict(config, model, historic, future, run_info, geo)
 
 
 class ShellModelRunner(BaseModelRunner[ConfigT]):
@@ -278,6 +300,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         self,
         config: ConfigT,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model by executing external training script (model file creation is optional)."""
@@ -340,6 +363,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions by executing external prediction script."""

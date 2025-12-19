@@ -90,6 +90,7 @@ def test_train_model(client: TestClient) -> None:
     # Prepare training data
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [
@@ -147,6 +148,7 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
     # 2. Train model
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [
@@ -171,6 +173,7 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
     # 3. Make predictions
     predict_request = {
         "artifact_id": model_artifact_id,
+        "run_info": {"prediction_length": 3},
         "historic": {
             "columns": ["rainfall", "mean_temperature"],
             "data": [],
@@ -224,7 +227,8 @@ def test_train_and_predict_workflow(client: TestClient) -> None:
 def test_train_with_invalid_config_id(client: TestClient) -> None:
     """Test training with non-existent config ID."""
     train_request = {
-        "config_id": "01K72P5N5KCRM6MD3BRE4P0999",  # Non-existent
+        "config_id": "01K72P5N5KCRM6MD3BRE4P0999",
+            "run_info": {"prediction_length": 3},  # Non-existent
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [[10.0, 25.0, 5.0]],
@@ -246,6 +250,7 @@ def test_predict_with_invalid_model_artifact(client: TestClient) -> None:
     """Test prediction with non-existent model artifact."""
     predict_request = {
         "artifact_id": "01K72P5N5KCRM6MD3BRE4P0999",  # Non-existent
+        "run_info": {"prediction_length": 3},
         "historic": {
             "columns": ["rainfall", "mean_temperature"],
             "data": [],
@@ -287,7 +292,8 @@ def test_predict_request_validation(client: TestClient) -> None:
     # Missing artifact_id
     response = client.post(
         "/api/v1/ml/$predict",
-        json={"historic": {"columns": [], "data": []}, "future": {"columns": [], "data": []}},
+        json={"run_info": {"prediction_length": 3},
+            "historic": {"columns": [], "data": []}, "future": {"columns": [], "data": []}},
     )
     assert response.status_code == 422
 
@@ -301,7 +307,8 @@ def test_predict_request_validation(client: TestClient) -> None:
     # Missing future
     response = client.post(
         "/api/v1/ml/$predict",
-        json={"artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "historic": {"columns": [], "data": []}},
+        json={"artifact_id": "01K72P5N5KCRM6MD3BRE4P0001", "run_info": {"prediction_length": 3},
+            "historic": {"columns": [], "data": []}},
     )
     assert response.status_code == 422
 
@@ -320,6 +327,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
 
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [[10.0, 25.0, 5.0], [15.0, 28.0, 8.0], [20.0, 30.0, 12.0]],
@@ -337,6 +345,7 @@ def test_multiple_predictions_from_same_model(client: TestClient) -> None:
     for i in range(3):
         predict_request = {
             "artifact_id": model_artifact_id,
+            "run_info": {"prediction_length": 3},
             "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
             "future": {"columns": ["rainfall", "mean_temperature"], "data": [[10 + i, 25 + i]]},
         }
@@ -371,6 +380,7 @@ def test_artifact_hierarchy_levels(client: TestClient) -> None:
 
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [[10.0, 25.0, 5.0]],
@@ -389,7 +399,8 @@ def test_artifact_hierarchy_levels(client: TestClient) -> None:
     # Make prediction
     predict_request = {
         "artifact_id": model_artifact_id,
-        "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
+        "run_info": {"prediction_length": 3},
+            "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
         "future": {"columns": ["rainfall", "mean_temperature"], "data": [[11.0, 26.0]]},
     }
 
@@ -430,6 +441,7 @@ def test_concurrent_training_jobs(client: TestClient) -> None:
     for config_id in config_ids:
         train_request = {
             "config_id": config_id,
+            "run_info": {"prediction_length": 3},
             "data": {
                 "columns": ["rainfall", "mean_temperature", "disease_cases"],
                 "data": [[10.0, 25.0, 5.0]],

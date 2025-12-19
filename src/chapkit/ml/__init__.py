@@ -2,7 +2,7 @@
 
 from .manager import MLManager
 from .router import MLRouter
-from .runner import BaseModelRunner, FunctionalModelRunner, ShellModelRunner
+from .runner import BaseModelRunner, FunctionalModelRunner, RunInfo, ShellModelRunner
 from .schemas import (
     MLPredictionArtifactData,
     MLTrainingArtifactData,
@@ -22,6 +22,7 @@ __all__ = [
     "PredictRequest",
     "PredictResponse",
     "MLPredictionArtifactData",
+    "RunInfo",
     "ShellModelRunner",
     "TrainRequest",
     "TrainResponse",

@@ -13,7 +13,7 @@ from ulid import ULID
 from chapkit.artifact import ArtifactManager, ArtifactRepository
 from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
 from chapkit.data import DataFrame
-from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, TrainRequest
+from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, RunInfo, TrainRequest
 from chapkit.scheduler import InMemoryChapkitScheduler
 
 
@@ -26,6 +26,7 @@ class SimpleConfig(BaseConfig):
 async def simple_train(
     config: BaseConfig,
     data: DataFrame,
+    run_info: RunInfo,
     geo: FeatureCollection | None = None,
 ) -> dict[str, int]:
     """Simple training function that takes measurable time."""
@@ -38,8 +39,9 @@ async def simple_train(
 async def simple_predict(
     config: BaseConfig,
     model: dict[str, int],
-    historic: DataFrame | None,
+    historic: DataFrame,
     future: DataFrame,
+    run_info: RunInfo,
     geo: FeatureCollection | None = None,
 ) -> DataFrame:
     """Simple prediction function that takes measurable time."""
@@ -61,6 +63,7 @@ class MockModel:
 async def dict_wrapped_train(
     config: BaseConfig,
     data: DataFrame,
+    run_info: RunInfo,
     geo: FeatureCollection | None = None,
 ) -> dict[str, object]:
     """Training function that returns dict with 'model' key (ml_class.py pattern)."""
@@ -112,6 +115,7 @@ async def test_training_timing_metadata_captured(
     train_request = TrainRequest(
         config_id=config_id,
         data=DataFrame.from_pandas(train_df),
+        run_info=RunInfo(prediction_length=2),
     )
 
     response = await ml_manager.execute_train(train_request)
@@ -163,6 +167,7 @@ async def test_prediction_timing_metadata_captured(
     train_request = TrainRequest(
         config_id=config_id,
         data=DataFrame.from_pandas(train_df),
+        run_info=RunInfo(prediction_length=2),
     )
     train_response = await ml_manager.execute_train(train_request)
 
@@ -174,6 +179,7 @@ async def test_prediction_timing_metadata_captured(
         artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
+        run_info=RunInfo(prediction_length=2),
     )
     predict_response = await ml_manager.execute_predict(predict_request)
 
@@ -223,6 +229,7 @@ async def test_timing_metadata_iso_format(
     train_request = TrainRequest(
         config_id=config_id,
         data=DataFrame.from_pandas(train_df),
+        run_info=RunInfo(prediction_length=2),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -255,6 +262,7 @@ async def test_timing_duration_rounded_to_two_decimals(
     train_request = TrainRequest(
         config_id=config_id,
         data=DataFrame.from_pandas(train_df),
+        run_info=RunInfo(prediction_length=2),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -284,6 +292,7 @@ async def test_original_metadata_preserved(
     train_request = TrainRequest(
         config_id=config_id,
         data=DataFrame.from_pandas(train_df),
+        run_info=RunInfo(prediction_length=2),
     )
     train_response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -305,6 +314,7 @@ async def test_original_metadata_preserved(
         artifact_id=ULID.from_str(train_response.artifact_id),
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
+        run_info=RunInfo(prediction_length=2),
     )
     predict_response = await ml_manager.execute_predict(predict_request)
     await asyncio.sleep(0.5)
@@ -333,6 +343,7 @@ async def test_content_type_set_in_training_artifact(
     train_request = TrainRequest(
         config_id=config_id,
         data=DataFrame.from_pandas(train_df),
+        run_info=RunInfo(prediction_length=2),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -389,6 +400,7 @@ async def test_typed_structure_present_in_artifact(
     train_request = TrainRequest(
         config_id=config_id,
         data=DataFrame.from_pandas(train_df),
+        run_info=RunInfo(prediction_length=2),
     )
     response = await ml_manager.execute_train(train_request)
     await asyncio.sleep(0.5)
@@ -449,6 +461,7 @@ async def test_predict_with_wrong_artifact_type_raises_error(ml_manager: MLManag
         artifact_id=wrong_artifact_id,
         historic=DataFrame.from_pandas(pd.DataFrame({"feature1": [], "feature2": []})),
         future=DataFrame.from_pandas(predict_df),
+        run_info=RunInfo(prediction_length=2),
     )
 
     response = await ml_manager.execute_predict(predict_request)
