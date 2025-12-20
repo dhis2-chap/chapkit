@@ -43,6 +43,7 @@ def test_download_prediction_artifact_as_csv(client: TestClient):
     # Train model
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [[10.0, 25.0, 5.0], [12.0, 26.0, 6.0], [8.0, 24.0, 4.0]],
@@ -60,7 +61,8 @@ def test_download_prediction_artifact_as_csv(client: TestClient):
     # Predict
     predict_request = {
         "artifact_id": model_artifact_id,
-        "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
+        "run_info": {"prediction_length": 3},
+            "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
         "future": {"columns": ["rainfall", "mean_temperature"], "data": [[11.0, 25.5], [9.0, 24.5]]},
     }
     predict_response = client.post("/api/v1/ml/$predict", json=predict_request)
@@ -105,6 +107,7 @@ def test_get_metadata_from_training_artifact(client: TestClient):
     # Train model
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [[10.0, 25.0, 5.0], [12.0, 26.0, 6.0], [8.0, 24.0, 4.0]],
@@ -151,6 +154,7 @@ def test_get_metadata_from_prediction_artifact(client: TestClient):
     # Train model
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "disease_cases"],
             "data": [[10.0, 25.0, 5.0], [12.0, 26.0, 6.0], [8.0, 24.0, 4.0]],
@@ -168,7 +172,8 @@ def test_get_metadata_from_prediction_artifact(client: TestClient):
     # Predict
     predict_request = {
         "artifact_id": model_artifact_id,
-        "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
+        "run_info": {"prediction_length": 3},
+            "historic": {"columns": ["rainfall", "mean_temperature"], "data": []},
         "future": {"columns": ["rainfall", "mean_temperature"], "data": [[11.0, 25.5]]},
     }
     predict_response = client.post("/api/v1/ml/$predict", json=predict_request)

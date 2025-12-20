@@ -12,6 +12,7 @@ from typing import Any, Awaitable, Callable, Generic, Literal, TypeVar
 
 import yaml
 from geojson_pydantic import FeatureCollection
+from pydantic import BaseModel, Field
 from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
@@ -20,10 +21,27 @@ from chapkit.utils import run_shell
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
+
+class RunInfo(BaseModel):
+    """Runtime information passed from CHAP to models."""
+
+    prediction_length: int = Field(description="Number of periods to predict")
+    additional_continuous_covariates: list[str] = Field(
+        default_factory=list,
+        description="User-specified additional covariates present in the data",
+    )
+    future_covariate_origin: str | None = Field(
+        default=None,
+        description="Origin/source of future covariate forecasts",
+    )
+
+
 # Type aliases for ML runner functions
-type TrainFunction[ConfigT] = Callable[[ConfigT, DataFrame, FeatureCollection | None], Awaitable[Any]]
+type TrainFunction[ConfigT] = Callable[
+    [ConfigT, DataFrame, RunInfo, FeatureCollection | None], Awaitable[Any]
+]
 type PredictFunction[ConfigT] = Callable[
-    [ConfigT, Any, DataFrame, DataFrame, FeatureCollection | None], Awaitable[DataFrame]
+    [ConfigT, Any, DataFrame, DataFrame, RunInfo, FeatureCollection | None], Awaitable[DataFrame]
 ]
 
 logger = get_logger(__name__)
@@ -78,6 +96,7 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
         self,
         config: ConfigT,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object (must be pickleable)."""
@@ -90,6 +109,7 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions using a trained model and return predictions as DataFrame."""
@@ -112,10 +132,11 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         self,
         config: ConfigT,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object."""
-        return await self._on_train(config, data, geo)
+        return await self._on_train(config, data, run_info, geo)
 
     async def on_predict(
         self,
@@ -123,14 +144,48 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions using a trained model."""
-        return await self._on_predict(config, model, historic, future, geo)
+        return await self._on_predict(config, model, historic, future, run_info, geo)
 
 
 class ShellModelRunner(BaseModelRunner[ConfigT]):
-    """Shell-based model runner that executes external scripts for train/predict operations."""
+    """Shell-based model runner that executes external scripts for train/predict operations.
+
+    Command templates support the following variables:
+
+    Training command variables:
+        {data_file}: Path to training data CSV (data.csv)
+        {run_info_file}: Path to run info YAML (run_info.yml)
+        {geo_file}: Path to geospatial data JSON (geo.json, empty if not provided)
+
+    Prediction command variables:
+        {historic_file}: Path to historic data CSV (historic.csv)
+        {future_file}: Path to future data CSV (future.csv)
+        {output_file}: Path where predictions should be written (predictions.csv)
+        {run_info_file}: Path to run info YAML (run_info.yml)
+        {geo_file}: Path to geospatial data JSON (geo.json, empty if not provided)
+
+    Files always available in workspace:
+        config.yml: Model configuration in YAML format
+        run_info.yml: Runtime information (prediction_length, additional_covariates, etc.)
+
+    Schema Discovery:
+        If info_command is provided, call discover_model_info() to get the config schema
+        and service info from the external script. This enables R models (or any language)
+        to define their own configuration schema.
+
+    Example with R SDK:
+        >>> from chapkit.ml.schema_discovery import discover_model_info
+        >>> model_info = discover_model_info("Rscript model.R info --format json")
+        >>> runner = ShellModelRunner(
+        ...     train_command="Rscript model.R train --data {data_file} --run-info {run_info_file}",
+        ...     predict_command="Rscript model.R predict --historic {historic_file} ...",
+        ... )
+        >>> # Use model_info.config_class as the config_schema in MLServiceBuilder
+    """
 
     def __init__(
         self,
@@ -144,8 +199,11 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         build artifacts.
 
         Args:
-            train_command: Command template for training (use relative paths)
-            predict_command: Command template for prediction (use relative paths)
+            train_command: Command template for training (use relative paths).
+                Available variables: {data_file}, {run_info_file}, {geo_file}
+            predict_command: Command template for prediction (use relative paths).
+                Available variables: {historic_file}, {future_file}, {output_file},
+                {run_info_file}, {geo_file}
         """
         self.train_command = train_command
         self.predict_command = predict_command
@@ -278,6 +336,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         self,
         config: ConfigT,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model by executing external training script (model file creation is optional)."""
@@ -290,6 +349,10 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Write config to YAML file
             config_file = temp_dir / "config.yml"
             config_file.write_text(yaml.safe_dump(config.model_dump(), indent=2))
+
+            # Write run_info to YAML file
+            run_info_file = temp_dir / "run_info.yml"
+            run_info_file.write_text(yaml.safe_dump(run_info.model_dump(), indent=2))
 
             # Write training data to CSV
             data_file = temp_dir / "data.csv"
@@ -304,6 +367,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Substitute variables in command (use relative paths)
             command = self.train_command.format(
                 data_file="data.csv",
+                run_info_file="run_info.yml",
                 geo_file="geo.json" if geo_file else "",
             )
 
@@ -340,6 +404,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions by executing external prediction script."""
@@ -359,6 +424,10 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
             # Copy workspace contents to temp_dir (preserves all training artifacts)
             shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
+
+            # Write run_info to YAML file (fresh for each prediction)
+            run_info_file = temp_dir / "run_info.yml"
+            run_info_file.write_text(yaml.safe_dump(run_info.model_dump(), indent=2))
 
             # Write historic data (always fresh for each prediction)
             historic_file = temp_dir / "historic.csv"
@@ -382,6 +451,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 historic_file="historic.csv",
                 future_file="future.csv",
                 output_file="predictions.csv",
+                run_info_file="run_info.yml",
                 geo_file="geo.json" if geo_file else "",
             )
 

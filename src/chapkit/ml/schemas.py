@@ -29,6 +29,7 @@ from chapkit.artifact.schemas import (
 )
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
+from chapkit.ml.runner import RunInfo
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig, contravariant=True)
 
@@ -38,6 +39,7 @@ class TrainRequest(BaseModel):
 
     config_id: ULID = Field(description="ID of the config to use for training")
     data: DataFrame = Field(description="Training data as DataFrame")
+    run_info: RunInfo = Field(description="Runtime information for the model")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
 
 
@@ -55,6 +57,7 @@ class PredictRequest(BaseModel):
     artifact_id: ULID = Field(description="ID of the artifact containing the trained model")
     historic: DataFrame = Field(description="Historic data as DataFrame")
     future: DataFrame = Field(description="Future/prediction data as DataFrame")
+    run_info: RunInfo = Field(description="Runtime information for the model")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
 
 
@@ -73,6 +76,7 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         self,
         config: ConfigT,
         data: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model and return the trained model object (must be pickleable)."""
@@ -95,6 +99,7 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         model: Any,
         historic: DataFrame,
         future: DataFrame,
+        run_info: RunInfo,
         geo: FeatureCollection | None = None,
     ) -> DataFrame:
         """Make predictions using a trained model and return predictions as DataFrame."""

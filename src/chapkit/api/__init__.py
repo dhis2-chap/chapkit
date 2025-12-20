@@ -22,7 +22,7 @@ from chapkit.artifact import ArtifactRouter
 from chapkit.config import ConfigRouter
 
 from .dependencies import get_artifact_manager, get_config_manager
-from .service_builder import AssessedStatus, MLServiceBuilder, MLServiceInfo, ServiceBuilder
+from .service_builder import AssessedStatus, MLServiceBuilder, MLServiceInfo, PeriodType, ServiceBuilder
 
 __all__ = [
     # Base classes
@@ -58,6 +58,7 @@ __all__ = [
     "ServiceInfo",
     "MLServiceInfo",
     "AssessedStatus",
+    "PeriodType",
     # Utilities
     "build_location_url",
     "run_app",

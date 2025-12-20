@@ -68,6 +68,7 @@ def test_train_with_shell_runner(client: TestClient) -> None:
     # Train with external script
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [
@@ -111,6 +112,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
     # Train model
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [
@@ -133,6 +135,7 @@ def test_train_and_predict_with_external_scripts(client: TestClient) -> None:
     # Make predictions
     predict_request = {
         "artifact_id": model_artifact_id,
+        "run_info": {"prediction_length": 3},
         "historic": {
             "columns": ["rainfall", "mean_temperature", "humidity"],
             "data": [],
@@ -184,6 +187,7 @@ def test_train_with_minimal_data(client: TestClient) -> None:
     # Train with just one sample
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [[10.0, 25.0, 60.0, 5.0]],
@@ -208,6 +212,7 @@ def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
 
     train_request = {
         "config_id": config_id,
+            "run_info": {"prediction_length": 3},
         "data": {
             "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
             "data": [[10.0, 25.0, 60.0, 5.0], [15.0, 28.0, 70.0, 8.0], [20.0, 30.0, 80.0, 12.0]],
@@ -225,6 +230,7 @@ def test_multiple_predictions_from_shell_model(client: TestClient) -> None:
     for i in range(3):
         predict_request = {
             "artifact_id": model_artifact_id,
+            "run_info": {"prediction_length": 3},
             "historic": {"columns": ["rainfall", "mean_temperature", "humidity"], "data": []},
             "future": {"columns": ["rainfall", "mean_temperature", "humidity"], "data": [[10 + i, 25 + i, 60 + i]]},
         }
@@ -263,6 +269,7 @@ def test_concurrent_shell_training_jobs(client: TestClient) -> None:
     for config_id in config_ids:
         train_request = {
             "config_id": config_id,
+            "run_info": {"prediction_length": 3},
             "data": {
                 "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
                 "data": [[10.0, 25.0, 60.0, 5.0]],
