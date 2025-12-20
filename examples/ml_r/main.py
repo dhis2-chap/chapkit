@@ -18,9 +18,14 @@ The R model script uses chap.r.sdk's create_chapkit_cli() which provides:
 - `info --format json` for schema discovery
 """
 
+from pathlib import Path
+
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner, discover_model_info
+
+# Get the directory where this script lives (for finding model.R)
+SCRIPT_DIR = Path(__file__).parent
 
 # ============================================================================
 # Schema Discovery from R Model
@@ -32,6 +37,7 @@ from chapkit.ml import ShellModelRunner, discover_model_info
 model_info = discover_model_info(
     "Rscript model.R info --format json",
     model_name="MeanModelConfig",
+    cwd=SCRIPT_DIR,
 )
 
 # The discovered model_info contains:
@@ -55,14 +61,16 @@ print(f"Discovered config schema: {model_info.config_class.model_json_schema()}"
 #   {output_file} - Predictions CSV output path
 #   {run_info_file} - Run info YAML with prediction_length, etc.
 
+MODEL_SCRIPT = SCRIPT_DIR / "model.R"
+
 train_command = (
-    "Rscript model.R train "
+    f"Rscript {MODEL_SCRIPT} train "
     "--data {data_file} "
     "--run-info {run_info_file}"
 )
 
 predict_command = (
-    "Rscript model.R predict "
+    f"Rscript {MODEL_SCRIPT} predict "
     "--historic {historic_file} "
     "--future {future_file} "
     "--output {output_file} "
