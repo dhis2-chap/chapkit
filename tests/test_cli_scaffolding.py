@@ -658,9 +658,6 @@ def test_scaffold_docker_build(
     template: str,
 ) -> None:
     """Test that scaffolded project Docker image builds successfully."""
-    if CI_ENV and os.getenv("CHAPKIT_RUN_DOCKER_TESTS") != "1":
-        pytest.skip("Skipping Docker build tests on CI (set CHAPKIT_RUN_DOCKER_TESTS=1 to enable)")
-
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
@@ -698,9 +695,6 @@ def test_scaffold_functional_train_predict_docker(
     scaffold_project_no_sync: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded functional ML project via Docker container."""
-    if CI_ENV and os.getenv("CHAPKIT_RUN_DOCKER_TESTS") != "1":
-        pytest.skip("Skipping Docker tests on CI (set CHAPKIT_RUN_DOCKER_TESTS=1 to enable)")
-
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
@@ -719,9 +713,6 @@ def test_scaffold_shell_train_predict_docker(
     scaffold_project_no_sync: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded shell ML project via Docker container."""
-    if CI_ENV and os.getenv("CHAPKIT_RUN_DOCKER_TESTS") != "1":
-        pytest.skip("Skipping Docker tests on CI (set CHAPKIT_RUN_DOCKER_TESTS=1 to enable)")
-
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
