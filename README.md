@@ -120,21 +120,23 @@ artifact = await artifact_manager.save(
 Train and predict workflows with automatic model storage:
 
 ```python
+from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner
-import pandas as pd
 
-async def train_model(config: MyConfig, data: pd.DataFrame, geo=None):
+
+async def train_model(config: MyConfig, data: DataFrame, geo=None) -> dict:
     """Train your model - returns trained model object."""
-    from sklearn.linear_model import LinearRegression
-    model = LinearRegression()
-    model.fit(data[["feature1", "feature2"]], data["target"])
-    return model
+    df = data.to_pandas()
+    # Your training logic here
+    return {"trained": True}
 
-async def predict(config: MyConfig, model, historic: pd.DataFrame, future: pd.DataFrame, geo=None):
+
+async def predict(config: MyConfig, model: dict, historic: DataFrame, future: DataFrame, geo=None) -> DataFrame:
     """Make predictions - returns DataFrame with predictions."""
-    predictions = model.predict(future[["feature1", "feature2"]])
-    future["predictions"] = predictions
-    return future
+    future_df = future.to_pandas()
+    future_df["sample_0"] = 0.0  # Your predictions here
+    return DataFrame.from_pandas(future_df)
+
 
 # Wrap functions in runner
 runner = FunctionalModelRunner(on_train=train_model, on_predict=predict)
