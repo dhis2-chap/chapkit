@@ -156,9 +156,14 @@ def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, Non
     content = content.replace("8000:8000", f"{port}:8000")
     compose_file.write_text(content)
 
-    # Create data directory for bind mount
-    data_dir = project_dir / "data"
-    data_dir.mkdir(exist_ok=True)
+    # Use in-memory SQLite to avoid bind mount UID issues on Linux CI
+    main_file = project_dir / "main.py"
+    main_content = main_file.read_text()
+    main_content = main_content.replace(
+        "sqlite+aiosqlite:///data/chapkit.db",
+        "sqlite+aiosqlite:///:memory:",
+    )
+    main_file.write_text(main_content)
 
     try:
         # Build and start
@@ -662,9 +667,6 @@ def test_scaffold_docker_build(
     template: str,
 ) -> None:
     """Test that scaffolded project Docker image builds successfully."""
-    if CI_ENV:
-        pytest.skip("Docker tests disabled on CI due to UID/permission issues with bind mounts")
-
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
@@ -702,9 +704,6 @@ def test_scaffold_functional_train_predict_docker(
     scaffold_project_no_sync: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded functional ML project via Docker container."""
-    if CI_ENV:
-        pytest.skip("Docker tests disabled on CI due to UID/permission issues with bind mounts")
-
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
@@ -723,9 +722,6 @@ def test_scaffold_shell_train_predict_docker(
     scaffold_project_no_sync: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded shell ML project via Docker container."""
-    if CI_ENV:
-        pytest.skip("Docker tests disabled on CI due to UID/permission issues with bind mounts")
-
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
