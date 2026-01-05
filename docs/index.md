@@ -10,34 +10,55 @@ Build production-ready ML services with train/predict workflows, artifact storag
 ## Quick Start: ML Service
 
 ```python
+from geojson_pydantic import FeatureCollection
+
 from chapkit import BaseConfig
 from chapkit.api import MLServiceBuilder, MLServiceInfo
 from chapkit.artifact import ArtifactHierarchy
+from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner
-import pandas as pd
+
 
 class MyMLConfig(BaseConfig):
     """Configuration for your ML model."""
 
-async def train_model(config, data, geo=None):
+
+async def train_model(
+    config: MyMLConfig,
+    data: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> dict:
     """Train your model - returns trained model object."""
-    from sklearn.linear_model import LinearRegression
-    model = LinearRegression()
-    model.fit(data[["feature1", "feature2"]], data["target"])
-    return model
+    df = data.to_pandas()
+    # Your training logic here - example using sklearn:
+    # from sklearn.linear_model import LinearRegression
+    # model = LinearRegression()
+    # model.fit(df[["feature1", "feature2"]], df["target"])
+    return {"trained": True}
 
-async def predict(config, model, historic, future, geo=None):
+
+async def predict(
+    config: MyMLConfig,
+    model: dict,
+    historic: DataFrame,
+    future: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> DataFrame:
     """Make predictions using the trained model."""
-    predictions = model.predict(future[["feature1", "feature2"]])
-    future["predictions"] = predictions
-    return future
+    future_df = future.to_pandas()
+    # Your prediction logic here
+    future_df["sample_0"] = 0.0  # Replace with actual predictions
+    return DataFrame.from_pandas(future_df)
 
-# Build complete ML service with one builder
+
 app = (
     MLServiceBuilder(
         info=MLServiceInfo(display_name="Disease Prediction Service"),
         config_schema=MyMLConfig,
-        hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training_workspace", 1: "ml_prediction"}),
+        hierarchy=ArtifactHierarchy(
+            name="ml",
+            level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
+        ),
         runner=FunctionalModelRunner(on_train=train_model, on_predict=predict),
     )
     .with_monitoring()  # Optional: Add Prometheus metrics
