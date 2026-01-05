@@ -1,4 +1,4 @@
-.PHONY: help install lint test coverage clean docker-build docker-run docs docs-serve docs-build
+.PHONY: help install lint test test-slow test-durations coverage clean docker-build docker-run docs docs-serve docs-build
 
 # ==============================================================================
 # Venv
@@ -18,7 +18,9 @@ help:
 	@echo "Targets:"
 	@echo "  install      Install dependencies"
 	@echo "  lint         Run linter and type checker"
-	@echo "  test         Run tests"
+	@echo "  test         Run tests (excludes slow tests)"
+	@echo "  test-slow    Run slow CLI scaffolding tests"
+	@echo "  test-durations Show 20 slowest tests"
 	@echo "  coverage     Run tests with coverage reporting"
 	@echo "  migrate      Generate a new migration (use MSG='description')"
 	@echo "  upgrade      Apply pending migrations"
@@ -43,12 +45,20 @@ lint:
 	@$(UV) run pyright
 
 test:
-	@echo ">>> Running tests"
-	@$(UV) run pytest -q
+	@echo ">>> Running tests (excluding slow)"
+	@$(UV) run pytest -q -m "not slow"
+
+test-slow:
+	@echo ">>> Running slow CLI scaffolding tests"
+	@$(UV) run pytest -v -m slow tests/test_cli_scaffolding.py
+
+test-durations:
+	@echo ">>> Running tests and showing 20 slowest"
+	@$(UV) run pytest -q -m "not slow" --durations=20
 
 coverage:
-	@echo ">>> Running tests with coverage"
-	@$(UV) run coverage run -m pytest -q
+	@echo ">>> Running tests with coverage (excluding slow)"
+	@$(UV) run coverage run -m pytest -q -m "not slow"
 	@$(UV) run coverage report
 	@$(UV) run coverage xml
 
