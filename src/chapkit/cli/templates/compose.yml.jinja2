@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/workspace/data
+      - ck_{{ PROJECT_SLUG }}_data:/workspace/data
     environment:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
@@ -25,8 +25,11 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - {{ PROJECT_SLUG }}
+      - ck_{{ PROJECT_SLUG }}
 
 networks:
-  {{ PROJECT_SLUG }}:
+  ck_{{ PROJECT_SLUG }}:
     driver: bridge
+
+volumes:
+  ck_{{ PROJECT_SLUG }}_data:

@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/workspace/data
+      - ck_{{ PROJECT_SLUG }}_data:/workspace/data
     environment:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
@@ -25,7 +25,7 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - {{ PROJECT_SLUG }}
+      - ck_{{ PROJECT_SLUG }}
 
   prometheus:
     image: prom/prometheus:latest
@@ -38,7 +38,7 @@ services:
       - "--web.console.templates=/usr/share/prometheus/consoles"
     volumes:
       - ./monitoring/prometheus:/etc/prometheus:ro
-      - prometheus-data:/prometheus
+      - ck_{{ PROJECT_SLUG }}_prometheus:/prometheus
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
@@ -47,7 +47,7 @@ services:
       retries: 3
       start_period: 5s
     networks:
-      - {{ PROJECT_SLUG }}
+      - ck_{{ PROJECT_SLUG }}
     depends_on:
       api:
         condition: service_healthy
@@ -67,7 +67,7 @@ services:
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana-data:/var/lib/grafana
+      - ck_{{ PROJECT_SLUG }}_grafana:/var/lib/grafana
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
@@ -76,15 +76,16 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - {{ PROJECT_SLUG }}
+      - ck_{{ PROJECT_SLUG }}
     depends_on:
       prometheus:
         condition: service_healthy
 
 networks:
-  {{ PROJECT_SLUG }}:
+  ck_{{ PROJECT_SLUG }}:
     driver: bridge
 
 volumes:
-  grafana-data:
-  prometheus-data:
+  ck_{{ PROJECT_SLUG }}_data:
+  ck_{{ PROJECT_SLUG }}_prometheus:
+  ck_{{ PROJECT_SLUG }}_grafana:

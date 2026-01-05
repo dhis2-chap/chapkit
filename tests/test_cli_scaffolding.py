@@ -156,15 +156,6 @@ def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, Non
     content = content.replace("8000:8000", f"{port}:8000")
     compose_file.write_text(content)
 
-    # Use in-memory SQLite to avoid bind mount UID issues on Linux CI
-    main_file = project_dir / "main.py"
-    main_content = main_file.read_text()
-    main_content = main_content.replace(
-        "sqlite+aiosqlite:///data/chapkit.db",
-        "sqlite+aiosqlite:///:memory:",
-    )
-    main_file.write_text(main_content)
-
     try:
         # Build and start
         result = subprocess.run(
