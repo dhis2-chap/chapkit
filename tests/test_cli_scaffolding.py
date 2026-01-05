@@ -156,9 +156,11 @@ def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, Non
     content = content.replace("8000:8000", f"{port}:8000")
     compose_file.write_text(content)
 
-    # Create data directory for bind mount (prevents permission issues on CI)
+    # Create data directory for bind mount with world-writable permissions
+    # Needed because Docker container runs as non-root UID that differs from host UID
     data_dir = project_dir / "data"
     data_dir.mkdir(exist_ok=True)
+    data_dir.chmod(0o777)
 
     try:
         # Build and start
