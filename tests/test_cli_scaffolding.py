@@ -548,3 +548,69 @@ def test_scaffold_config_artifact_linkage(
             assert len(artifacts) >= 1
             artifact_ids = [a["id"] for a in artifacts]
             assert artifact_id in artifact_ids
+
+
+@pytest.fixture
+def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[str, str], Path]:
+    """Scaffold a project without installing dependencies (for Docker build tests)."""
+
+    def _scaffold(name: str, template: str = "ml") -> Path:
+        result = subprocess.run(
+            [
+                "uv",
+                "run",
+                "chapkit",
+                "init",
+                name,
+                "--template",
+                template,
+                "--path",
+                str(tmp_path),
+            ],
+            cwd=chapkit_root,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
+        return tmp_path / name
+
+    return _scaffold
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("template", ["ml", "ml-shell"])
+def test_scaffold_docker_build(
+    scaffold_project_no_sync: Callable[[str, str], Path],
+    template: str,
+) -> None:
+    """Test that scaffolded project Docker image builds successfully."""
+    # Check if Docker is available
+    docker_check = subprocess.run(["docker", "info"], capture_output=True)
+    if docker_check.returncode != 0:
+        pytest.skip("Docker is not available")
+
+    project_dir = scaffold_project_no_sync(f"test-docker-{template}", template)
+    image_name = f"chapkit-test-{template}"
+
+    try:
+        # Build the Docker image
+        result = subprocess.run(
+            ["docker", "build", "-t", image_name, "."],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minute timeout for build
+        )
+
+        # Skip if chapkit version isn't published to PyPI yet
+        if result.returncode != 0 and "chapkit" in result.stderr and "No solution found" in result.stderr:
+            pytest.skip("chapkit version not yet published to PyPI - Docker build requires released version")
+
+        assert result.returncode == 0, f"Docker build failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+    finally:
+        # Cleanup: remove the test image (ignore errors if image doesn't exist)
+        subprocess.run(
+            ["docker", "rmi", "-f", image_name],
+            capture_output=True,
+        )
