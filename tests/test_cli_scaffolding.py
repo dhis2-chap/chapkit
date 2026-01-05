@@ -27,6 +27,8 @@ import pytest
 
 pytestmark = pytest.mark.slow
 
+CI_ENV = os.getenv("CI", "").lower() in {"1", "true", "yes"}
+
 
 def find_free_port() -> int:
     """Find a free port on localhost."""
@@ -172,16 +174,16 @@ def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, Non
 
         base_url = f"http://127.0.0.1:{port}"
 
-        # Wait for health check (up to 90s - Docker startup can be slow)
+        # Wait for health check (Docker startup can be slow on CI runners)
         start_time = time.time()
-        timeout_secs = 90
+        timeout_secs = 150 if CI_ENV else 90
         while time.time() - start_time < timeout_secs:
             try:
                 with httpx.Client(timeout=2) as client:
                     resp = client.get(f"{base_url}/health")
                     if resp.status_code == 200:
                         break
-            except (httpx.ConnectError, httpx.ReadTimeout, httpx.ReadError):
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.ReadError, httpx.RemoteProtocolError):
                 pass
             time.sleep(1)
         else:
@@ -656,6 +658,9 @@ def test_scaffold_docker_build(
     template: str,
 ) -> None:
     """Test that scaffolded project Docker image builds successfully."""
+    if CI_ENV and os.getenv("CHAPKIT_RUN_DOCKER_TESTS") != "1":
+        pytest.skip("Skipping Docker build tests on CI (set CHAPKIT_RUN_DOCKER_TESTS=1 to enable)")
+
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
@@ -693,6 +698,9 @@ def test_scaffold_functional_train_predict_docker(
     scaffold_project_no_sync: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded functional ML project via Docker container."""
+    if CI_ENV and os.getenv("CHAPKIT_RUN_DOCKER_TESTS") != "1":
+        pytest.skip("Skipping Docker tests on CI (set CHAPKIT_RUN_DOCKER_TESTS=1 to enable)")
+
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
@@ -711,6 +719,9 @@ def test_scaffold_shell_train_predict_docker(
     scaffold_project_no_sync: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded shell ML project via Docker container."""
+    if CI_ENV and os.getenv("CHAPKIT_RUN_DOCKER_TESTS") != "1":
+        pytest.skip("Skipping Docker tests on CI (set CHAPKIT_RUN_DOCKER_TESTS=1 to enable)")
+
     # Check if Docker is available
     docker_check = subprocess.run(["docker", "info"], capture_output=True)
     if docker_check.returncode != 0:
