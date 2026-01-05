@@ -1812,5 +1812,3 @@ polars_df = pl.read_csv("large_file.csv")
 
 For related features, see:
 - [Servicekit Repository](https://github.com/winterop-com/servicekit) - Building services with servicekit
-- [Authentication Guide](authentication.md) - Securing data endpoints
-- [Job Scheduler Guide](job-scheduler.md) - Processing DataFrame data in background
