@@ -156,6 +156,10 @@ def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, Non
     content = content.replace("8000:8000", f"{port}:8000")
     compose_file.write_text(content)
 
+    # Create data directory for bind mount (prevents permission issues on CI)
+    data_dir = project_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+
     try:
         # Build and start
         result = subprocess.run(
