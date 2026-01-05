@@ -14,7 +14,6 @@ ENV UV_PIP_EXTRA_ARGS="--only-binary=:all:"
 # Copy project files needed for wheel build
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
-COPY alembic/ ./alembic/
 COPY alembic.ini ./
 
 # Install git (needed for dependencies) and build chapkit wheel
@@ -58,7 +57,6 @@ COPY --from=builder --chown=${USER}:${USER} /app/.venv /app/.venv
 
 # Copy examples and migration files
 COPY --chown=${USER}:${USER} examples/ ./examples/
-COPY --chown=${USER}:${USER} alembic/ ./alembic/
 COPY --chown=${USER}:${USER} alembic.ini ./
 
 ENV VIRTUAL_ENV=/app/.venv
