@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.10.4"
+version = "0.10.5"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
@@ -100,6 +100,9 @@ filterwarnings = [
   "ignore:Pydantic serializer warnings:UserWarning",
   "ignore:Remove.*format_exc_info.*:UserWarning",
 ]
+markers = [
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 
 [tool.coverage.run]
 branch = true
@@ -154,7 +157,7 @@ ignore_errors = true
 
 [tool.pyright]
 include = ["src", "tests", "examples"]
-exclude = ["examples/artifact_manager"]
+exclude = ["examples/artifact_manager", "**/.venv"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true

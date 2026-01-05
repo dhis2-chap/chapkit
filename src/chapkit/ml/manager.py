@@ -99,7 +99,9 @@ class MLManager(Generic[ConfigT]):
         training_completed_at = datetime.datetime.now(datetime.UTC)
         training_duration = (training_completed_at - training_started_at).total_seconds()
 
-        workspace_dir = None
+        # Extract workspace_dir before try block (for cleanup in finally)
+        workspace_dir_str = training_result.get("workspace_dir") if isinstance(training_result, dict) else None
+        workspace_dir = Path(workspace_dir_str) if workspace_dir_str else None
 
         try:
             # Let runner create artifact structure
@@ -112,13 +114,9 @@ class MLManager(Generic[ConfigT]):
             )
 
             # Validate artifact structure with Pydantic
-            from chapkit.artifact.schemas import MLTrainingArtifactData
+            from chapkit.artifact.schemas import MLTrainingWorkspaceArtifactData
 
-            MLTrainingArtifactData.model_validate(artifact_data_dict)
-
-            # Extract workspace_dir if present (for cleanup)
-            if isinstance(training_result, dict) and "workspace_dir" in training_result:
-                workspace_dir = Path(training_result["workspace_dir"])
+            MLTrainingWorkspaceArtifactData.model_validate(artifact_data_dict)
 
             # Store artifact
             async with self.database.session() as session:
@@ -159,7 +157,7 @@ class MLManager(Generic[ConfigT]):
 
         # Extract model and config_id from artifact
         training_data = training_artifact.data
-        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training":
+        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training_workspace":
             raise ValueError(f"Artifact {request.artifact_id} is not a training artifact")
 
         # Check training status - block prediction on failed training
@@ -173,13 +171,15 @@ class MLManager(Generic[ConfigT]):
                 f"Training script exited with code {exit_code}."
             )
 
-        # Check if artifact is workspace (ShellModelRunner) or pickled model (FunctionalModelRunner)
+        # Check if artifact is workspace (ZIP) or pickled model
         is_workspace = training_data.get("content_type") == "application/zip"
         extracted_workspace = None
+        prediction_workspace_dir = None
 
         try:
             if is_workspace:
                 # Extract workspace from zip
+                import pickle
                 import tempfile
                 import zipfile
                 from io import BytesIO
@@ -192,12 +192,31 @@ class MLManager(Generic[ConfigT]):
                 with zipfile.ZipFile(zip_buffer, "r") as zf:
                     zf.extractall(extracted_workspace)
 
-                # Create model dict with workspace info for runner
-                trained_model = {
-                    "workspace_dir": str(extracted_workspace),
-                }
+                # Determine how to pass model based on runner type
+                from .runner import ShellModelRunner
+
+                if isinstance(self.runner, ShellModelRunner):
+                    # ShellModelRunner: pass workspace directory to runner
+                    trained_model = {
+                        "workspace_dir": str(extracted_workspace),
+                    }
+                else:
+                    # FunctionalModelRunner with workspace: load pickled model from workspace
+                    model_pickle_path = extracted_workspace / "model.pickle"
+                    if model_pickle_path.exists():
+                        try:
+                            trained_model = pickle.loads(model_pickle_path.read_bytes())
+                        except (pickle.UnpicklingError, EOFError, TypeError) as e:
+                            raise ValueError(
+                                f"Failed to load model from {model_pickle_path}: "
+                                f"corrupted or incompatible pickle file. {e}"
+                            ) from e
+                    else:
+                        raise ValueError(
+                            f"Training artifact workspace missing model.pickle file at {model_pickle_path}"
+                        )
             else:
-                # Pickled model handling (FunctionalModelRunner)
+                # Pickled model handling (FunctionalModelRunner without workspace)
                 trained_model = training_data["content"]
 
             config_id = ULID.from_str(training_metadata["config_id"])
@@ -213,7 +232,7 @@ class MLManager(Generic[ConfigT]):
 
             # Make predictions with timing
             prediction_started_at = datetime.datetime.now(datetime.UTC)
-            predictions = await self.runner.on_predict(
+            prediction_result = await self.runner.on_predict(
                 config=config.data,
                 model=trained_model,
                 historic=request.historic,
@@ -223,17 +242,33 @@ class MLManager(Generic[ConfigT]):
             prediction_completed_at = datetime.datetime.now(datetime.UTC)
             prediction_duration = (prediction_completed_at - prediction_started_at).total_seconds()
 
-        finally:
-            # Cleanup extracted workspace
-            if extracted_workspace and extracted_workspace.exists():
-                shutil.rmtree(extracted_workspace, ignore_errors=True)
+            # Extract predictions from result (handles both new dict format and legacy DataFrame)
+            if isinstance(prediction_result, dict) and "content" in prediction_result:
+                # New unified format: {content, workspace_dir, exit_code, stdout, stderr}
+                predictions = prediction_result["content"]
+                workspace_dir_str = prediction_result.get("workspace_dir")
+            else:
+                # Legacy format: BaseModelRunner subclasses return DataFrame directly
+                predictions = prediction_result
+                workspace_dir_str = None
 
-        # Store predictions in artifact with parent linkage
-        async with self.database.session() as session:
-            artifact_repo = ArtifactRepository(session)
-            artifact_manager = ArtifactManager(artifact_repo)
+            # Create workspace artifact if workspace was created (both runners can produce workspace)
+            if workspace_dir_str:
+                prediction_workspace_dir = Path(workspace_dir_str)
 
-            # Create metadata
+                # Create workspace artifact data (zips workspace)
+                # Runner returns ml_prediction_workspace type for debugging artifacts
+                workspace_artifact_dict = await self.runner.create_prediction_artifact(
+                    prediction_result=prediction_result,
+                    config_id=str(config_id),
+                    started_at=prediction_started_at,
+                    completed_at=prediction_completed_at,
+                    duration_seconds=round(prediction_duration, 2),
+                )
+            else:
+                workspace_artifact_dict = None
+
+            # Create prediction artifact with DataFrame (same for both runners)
             from chapkit.artifact.schemas import MLMetadata, MLPredictionArtifactData
 
             metadata = MLMetadata(
@@ -245,7 +280,6 @@ class MLManager(Generic[ConfigT]):
             )
 
             # Create and validate artifact data structure with Pydantic
-            # Note: We validate but don't serialize to JSON because content contains Python objects
             artifact_data_model = MLPredictionArtifactData(
                 type="ml_prediction",
                 metadata=metadata,
@@ -255,7 +289,7 @@ class MLManager(Generic[ConfigT]):
             )
 
             # Construct dict manually to preserve Python objects (database uses PickleType)
-            artifact_data = {
+            artifact_data_dict = {
                 "type": artifact_data_model.type,
                 "metadata": artifact_data_model.metadata.model_dump(),
                 "content": predictions,  # Keep as Python object (DataFrame)
@@ -263,13 +297,39 @@ class MLManager(Generic[ConfigT]):
                 "content_size": artifact_data_model.content_size,
             }
 
-            await artifact_manager.save(
-                ArtifactIn(
-                    id=artifact_id,
-                    data=artifact_data,
-                    parent_id=request.artifact_id,
-                    level=1,
+            # Store artifacts
+            async with self.database.session() as session:
+                artifact_repo = ArtifactRepository(session)
+                artifact_manager = ArtifactManager(artifact_repo)
+
+                # 1. Store prediction artifact (level 1, parent = training artifact)
+                await artifact_manager.save(
+                    ArtifactIn(
+                        id=artifact_id,
+                        data=artifact_data_dict,
+                        parent_id=request.artifact_id,
+                        level=1,
+                    )
                 )
-            )
+
+                # 2. Store workspace artifact if workspace was created (level 2, parent = prediction artifact)
+                if workspace_artifact_dict is not None:
+                    workspace_artifact_id = ULID()
+                    await artifact_manager.save(
+                        ArtifactIn(
+                            id=workspace_artifact_id,
+                            data=workspace_artifact_dict,
+                            parent_id=artifact_id,
+                            level=2,
+                        )
+                    )
+
+        finally:
+            # Cleanup extracted training workspace
+            if extracted_workspace and extracted_workspace.exists():
+                shutil.rmtree(extracted_workspace, ignore_errors=True)
+            # Cleanup prediction workspace (created by ShellModelRunner)
+            if prediction_workspace_dir and prediction_workspace_dir.exists():
+                shutil.rmtree(prediction_workspace_dir, ignore_errors=True)
 
         return artifact_id

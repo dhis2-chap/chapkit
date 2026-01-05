@@ -15,7 +15,7 @@ from .schemas import (
     GenericMetadata,
     MLMetadata,
     MLPredictionArtifactData,
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
     validate_artifact_data,
 )
 
@@ -30,7 +30,7 @@ __all__ = [
     "ArtifactRouter",
     "ArtifactData",
     "BaseArtifactData",
-    "MLTrainingArtifactData",
+    "MLTrainingWorkspaceArtifactData",
     "MLPredictionArtifactData",
     "GenericArtifactData",
     "MLMetadata",

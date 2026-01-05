@@ -2,7 +2,7 @@
 
 Migration Note:
     TrainedModelArtifactData and PredictionArtifactData have been replaced by
-    MLTrainingArtifactData and MLPredictionArtifactData from chapkit.artifact.data_schemas.
+    MLTrainingWorkspaceArtifactData and MLPredictionArtifactData from chapkit.artifact.schemas.
 
     Key changes:
     - ml_type field renamed to type
@@ -25,7 +25,7 @@ from ulid import ULID
 
 from chapkit.artifact.schemas import (
     MLPredictionArtifactData,
-    MLTrainingArtifactData,
+    MLTrainingWorkspaceArtifactData,
 )
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
@@ -96,8 +96,19 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         historic: DataFrame,
         future: DataFrame,
         geo: FeatureCollection | None = None,
-    ) -> DataFrame:
-        """Make predictions using a trained model and return predictions as DataFrame."""
+    ) -> Any:
+        """Make predictions using a trained model and return predictions."""
+        ...
+
+    async def create_prediction_artifact(
+        self,
+        prediction_result: Any,
+        config_id: str,
+        started_at: datetime.datetime,
+        completed_at: datetime.datetime,
+        duration_seconds: float,
+    ) -> dict[str, Any]:
+        """Create artifact data structure from prediction result."""
         ...
 
 
@@ -107,6 +118,6 @@ __all__ = [
     "PredictRequest",
     "PredictResponse",
     "ModelRunnerProtocol",
-    "MLTrainingArtifactData",
+    "MLTrainingWorkspaceArtifactData",
     "MLPredictionArtifactData",
 ]

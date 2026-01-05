@@ -32,6 +32,9 @@ jobs:
     - name: Run tests with coverage
       run: make coverage
 
+    - name: Run slow CLI scaffolding tests
+      run: make test-slow
+
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:
