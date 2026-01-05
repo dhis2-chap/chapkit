@@ -451,6 +451,70 @@ docker compose logs -f
 docker compose down
 ```
 
+### Docker Data Management
+
+The generated `Dockerfile` and `compose.yml` are **starting points** designed to work out of the box. Customize them for your specific deployment needs.
+
+The following describes the default configuration. If you change `DATABASE_URL` or other settings, your setup may differ.
+
+**Named Volumes**
+
+Docker Compose uses named volumes (not bind mounts) for data persistence:
+
+```yaml
+volumes:
+  - ck_my_service_data:/workspace/data
+```
+
+This approach:
+
+- Works consistently across macOS, Linux, and Windows
+- Avoids UID permission issues on Linux
+- Data persists across container restarts
+
+**Accessing Data**
+
+```bash
+# List files in data directory
+docker compose exec api ls /workspace/data
+
+# Copy database out of container
+docker compose cp api:/workspace/data/chapkit.db ./backup.db
+
+# Copy database into container
+docker compose cp ./mydata.db api:/workspace/data/chapkit.db
+
+# Direct SQLite access
+docker compose exec api sqlite3 /workspace/data/chapkit.db ".tables"
+```
+
+**Volume Management**
+
+```bash
+# List all Docker volumes
+docker volume ls
+
+# Inspect volume details
+docker volume inspect ck_my_service_data
+
+# Remove containers but keep data
+docker compose down
+
+# Remove containers AND data (warning: data loss)
+docker compose down -v
+```
+
+**Using Bind Mounts**
+
+If you need direct host filesystem access, modify `compose.yml` to use a bind mount:
+
+```yaml
+volumes:
+  - ./data:/workspace/data  # Host path:container path
+```
+
+Note: On Linux, ensure the host directory has correct permissions for the container user (UID 10001).
+
 ### Access Services
 
 - **API**: http://localhost:8000
