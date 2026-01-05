@@ -319,11 +319,32 @@ def test_scaffold_functional_train_predict(
             assert pred_artifact["data"]["type"] == "ml_prediction"
             assert pred_artifact["data"]["metadata"]["status"] == "success"
 
-            # 8. Verify predictions have expected structure
+            # 8. Verify prediction DataFrame content
             predictions = pred_artifact["data"]["content"]
             assert "columns" in predictions
             assert "data" in predictions
-            assert "sample_0" in predictions["columns"]
+            assert len(predictions["data"]) > 0, "Predictions should have data rows"
+            assert "sample_0" in predictions["columns"], "Predictions should have sample_0 column"
+
+            # 9. Verify level 2 prediction workspace artifact exists
+            tree_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}/$tree")
+            assert tree_resp.status_code == 200
+            tree = tree_resp.json()
+
+            # Tree root is the prediction artifact
+            assert tree["id"] == pred_artifact_id
+            assert tree["level"] == 1
+
+            # Should have children (the prediction workspace)
+            assert "children" in tree
+            assert len(tree["children"]) >= 1
+
+            # Verify workspace artifact structure
+            workspace_artifact = tree["children"][0]
+            assert workspace_artifact["level"] == 2
+            assert workspace_artifact["parent_id"] == pred_artifact_id
+            assert workspace_artifact["data"]["type"] == "ml_prediction_workspace"
+            assert workspace_artifact["data"]["content_type"] == "application/zip"
 
 
 @pytest.mark.slow
@@ -399,6 +420,33 @@ def test_scaffold_shell_train_predict(
             assert pred_artifact["level"] == 1
             assert pred_artifact["parent_id"] == artifact_id
             assert pred_artifact["data"]["type"] == "ml_prediction"
+
+            # 8. Verify prediction DataFrame content
+            predictions = pred_artifact["data"]["content"]
+            assert "columns" in predictions
+            assert "data" in predictions
+            assert len(predictions["data"]) > 0, "Predictions should have data rows"
+            assert "sample_0" in predictions["columns"], "Predictions should have sample_0 column"
+
+            # 9. Verify level 2 prediction workspace artifact exists
+            tree_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}/$tree")
+            assert tree_resp.status_code == 200
+            tree = tree_resp.json()
+
+            # Tree root is the prediction artifact
+            assert tree["id"] == pred_artifact_id
+            assert tree["level"] == 1
+
+            # Should have children (the prediction workspace)
+            assert "children" in tree
+            assert len(tree["children"]) >= 1
+
+            # Verify workspace artifact structure
+            workspace_artifact = tree["children"][0]
+            assert workspace_artifact["level"] == 2
+            assert workspace_artifact["parent_id"] == pred_artifact_id
+            assert workspace_artifact["data"]["type"] == "ml_prediction_workspace"
+            assert workspace_artifact["data"]["content_type"] == "application/zip"
 
 
 @pytest.mark.slow

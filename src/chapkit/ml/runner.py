@@ -566,7 +566,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         workspace_content = zip_workspace(workspace_dir)
         return create_workspace_artifact(
             workspace_content=workspace_content,
-            artifact_type="ml_prediction",
+            artifact_type="ml_prediction_workspace",
             config_id=config_id,
             started_at=started_at,
             completed_at=completed_at,
