@@ -99,7 +99,9 @@ class MLManager(Generic[ConfigT]):
         training_completed_at = datetime.datetime.now(datetime.UTC)
         training_duration = (training_completed_at - training_started_at).total_seconds()
 
-        workspace_dir = None
+        # Extract workspace_dir before try block (for cleanup in finally)
+        workspace_dir_str = training_result.get("workspace_dir") if isinstance(training_result, dict) else None
+        workspace_dir = Path(workspace_dir_str) if workspace_dir_str else None
 
         try:
             # Let runner create artifact structure
@@ -115,11 +117,6 @@ class MLManager(Generic[ConfigT]):
             from chapkit.artifact.schemas import MLTrainingWorkspaceArtifactData
 
             MLTrainingWorkspaceArtifactData.model_validate(artifact_data_dict)
-
-            # Extract workspace_dir if present (for cleanup)
-            workspace_dir_str = training_result.get("workspace_dir") if isinstance(training_result, dict) else None
-            if workspace_dir_str:
-                workspace_dir = Path(workspace_dir_str)
 
             # Store artifact
             async with self.database.session() as session:

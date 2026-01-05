@@ -197,28 +197,18 @@ async def predict_fn(config, model, historic, future, geo=None):
     # Prediction logic
     return predictions
 
-# Workspace enabled by default (stores all inputs and outputs as ZIP)
 runner = FunctionalModelRunner(on_train=train_fn, on_predict=predict_fn)
-
-# Disable workspace for smaller artifacts (stores only pickled model)
-runner = FunctionalModelRunner(
-    on_train=train_fn,
-    on_predict=predict_fn,
-    enable_workspace=False,
-)
 ```
 
 **Workspace Feature:**
-- **Enabled by default**: Training and prediction artifacts include complete workspace ZIPs
+- Training and prediction artifacts include complete workspace ZIPs (same as ShellModelRunner)
 - Workspace contains: config.yml, data.csv, geo.json (if provided), model.pickle, predictions.csv
 - Enables debugging by inspecting exact inputs and outputs
-- Set `enable_workspace=False` for smaller artifacts (pickled model only)
 
 **Use Cases:**
 - Simple models without state
 - Quick prototypes
 - Pure function workflows
-- Full traceability with workspace enabled
 
 ### ShellModelRunner
 
@@ -613,42 +603,7 @@ Chapkit uses typed artifact data schemas for consistent ML artifact storage with
 
 ### ML Training Artifact
 
-Stored at hierarchy level 0 using `MLTrainingWorkspaceArtifactData`. The artifact structure differs based on the runner configuration:
-
-#### FunctionalModelRunner with `enable_workspace=False`
-
-Stores pickled Python model objects directly:
-
-```json
-{
-  "type": "ml_training_workspace",
-  "metadata": {
-    "status": "success",
-    "config_id": "01CONFIG...",
-    "started_at": "2025-10-14T10:00:00Z",
-    "completed_at": "2025-10-14T10:00:15Z",
-    "duration_seconds": 15.23
-  },
-  "content": "<Python model object>",
-  "content_type": "application/x-pickle",
-  "content_size": 1234
-}
-```
-
-**Schema Structure:**
-- `type`: Discriminator field - always `"ml_training_workspace"`
-- `metadata`: Structured execution metadata
-  - `status`: "success" (always success for FunctionalModelRunner)
-  - `config_id`: Config used for training
-  - `started_at`, `completed_at`: ISO 8601 timestamps
-  - `duration_seconds`: Training duration
-- `content`: Trained model (Python object, stored as PickleType)
-- `content_type`: "application/x-pickle"
-- `content_size`: Size in bytes (optional)
-
-#### FunctionalModelRunner (default) / ShellModelRunner
-
-Stores compressed workspace as zip artifact (workspace enabled by default for FunctionalModelRunner):
+Stored at hierarchy level 0 using `MLTrainingWorkspaceArtifactData`. Both `FunctionalModelRunner` and `ShellModelRunner` store compressed workspace ZIP artifacts:
 
 ```json
 {
@@ -768,6 +723,78 @@ Both FunctionalModelRunner (default) and ShellModelRunner create an additional w
 - Additional files created during execution (logs, intermediate results)
 
 **Accessing workspace:** Use `GET /api/v1/artifacts/{prediction_id}/$tree` to find the workspace artifact ID, then retrieve it directly.
+
+#### Workspace File Structure
+
+Training workspace ZIP contains:
+```
+workspace/
+  config.yml          # Model configuration (YAML serialized)
+  data.csv            # Training data with all columns
+  geo.json            # GeoJSON features (if requires_geo=True)
+  model.pickle        # Trained model (FunctionalModelRunner only)
+  [script outputs]    # Any files created by training script
+```
+
+Prediction workspace ZIP contains:
+```
+workspace/
+  config.yml          # Model configuration (YAML serialized)
+  historic.csv        # Historical observations
+  future.csv          # Future periods to predict
+  geo.json            # GeoJSON features (if requires_geo=True)
+  predictions.csv     # Model predictions
+  model.pickle        # Trained model (FunctionalModelRunner only)
+  [script outputs]    # Any files created by prediction script
+```
+
+#### Extracting and Inspecting Workspaces
+
+Download and extract workspace for debugging:
+
+```python
+import zipfile
+from io import BytesIO
+
+# Get workspace artifact
+artifact = await artifact_manager.find_by_id(workspace_artifact_id)
+workspace_zip = artifact.data["content"]
+
+# Extract to directory
+with zipfile.ZipFile(BytesIO(workspace_zip), "r") as zf:
+    zf.extractall("/tmp/workspace_debug")
+
+# Or list contents
+with zipfile.ZipFile(BytesIO(workspace_zip), "r") as zf:
+    for name in zf.namelist():
+        print(name)
+```
+
+Using curl:
+```bash
+# Download workspace artifact content
+curl -o workspace.zip \
+  http://localhost:8000/api/v1/artifacts/$WORKSPACE_ID/\$download
+
+# Extract and inspect
+unzip workspace.zip -d workspace_debug/
+cat workspace_debug/config.yml
+head workspace_debug/predictions.csv
+```
+
+#### Storage Considerations
+
+Both `FunctionalModelRunner` and `ShellModelRunner` always create workspace ZIP artifacts containing all inputs and outputs. This provides full debugging capability and audit trails.
+
+**Typical artifact sizes:**
+- Training workspace: 1-100+ MB (depends on project size)
+- Prediction workspace: 0.5-50+ MB
+- Prediction DataFrame: Small (KB range)
+
+**Managing storage:**
+- Use artifact retention policies to auto-delete old workspaces
+- Level 2 workspace artifacts are primarily for debugging - short retention OK
+- See [Artifact Retention Strategies](#artifact-retention-strategies) for cleanup examples
 
 ### Accessing Artifact Data
 
@@ -1301,17 +1328,6 @@ async def cleanup_workspace_artifacts(app: FastAPI, days: int = 7) -> None:
         await artifact_repository.commit()
 ```
 
-4. **Disable workspace for smaller footprint**:
-
-```python
-# FunctionalModelRunner: disable workspace to store only pickled models
-runner = FunctionalModelRunner(
-    on_train=train_fn,
-    on_predict=predict_fn,
-    enable_workspace=False,  # Only store pickled model, no ZIP
-)
-```
-
 **Scheduled cleanup with APScheduler:**
 
 ```python
@@ -1581,6 +1597,81 @@ MLServiceBuilder(..., database_url="postgresql://...")
 // Wrong formats:
 // {"col1": [1, 3], "col2": [2, 4]}  (dict format - not supported)
 // [{"col1": 1, "col2": 2}]  (records format - not supported)
+```
+
+### Prediction Blocked by Failed Training
+
+**Problem:** "Cannot predict using failed training artifact"
+
+**Cause:** Training script exited with non-zero code, artifact has status="failed"
+
+**Solution:**
+```bash
+# Check training artifact status
+curl http://localhost:8000/api/v1/artifacts/$TRAINING_ARTIFACT_ID | jq '.data.metadata'
+
+# If status is "failed", check stdout/stderr
+curl http://localhost:8000/api/v1/artifacts/$TRAINING_ARTIFACT_ID | \
+  jq '.data.metadata | {status, exit_code, stdout, stderr}'
+
+# Re-train with fixed script
+curl -X POST http://localhost:8000/api/v1/ml/\$train \
+  -H "Content-Type: application/json" \
+  -d '{"config_id": "...", "data": {...}}'
+```
+
+### Pickle Compatibility Errors
+
+**Problem:** "corrupted or incompatible pickle file" during prediction
+
+**Causes:**
+1. Model trained with different Python version
+2. Model class definition changed
+3. Required package version mismatch
+
+**Solution:**
+```python
+# Check Python version compatibility
+# Models pickled in Python 3.10 may not load in Python 3.12
+
+# Ensure same environment for train and predict
+# - Same Python version
+# - Same scikit-learn/numpy versions
+# - Same class definitions
+
+# If model class changed, re-train:
+curl -X POST http://localhost:8000/api/v1/ml/\$train ...
+```
+
+### Workspace Extraction Fails
+
+**Problem:** Cannot unzip or read workspace artifact
+
+**Causes:**
+1. Artifact content is not a ZIP (pickled model instead)
+2. Corrupted workspace during creation
+
+**Solution:**
+```bash
+# Check artifact content_type
+curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq '.data.content_type'
+
+# If "application/x-pickle" - not a workspace, use pickle.loads()
+# If "application/zip" - workspace, use zipfile
+
+# Python inspection:
+import pickle
+import zipfile
+from io import BytesIO
+
+artifact = await artifact_manager.find_by_id(artifact_id)
+content_type = artifact.data["content_type"]
+
+if content_type == "application/zip":
+    with zipfile.ZipFile(BytesIO(artifact.data["content"]), "r") as zf:
+        print(zf.namelist())
+else:
+    model = pickle.loads(artifact.data["content"])
 ```
 
 ---

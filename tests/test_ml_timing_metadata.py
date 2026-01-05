@@ -77,8 +77,7 @@ async def ml_manager() -> AsyncIterator[MLManager]:
 
     scheduler = InMemoryChapkitScheduler()
 
-    # Disable workspace to test pickled model artifacts (workspace tested separately)
-    runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict, enable_workspace=False)
+    runner = FunctionalModelRunner(on_train=simple_train, on_predict=simple_predict)
 
     manager = MLManager(runner, scheduler, database, SimpleConfig)
     yield manager
@@ -117,8 +116,8 @@ async def test_training_timing_metadata_captured(
 
     response = await ml_manager.execute_train(train_request)
 
-    # Wait for job to complete
-    await asyncio.sleep(0.5)
+    # Wait for job to complete (workspace creation takes longer)
+    await asyncio.sleep(2.0)
 
     # Retrieve trained model artifact
     async with ml_manager.database.session() as session:
@@ -167,8 +166,8 @@ async def test_prediction_timing_metadata_captured(
     )
     train_response = await ml_manager.execute_train(train_request)
 
-    # Wait for training to complete
-    await asyncio.sleep(0.5)
+    # Wait for training to complete (workspace creation takes longer)
+    await asyncio.sleep(2.0)
 
     # Submit prediction job
     predict_request = PredictRequest(
@@ -178,8 +177,8 @@ async def test_prediction_timing_metadata_captured(
     )
     predict_response = await ml_manager.execute_predict(predict_request)
 
-    # Wait for prediction to complete
-    await asyncio.sleep(0.5)
+    # Wait for prediction to complete (workspace creation takes longer)
+    await asyncio.sleep(2.0)
 
     # Retrieve prediction artifact
     async with ml_manager.database.session() as session:
@@ -226,7 +225,7 @@ async def test_timing_metadata_iso_format(
         data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.0)
 
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
@@ -258,7 +257,7 @@ async def test_timing_duration_rounded_to_two_decimals(
         data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.0)
 
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
@@ -287,7 +286,7 @@ async def test_original_metadata_preserved(
         data=DataFrame.from_pandas(train_df),
     )
     train_response = await ml_manager.execute_train(train_request)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.0)
 
     # Check training artifact
     async with ml_manager.database.session() as session:
@@ -308,7 +307,7 @@ async def test_original_metadata_preserved(
         future=DataFrame.from_pandas(predict_df),
     )
     predict_response = await ml_manager.execute_predict(predict_request)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.0)
 
     # Check prediction artifact
     async with ml_manager.database.session() as session:
@@ -336,7 +335,7 @@ async def test_content_type_set_in_training_artifact(
         data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.0)
 
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
@@ -345,7 +344,8 @@ async def test_content_type_set_in_training_artifact(
 
     assert artifact is not None
     assert "content_type" in artifact.data
-    assert artifact.data["content_type"] == "application/x-pickle"
+    # Workspace is always enabled, so content_type is always application/zip
+    assert artifact.data["content_type"] == "application/zip"
 
 
 async def test_typed_metadata_validation(
@@ -392,7 +392,7 @@ async def test_typed_structure_present_in_artifact(
         data=DataFrame.from_pandas(train_df),
     )
     response = await ml_manager.execute_train(train_request)
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.0)
 
     async with ml_manager.database.session() as session:
         artifact_repo = ArtifactRepository(session)
@@ -456,7 +456,7 @@ async def test_predict_with_wrong_artifact_type_raises_error(ml_manager: MLManag
     job_id = ULID.from_str(response.job_id)
 
     # Wait for job to fail
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(2.0)
 
     # Check that job failed with the right error
     record = await ml_manager.scheduler.get_record(job_id)

@@ -148,106 +148,12 @@ def test_zip_workspace_with_mock_corruption() -> None:
         shutil.rmtree(workspace_dir, ignore_errors=True)
 
 
-# --- Tests for FunctionalModelRunner with workspace disabled ---
+# --- Tests for FunctionalModelRunner artifact validation ---
 
 
 @pytest.mark.asyncio
-async def test_functional_runner_workspace_disabled_train() -> None:
-    """Test FunctionalModelRunner with enable_workspace=False for training."""
-
-    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
-        return "simple_model"
-
-    async def predict_fn(
-        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
-    ) -> DataFrame:
-        return future.add_column("prediction", [1.0] * len(future.data))
-
-    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
-        on_train=train_fn,
-        on_predict=predict_fn,
-        enable_workspace=False,
-    )
-
-    config = MockConfig()
-    data = DataFrame(columns=["feature1", "target"], data=[[1, 0], [2, 1]])
-
-    result = await runner.on_train(config, data)
-
-    # With workspace disabled, result should still be dict but with None workspace_dir
-    assert isinstance(result, dict)
-    assert result["content"] == "simple_model"
-    assert result["workspace_dir"] is None
-
-
-@pytest.mark.asyncio
-async def test_functional_runner_workspace_disabled_predict() -> None:
-    """Test FunctionalModelRunner with enable_workspace=False for prediction."""
-
-    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
-        return "simple_model"
-
-    async def predict_fn(
-        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
-    ) -> DataFrame:
-        return future.add_column("prediction", [1.0] * len(future.data))
-
-    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
-        on_train=train_fn,
-        on_predict=predict_fn,
-        enable_workspace=False,
-    )
-
-    config = MockConfig()
-    model = "simple_model"
-    historic = DataFrame(columns=["feature1"], data=[])
-    future = DataFrame(columns=["feature1"], data=[[3], [4]])
-
-    result = await runner.on_predict(config, model, historic, future)
-
-    # With workspace disabled, result should still be dict but with None workspace_dir
-    assert isinstance(result, dict)
-    assert result["workspace_dir"] is None
-    assert "prediction" in result["content"].columns
-
-
-@pytest.mark.asyncio
-async def test_functional_runner_create_training_artifact_no_workspace() -> None:
-    """Test create_training_artifact falls back to pickle when workspace disabled."""
-
-    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
-        return "simple_model"
-
-    async def predict_fn(
-        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
-    ) -> DataFrame:
-        return future
-
-    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
-        on_train=train_fn,
-        on_predict=predict_fn,
-        enable_workspace=False,
-    )
-
-    now = datetime.datetime.now(datetime.UTC)
-    training_result = {"content": "my_model", "workspace_dir": None}
-
-    artifact = await runner.create_training_artifact(
-        training_result=training_result,
-        config_id="test-config-id",
-        started_at=now,
-        completed_at=now,
-        duration_seconds=1.5,
-    )
-
-    assert artifact["type"] == "ml_training_workspace"
-    assert artifact["content"] == "my_model"
-    assert artifact["content_type"] == "application/x-pickle"
-
-
-@pytest.mark.asyncio
-async def test_functional_runner_create_prediction_artifact_no_workspace() -> None:
-    """Test create_prediction_artifact falls back to DataFrame when workspace disabled."""
+async def test_functional_runner_create_training_artifact_requires_workspace() -> None:
+    """Test create_training_artifact raises error when workspace_dir is missing."""
 
     async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
         return "model"
@@ -260,67 +166,24 @@ async def test_functional_runner_create_prediction_artifact_no_workspace() -> No
     runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
         on_train=train_fn,
         on_predict=predict_fn,
-        enable_workspace=False,
-    )
-
-    now = datetime.datetime.now(datetime.UTC)
-    predictions = DataFrame(columns=["feature1", "prediction"], data=[[1, 0.5]])
-    prediction_result = {"content": predictions, "workspace_dir": None}
-
-    artifact = await runner.create_prediction_artifact(
-        prediction_result=prediction_result,
-        config_id="test-config-id",
-        started_at=now,
-        completed_at=now,
-        duration_seconds=0.5,
-    )
-
-    assert artifact["type"] == "ml_prediction"
-    assert artifact["content"] == predictions
-    assert artifact["content_type"] == "application/vnd.chapkit.dataframe+json"
-
-
-# --- Tests for legacy fallback in create_training/prediction_artifact ---
-
-
-@pytest.mark.asyncio
-async def test_functional_runner_create_training_artifact_legacy_format() -> None:
-    """Test create_training_artifact handles legacy non-dict training result."""
-
-    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
-        return "legacy_model"
-
-    async def predict_fn(
-        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
-    ) -> DataFrame:
-        return future
-
-    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
-        on_train=train_fn,
-        on_predict=predict_fn,
-        enable_workspace=False,
     )
 
     now = datetime.datetime.now(datetime.UTC)
 
-    # Pass a non-dict legacy result
-    artifact = await runner.create_training_artifact(
-        training_result="legacy_model_object",
-        config_id="test-config-id",
-        started_at=now,
-        completed_at=now,
-        duration_seconds=1.0,
-    )
-
-    # Should fall back to base class implementation
-    assert artifact["type"] == "ml_training_workspace"
-    assert artifact["content"] == "legacy_model_object"
-    assert artifact["content_type"] == "application/x-pickle"
+    # Pass result without workspace_dir
+    with pytest.raises(ValueError, match="requires workspace dict from on_train"):
+        await runner.create_training_artifact(
+            training_result={"content": "model", "workspace_dir": None},
+            config_id="test-config-id",
+            started_at=now,
+            completed_at=now,
+            duration_seconds=1.0,
+        )
 
 
 @pytest.mark.asyncio
-async def test_functional_runner_create_prediction_artifact_legacy_format() -> None:
-    """Test create_prediction_artifact handles legacy non-dict prediction result."""
+async def test_functional_runner_create_prediction_artifact_requires_workspace() -> None:
+    """Test create_prediction_artifact raises error when workspace_dir is missing."""
 
     async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
         return "model"
@@ -333,25 +196,20 @@ async def test_functional_runner_create_prediction_artifact_legacy_format() -> N
     runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
         on_train=train_fn,
         on_predict=predict_fn,
-        enable_workspace=False,
     )
 
     now = datetime.datetime.now(datetime.UTC)
-    legacy_predictions = DataFrame(columns=["col1", "pred"], data=[[1, 0.9]])
+    predictions = DataFrame(columns=["x"], data=[[1]])
 
-    # Pass a non-dict legacy result (just DataFrame)
-    artifact = await runner.create_prediction_artifact(
-        prediction_result=legacy_predictions,
-        config_id="test-config-id",
-        started_at=now,
-        completed_at=now,
-        duration_seconds=0.3,
-    )
-
-    # Should fall back to base class implementation
-    assert artifact["type"] == "ml_prediction"
-    assert artifact["content"] == legacy_predictions
-    assert artifact["content_type"] == "application/vnd.chapkit.dataframe+json"
+    # Pass result without workspace_dir
+    with pytest.raises(ValueError, match="requires workspace dict from on_predict"):
+        await runner.create_prediction_artifact(
+            prediction_result={"content": predictions, "workspace_dir": None},
+            config_id="test-config-id",
+            started_at=now,
+            completed_at=now,
+            duration_seconds=0.5,
+        )
 
 
 # --- Tests for BaseModelRunner.create_prediction_artifact default ---
@@ -556,7 +414,6 @@ async def test_functional_runner_train_with_geo() -> None:
     runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
         on_train=train_fn,
         on_predict=predict_fn,
-        enable_workspace=True,
     )
 
     config = MockConfig()
@@ -605,7 +462,6 @@ async def test_functional_runner_predict_with_geo() -> None:
     runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
         on_train=train_fn,
         on_predict=predict_fn,
-        enable_workspace=True,
     )
 
     config = MockConfig()
@@ -680,7 +536,6 @@ async def test_mlmanager_predict_with_corrupted_pickle() -> None:
     runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
         on_train=train_fn,
         on_predict=predict_fn,
-        enable_workspace=True,
     )
 
     # Create mock database and scheduler
@@ -759,7 +614,6 @@ async def test_mlmanager_predict_with_empty_pickle() -> None:
     runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
         on_train=train_fn,
         on_predict=predict_fn,
-        enable_workspace=True,
     )
 
     mock_database = MagicMock()
@@ -812,3 +666,240 @@ async def test_mlmanager_predict_with_empty_pickle() -> None:
         # Should raise ValueError due to empty pickle (EOFError)
         with pytest.raises(ValueError, match="corrupted or incompatible pickle file"):
             await manager._predict_task(request, prediction_artifact_id)
+
+
+@pytest.mark.asyncio
+async def test_mlmanager_predict_with_failed_training_artifact() -> None:
+    """Test that prediction is blocked when training artifact has status='failed'."""
+    from ulid import ULID
+
+    from chapkit.ml.manager import MLManager
+    from chapkit.ml.schemas import PredictRequest
+
+    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
+        return "model"
+
+    async def predict_fn(
+        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
+    ) -> DataFrame:
+        return future
+
+    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
+        on_train=train_fn,
+        on_predict=predict_fn,
+    )
+
+    mock_database = MagicMock()
+    mock_scheduler = MagicMock()
+
+    manager: MLManager[MockConfig] = MLManager(
+        runner=runner,
+        scheduler=mock_scheduler,
+        database=mock_database,
+        config_schema=MockConfig,
+    )
+
+    # Create training artifact with status="failed"
+    training_artifact_id = ULID()
+    config_id = ULID()
+
+    training_artifact = MagicMock()
+    training_artifact.data = {
+        "type": "ml_training_workspace",
+        "metadata": {
+            "status": "failed",  # Training failed
+            "exit_code": 1,
+            "config_id": str(config_id),
+            "started_at": "2025-01-01T00:00:00",
+            "completed_at": "2025-01-01T00:01:00",
+            "duration_seconds": 60.0,
+            "stdout": "Training started...",
+            "stderr": "Error: training failed",
+        },
+        "content": b"workspace zip content",
+        "content_type": "application/zip",
+    }
+
+    mock_artifact_manager = AsyncMock()
+    mock_artifact_manager.find_by_id = AsyncMock(return_value=training_artifact)
+
+    mock_session = MagicMock()
+    mock_database.session = MagicMock(
+        return_value=MagicMock(__aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock())
+    )
+
+    with (
+        patch("chapkit.ml.manager.ArtifactRepository"),
+        patch("chapkit.ml.manager.ArtifactManager", return_value=mock_artifact_manager),
+    ):
+        request = PredictRequest(
+            artifact_id=training_artifact_id,
+            historic=DataFrame(columns=["x"], data=[]),
+            future=DataFrame(columns=["x"], data=[[1.0]]),
+        )
+        prediction_artifact_id = ULID()
+
+        # Should raise ValueError because training failed
+        with pytest.raises(ValueError, match="Cannot predict using failed training artifact"):
+            await manager._predict_task(request, prediction_artifact_id)
+
+
+# --- Tests for workspace cleanup ---
+
+
+@pytest.mark.asyncio
+async def test_mlmanager_train_cleans_up_workspace_on_success() -> None:
+    """Test that training cleans up workspace directory after successful completion."""
+
+    from ulid import ULID
+
+    from chapkit.ml.manager import MLManager
+    from chapkit.ml.schemas import TrainRequest
+
+    # Track workspace directory created
+    created_workspace_dir: Path | None = None
+
+    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
+        return "trained_model"
+
+    async def predict_fn(
+        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
+    ) -> DataFrame:
+        return future
+
+    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
+        on_train=train_fn,
+        on_predict=predict_fn,
+    )
+
+    mock_database = MagicMock()
+    mock_scheduler = MagicMock()
+
+    manager: MLManager[MockConfig] = MLManager(
+        runner=runner,
+        scheduler=mock_scheduler,
+        database=mock_database,
+        config_schema=MockConfig,
+    )
+
+    config_id = ULID()
+    mock_config = MagicMock()
+    mock_config.data = MockConfig()
+
+    mock_config_manager = AsyncMock()
+    mock_config_manager.find_by_id = AsyncMock(return_value=mock_config)
+
+    mock_artifact_manager = AsyncMock()
+    mock_config_repo = AsyncMock()
+
+    mock_session = MagicMock()
+    mock_database.session = MagicMock(
+        return_value=MagicMock(__aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock())
+    )
+
+    # Capture workspace directory from runner
+    original_on_train = runner.on_train
+
+    async def capturing_on_train(config: Any, data: Any, geo: Any = None) -> Any:
+        nonlocal created_workspace_dir
+        result = await original_on_train(config, data, geo)
+        if isinstance(result, dict) and result.get("workspace_dir"):
+            created_workspace_dir = Path(result["workspace_dir"])
+        return result
+
+    with (
+        patch("chapkit.ml.manager.ConfigRepository", return_value=mock_config_repo),
+        patch("chapkit.ml.manager.ConfigManager", return_value=mock_config_manager),
+        patch("chapkit.ml.manager.ArtifactRepository"),
+        patch("chapkit.ml.manager.ArtifactManager", return_value=mock_artifact_manager),
+        patch.object(runner, "on_train", side_effect=capturing_on_train),
+    ):
+        request = TrainRequest(
+            config_id=config_id,
+            data=DataFrame(columns=["x", "y"], data=[[1, 2]]),
+        )
+        artifact_id = ULID()
+
+        await manager._train_task(request, artifact_id)
+
+        # Verify workspace was created and then cleaned up
+        assert created_workspace_dir is not None
+        assert not created_workspace_dir.exists(), "Workspace directory should be cleaned up"
+
+
+@pytest.mark.asyncio
+async def test_mlmanager_train_cleans_up_workspace_on_error() -> None:
+    """Test that training cleans up workspace directory even when error occurs."""
+    from ulid import ULID
+
+    from chapkit.ml.manager import MLManager
+    from chapkit.ml.schemas import TrainRequest
+
+    created_workspace_dir: Path | None = None
+
+    async def train_fn(config: MockConfig, data: DataFrame, geo: Any = None) -> str:
+        return "trained_model"
+
+    async def predict_fn(
+        config: MockConfig, model: Any, historic: DataFrame, future: DataFrame, geo: Any = None
+    ) -> DataFrame:
+        return future
+
+    runner: FunctionalModelRunner[MockConfig] = FunctionalModelRunner(
+        on_train=train_fn,
+        on_predict=predict_fn,
+    )
+
+    mock_database = MagicMock()
+    mock_scheduler = MagicMock()
+
+    manager: MLManager[MockConfig] = MLManager(
+        runner=runner,
+        scheduler=mock_scheduler,
+        database=mock_database,
+        config_schema=MockConfig,
+    )
+
+    config_id = ULID()
+    mock_config = MagicMock()
+    mock_config.data = MockConfig()
+
+    mock_config_manager = AsyncMock()
+    mock_config_manager.find_by_id = AsyncMock(return_value=mock_config)
+
+    mock_session = MagicMock()
+    mock_database.session = MagicMock(
+        return_value=MagicMock(__aenter__=AsyncMock(return_value=mock_session), __aexit__=AsyncMock())
+    )
+
+    original_on_train = runner.on_train
+
+    async def capturing_on_train(config: Any, data: Any, geo: Any = None) -> Any:
+        nonlocal created_workspace_dir
+        result = await original_on_train(config, data, geo)
+        if isinstance(result, dict) and result.get("workspace_dir"):
+            created_workspace_dir = Path(result["workspace_dir"])
+        return result
+
+    async def failing_create_artifact(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        # Call original to ensure workspace is created, then fail
+        raise RuntimeError("Artifact creation error")
+
+    with (
+        patch("chapkit.ml.manager.ConfigRepository"),
+        patch("chapkit.ml.manager.ConfigManager", return_value=mock_config_manager),
+        patch.object(runner, "on_train", side_effect=capturing_on_train),
+        patch.object(runner, "create_training_artifact", side_effect=failing_create_artifact),
+    ):
+        request = TrainRequest(
+            config_id=config_id,
+            data=DataFrame(columns=["x", "y"], data=[[1, 2]]),
+        )
+        artifact_id = ULID()
+
+        with pytest.raises(RuntimeError, match="Artifact creation error"):
+            await manager._train_task(request, artifact_id)
+
+        # Verify workspace was cleaned up even after error
+        assert created_workspace_dir is not None
+        assert not created_workspace_dir.exists(), "Workspace should be cleaned up after error"

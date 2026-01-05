@@ -264,12 +264,10 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         self,
         on_train: TrainFunction[ConfigT],
         on_predict: PredictFunction[ConfigT],
-        enable_workspace: bool = True,
     ) -> None:
         """Initialize functional runner with train and predict functions."""
         self._on_train = on_train
         self._on_predict = on_predict
-        self.enable_workspace = enable_workspace
 
     async def on_train(
         self,
@@ -277,31 +275,26 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         data: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
-        """Train a model and return dict with content and optional workspace.
+        """Train a model and return dict with content and workspace.
 
         Returns:
             Dict with keys: content (model), workspace_dir, exit_code, stdout, stderr
         """
-        workspace_dir = None
-
-        if self.enable_workspace:
-            workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_train_"))
-            # Copy full project directory for reproducibility
-            prepare_workspace(Path.cwd(), workspace_dir)
-            # Write training input files
-            write_training_inputs(workspace_dir, config, data, geo)
+        workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_train_"))
+        # Copy full project directory for reproducibility
+        prepare_workspace(Path.cwd(), workspace_dir)
+        # Write training input files
+        write_training_inputs(workspace_dir, config, data, geo)
 
         # Execute training function
         model = await self._on_train(config, data, geo)
 
-        if self.enable_workspace:
-            # Write model.pickle
-            assert workspace_dir is not None  # For type checker
-            (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
+        # Write model.pickle
+        (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
 
         return {
             "content": model,
-            "workspace_dir": str(workspace_dir) if workspace_dir else None,
+            "workspace_dir": str(workspace_dir),
             "exit_code": None,
             "stdout": None,
             "stderr": None,
@@ -315,35 +308,30 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         future: DataFrame,
         geo: FeatureCollection | None = None,
     ) -> Any:
-        """Make predictions and return dict with content and optional workspace.
+        """Make predictions and return dict with content and workspace.
 
         Returns:
             Dict with keys: content (DataFrame), workspace_dir, exit_code, stdout, stderr
         """
-        workspace_dir = None
-
-        if self.enable_workspace:
-            workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_predict_"))
-            # Copy full project directory for reproducibility
-            prepare_workspace(Path.cwd(), workspace_dir)
-            # Write config.yml
-            (workspace_dir / "config.yml").write_text(yaml.safe_dump(config.model_dump(), indent=2))
-            # Write prediction input files
-            write_prediction_inputs(workspace_dir, historic, future, geo)
-            # Write model.pickle (input model for prediction)
-            (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
+        workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_predict_"))
+        # Copy full project directory for reproducibility
+        prepare_workspace(Path.cwd(), workspace_dir)
+        # Write config.yml
+        (workspace_dir / "config.yml").write_text(yaml.safe_dump(config.model_dump(), indent=2))
+        # Write prediction input files
+        write_prediction_inputs(workspace_dir, historic, future, geo)
+        # Write model.pickle (input model for prediction)
+        (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
 
         # Execute prediction function
         predictions = await self._on_predict(config, model, historic, future, geo)
 
-        if self.enable_workspace:
-            # Write predictions.csv
-            assert workspace_dir is not None  # For type checker
-            predictions.to_csv(workspace_dir / "predictions.csv")
+        # Write predictions.csv
+        predictions.to_csv(workspace_dir / "predictions.csv")
 
         return {
             "content": predictions,
-            "workspace_dir": str(workspace_dir) if workspace_dir else None,
+            "workspace_dir": str(workspace_dir),
             "exit_code": None,
             "stdout": None,
             "stderr": None,
@@ -357,29 +345,28 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         completed_at: datetime.datetime,
         duration_seconds: float,
     ) -> dict[str, Any]:
-        """Create artifact from training result, with optional workspace zipping."""
+        """Create artifact from training result by zipping workspace."""
         # Extract content and workspace from unified result dict
         if isinstance(training_result, dict) and "content" in training_result:
-            model = training_result["content"]
             workspace_dir = training_result.get("workspace_dir")
         else:
-            # Fallback for legacy callers
-            model = training_result
             workspace_dir = None
 
-        if workspace_dir and self.enable_workspace:
-            # Zip workspace like ShellModelRunner
-            return await self._create_workspace_artifact(
-                workspace_dir=Path(workspace_dir),
-                config_id=config_id,
-                started_at=started_at,
-                completed_at=completed_at,
-                duration_seconds=duration_seconds,
-                artifact_type="ml_training_workspace",
+        if not workspace_dir:
+            raise ValueError(
+                "FunctionalModelRunner.create_training_artifact() requires workspace dict from on_train(). "
+                "Got result without workspace_dir."
             )
-        else:
-            # Default: pickle model directly
-            return await super().create_training_artifact(model, config_id, started_at, completed_at, duration_seconds)
+
+        # Zip workspace like ShellModelRunner
+        return await self._create_workspace_artifact(
+            workspace_dir=Path(workspace_dir),
+            config_id=config_id,
+            started_at=started_at,
+            completed_at=completed_at,
+            duration_seconds=duration_seconds,
+            artifact_type="ml_training_workspace",
+        )
 
     async def create_prediction_artifact(
         self,
@@ -389,31 +376,28 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         completed_at: datetime.datetime,
         duration_seconds: float,
     ) -> dict[str, Any]:
-        """Create artifact from prediction result, with optional workspace zipping."""
+        """Create artifact from prediction result by zipping workspace."""
         # Extract content and workspace from unified result dict
         if isinstance(prediction_result, dict) and "content" in prediction_result:
-            predictions = prediction_result["content"]
             workspace_dir = prediction_result.get("workspace_dir")
         else:
-            # Fallback for legacy callers
-            predictions = prediction_result
             workspace_dir = None
 
-        if workspace_dir and self.enable_workspace:
-            # Zip workspace like ShellModelRunner (workspace artifact for debugging)
-            return await self._create_workspace_artifact(
-                workspace_dir=Path(workspace_dir),
-                config_id=config_id,
-                started_at=started_at,
-                completed_at=completed_at,
-                duration_seconds=duration_seconds,
-                artifact_type="ml_prediction_workspace",
+        if not workspace_dir:
+            raise ValueError(
+                "FunctionalModelRunner.create_prediction_artifact() requires workspace dict from on_predict(). "
+                "Got result without workspace_dir."
             )
-        else:
-            # Default: store predictions directly
-            return await super().create_prediction_artifact(
-                predictions, config_id, started_at, completed_at, duration_seconds
-            )
+
+        # Zip workspace like ShellModelRunner (workspace artifact for debugging)
+        return await self._create_workspace_artifact(
+            workspace_dir=Path(workspace_dir),
+            config_id=config_id,
+            started_at=started_at,
+            completed_at=completed_at,
+            duration_seconds=duration_seconds,
+            artifact_type="ml_prediction_workspace",
+        )
 
     async def _create_workspace_artifact(
         self,
