@@ -145,6 +145,68 @@ def run_service(project_dir: Path, port: int) -> Generator[str, None, None]:
             process.wait(timeout=5)
 
 
+@contextmanager
+def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, None]:
+    """Start service via docker compose and yield base URL."""
+    # Update compose.yml to use the specified port
+    compose_file = project_dir / "compose.yml"
+    content = compose_file.read_text()
+    content = content.replace("8000:8000", f"{port}:8000")
+    compose_file.write_text(content)
+
+    try:
+        # Build and start
+        result = subprocess.run(
+            ["docker", "compose", "up", "-d", "--build"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            # Check for chapkit version issue (could be in stdout or stderr)
+            combined_output = result.stdout + result.stderr
+            if "chapkit" in combined_output and "No solution found" in combined_output:
+                pytest.skip("chapkit version not yet published to PyPI - Docker build requires released version")
+            raise RuntimeError(f"docker compose up failed:\nstdout: {result.stdout}\nstderr: {result.stderr}")
+
+        base_url = f"http://127.0.0.1:{port}"
+
+        # Wait for health check (up to 90s - Docker startup can be slow)
+        start_time = time.time()
+        timeout_secs = 90
+        while time.time() - start_time < timeout_secs:
+            try:
+                with httpx.Client(timeout=2) as client:
+                    resp = client.get(f"{base_url}/health")
+                    if resp.status_code == 200:
+                        break
+            except (httpx.ConnectError, httpx.ReadTimeout):
+                pass
+            time.sleep(1)
+        else:
+            # Get logs for debugging
+            logs = subprocess.run(
+                ["docker", "compose", "logs"],
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+            )
+            raise TimeoutError(
+                f"Docker service did not start within {timeout_secs}s. Logs:\n{logs.stdout}\n{logs.stderr}"
+            )
+
+        yield base_url
+
+    finally:
+        # Cleanup
+        subprocess.run(
+            ["docker", "compose", "down", "-v", "--rmi", "local"],
+            cwd=project_dir,
+            capture_output=True,
+        )
+
+
 def wait_for_job_completion(client: httpx.Client, base_url: str, job_id: str, timeout: float = 60.0) -> dict[str, Any]:
     """Poll job status until completion or timeout."""
     start_time = time.time()
@@ -159,6 +221,196 @@ def wait_for_job_completion(client: httpx.Client, base_url: str, job_id: str, ti
         time.sleep(0.5)
 
     raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
+
+
+def run_functional_train_predict_workflow(client: httpx.Client, base_url: str, job_timeout: float = 60.0) -> None:
+    """Run train/predict workflow for functional template and verify artifacts."""
+    # 1. Create config
+    config_resp = client.post(
+        f"{base_url}/api/v1/configs",
+        json={"name": "test-config", "data": {}},
+    )
+    assert config_resp.status_code == 201, f"Config creation failed: {config_resp.text}"
+    config_id = config_resp.json()["id"]
+
+    # 2. Train
+    train_resp = client.post(
+        f"{base_url}/api/v1/ml/$train",
+        json={
+            "config_id": config_id,
+            "data": {
+                "columns": ["x", "y"],
+                "data": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+            },
+        },
+    )
+    assert train_resp.status_code == 202, f"Train submission failed: {train_resp.text}"
+    train_data = train_resp.json()
+    artifact_id = train_data["artifact_id"]
+    job_id = train_data["job_id"]
+
+    # 3. Wait for training
+    job = wait_for_job_completion(client, base_url, job_id, timeout=job_timeout)
+    assert job["status"] == "completed", f"Training failed: {job.get('error')}"
+
+    # 4. Verify training artifact
+    artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{artifact_id}")
+    assert artifact_resp.status_code == 200
+    artifact = artifact_resp.json()
+
+    assert artifact["level"] == 0
+    assert artifact["data"]["type"] == "ml_training_workspace"
+    assert artifact["data"]["content_type"] == "application/zip"
+    assert artifact["data"]["metadata"]["status"] == "success"
+
+    # 5. Predict
+    predict_resp = client.post(
+        f"{base_url}/api/v1/ml/$predict",
+        json={
+            "artifact_id": artifact_id,
+            "historic": {"columns": ["x"], "data": []},
+            "future": {"columns": ["x"], "data": [[7.0], [8.0]]},
+        },
+    )
+    assert predict_resp.status_code == 202, f"Predict submission failed: {predict_resp.text}"
+    pred_data = predict_resp.json()
+    pred_artifact_id = pred_data["artifact_id"]
+    pred_job_id = pred_data["job_id"]
+
+    # 6. Wait for prediction
+    pred_job = wait_for_job_completion(client, base_url, pred_job_id, timeout=job_timeout)
+    assert pred_job["status"] == "completed", f"Prediction failed: {pred_job.get('error')}"
+
+    # 7. Verify prediction artifact linkage
+    pred_artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}")
+    assert pred_artifact_resp.status_code == 200
+    pred_artifact = pred_artifact_resp.json()
+
+    assert pred_artifact["level"] == 1
+    assert pred_artifact["parent_id"] == artifact_id
+    assert pred_artifact["data"]["type"] == "ml_prediction"
+    assert pred_artifact["data"]["metadata"]["status"] == "success"
+
+    # 8. Verify prediction DataFrame content
+    predictions = pred_artifact["data"]["content"]
+    assert "columns" in predictions
+    assert "data" in predictions
+    assert len(predictions["data"]) > 0, "Predictions should have data rows"
+    assert "sample_0" in predictions["columns"], "Predictions should have sample_0 column"
+
+    # 9. Verify level 2 prediction workspace artifact exists
+    tree_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}/$tree")
+    assert tree_resp.status_code == 200
+    tree = tree_resp.json()
+
+    # Tree root is the prediction artifact
+    assert tree["id"] == pred_artifact_id
+    assert tree["level"] == 1
+
+    # Should have children (the prediction workspace)
+    assert "children" in tree
+    assert len(tree["children"]) >= 1
+
+    # Verify workspace artifact structure
+    workspace_artifact = tree["children"][0]
+    assert workspace_artifact["level"] == 2
+    assert workspace_artifact["parent_id"] == pred_artifact_id
+    assert workspace_artifact["data"]["type"] == "ml_prediction_workspace"
+    assert workspace_artifact["data"]["content_type"] == "application/zip"
+
+
+def run_shell_train_predict_workflow(client: httpx.Client, base_url: str, job_timeout: float = 120.0) -> None:
+    """Run train/predict workflow for shell template and verify artifacts."""
+    # 1. Create config
+    config_resp = client.post(
+        f"{base_url}/api/v1/configs",
+        json={"name": "shell-test-config", "data": {}},
+    )
+    assert config_resp.status_code == 201, f"Config creation failed: {config_resp.text}"
+    config_id = config_resp.json()["id"]
+
+    # 2. Train
+    train_resp = client.post(
+        f"{base_url}/api/v1/ml/$train",
+        json={
+            "config_id": config_id,
+            "data": {
+                "columns": ["x", "y", "target"],
+                "data": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]],
+            },
+        },
+    )
+    assert train_resp.status_code == 202, f"Train submission failed: {train_resp.text}"
+    train_data = train_resp.json()
+    artifact_id = train_data["artifact_id"]
+    job_id = train_data["job_id"]
+
+    # 3. Wait for training (shell scripts may take longer)
+    job = wait_for_job_completion(client, base_url, job_id, timeout=job_timeout)
+    assert job["status"] == "completed", f"Training failed: {job.get('error')}"
+
+    # 4. Verify training artifact
+    artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{artifact_id}")
+    assert artifact_resp.status_code == 200
+    artifact = artifact_resp.json()
+
+    assert artifact["level"] == 0
+    assert artifact["data"]["type"] == "ml_training_workspace"
+    assert artifact["data"]["content_type"] == "application/zip"
+
+    # 5. Predict
+    predict_resp = client.post(
+        f"{base_url}/api/v1/ml/$predict",
+        json={
+            "artifact_id": artifact_id,
+            "historic": {"columns": ["x", "y"], "data": []},
+            "future": {"columns": ["x", "y"], "data": [[10.0, 11.0], [12.0, 13.0]]},
+        },
+    )
+    assert predict_resp.status_code == 202, f"Predict submission failed: {predict_resp.text}"
+    pred_data = predict_resp.json()
+    pred_artifact_id = pred_data["artifact_id"]
+    pred_job_id = pred_data["job_id"]
+
+    # 6. Wait for prediction
+    pred_job = wait_for_job_completion(client, base_url, pred_job_id, timeout=job_timeout)
+    assert pred_job["status"] == "completed", f"Prediction failed: {pred_job.get('error')}"
+
+    # 7. Verify prediction artifact linkage
+    pred_artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}")
+    assert pred_artifact_resp.status_code == 200
+    pred_artifact = pred_artifact_resp.json()
+
+    assert pred_artifact["level"] == 1
+    assert pred_artifact["parent_id"] == artifact_id
+    assert pred_artifact["data"]["type"] == "ml_prediction"
+
+    # 8. Verify prediction DataFrame content
+    predictions = pred_artifact["data"]["content"]
+    assert "columns" in predictions
+    assert "data" in predictions
+    assert len(predictions["data"]) > 0, "Predictions should have data rows"
+    assert "sample_0" in predictions["columns"], "Predictions should have sample_0 column"
+
+    # 9. Verify level 2 prediction workspace artifact exists
+    tree_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}/$tree")
+    assert tree_resp.status_code == 200
+    tree = tree_resp.json()
+
+    # Tree root is the prediction artifact
+    assert tree["id"] == pred_artifact_id
+    assert tree["level"] == 1
+
+    # Should have children (the prediction workspace)
+    assert "children" in tree
+    assert len(tree["children"]) >= 1
+
+    # Verify workspace artifact structure
+    workspace_artifact = tree["children"][0]
+    assert workspace_artifact["level"] == 2
+    assert workspace_artifact["parent_id"] == pred_artifact_id
+    assert workspace_artifact["data"]["type"] == "ml_prediction_workspace"
+    assert workspace_artifact["data"]["content_type"] == "application/zip"
 
 
 @pytest.mark.slow
@@ -253,98 +505,7 @@ def test_scaffold_functional_train_predict(
 
     with run_service(project_dir, port) as base_url:
         with httpx.Client(timeout=30) as client:
-            # 1. Create config
-            config_resp = client.post(
-                f"{base_url}/api/v1/configs",
-                json={"name": "test-config", "data": {}},
-            )
-            assert config_resp.status_code == 201, f"Config creation failed: {config_resp.text}"
-            config_id = config_resp.json()["id"]
-
-            # 2. Train
-            train_resp = client.post(
-                f"{base_url}/api/v1/ml/$train",
-                json={
-                    "config_id": config_id,
-                    "data": {
-                        "columns": ["x", "y"],
-                        "data": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
-                    },
-                },
-            )
-            assert train_resp.status_code == 202, f"Train submission failed: {train_resp.text}"
-            train_data = train_resp.json()
-            artifact_id = train_data["artifact_id"]
-            job_id = train_data["job_id"]
-
-            # 3. Wait for training
-            job = wait_for_job_completion(client, base_url, job_id)
-            assert job["status"] == "completed", f"Training failed: {job.get('error')}"
-
-            # 4. Verify training artifact
-            artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{artifact_id}")
-            assert artifact_resp.status_code == 200
-            artifact = artifact_resp.json()
-
-            assert artifact["level"] == 0
-            assert artifact["data"]["type"] == "ml_training_workspace"
-            assert artifact["data"]["content_type"] == "application/zip"
-            assert artifact["data"]["metadata"]["status"] == "success"
-
-            # 5. Predict
-            predict_resp = client.post(
-                f"{base_url}/api/v1/ml/$predict",
-                json={
-                    "artifact_id": artifact_id,
-                    "historic": {"columns": ["x"], "data": []},
-                    "future": {"columns": ["x"], "data": [[7.0], [8.0]]},
-                },
-            )
-            assert predict_resp.status_code == 202, f"Predict submission failed: {predict_resp.text}"
-            pred_data = predict_resp.json()
-            pred_artifact_id = pred_data["artifact_id"]
-            pred_job_id = pred_data["job_id"]
-
-            # 6. Wait for prediction
-            pred_job = wait_for_job_completion(client, base_url, pred_job_id)
-            assert pred_job["status"] == "completed", f"Prediction failed: {pred_job.get('error')}"
-
-            # 7. Verify prediction artifact linkage
-            pred_artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}")
-            assert pred_artifact_resp.status_code == 200
-            pred_artifact = pred_artifact_resp.json()
-
-            assert pred_artifact["level"] == 1
-            assert pred_artifact["parent_id"] == artifact_id
-            assert pred_artifact["data"]["type"] == "ml_prediction"
-            assert pred_artifact["data"]["metadata"]["status"] == "success"
-
-            # 8. Verify prediction DataFrame content
-            predictions = pred_artifact["data"]["content"]
-            assert "columns" in predictions
-            assert "data" in predictions
-            assert len(predictions["data"]) > 0, "Predictions should have data rows"
-            assert "sample_0" in predictions["columns"], "Predictions should have sample_0 column"
-
-            # 9. Verify level 2 prediction workspace artifact exists
-            tree_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}/$tree")
-            assert tree_resp.status_code == 200
-            tree = tree_resp.json()
-
-            # Tree root is the prediction artifact
-            assert tree["id"] == pred_artifact_id
-            assert tree["level"] == 1
-
-            # Should have children (the prediction workspace)
-            assert "children" in tree
-            assert len(tree["children"]) >= 1
-
-            # Verify workspace artifact structure
-            workspace_artifact = tree["children"][0]
-            assert workspace_artifact["level"] == 2
-            assert workspace_artifact["parent_id"] == pred_artifact_id
-            assert workspace_artifact["data"]["type"] == "ml_prediction_workspace"
-            assert workspace_artifact["data"]["content_type"] == "application/zip"
+            run_functional_train_predict_workflow(client, base_url)
 
 
 @pytest.mark.slow
@@ -357,96 +518,7 @@ def test_scaffold_shell_train_predict(
 
     with run_service(project_dir, port) as base_url:
         with httpx.Client(timeout=60) as client:
-            # 1. Create config
-            config_resp = client.post(
-                f"{base_url}/api/v1/configs",
-                json={"name": "shell-test-config", "data": {}},
-            )
-            assert config_resp.status_code == 201, f"Config creation failed: {config_resp.text}"
-            config_id = config_resp.json()["id"]
-
-            # 2. Train
-            train_resp = client.post(
-                f"{base_url}/api/v1/ml/$train",
-                json={
-                    "config_id": config_id,
-                    "data": {
-                        "columns": ["x", "y", "target"],
-                        "data": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]],
-                    },
-                },
-            )
-            assert train_resp.status_code == 202, f"Train submission failed: {train_resp.text}"
-            train_data = train_resp.json()
-            artifact_id = train_data["artifact_id"]
-            job_id = train_data["job_id"]
-
-            # 3. Wait for training (shell scripts may take longer)
-            job = wait_for_job_completion(client, base_url, job_id, timeout=120)
-            assert job["status"] == "completed", f"Training failed: {job.get('error')}"
-
-            # 4. Verify training artifact
-            artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{artifact_id}")
-            assert artifact_resp.status_code == 200
-            artifact = artifact_resp.json()
-
-            assert artifact["level"] == 0
-            assert artifact["data"]["type"] == "ml_training_workspace"
-            assert artifact["data"]["content_type"] == "application/zip"
-
-            # 5. Predict
-            predict_resp = client.post(
-                f"{base_url}/api/v1/ml/$predict",
-                json={
-                    "artifact_id": artifact_id,
-                    "historic": {"columns": ["x", "y"], "data": []},
-                    "future": {"columns": ["x", "y"], "data": [[10.0, 11.0], [12.0, 13.0]]},
-                },
-            )
-            assert predict_resp.status_code == 202, f"Predict submission failed: {predict_resp.text}"
-            pred_data = predict_resp.json()
-            pred_artifact_id = pred_data["artifact_id"]
-            pred_job_id = pred_data["job_id"]
-
-            # 6. Wait for prediction
-            pred_job = wait_for_job_completion(client, base_url, pred_job_id, timeout=120)
-            assert pred_job["status"] == "completed", f"Prediction failed: {pred_job.get('error')}"
-
-            # 7. Verify prediction artifact linkage
-            pred_artifact_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}")
-            assert pred_artifact_resp.status_code == 200
-            pred_artifact = pred_artifact_resp.json()
-
-            assert pred_artifact["level"] == 1
-            assert pred_artifact["parent_id"] == artifact_id
-            assert pred_artifact["data"]["type"] == "ml_prediction"
-
-            # 8. Verify prediction DataFrame content
-            predictions = pred_artifact["data"]["content"]
-            assert "columns" in predictions
-            assert "data" in predictions
-            assert len(predictions["data"]) > 0, "Predictions should have data rows"
-            assert "sample_0" in predictions["columns"], "Predictions should have sample_0 column"
-
-            # 9. Verify level 2 prediction workspace artifact exists
-            tree_resp = client.get(f"{base_url}/api/v1/artifacts/{pred_artifact_id}/$tree")
-            assert tree_resp.status_code == 200
-            tree = tree_resp.json()
-
-            # Tree root is the prediction artifact
-            assert tree["id"] == pred_artifact_id
-            assert tree["level"] == 1
-
-            # Should have children (the prediction workspace)
-            assert "children" in tree
-            assert len(tree["children"]) >= 1
-
-            # Verify workspace artifact structure
-            workspace_artifact = tree["children"][0]
-            assert workspace_artifact["level"] == 2
-            assert workspace_artifact["parent_id"] == pred_artifact_id
-            assert workspace_artifact["data"]["type"] == "ml_prediction_workspace"
-            assert workspace_artifact["data"]["content_type"] == "application/zip"
+            run_shell_train_predict_workflow(client, base_url)
 
 
 @pytest.mark.slow
@@ -614,3 +686,39 @@ def test_scaffold_docker_build(
             ["docker", "rmi", "-f", image_name],
             capture_output=True,
         )
+
+
+@pytest.mark.slow
+def test_scaffold_functional_train_predict_docker(
+    scaffold_project_no_sync: Callable[[str, str], Path],
+) -> None:
+    """Test scaffolded functional ML project via Docker container."""
+    # Check if Docker is available
+    docker_check = subprocess.run(["docker", "info"], capture_output=True)
+    if docker_check.returncode != 0:
+        pytest.skip("Docker is not available")
+
+    project_dir = scaffold_project_no_sync("test-docker-ml-workflow", "ml")
+    port = find_free_port()
+
+    with run_service_docker(project_dir, port) as base_url:
+        with httpx.Client(timeout=60) as client:
+            run_functional_train_predict_workflow(client, base_url, job_timeout=120.0)
+
+
+@pytest.mark.slow
+def test_scaffold_shell_train_predict_docker(
+    scaffold_project_no_sync: Callable[[str, str], Path],
+) -> None:
+    """Test scaffolded shell ML project via Docker container."""
+    # Check if Docker is available
+    docker_check = subprocess.run(["docker", "info"], capture_output=True)
+    if docker_check.returncode != 0:
+        pytest.skip("Docker is not available")
+
+    project_dir = scaffold_project_no_sync("test-docker-shell-workflow", "ml-shell")
+    port = find_free_port()
+
+    with run_service_docker(project_dir, port) as base_url:
+        with httpx.Client(timeout=120) as client:
+            run_shell_train_predict_workflow(client, base_url, job_timeout=180.0)
