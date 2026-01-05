@@ -181,7 +181,7 @@ def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, Non
                     resp = client.get(f"{base_url}/health")
                     if resp.status_code == 200:
                         break
-            except (httpx.ConnectError, httpx.ReadTimeout):
+            except (httpx.ConnectError, httpx.ReadTimeout, httpx.ReadError):
                 pass
             time.sleep(1)
         else:
