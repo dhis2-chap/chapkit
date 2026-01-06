@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
+    pytest.importorskip("pandas")
     # Change to example directory so Path.cwd() works correctly in ShellModelRunner
     original_cwd = Path.cwd()
     example_dir = Path(__file__).parent.parent / "examples" / "ml_shell"

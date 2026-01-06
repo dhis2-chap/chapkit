@@ -3,8 +3,8 @@
 import asyncio
 import datetime
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
-import pandas as pd
 import pytest
 from geojson_pydantic import FeatureCollection
 from servicekit import SqliteDatabaseBuilder
@@ -15,6 +15,11 @@ from chapkit.config import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner, MLManager, PredictRequest, TrainRequest
 from chapkit.scheduler import InMemoryChapkitScheduler
+
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    pd = pytest.importorskip("pandas")
 
 
 class SimpleConfig(BaseConfig):

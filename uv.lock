@@ -98,16 +98,20 @@ wheels = [
 
 [[package]]
 name = "chapkit"
-version = "0.10.5"
+version = "0.11.1"
 source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
     { name = "jinja2" },
+    { name = "servicekit" },
+    { name = "typer" },
+]
+
+[package.optional-dependencies]
+dataframe = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "polars" },
-    { name = "servicekit" },
-    { name = "typer" },
     { name = "xarray" },
 ]
 
@@ -132,13 +136,14 @@ dev = [
 requires-dist = [
     { name = "geojson-pydantic", specifier = ">=2.1.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "numpy", specifier = ">=2" },
-    { name = "pandas", specifier = ">=2.3.3" },
-    { name = "polars", specifier = ">=1.34.0" },
+    { name = "numpy", marker = "extra == 'dataframe'", specifier = ">=2" },
+    { name = "pandas", marker = "extra == 'dataframe'", specifier = ">=2.3.3" },
+    { name = "polars", marker = "extra == 'dataframe'", specifier = ">=1.34.0" },
     { name = "servicekit", specifier = ">=0.5.3" },
     { name = "typer", specifier = ">=0.21.0" },
-    { name = "xarray", specifier = ">=2025.10.1" },
+    { name = "xarray", marker = "extra == 'dataframe'", specifier = ">=2025.10.1" },
 ]
+provides-extras = ["dataframe"]
 
 [package.metadata.requires-dev]
 dev = [
