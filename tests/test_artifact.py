@@ -1,4 +1,3 @@
-import pandas as pd
 import pytest
 from servicekit import SqliteDatabaseBuilder
 from ulid import ULID
@@ -720,6 +719,7 @@ class TestBaseManagerLifecycle:
 
 def test_dataframe_round_trip() -> None:
     """DataFrame should round-trip DataFrame data."""
+    pd = pytest.importorskip("pandas")
     df = pd.DataFrame({"col1": [1, 2], "col2": ["a", "b"]})
     wrapper = DataFrame.from_pandas(df)
 
@@ -732,5 +732,6 @@ def test_dataframe_round_trip() -> None:
 
 def test_dataframe_requires_dataframe() -> None:
     """DataFrame.from_pandas should validate input type."""
+    pytest.importorskip("pandas")
     with pytest.raises(TypeError):
         DataFrame.from_pandas({"not": "dataframe"})  # pyright: ignore[reportArgumentType]

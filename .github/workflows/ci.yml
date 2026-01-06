@@ -23,8 +23,8 @@ jobs:
       with:
         python-version: "3.13"
     
-    - name: Install dependencies
-      run: make install
+    - name: Install dependencies (including optional extras)
+      run: uv sync --all-extras --group dev
 
     - name: Run linting
       run: make lint

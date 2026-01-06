@@ -16,12 +16,13 @@ from typing import Any, cast
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.ml_functional.main import app
-
 
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
+    pytest.importorskip("pandas")
+    from examples.ml_functional.main import app
+
     with TestClient(app) as test_client:
         yield test_client
 

@@ -9,6 +9,7 @@ from starlette.testclient import TestClient
 @pytest.fixture(scope="module")
 def client():
     """Create test client using ML functional example."""
+    pytest.importorskip("pandas")
     from examples.ml_functional.main import app
 
     # The example app initializes the database on lifespan startup
