@@ -1700,17 +1700,20 @@ def test_csv_roundtrip(tmp_path):
 - **Validation**: Pure Python (no dependencies)
 
 ### Optional (With Dependencies)
-Install as needed:
+Install only what you need:
 
 ```bash
 # For pandas support
-uv add pandas
+uv add chapkit[pandas]
 
 # For polars support
-uv add polars
+uv add chapkit[polars]
 
-# For xarray support
-uv add xarray
+# For xarray support (includes pandas, required for conversions)
+uv add chapkit[xarray]
+
+# For all dataframe libraries
+uv add chapkit[dataframe]
 
 # For PyArrow/Parquet support (future)
 uv add 'servicekit[arrow]'

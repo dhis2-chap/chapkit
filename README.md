@@ -35,6 +35,17 @@ pip install chapkit
 
 Chapkit automatically installs servicekit as a dependency.
 
+### Optional Dependencies
+
+For DataFrame conversions to/from pandas, polars, or xarray, install the extras you need:
+
+```bash
+uv add chapkit[pandas]    # pandas support
+uv add chapkit[polars]    # polars support
+uv add chapkit[xarray]    # xarray support (includes pandas)
+uv add chapkit[dataframe] # all of the above
+```
+
 ## CLI Usage
 
 Quickly scaffold a new ML service project using `uvx`:
