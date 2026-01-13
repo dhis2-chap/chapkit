@@ -289,6 +289,7 @@ class TestDataGenerator:
     def generate_config_data(self, variation: int = 0) -> dict[str, Any]:
         """Generate config data with variations for different hyperparameters."""
         return {
+            "id": str(ULID()),
             "test_param_1": variation * 0.1,
             "test_param_2": f"variation_{variation}",
             "test_seed": variation,
