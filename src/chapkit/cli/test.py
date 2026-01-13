@@ -71,6 +71,16 @@ class TestRunner:
         except Exception as e:
             return False, f"Error fetching service info: {e}"
 
+    def fetch_config_schema(self) -> tuple[bool, str, dict[str, Any] | None]:
+        """Fetch config JSON schema from service."""
+        try:
+            response = self.client.get(f"{self.base_url}/api/v1/configs/$schema")
+            if response.status_code == 200:
+                return True, "Schema fetched", response.json()
+            return False, f"Failed to fetch schema: {response.text}", None
+        except Exception as e:
+            return False, f"Error fetching schema: {e}", None
+
     def create_config(self, name: str, data: dict[str, Any]) -> tuple[bool, str, str | None]:
         """Create a config and return (success, message, config_id)."""
         try:
@@ -287,13 +297,47 @@ class TestDataGenerator:
         return historic, future
 
     def generate_config_data(self, variation: int = 0) -> dict[str, Any]:
-        """Generate config data with variations for different hyperparameters."""
+        """Generate fallback config data when schema is not available."""
         return {
             "id": str(ULID()),
             "test_param_1": variation * 0.1,
             "test_param_2": f"variation_{variation}",
             "test_seed": variation,
         }
+
+    def generate_config_data_from_schema(self, schema: dict[str, Any], variation: int = 0) -> dict[str, Any]:
+        """Generate config data matching the JSON schema."""
+        data: dict[str, Any] = {"id": str(ULID())}
+
+        properties = schema.get("properties", {})
+        for field_name, field_schema in properties.items():
+            if field_name == "id":
+                continue
+            data[field_name] = self._generate_value_for_schema(field_schema, variation)
+
+        return data
+
+    def _generate_value_for_schema(self, field_schema: dict[str, Any], variation: int) -> Any:
+        """Generate a value matching the field schema type."""
+        field_type = field_schema.get("type", "string")
+
+        if field_type == "integer":
+            return variation
+        elif field_type == "number":
+            return variation * 0.1
+        elif field_type == "boolean":
+            return variation % 2 == 0
+        elif field_type == "string":
+            if "enum" in field_schema:
+                enum_values = field_schema["enum"]
+                return enum_values[variation % len(enum_values)]
+            return f"test_value_{variation}"
+        elif field_type == "array":
+            return []
+        elif field_type == "object":
+            return {}
+        else:
+            return None
 
     def generate_geo_data(self, num_features: int = 5) -> dict[str, Any]:
         """Generate simple GeoJSON FeatureCollection with Point geometries."""
@@ -471,6 +515,14 @@ def test_command(
             )
             typer.echo()
 
+        # 3. Fetch config schema
+        config_schema: dict[str, Any] | None = None
+        success, message, config_schema = runner.fetch_config_schema()
+        if not success:
+            typer.echo(f"  [WARNING] {message} - using fallback config data")
+        elif verbose:
+            typer.echo(f"  Config schema fetched")
+
         # Determine extra covariates to add
         extra_covariates = 2 if runner.allow_free_additional_continuous_covariates else 0
 
@@ -479,12 +531,15 @@ def test_command(
         if save_data_path and geo_data:
             save_test_data(save_data_path, "geo.json", geo_data)
 
-        # 3. Create configs
+        # 4. Create configs
         typer.echo(f"Creating {num_configs} config(s)...")
         config_ids: list[str] = []
         for i in range(num_configs):
             config_name = f"test_config_{ULID()}"
-            config_data = generator.generate_config_data(variation=i)
+            if config_schema:
+                config_data = generator.generate_config_data_from_schema(config_schema, variation=i)
+            else:
+                config_data = generator.generate_config_data(variation=i)
 
             if save_data_path:
                 save_test_data(save_data_path, f"config_{i}.json", config_data)
@@ -502,7 +557,7 @@ def test_command(
         typer.echo(f"  Created {len(config_ids)} config(s)")
         typer.echo()
 
-        # 4. Run trainings
+        # 5. Run trainings
         total_trainings = num_configs * num_trainings
         typer.echo(f"Running {total_trainings} training job(s)...")
 
@@ -548,7 +603,7 @@ def test_command(
         typer.echo(f"  Completed: {stats['trainings_completed']}, Failed: {stats['trainings_failed']}")
         typer.echo()
 
-        # 5. Run predictions
+        # 6. Run predictions
         if model_artifacts:
             total_predictions = len(model_artifacts) * num_predictions
             typer.echo(f"Running {total_predictions} prediction job(s)...")
@@ -602,7 +657,7 @@ def test_command(
             typer.echo(f"  Completed: {stats['predictions_completed']}, Failed: {stats['predictions_failed']}")
             typer.echo()
 
-        # 6. Summary
+        # 7. Summary
         elapsed = time.time() - stats["start_time"]
 
         typer.echo("=" * 50)
