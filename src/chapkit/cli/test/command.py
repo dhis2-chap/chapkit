@@ -139,7 +139,7 @@ def test_command(
             typer.echo(f"  [FAILED] {message}", err=True)
             raise typer.Exit(code=1)
         elif verbose:
-            typer.echo(f"  Config schema fetched")
+            typer.echo("  Config schema fetched")
 
         # Determine extra covariates to add
         extra_covariates = 2 if runner.allow_free_additional_continuous_covariates else 0
@@ -174,7 +174,9 @@ def test_command(
 
         # 5. Run trainings
         total_trainings = num_configs * num_trainings
-        typer.echo(f"Running {total_trainings} training job(s)..." + (f" (parallel={parallel})" if parallel > 1 else ""))
+        typer.echo(
+            f"Running {total_trainings} training job(s)..." + (f" (parallel={parallel})" if parallel > 1 else "")
+        )
 
         model_artifacts: list[tuple[str, str]] = []  # List of (config_id, artifact_id) tuples
         training_index = 0
@@ -236,7 +238,8 @@ def test_command(
         if model_artifacts:
             total_predictions = len(model_artifacts) * num_predictions
             typer.echo(
-                f"Running {total_predictions} prediction job(s)..." + (f" (parallel={parallel})" if parallel > 1 else "")
+                f"Running {total_predictions} prediction job(s)..."
+                + (f" (parallel={parallel})" if parallel > 1 else "")
             )
             prediction_index = 0
             pending_prediction_jobs: list[tuple[str, str]] = []  # (job_id, pred_artifact_id)
