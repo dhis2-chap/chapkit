@@ -43,6 +43,9 @@ This is the easiest way to test your service - it handles starting and stopping 
 | `--delay` | `-d` | `1.0` | Delay between job submissions (seconds) |
 | `--verbose` | `-v` | `false` | Show detailed output |
 | `--start-service` | | `false` | Auto-start service with in-memory DB |
+| `--save-data` | | `false` | Save generated test data files |
+| `--save-data-dir` | | `target` | Directory for saved test data |
+| `--parallel` | | `1` | Number of jobs to run in parallel (experimental) |
 
 ### Examples
 
@@ -62,6 +65,19 @@ Test against a remote service:
 
 ```bash
 chapkit test --url http://my-service:8000
+```
+
+Save generated test data for inspection:
+
+```bash
+chapkit test --start-service --save-data
+ls target/  # Contains config_*.json, training_*.json, prediction_*.json
+```
+
+Run jobs in parallel (experimental):
+
+```bash
+chapkit test --start-service -c 2 -t 4 -p 4 --parallel 4
 ```
 
 ## Manual Service Startup

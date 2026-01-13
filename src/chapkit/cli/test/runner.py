@@ -166,6 +166,13 @@ class TestRunner:
         except Exception as e:
             return False, f"Error verifying artifact: {e}", None
 
+    def wait_for_jobs(self, job_ids: list[str]) -> list[tuple[bool, str, dict[str, Any] | None]]:
+        """Wait for multiple jobs to complete."""
+        results = []
+        for job_id in job_ids:
+            results.append(self.wait_for_job(job_id))
+        return results
+
     def close(self) -> None:
         """Close the HTTP client."""
         self.client.close()

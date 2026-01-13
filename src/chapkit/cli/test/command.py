@@ -63,6 +63,10 @@ def test_command(
         str,
         typer.Option("--save-data-dir", help="Directory for saved test data"),
     ] = "target",
+    parallel: Annotated[
+        int,
+        typer.Option("--parallel", help="Number of jobs to run in parallel (experimental)"),
+    ] = 1,
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
     service_process: subprocess.Popen[bytes] | None = None
@@ -170,10 +174,27 @@ def test_command(
 
         # 5. Run trainings
         total_trainings = num_configs * num_trainings
-        typer.echo(f"Running {total_trainings} training job(s)...")
+        typer.echo(f"Running {total_trainings} training job(s)..." + (f" (parallel={parallel})" if parallel > 1 else ""))
 
         model_artifacts: list[tuple[str, str]] = []  # List of (config_id, artifact_id) tuples
         training_index = 0
+        pending_training_jobs: list[tuple[str, str, str]] = []  # (job_id, artifact_id, config_id)
+
+        def process_training_batch() -> None:
+            """Wait for pending training jobs and process results."""
+            if not pending_training_jobs:
+                return
+            job_ids = [j[0] for j in pending_training_jobs]
+            results = runner.wait_for_jobs(job_ids)
+            for (job_id, artifact_id, cfg_id), (success, msg, _) in zip(pending_training_jobs, results):
+                if success:
+                    stats["trainings_completed"] += 1
+                    model_artifacts.append((cfg_id, artifact_id))
+                    if verbose:
+                        typer.echo(f"  [OK] Training {artifact_id}: {msg}")
+                else:
+                    stats["trainings_failed"] += 1
+                    typer.echo(f"  [FAILED] Training job {job_id}: {msg}", err=True)
 
         for config_idx, config_id in enumerate(config_ids):
             for _ in range(num_trainings):
@@ -196,20 +217,17 @@ def test_command(
                 if verbose:
                     typer.echo(f"  Submitted training job {job_id}")
 
-                # Wait for completion
-                success, msg, _ = runner.wait_for_job(job_id)  # type: ignore[arg-type]
-                if success:
-                    stats["trainings_completed"] += 1
-                    model_artifacts.append((config_id, artifact_id))  # type: ignore[arg-type]
-                    if verbose:
-                        typer.echo(f"  [OK] Training {artifact_id}: {msg}")
-                else:
-                    stats["trainings_failed"] += 1
-                    typer.echo(f"  [FAILED] Training job {job_id}: {msg}", err=True)
+                pending_training_jobs.append((job_id, artifact_id, config_id))  # type: ignore[arg-type]
 
-                # Delay between jobs
-                if delay > 0:
-                    time.sleep(delay)
+                # Process batch when we reach parallel limit
+                if len(pending_training_jobs) >= parallel:
+                    process_training_batch()
+                    pending_training_jobs.clear()
+                    if delay > 0:
+                        time.sleep(delay)
+
+        # Process remaining jobs
+        process_training_batch()
 
         typer.echo(f"  Completed: {stats['trainings_completed']}, Failed: {stats['trainings_failed']}")
         typer.echo()
@@ -217,8 +235,27 @@ def test_command(
         # 6. Run predictions
         if model_artifacts:
             total_predictions = len(model_artifacts) * num_predictions
-            typer.echo(f"Running {total_predictions} prediction job(s)...")
+            typer.echo(
+                f"Running {total_predictions} prediction job(s)..." + (f" (parallel={parallel})" if parallel > 1 else "")
+            )
             prediction_index = 0
+            pending_prediction_jobs: list[tuple[str, str]] = []  # (job_id, pred_artifact_id)
+
+            def process_prediction_batch() -> None:
+                """Wait for pending prediction jobs and process results."""
+                if not pending_prediction_jobs:
+                    return
+                job_ids = [j[0] for j in pending_prediction_jobs]
+                results = runner.wait_for_jobs(job_ids)
+                for (job_id, pred_artifact_id), (success, msg, _) in zip(pending_prediction_jobs, results):
+                    if success:
+                        stats["predictions_completed"] += 1
+                        v_success, v_msg, _ = runner.verify_artifact(pred_artifact_id)
+                        if v_success and verbose:
+                            typer.echo(f"  [OK] Prediction {pred_artifact_id}: verified")
+                    else:
+                        stats["predictions_failed"] += 1
+                        typer.echo(f"  [FAILED] Prediction job {job_id}: {msg}", err=True)
 
             for artifact_idx, (_, model_artifact_id) in enumerate(model_artifacts):
                 for _ in range(num_predictions):
@@ -248,22 +285,17 @@ def test_command(
                     if verbose:
                         typer.echo(f"  Submitted prediction job {job_id}")
 
-                    # Wait for completion
-                    success, msg, _ = runner.wait_for_job(job_id)  # type: ignore[arg-type]
-                    if success:
-                        stats["predictions_completed"] += 1
+                    pending_prediction_jobs.append((job_id, pred_artifact_id))  # type: ignore[arg-type]
 
-                        # Verify artifact exists
-                        v_success, v_msg, _ = runner.verify_artifact(pred_artifact_id)  # type: ignore[arg-type]
-                        if v_success and verbose:
-                            typer.echo(f"  [OK] Prediction {pred_artifact_id}: verified")
-                    else:
-                        stats["predictions_failed"] += 1
-                        typer.echo(f"  [FAILED] Prediction job {job_id}: {msg}", err=True)
+                    # Process batch when we reach parallel limit
+                    if len(pending_prediction_jobs) >= parallel:
+                        process_prediction_batch()
+                        pending_prediction_jobs.clear()
+                        if delay > 0:
+                            time.sleep(delay)
 
-                    # Delay between jobs
-                    if delay > 0:
-                        time.sleep(delay)
+            # Process remaining jobs
+            process_prediction_batch()
 
             typer.echo(f"  Completed: {stats['predictions_completed']}, Failed: {stats['predictions_failed']}")
             typer.echo()
