@@ -1,0 +1,394 @@
+"""Artifact subcommands for chapkit CLI."""
+
+import asyncio
+import zipfile
+from io import BytesIO
+from pathlib import Path
+from typing import Annotated
+
+import httpx
+import typer
+from servicekit import SqliteDatabaseBuilder
+from ulid import ULID
+
+from chapkit.artifact import ArtifactRepository
+
+artifact_app = typer.Typer(
+    name="artifact",
+    help="Artifact management commands",
+    no_args_is_help=True,
+)
+
+
+async def _extract_from_database(
+    database_path: Path,
+    artifact_id: ULID,
+    output_dir: Path,
+) -> tuple[bool, str]:
+    """Extract artifact content from local database."""
+    alembic_dir = Path(__file__).parent.parent / "alembic"
+
+    db = (
+        SqliteDatabaseBuilder.from_file(str(database_path))
+        .with_migrations(enabled=True, alembic_dir=alembic_dir)
+        .build()
+    )
+    await db.init()
+
+    try:
+        async with db.session() as session:
+            repository = ArtifactRepository(session)
+            artifact = await repository.find_by_id(artifact_id)
+
+            if artifact is None:
+                return False, f"Artifact {artifact_id} not found"
+
+            data = artifact.data
+            if not isinstance(data, dict):
+                return False, f"Artifact {artifact_id} has invalid data format"
+
+            content = data.get("content")
+            content_type = data.get("content_type")
+
+            if content is None:
+                return False, f"Artifact {artifact_id} has no content"
+
+            if content_type != "application/zip":
+                return False, (f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})")
+
+            if not isinstance(content, bytes):
+                return False, f"Artifact {artifact_id} content is not bytes"
+
+            return _extract_zip_content(content, output_dir)
+    finally:
+        await db.dispose()
+
+
+def _extract_from_url(
+    base_url: str,
+    artifact_id: ULID,
+    output_dir: Path,
+) -> tuple[bool, str]:
+    """Extract artifact content from remote service via HTTP."""
+    download_url = f"{base_url.rstrip('/')}/api/v1/artifacts/{artifact_id}/$download"
+
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            response = client.get(download_url)
+
+            if response.status_code == 404:
+                return False, f"Artifact {artifact_id} not found"
+
+            if response.status_code != 200:
+                return False, (f"HTTP error {response.status_code}: {response.text[:200]}")
+
+            content_type = response.headers.get("content-type", "")
+            if "application/zip" not in content_type:
+                return False, (f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})")
+
+            return _extract_zip_content(response.content, output_dir)
+
+    except httpx.ConnectError:
+        return False, f"Connection error: Could not connect to {base_url}"
+    except httpx.TimeoutException:
+        return False, f"Timeout error: Request to {base_url} timed out"
+    except httpx.HTTPError as e:
+        return False, f"HTTP error: {e}"
+
+
+def _extract_zip_content(content: bytes, output_dir: Path) -> tuple[bool, str]:
+    """Extract ZIP content to output directory."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    zip_buffer = BytesIO(content)
+
+    try:
+        with zipfile.ZipFile(zip_buffer, "r") as zf:
+            bad_file = zf.testzip()
+            if bad_file is not None:
+                return False, f"Corrupted file in ZIP: {bad_file}"
+
+            zf.extractall(output_dir)
+            file_count = len(zf.namelist())
+
+        return True, f"Extracted {file_count} files to {output_dir}"
+
+    except zipfile.BadZipFile as e:
+        return False, f"Invalid ZIP file: {e}"
+
+
+def _format_size(size: int | None) -> str:
+    """Format byte size to human-readable string."""
+    if size is None:
+        return "-"
+    if size < 1024:
+        return f"{size} B"
+    if size < 1024 * 1024:
+        return f"{size / 1024:.1f} KB"
+    if size < 1024 * 1024 * 1024:
+        return f"{size / (1024 * 1024):.1f} MB"
+    return f"{size / (1024 * 1024 * 1024):.1f} GB"
+
+
+async def _list_from_database(database_path: Path) -> tuple[bool, str, list[dict]]:
+    """List artifacts from local database."""
+    alembic_dir = Path(__file__).parent.parent / "alembic"
+
+    db = (
+        SqliteDatabaseBuilder.from_file(str(database_path))
+        .with_migrations(enabled=True, alembic_dir=alembic_dir)
+        .build()
+    )
+    await db.init()
+
+    try:
+        async with db.session() as session:
+            repository = ArtifactRepository(session)
+            artifacts = await repository.find_all()
+
+            result = []
+            for artifact in artifacts:
+                data = artifact.data if isinstance(artifact.data, dict) else {}
+                result.append(
+                    {
+                        "id": str(artifact.id),
+                        "type": data.get("type", "-"),
+                        "content_type": data.get("content_type", "-"),
+                        "size": data.get("content_size"),
+                        "level": artifact.level,
+                        "parent_id": str(artifact.parent_id) if artifact.parent_id else None,
+                        "created_at": artifact.created_at.isoformat() if artifact.created_at else "-",
+                    }
+                )
+
+            return True, "", result
+    finally:
+        await db.dispose()
+
+
+def _list_from_url(base_url: str) -> tuple[bool, str, list[dict]]:
+    """List artifacts from remote service via HTTP."""
+    list_url = f"{base_url.rstrip('/')}/api/v1/artifacts"
+
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.get(list_url)
+
+            if response.status_code != 200:
+                return False, f"HTTP error {response.status_code}: {response.text[:200]}", []
+
+            artifacts = response.json()
+            result = []
+            for artifact in artifacts:
+                data = artifact.get("data", {}) if isinstance(artifact.get("data"), dict) else {}
+                result.append(
+                    {
+                        "id": artifact.get("id", "-"),
+                        "type": data.get("type", "-"),
+                        "content_type": data.get("content_type", "-"),
+                        "size": data.get("content_size"),
+                        "level": artifact.get("level", 0),
+                        "parent_id": artifact.get("parent_id"),
+                        "created_at": artifact.get("created_at", "-"),
+                    }
+                )
+
+            return True, "", result
+
+    except httpx.ConnectError:
+        return False, f"Connection error: Could not connect to {base_url}", []
+    except httpx.TimeoutException:
+        return False, f"Timeout error: Request to {base_url} timed out", []
+    except httpx.HTTPError as e:
+        return False, f"HTTP error: {e}", []
+
+
+def list_command(
+    database: Annotated[
+        Path | None,
+        typer.Option(
+            "--database",
+            "-d",
+            help="Path to SQLite database file",
+        ),
+    ] = None,
+    url: Annotated[
+        str | None,
+        typer.Option(
+            "--url",
+            "-u",
+            help="Base URL of running chapkit service (e.g., http://localhost:8000)",
+        ),
+    ] = None,
+    artifact_type: Annotated[
+        str | None,
+        typer.Option(
+            "--type",
+            "-t",
+            help="Filter by artifact type (e.g., ml_training_workspace, ml_prediction)",
+        ),
+    ] = None,
+) -> None:
+    """List all artifacts with their type and metadata."""
+    # Validate mutual exclusivity
+    if database is None and url is None:
+        typer.echo(
+            "Error: Must provide either --database or --url",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if database is not None and url is not None:
+        typer.echo(
+            "Error: Cannot use both --database and --url (mutually exclusive)",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    # Validate database exists (if local mode)
+    if database is not None and not database.exists():
+        typer.echo(f"Error: Database file not found: {database}", err=True)
+        raise typer.Exit(code=1)
+
+    # Fetch artifacts
+    if database is not None:
+        success, error, artifacts = asyncio.run(_list_from_database(database))
+    else:
+        assert url is not None  # Guaranteed by mutual exclusivity check above
+        success, error, artifacts = _list_from_url(url)
+
+    if not success:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(code=1)
+
+    # Filter by type if specified
+    if artifact_type:
+        artifacts = [a for a in artifacts if a["type"] == artifact_type]
+
+    if not artifacts:
+        typer.echo("No artifacts found")
+        return
+
+    # Print header
+    typer.echo(f"{'ID':<28} {'TYPE':<25} {'CONTENT':<16} {'SIZE':<10} {'LEVEL'}")
+    typer.echo("-" * 90)
+
+    # Print artifacts
+    for artifact in artifacts:
+        artifact_id = artifact["id"][:26] + ".." if len(artifact["id"]) > 28 else artifact["id"]
+        artifact_type_str = artifact["type"][:23] + ".." if len(artifact["type"]) > 25 else artifact["type"]
+        content_type = artifact["content_type"]
+        if content_type != "-":
+            # Shorten content type for display
+            content_type = content_type.split("/")[-1][:14]
+        size = _format_size(artifact["size"])
+        level = str(artifact["level"])
+
+        typer.echo(f"{artifact_id:<28} {artifact_type_str:<25} {content_type:<16} {size:<10} {level}")
+
+
+def extract_command(
+    artifact_id: Annotated[
+        str,
+        typer.Argument(help="Artifact ID (ULID) to extract"),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output directory for extracted files (default: ./<artifact_id>)",
+        ),
+    ] = None,
+    database: Annotated[
+        Path | None,
+        typer.Option(
+            "--database",
+            "-d",
+            help="Path to SQLite database file",
+        ),
+    ] = None,
+    url: Annotated[
+        str | None,
+        typer.Option(
+            "--url",
+            "-u",
+            help="Base URL of running chapkit service (e.g., http://localhost:8000)",
+        ),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Overwrite existing output directory",
+        ),
+    ] = False,
+) -> None:
+    """Extract a ZIP artifact to a target directory."""
+    # Validate mutual exclusivity
+    if database is None and url is None:
+        typer.echo(
+            "Error: Must provide either --database or --url",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if database is not None and url is not None:
+        typer.echo(
+            "Error: Cannot use both --database and --url (mutually exclusive)",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    # Parse artifact ID
+    try:
+        ulid = ULID.from_str(artifact_id)
+    except ValueError as e:
+        typer.echo(f"Error: Invalid artifact ID '{artifact_id}': {e}", err=True)
+        raise typer.Exit(code=1)
+
+    # Validate database exists (if local mode)
+    if database is not None and not database.exists():
+        typer.echo(f"Error: Database file not found: {database}", err=True)
+        raise typer.Exit(code=1)
+
+    # Set default output directory
+    output_dir = output or Path(artifact_id)
+
+    # Check output directory
+    if output_dir.exists():
+        if not force:
+            typer.echo(
+                f"Error: Output directory already exists: {output_dir}\nUse --force to overwrite",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        typer.echo(f"Warning: Overwriting existing directory: {output_dir}")
+
+    typer.echo(f"Extracting artifact {artifact_id}...")
+
+    if database is not None:
+        typer.echo(f"Database: {database.absolute()}")
+    else:
+        typer.echo(f"URL: {url}")
+
+    typer.echo(f"Output: {output_dir.absolute()}")
+    typer.echo()
+
+    # Run extraction
+    if database is not None:
+        success, message = asyncio.run(_extract_from_database(database, ulid, output_dir))
+    else:
+        assert url is not None  # Guaranteed by mutual exclusivity check above
+        success, message = _extract_from_url(url, ulid, output_dir)
+
+    if success:
+        typer.echo(f"Success: {message}")
+    else:
+        typer.echo(f"Error: {message}", err=True)
+        raise typer.Exit(code=1)
+
+
+# Register commands
+artifact_app.command(name="list", help="List all artifacts with their type and metadata")(list_command)
+artifact_app.command(name="extract", help="Extract a ZIP artifact to a directory")(extract_command)
