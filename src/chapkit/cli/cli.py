@@ -3,6 +3,7 @@
 import typer
 
 from chapkit import __version__
+from chapkit.cli.artifact import artifact_app
 from chapkit.cli.init import init_command
 
 # Get servicekit version
@@ -36,6 +37,7 @@ def callback(
 
 # Register subcommands
 app.command(name="init", help="Initialize a new chapkit ML service project")(init_command)
+app.add_typer(artifact_app, name="artifact")
 
 
 def main() -> None:

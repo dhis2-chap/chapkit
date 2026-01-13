@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.11.2"
+version = "0.12.0"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
@@ -30,6 +30,7 @@ dependencies = [
   "typer>=0.21.0",
   "jinja2>=3.1.6",
   "servicekit>=0.5.3",
+  "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
