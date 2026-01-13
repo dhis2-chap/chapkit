@@ -46,6 +46,7 @@ This is the easiest way to test your service - it handles starting and stopping 
 | `--save-data` | | `false` | Save generated test data files |
 | `--save-data-dir` | | `target` | Directory for saved test data |
 | `--parallel` | | `1` | Number of jobs to run in parallel (experimental) |
+| `--debug` | | `false` | Show full stack traces on errors |
 
 ### Examples
 
