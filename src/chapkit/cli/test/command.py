@@ -253,7 +253,7 @@ def test_command(
                 for (job_id, pred_artifact_id), (success, msg, _) in zip(pending_prediction_jobs, results):
                     if success:
                         stats["predictions_completed"] += 1
-                        v_success, v_msg, _ = runner.verify_artifact(pred_artifact_id)
+                        v_success, _, _ = runner.verify_artifact(pred_artifact_id)
                         if v_success and verbose:
                             typer.echo(f"  [OK] Prediction {pred_artifact_id}: verified")
                     else:
