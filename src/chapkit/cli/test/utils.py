@@ -28,8 +28,8 @@ def start_service_subprocess(project_root: Path, port: int = 8000) -> subprocess
         [sys.executable, "main.py"],
         cwd=project_root,
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     return process
 
