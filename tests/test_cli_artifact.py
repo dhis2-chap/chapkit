@@ -15,7 +15,7 @@ from ulid import ULID
 from chapkit.artifact import Artifact
 from chapkit.cli.cli import app
 
-runner = CliRunner()
+runner = CliRunner(env={"NO_COLOR": "1"})
 
 ALEMBIC_DIR = Path(__file__).parent.parent / "src" / "chapkit" / "alembic"
 
