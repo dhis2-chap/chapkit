@@ -129,6 +129,14 @@ class TestDataGenerator:
 
     def _generate_value_for_schema(self, field_schema: dict[str, Any], variation: int) -> Any:
         """Generate a value matching the field schema type."""
+        if "default" in field_schema:
+            default = field_schema["default"]
+            if isinstance(default, int):
+                return default + variation
+            elif isinstance(default, float):
+                return default + (variation * 0.1)
+            return default
+
         field_type = field_schema.get("type", "string")
 
         if field_type == "integer":
