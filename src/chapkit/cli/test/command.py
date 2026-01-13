@@ -133,7 +133,7 @@ def test_command(
             typer.echo(
                 f"  Service info: required_covariates={runner.required_covariates}, "
                 f"requires_geo={runner.requires_geo}, "
-                f"allow_free_additional={runner.allow_free_additional_continuous_covariates}"
+                f"allow_free_additional_covariates={runner.allow_free_additional_continuous_covariates}"
             )
             typer.echo()
 
