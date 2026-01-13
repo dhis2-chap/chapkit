@@ -255,6 +255,14 @@ chapkit artifact download 01ABC123... --database ./data/chapkit.db --force
 
 ---
 
+### `chapkit test`
+
+Run end-to-end tests against your ML service. This command only appears when inside a chapkit project directory.
+
+See [Testing ML Services](testing-ml-services.md) for full documentation.
+
+---
+
 ## Template Types
 
 ### ML Template (Default)

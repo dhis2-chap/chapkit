@@ -6,6 +6,8 @@ This guide covers how to test chapkit ML services during development.
 
 The `chapkit test` command runs end-to-end tests against your ML service, verifying the complete workflow from config creation through training and prediction.
 
+**Note:** This command only appears when running `chapkit` from inside a chapkit project directory (a directory containing `main.py` with chapkit imports).
+
 ### Basic Usage
 
 First, start your service:
