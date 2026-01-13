@@ -158,9 +158,13 @@ ignore_errors = true
 module = "examples.artifact_manager.*"
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = ["chapkit.data.dataframe", "examples.dataframe_usage.*"]
+disable_error_code = ["import-not-found"]
+
 [tool.pyright]
 include = ["src", "tests", "examples"]
-exclude = ["examples/artifact_manager", "**/.venv"]
+exclude = ["examples/artifact_manager", "examples/dataframe_usage", "**/.venv"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true
@@ -173,3 +177,5 @@ reportUnknownVariableType = false
 reportMissingTypeArgument = false
 reportMissingTypeStubs = false
 reportUnknownLambdaType = false
+reportMissingImports = "warning"
+reportMissingModuleSource = false
