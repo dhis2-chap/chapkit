@@ -397,19 +397,22 @@ def test_command(
         typer.Option("--start-service", help="Auto-start service with in-memory database"),
     ] = False,
     save_data: Annotated[
-        str | None,
-        typer.Option("--save-data", help="Save generated test data to directory (default: target/)"),
-    ] = None,
+        bool,
+        typer.Option("--save-data", help="Save generated test data files"),
+    ] = False,
+    save_data_dir: Annotated[
+        str,
+        typer.Option("--save-data-dir", help="Directory for saved test data"),
+    ] = "target",
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
     service_process: subprocess.Popen[bytes] | None = None
-    save_data_dir: Path | None = None
+    save_data_path: Path | None = None
 
     # Handle --save-data
-    if save_data is not None:
-        # Use provided path or default to "target/"
-        save_data_dir = Path(save_data) if save_data else Path("target")
-        typer.echo(f"Saving test data to {save_data_dir}/")
+    if save_data:
+        save_data_path = Path(save_data_dir)
+        typer.echo(f"Saving test data to {save_data_path}/")
 
     # Handle --start-service
     if start_service:
@@ -472,8 +475,8 @@ def test_command(
 
         # Generate geo if required
         geo_data = generator.generate_geo_data() if runner.requires_geo else None
-        if save_data_dir and geo_data:
-            save_test_data(save_data_dir, "geo.json", geo_data)
+        if save_data_path and geo_data:
+            save_test_data(save_data_path, "geo.json", geo_data)
 
         # 3. Create configs
         typer.echo(f"Creating {num_configs} config(s)...")
@@ -482,8 +485,8 @@ def test_command(
             config_name = f"test_config_{ULID()}"
             config_data = generator.generate_config_data(variation=i)
 
-            if save_data_dir:
-                save_test_data(save_data_dir, f"config_{i}.json", config_data)
+            if save_data_path:
+                save_test_data(save_data_path, f"config_{i}.json", config_data)
 
             success, message, config_id = runner.create_config(config_name, config_data)
             if success and config_id:
@@ -513,8 +516,8 @@ def test_command(
                     extra_covariates=extra_covariates,
                 )
 
-                if save_data_dir:
-                    save_test_data(save_data_dir, f"training_{config_idx}_{training_index}.json", training_data)
+                if save_data_path:
+                    save_test_data(save_data_path, f"training_{config_idx}_{training_index}.json", training_data)
                     training_index += 1
 
                 success, msg, job_id, artifact_id = runner.submit_training(config_id, training_data, geo_data)
@@ -558,12 +561,12 @@ def test_command(
                         extra_covariates=extra_covariates,
                     )
 
-                    if save_data_dir:
+                    if save_data_path:
                         save_test_data(
-                            save_data_dir, f"prediction_{artifact_idx}_{prediction_index}_historic.json", historic
+                            save_data_path, f"prediction_{artifact_idx}_{prediction_index}_historic.json", historic
                         )
                         save_test_data(
-                            save_data_dir, f"prediction_{artifact_idx}_{prediction_index}_future.json", future
+                            save_data_path, f"prediction_{artifact_idx}_{prediction_index}_future.json", future
                         )
                         prediction_index += 1
 
