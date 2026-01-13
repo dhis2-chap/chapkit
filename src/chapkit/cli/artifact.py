@@ -20,12 +20,11 @@ artifact_app = typer.Typer(
 )
 
 
-async def _extract_from_database(
+async def _fetch_from_database(
     database_path: Path,
     artifact_id: ULID,
-    output_dir: Path,
-) -> tuple[bool, str]:
-    """Extract artifact content from local database."""
+) -> tuple[bool, str, bytes | None]:
+    """Fetch artifact content from local database."""
     alembic_dir = Path(__file__).parent.parent / "alembic"
 
     db = (
@@ -41,35 +40,34 @@ async def _extract_from_database(
             artifact = await repository.find_by_id(artifact_id)
 
             if artifact is None:
-                return False, f"Artifact {artifact_id} not found"
+                return False, f"Artifact {artifact_id} not found", None
 
             data = artifact.data
             if not isinstance(data, dict):
-                return False, f"Artifact {artifact_id} has invalid data format"
+                return False, f"Artifact {artifact_id} has invalid data format", None
 
             content = data.get("content")
             content_type = data.get("content_type")
 
             if content is None:
-                return False, f"Artifact {artifact_id} has no content"
+                return False, f"Artifact {artifact_id} has no content", None
 
             if content_type != "application/zip":
-                return False, (f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})")
+                return False, f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})", None
 
             if not isinstance(content, bytes):
-                return False, f"Artifact {artifact_id} content is not bytes"
+                return False, f"Artifact {artifact_id} content is not bytes", None
 
-            return _extract_zip_content(content, output_dir)
+            return True, "", content
     finally:
         await db.dispose()
 
 
-def _extract_from_url(
+def _fetch_from_url(
     base_url: str,
     artifact_id: ULID,
-    output_dir: Path,
-) -> tuple[bool, str]:
-    """Extract artifact content from remote service via HTTP."""
+) -> tuple[bool, str, bytes | None]:
+    """Fetch artifact content from remote service via HTTP."""
     download_url = f"{base_url.rstrip('/')}/api/v1/artifacts/{artifact_id}/$download"
 
     try:
@@ -77,23 +75,34 @@ def _extract_from_url(
             response = client.get(download_url)
 
             if response.status_code == 404:
-                return False, f"Artifact {artifact_id} not found"
+                return False, f"Artifact {artifact_id} not found", None
 
             if response.status_code != 200:
-                return False, (f"HTTP error {response.status_code}: {response.text[:200]}")
+                return False, f"HTTP error {response.status_code}: {response.text[:200]}", None
 
             content_type = response.headers.get("content-type", "")
             if "application/zip" not in content_type:
-                return False, (f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})")
+                return False, f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})", None
 
-            return _extract_zip_content(response.content, output_dir)
+            return True, "", response.content
 
     except httpx.ConnectError:
-        return False, f"Connection error: Could not connect to {base_url}"
+        return False, f"Connection error: Could not connect to {base_url}", None
     except httpx.TimeoutException:
-        return False, f"Timeout error: Request to {base_url} timed out"
+        return False, f"Timeout error: Request to {base_url} timed out", None
     except httpx.HTTPError as e:
-        return False, f"HTTP error: {e}"
+        return False, f"HTTP error: {e}", None
+
+
+def _save_zip_file(content: bytes, output_file: Path) -> tuple[bool, str]:
+    """Save ZIP content to a file."""
+    try:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_bytes(content)
+        size = len(content)
+        return True, f"Saved {_format_size(size)} to {output_file}"
+    except OSError as e:
+        return False, f"Failed to write file: {e}"
 
 
 def _extract_zip_content(content: bytes, output_dir: Path) -> tuple[bool, str]:
@@ -286,17 +295,17 @@ def list_command(
         typer.echo(f"{artifact_id:<28} {artifact_type_str:<25} {content_type:<16} {size:<10} {level}")
 
 
-def extract_command(
+def download_command(
     artifact_id: Annotated[
         str,
-        typer.Argument(help="Artifact ID (ULID) to extract"),
+        typer.Argument(help="Artifact ID (ULID) to download"),
     ],
     output: Annotated[
         Path | None,
         typer.Option(
             "--output",
             "-o",
-            help="Output directory for extracted files (default: ./<artifact_id>)",
+            help="Output path (default: ./<artifact_id>.zip or ./<artifact_id>/ with --extract)",
         ),
     ] = None,
     database: Annotated[
@@ -315,16 +324,24 @@ def extract_command(
             help="Base URL of running chapkit service (e.g., http://localhost:8000)",
         ),
     ] = None,
+    extract: Annotated[
+        bool,
+        typer.Option(
+            "--extract",
+            "-x",
+            help="Extract ZIP contents to a directory instead of saving as file",
+        ),
+    ] = False,
     force: Annotated[
         bool,
         typer.Option(
             "--force",
             "-f",
-            help="Overwrite existing output directory",
+            help="Overwrite existing output file or directory",
         ),
     ] = False,
 ) -> None:
-    """Extract a ZIP artifact to a target directory."""
+    """Download a ZIP artifact (optionally extract it)."""
     # Validate mutual exclusivity
     if database is None and url is None:
         typer.echo(
@@ -352,35 +369,50 @@ def extract_command(
         typer.echo(f"Error: Database file not found: {database}", err=True)
         raise typer.Exit(code=1)
 
-    # Set default output directory
-    output_dir = output or Path(artifact_id)
+    # Set default output path based on mode
+    if extract:
+        output_path = output or Path(artifact_id)
+    else:
+        output_path = output or Path(f"{artifact_id}.zip")
 
-    # Check output directory
-    if output_dir.exists():
+    # Check if output exists
+    if output_path.exists():
         if not force:
             typer.echo(
-                f"Error: Output directory already exists: {output_dir}\nUse --force to overwrite",
+                f"Error: Output already exists: {output_path}\nUse --force to overwrite",
                 err=True,
             )
             raise typer.Exit(code=1)
-        typer.echo(f"Warning: Overwriting existing directory: {output_dir}")
+        typer.echo(f"Warning: Overwriting existing: {output_path}")
 
-    typer.echo(f"Extracting artifact {artifact_id}...")
+    typer.echo(f"Downloading artifact {artifact_id}...")
 
     if database is not None:
         typer.echo(f"Database: {database.absolute()}")
     else:
         typer.echo(f"URL: {url}")
 
-    typer.echo(f"Output: {output_dir.absolute()}")
+    typer.echo(f"Output: {output_path.absolute()}")
     typer.echo()
 
-    # Run extraction
+    # Fetch content
     if database is not None:
-        success, message = asyncio.run(_extract_from_database(database, ulid, output_dir))
+        success, error, content = asyncio.run(_fetch_from_database(database, ulid))
     else:
         assert url is not None  # Guaranteed by mutual exclusivity check above
-        success, message = _extract_from_url(url, ulid, output_dir)
+        success, error, content = _fetch_from_url(url, ulid)
+
+    if not success:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(code=1)
+
+    assert content is not None  # Guaranteed by success=True
+
+    # Save or extract
+    if extract:
+        success, message = _extract_zip_content(content, output_path)
+    else:
+        success, message = _save_zip_file(content, output_path)
 
     if success:
         typer.echo(f"Success: {message}")
@@ -391,4 +423,4 @@ def extract_command(
 
 # Register commands
 artifact_app.command(name="list", help="List all artifacts with their type and metadata")(list_command)
-artifact_app.command(name="extract", help="Extract a ZIP artifact to a directory")(extract_command)
+artifact_app.command(name="download", help="Download a ZIP artifact (optionally extract it)")(download_command)

@@ -157,11 +157,63 @@ class TestArtifactList:
         assert "not found" in result.output.lower()
 
 
-class TestArtifactExtract:
-    """Tests for artifact extract command."""
+class TestArtifactDownload:
+    """Tests for artifact download command."""
 
-    def test_extract_success(self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path) -> None:
-        """Test successful artifact extraction."""
+    def test_download_as_file(self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path) -> None:
+        """Test downloading artifact as ZIP file (default behavior)."""
+        db_path, artifact_id = db_with_zip_artifact
+        output_file = tmp_path / "output.zip"
+
+        result = runner.invoke(
+            app,
+            [
+                "artifact",
+                "download",
+                str(artifact_id),
+                "--database",
+                str(db_path),
+                "--output",
+                str(output_file),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Success" in result.output
+        assert output_file.exists()
+        # Verify it's a valid ZIP
+        with zipfile.ZipFile(output_file, "r") as zf:
+            assert "test.txt" in zf.namelist()
+
+    def test_download_default_filename(self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path) -> None:
+        """Test downloading artifact uses artifact_id.zip as default filename."""
+        db_path, artifact_id = db_with_zip_artifact
+
+        # Change to tmp_path so the default file is created there
+        import os
+
+        old_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            result = runner.invoke(
+                app,
+                [
+                    "artifact",
+                    "download",
+                    str(artifact_id),
+                    "--database",
+                    str(db_path),
+                ],
+            )
+
+            assert result.exit_code == 0
+            expected_file = tmp_path / f"{artifact_id}.zip"
+            assert expected_file.exists()
+        finally:
+            os.chdir(old_cwd)
+
+    def test_download_with_extract(self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path) -> None:
+        """Test downloading and extracting artifact to directory."""
         db_path, artifact_id = db_with_zip_artifact
         output_dir = tmp_path / "output"
 
@@ -169,12 +221,13 @@ class TestArtifactExtract:
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 str(artifact_id),
                 "--database",
                 str(db_path),
                 "--output",
                 str(output_dir),
+                "--extract",
             ],
         )
 
@@ -184,34 +237,34 @@ class TestArtifactExtract:
         assert (output_dir / "subdir" / "nested.txt").exists()
         assert (output_dir / "test.txt").read_text() == "Hello, World!"
 
-    def test_extract_artifact_not_found(self, empty_db: Path, tmp_path: Path) -> None:
-        """Test extraction of non-existent artifact."""
-        output_dir = tmp_path / "output"
+    def test_download_artifact_not_found(self, empty_db: Path, tmp_path: Path) -> None:
+        """Test download of non-existent artifact."""
+        output_file = tmp_path / "output.zip"
         fake_id = ULID()
 
         result = runner.invoke(
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 str(fake_id),
                 "--database",
                 str(empty_db),
                 "--output",
-                str(output_dir),
+                str(output_file),
             ],
         )
 
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
 
-    def test_extract_invalid_artifact_id(self) -> None:
-        """Test extraction with invalid artifact ID."""
+    def test_download_invalid_artifact_id(self) -> None:
+        """Test download with invalid artifact ID."""
         result = runner.invoke(
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 "not-a-valid-ulid",
                 "--database",
                 "/some/path.db",
@@ -221,13 +274,13 @@ class TestArtifactExtract:
         assert result.exit_code == 1
         assert "Invalid artifact ID" in result.output
 
-    def test_extract_database_not_found(self) -> None:
-        """Test extraction with missing database file."""
+    def test_download_database_not_found(self) -> None:
+        """Test download with missing database file."""
         result = runner.invoke(
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 str(ULID()),
                 "--database",
                 "/nonexistent/path.db",
@@ -237,69 +290,69 @@ class TestArtifactExtract:
         assert result.exit_code == 1
         assert "not found" in result.output.lower()
 
-    def test_extract_non_zip_artifact(self, db_with_non_zip_artifact: tuple[Path, ULID], tmp_path: Path) -> None:
-        """Test extraction of non-ZIP artifact fails gracefully."""
+    def test_download_non_zip_artifact(self, db_with_non_zip_artifact: tuple[Path, ULID], tmp_path: Path) -> None:
+        """Test download of non-ZIP artifact fails gracefully."""
         db_path, artifact_id = db_with_non_zip_artifact
-        output_dir = tmp_path / "output"
+        output_file = tmp_path / "output.zip"
 
         result = runner.invoke(
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 str(artifact_id),
                 "--database",
                 str(db_path),
                 "--output",
-                str(output_dir),
+                str(output_file),
             ],
         )
 
         assert result.exit_code == 1
         assert "not a ZIP file" in result.output
 
-    def test_extract_output_exists_without_force(
+    def test_download_output_exists_without_force(
         self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path
     ) -> None:
-        """Test extraction fails if output directory exists without --force."""
+        """Test download fails if output exists without --force."""
         db_path, artifact_id = db_with_zip_artifact
-        output_dir = tmp_path / "output"
-        output_dir.mkdir()
+        output_file = tmp_path / "output.zip"
+        output_file.write_bytes(b"existing")
 
         result = runner.invoke(
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 str(artifact_id),
                 "--database",
                 str(db_path),
                 "--output",
-                str(output_dir),
+                str(output_file),
             ],
         )
 
         assert result.exit_code == 1
         assert "already exists" in result.output
 
-    def test_extract_output_exists_with_force(
+    def test_download_output_exists_with_force(
         self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path
     ) -> None:
-        """Test extraction succeeds if output directory exists with --force."""
+        """Test download succeeds if output exists with --force."""
         db_path, artifact_id = db_with_zip_artifact
-        output_dir = tmp_path / "output"
-        output_dir.mkdir()
+        output_file = tmp_path / "output.zip"
+        output_file.write_bytes(b"existing")
 
         result = runner.invoke(
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 str(artifact_id),
                 "--database",
                 str(db_path),
                 "--output",
-                str(output_dir),
+                str(output_file),
                 "--force",
             ],
         )
@@ -307,19 +360,19 @@ class TestArtifactExtract:
         assert result.exit_code == 0
         assert "Success" in result.output
 
-    def test_extract_missing_source(self) -> None:
-        """Test extract command requires either --database or --url."""
-        result = runner.invoke(app, ["artifact", "extract", str(ULID())])
+    def test_download_missing_source(self) -> None:
+        """Test download command requires either --database or --url."""
+        result = runner.invoke(app, ["artifact", "download", str(ULID())])
         assert result.exit_code == 1
         assert "Must provide either --database or --url" in result.output
 
-    def test_extract_both_sources(self, tmp_path: Path) -> None:
-        """Test extract command rejects both --database and --url."""
+    def test_download_both_sources(self, tmp_path: Path) -> None:
+        """Test download command rejects both --database and --url."""
         result = runner.invoke(
             app,
             [
                 "artifact",
-                "extract",
+                "download",
                 str(ULID()),
                 "--database",
                 str(tmp_path / "db.db"),
@@ -339,7 +392,7 @@ class TestArtifactHelp:
         result = runner.invoke(app, ["artifact", "--help"])
         assert result.exit_code == 0
         assert "list" in result.output
-        assert "extract" in result.output
+        assert "download" in result.output
 
     def test_artifact_list_help(self) -> None:
         """Test artifact list command shows help."""
@@ -349,11 +402,12 @@ class TestArtifactHelp:
         assert "--url" in result.output
         assert "--type" in result.output
 
-    def test_artifact_extract_help(self) -> None:
-        """Test artifact extract command shows help."""
-        result = runner.invoke(app, ["artifact", "extract", "--help"])
+    def test_artifact_download_help(self) -> None:
+        """Test artifact download command shows help."""
+        result = runner.invoke(app, ["artifact", "download", "--help"])
         assert result.exit_code == 0
         assert "--database" in result.output
         assert "--url" in result.output
         assert "--output" in result.output
+        assert "--extract" in result.output
         assert "--force" in result.output
