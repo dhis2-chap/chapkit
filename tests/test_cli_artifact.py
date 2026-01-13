@@ -1,6 +1,7 @@
 """Tests for artifact CLI commands."""
 
 import asyncio
+import re
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -15,7 +16,15 @@ from ulid import ULID
 from chapkit.artifact import Artifact
 from chapkit.cli.cli import app
 
-runner = CliRunner(env={"NO_COLOR": "1"})
+runner = CliRunner()
+
+# Pattern to strip ANSI escape codes from output
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape codes from text."""
+    return ANSI_ESCAPE.sub("", text)
 
 ALEMBIC_DIR = Path(__file__).parent.parent / "src" / "chapkit" / "alembic"
 
@@ -389,26 +398,29 @@ class TestArtifactHelp:
         """Test artifact command shows help."""
         result = runner.invoke(app, ["artifact", "--help"])
         assert result.exit_code == 0
-        assert "list" in result.output
-        assert "download" in result.output
+        output = strip_ansi(result.output)
+        assert "list" in output
+        assert "download" in output
 
     def test_artifact_list_help(self) -> None:
         """Test artifact list command shows help."""
         result = runner.invoke(app, ["artifact", "list", "--help"])
         assert result.exit_code == 0
-        assert "--database" in result.output
-        assert "--url" in result.output
-        assert "--type" in result.output
+        output = strip_ansi(result.output)
+        assert "--database" in output
+        assert "--url" in output
+        assert "--type" in output
 
     def test_artifact_download_help(self) -> None:
         """Test artifact download command shows help."""
         result = runner.invoke(app, ["artifact", "download", "--help"])
         assert result.exit_code == 0
-        assert "--database" in result.output
-        assert "--url" in result.output
-        assert "--output" in result.output
-        assert "--extract" in result.output
-        assert "--force" in result.output
+        output = strip_ansi(result.output)
+        assert "--database" in output
+        assert "--url" in output
+        assert "--output" in output
+        assert "--extract" in output
+        assert "--force" in output
 
 
 class TestArtifactListFromUrl:
