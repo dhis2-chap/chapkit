@@ -4,7 +4,9 @@ import asyncio
 import zipfile
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 from servicekit import SqliteDatabaseBuilder
 from typer.testing import CliRunner
@@ -407,3 +409,178 @@ class TestArtifactHelp:
         assert "--output" in result.output
         assert "--extract" in result.output
         assert "--force" in result.output
+
+
+class TestArtifactListFromUrl:
+    """Tests for artifact list via URL."""
+
+    def test_list_from_url_success(self) -> None:
+        """Test listing artifacts from URL."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                "id": "01ABC123456789ABCDEFGHIJ",
+                "data": {
+                    "type": "ml_training_workspace",
+                    "content_type": "application/zip",
+                    "content_size": 1024,
+                    "metadata": {"config_id": "01CFG123456789ABCDEF"},
+                },
+                "level": 0,
+                "created_at": "2024-01-15T10:30:00",
+            }
+        ]
+
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+            result = runner.invoke(app, ["artifact", "list", "--url", "http://localhost:8000"])
+
+        assert result.exit_code == 0
+        assert "ml_training_workspace" in result.output
+        assert "01CFG12345.." in result.output
+
+    def test_list_from_url_connection_error(self) -> None:
+        """Test list handles connection errors."""
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.side_effect = httpx.ConnectError("Connection refused")
+            result = runner.invoke(app, ["artifact", "list", "--url", "http://localhost:8000"])
+
+        assert result.exit_code == 1
+        assert "Connection error" in result.output
+
+    def test_list_from_url_timeout_error(self) -> None:
+        """Test list handles timeout errors."""
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.side_effect = httpx.TimeoutException("Timeout")
+            result = runner.invoke(app, ["artifact", "list", "--url", "http://localhost:8000"])
+
+        assert result.exit_code == 1
+        assert "Timeout error" in result.output
+
+    def test_list_from_url_http_error(self) -> None:
+        """Test list handles HTTP errors."""
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+            result = runner.invoke(app, ["artifact", "list", "--url", "http://localhost:8000"])
+
+        assert result.exit_code == 1
+        assert "HTTP error 500" in result.output
+
+
+class TestArtifactDownloadFromUrl:
+    """Tests for artifact download via URL."""
+
+    def test_download_from_url_success(self, tmp_path: Path) -> None:
+        """Test downloading artifact from URL."""
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr("test.txt", "Hello")
+        zip_content = zip_buffer.getvalue()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = {"content-type": "application/zip"}
+        mock_response.content = zip_content
+
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+            result = runner.invoke(
+                app,
+                [
+                    "artifact",
+                    "download",
+                    str(ULID()),
+                    "--url",
+                    "http://localhost:8000",
+                    "--output",
+                    str(tmp_path / "out.zip"),
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert "Success" in result.output
+        assert (tmp_path / "out.zip").exists()
+
+    def test_download_from_url_with_extract(self, tmp_path: Path) -> None:
+        """Test downloading and extracting artifact from URL."""
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            zf.writestr("test.txt", "Hello from URL")
+        zip_content = zip_buffer.getvalue()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = {"content-type": "application/zip"}
+        mock_response.content = zip_content
+
+        output_dir = tmp_path / "extracted"
+
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+            result = runner.invoke(
+                app,
+                [
+                    "artifact",
+                    "download",
+                    str(ULID()),
+                    "--url",
+                    "http://localhost:8000",
+                    "--extract",
+                    "--output",
+                    str(output_dir),
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert "Success" in result.output
+        assert (output_dir / "test.txt").exists()
+        assert (output_dir / "test.txt").read_text() == "Hello from URL"
+
+    def test_download_from_url_not_found(self) -> None:
+        """Test download handles 404."""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+            result = runner.invoke(
+                app,
+                ["artifact", "download", str(ULID()), "--url", "http://localhost:8000"],
+            )
+
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
+    def test_download_from_url_not_zip(self) -> None:
+        """Test download handles non-ZIP content type."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.headers = {"content-type": "application/json"}
+        mock_response.content = b'{"foo": "bar"}'
+
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.return_value = mock_response
+            result = runner.invoke(
+                app,
+                ["artifact", "download", str(ULID()), "--url", "http://localhost:8000"],
+            )
+
+        assert result.exit_code == 1
+        assert "not a ZIP file" in result.output
+
+    def test_download_from_url_connection_error(self) -> None:
+        """Test download handles connection errors."""
+        with patch("chapkit.cli.artifact.httpx.Client") as mock_client:
+            mock_client.return_value.__enter__.return_value.get.side_effect = httpx.ConnectError("Connection refused")
+            result = runner.invoke(
+                app,
+                ["artifact", "download", str(ULID()), "--url", "http://localhost:8000"],
+            )
+
+        assert result.exit_code == 1
+        assert "Connection error" in result.output
