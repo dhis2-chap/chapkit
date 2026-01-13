@@ -152,6 +152,100 @@ uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
 
 ---
 
+### `chapkit artifact list`
+
+List artifacts stored in a chapkit database or running service.
+
+**Usage:**
+
+```bash
+chapkit artifact list [OPTIONS]
+```
+
+**Options:**
+
+- `--database, -d PATH` - Path to SQLite database file
+- `--url, -u URL` - Base URL of running chapkit service
+- `--type, -t TYPE` - Filter by artifact type (e.g., `ml_training_workspace`, `ml_prediction`)
+- `--help` - Show help message
+
+**Note:** Either `--database` or `--url` must be provided (mutually exclusive).
+
+**Examples:**
+
+```bash
+# List from local database
+chapkit artifact list --database ./data/chapkit.db
+
+# List from running service
+chapkit artifact list --url http://localhost:8000
+
+# Filter by type
+chapkit artifact list --database ./data/chapkit.db --type ml_training_workspace
+```
+
+**Output:**
+
+```
+ID                           TYPE                      CONTENT          SIZE       LEVEL
+------------------------------------------------------------------------------------------
+01ABC123456789ABCDEFGHIJ     ml_training_workspace     zip              1.2 MB     0
+01DEF987654321FEDCBA98       ml_prediction             json             45.3 KB    1
+```
+
+---
+
+### `chapkit artifact download`
+
+Download a ZIP artifact from a chapkit database or running service.
+
+**Usage:**
+
+```bash
+chapkit artifact download ARTIFACT_ID [OPTIONS]
+```
+
+**Arguments:**
+
+- `ARTIFACT_ID` - Artifact ID (ULID) to download (required)
+
+**Options:**
+
+- `--database, -d PATH` - Path to SQLite database file
+- `--url, -u URL` - Base URL of running chapkit service
+- `--output, -o PATH` - Output path (default: `./<artifact_id>.zip` or `./<artifact_id>/` with `--extract`)
+- `--extract, -x` - Extract ZIP contents to a directory instead of saving as file
+- `--force, -f` - Overwrite existing output file or directory
+- `--help` - Show help message
+
+**Note:** Either `--database` or `--url` must be provided (mutually exclusive).
+
+**Examples:**
+
+```bash
+# Download as ZIP file (default)
+chapkit artifact download 01ABC123... --database ./data/chapkit.db
+# Creates: 01ABC123....zip
+
+# Download with custom filename
+chapkit artifact download 01ABC123... --database ./data/chapkit.db -o model.zip
+
+# Extract to directory
+chapkit artifact download 01ABC123... --database ./data/chapkit.db --extract
+# Creates: 01ABC123.../
+
+# Extract to custom directory
+chapkit artifact download 01ABC123... --database ./data/chapkit.db --extract -o ./workspace
+
+# Download from running service
+chapkit artifact download 01ABC123... --url http://localhost:8000
+
+# Force overwrite existing
+chapkit artifact download 01ABC123... --database ./data/chapkit.db --force
+```
+
+---
+
 ## Template Types
 
 ### ML Template (Default)
