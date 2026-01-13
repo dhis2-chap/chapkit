@@ -1,5 +1,6 @@
 """End-to-end test command for chapkit ML services."""
 
+import json
 import os
 import random
 import subprocess
@@ -11,6 +12,14 @@ from typing import Annotated, Any
 import httpx
 import typer
 from ulid import ULID
+
+
+def save_test_data(directory: Path, filename: str, data: dict[str, Any]) -> None:
+    """Save test data to JSON file."""
+    directory.mkdir(parents=True, exist_ok=True)
+    filepath = directory / filename
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
 
 
 class TestRunner:
@@ -387,9 +396,20 @@ def test_command(
         bool,
         typer.Option("--start-service", help="Auto-start service with in-memory database"),
     ] = False,
+    save_data: Annotated[
+        str | None,
+        typer.Option("--save-data", help="Save generated test data to directory (default: target/)"),
+    ] = None,
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
     service_process: subprocess.Popen[bytes] | None = None
+    save_data_dir: Path | None = None
+
+    # Handle --save-data
+    if save_data is not None:
+        # Use provided path or default to "target/"
+        save_data_dir = Path(save_data) if save_data else Path("target")
+        typer.echo(f"Saving test data to {save_data_dir}/")
 
     # Handle --start-service
     if start_service:
@@ -452,6 +472,8 @@ def test_command(
 
         # Generate geo if required
         geo_data = generator.generate_geo_data() if runner.requires_geo else None
+        if save_data_dir and geo_data:
+            save_test_data(save_data_dir, "geo.json", geo_data)
 
         # 3. Create configs
         typer.echo(f"Creating {num_configs} config(s)...")
@@ -459,6 +481,9 @@ def test_command(
         for i in range(num_configs):
             config_name = f"test_config_{ULID()}"
             config_data = generator.generate_config_data(variation=i)
+
+            if save_data_dir:
+                save_test_data(save_data_dir, f"config_{i}.json", config_data)
 
             success, message, config_id = runner.create_config(config_name, config_data)
             if success and config_id:
@@ -478,14 +503,19 @@ def test_command(
         typer.echo(f"Running {total_trainings} training job(s)...")
 
         model_artifacts: list[tuple[str, str]] = []  # List of (config_id, artifact_id) tuples
+        training_index = 0
 
-        for config_id in config_ids:
+        for config_idx, config_id in enumerate(config_ids):
             for _ in range(num_trainings):
                 training_data = generator.generate_training_data(
                     num_rows=num_rows,
                     required_covariates=runner.required_covariates,
                     extra_covariates=extra_covariates,
                 )
+
+                if save_data_dir:
+                    save_test_data(save_data_dir, f"training_{config_idx}_{training_index}.json", training_data)
+                    training_index += 1
 
                 success, msg, job_id, artifact_id = runner.submit_training(config_id, training_data, geo_data)
                 if not success:
@@ -518,14 +548,24 @@ def test_command(
         if model_artifacts:
             total_predictions = len(model_artifacts) * num_predictions
             typer.echo(f"Running {total_predictions} prediction job(s)...")
+            prediction_index = 0
 
-            for _, model_artifact_id in model_artifacts:
+            for artifact_idx, (_, model_artifact_id) in enumerate(model_artifacts):
                 for _ in range(num_predictions):
                     historic, future = generator.generate_prediction_data(
                         num_rows=10,
                         required_covariates=runner.required_covariates,
                         extra_covariates=extra_covariates,
                     )
+
+                    if save_data_dir:
+                        save_test_data(
+                            save_data_dir, f"prediction_{artifact_idx}_{prediction_index}_historic.json", historic
+                        )
+                        save_test_data(
+                            save_data_dir, f"prediction_{artifact_idx}_{prediction_index}_future.json", future
+                        )
+                        prediction_index += 1
 
                     success, msg, job_id, pred_artifact_id = runner.submit_prediction(
                         model_artifact_id, historic, future, geo_data
