@@ -115,15 +115,6 @@ class TestDataGenerator:
 
         return historic, future
 
-    def generate_config_data(self, variation: int = 0) -> dict[str, Any]:
-        """Generate fallback config data when schema is not available."""
-        return {
-            "id": str(ULID()),
-            "test_param_1": variation * 0.1,
-            "test_param_2": f"variation_{variation}",
-            "test_seed": variation,
-        }
-
     def generate_config_data_from_schema(self, schema: dict[str, Any], variation: int = 0) -> dict[str, Any]:
         """Generate config data matching the JSON schema."""
         data: dict[str, Any] = {"id": str(ULID())}

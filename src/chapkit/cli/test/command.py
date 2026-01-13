@@ -130,10 +130,10 @@ def test_command(
             typer.echo()
 
         # 3. Fetch config schema
-        config_schema: dict[str, Any] | None = None
         success, message, config_schema = runner.fetch_config_schema()
-        if not success:
-            typer.echo(f"  [WARNING] {message} - using fallback config data")
+        if not success or config_schema is None:
+            typer.echo(f"  [FAILED] {message}", err=True)
+            raise typer.Exit(code=1)
         elif verbose:
             typer.echo(f"  Config schema fetched")
 
@@ -150,10 +150,7 @@ def test_command(
         config_ids: list[str] = []
         for i in range(num_configs):
             config_name = f"test_config_{ULID()}"
-            if config_schema:
-                config_data = generator.generate_config_data_from_schema(config_schema, variation=i)
-            else:
-                config_data = generator.generate_config_data(variation=i)
+            config_data = generator.generate_config_data_from_schema(config_schema, variation=i)
 
             if save_data_path:
                 save_test_data(save_data_path, f"config_{i}.json", config_data)
