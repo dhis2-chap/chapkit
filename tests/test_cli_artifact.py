@@ -26,6 +26,7 @@ def strip_ansi(text: str) -> str:
     """Remove ANSI escape codes from text."""
     return ANSI_ESCAPE.sub("", text)
 
+
 ALEMBIC_DIR = Path(__file__).parent.parent / "src" / "chapkit" / "alembic"
 
 

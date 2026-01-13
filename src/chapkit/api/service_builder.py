@@ -302,6 +302,8 @@ class ServiceBuilder(BaseServiceBuilder):
         """Build lifespan context manager with InMemoryChapkitScheduler."""
         # Get parent lifespan factory
         parent_lifespan = super()._build_lifespan()
+        # Capture database instance for cleanup (since we inject it, parent won't dispose)
+        database_instance = self._database_instance
 
         @asynccontextmanager
         async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -314,7 +316,12 @@ class ServiceBuilder(BaseServiceBuilder):
                     set_scheduler(scheduler)
                     app.state.scheduler = scheduler
 
-                yield
+                try:
+                    yield
+                finally:
+                    # Dispose injected database (parent won't since should_manage_lifecycle=False)
+                    if database_instance is not None:
+                        await database_instance.dispose()
 
         return lifespan
 

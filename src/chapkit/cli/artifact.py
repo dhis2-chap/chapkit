@@ -25,11 +25,7 @@ async def _fetch_from_database(
     artifact_id: ULID,
 ) -> tuple[bool, str, bytes | None]:
     """Fetch artifact content from local database."""
-    db = (
-        SqliteDatabaseBuilder.from_file(str(database_path))
-        .with_migrations(enabled=False)
-        .build()
-    )
+    db = SqliteDatabaseBuilder.from_file(str(database_path)).with_migrations(enabled=False).build()
     await db.init()
 
     try:
@@ -160,11 +156,7 @@ def _format_timestamp(timestamp: str | None) -> str:
 
 async def _list_from_database(database_path: Path) -> tuple[bool, str, list[dict]]:
     """List artifacts from local database."""
-    db = (
-        SqliteDatabaseBuilder.from_file(str(database_path))
-        .with_migrations(enabled=False)
-        .build()
-    )
+    db = SqliteDatabaseBuilder.from_file(str(database_path)).with_migrations(enabled=False).build()
     await db.init()
 
     try:
