@@ -8,6 +8,7 @@ import typer
 from chapkit import __version__
 from chapkit.cli.artifact import artifact_app
 from chapkit.cli.init import init_command
+from chapkit.cli.test import test_command
 
 # Get servicekit version
 try:
@@ -60,6 +61,9 @@ def callback(
 # Only show 'init' command when NOT inside a chapkit project
 if _find_chapkit_project() is None:
     app.command(name="init", help="Initialize a new chapkit ML service project")(init_command)
+# Only show 'test' command when INSIDE a chapkit project
+if _find_chapkit_project() is not None:
+    app.command(name="test", help="Run end-to-end test of the ML service workflow")(test_command)
 app.add_typer(artifact_app, name="artifact")
 
 
