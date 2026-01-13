@@ -42,7 +42,6 @@ This is the easiest way to test your service - it handles starting and stopping 
 | `--timeout` | | `60.0` | Job completion timeout (seconds) |
 | `--delay` | `-d` | `1.0` | Delay between job submissions (seconds) |
 | `--verbose` | `-v` | `false` | Show detailed output |
-| `--cleanup` | | `false` | Delete test resources after |
 | `--start-service` | | `false` | Auto-start service with in-memory DB |
 
 ### Examples
@@ -63,12 +62,6 @@ Test against a remote service:
 
 ```bash
 chapkit test --url http://my-service:8000
-```
-
-Clean up test data after running:
-
-```bash
-chapkit test --start-service --cleanup
 ```
 
 ## Manual Service Startup

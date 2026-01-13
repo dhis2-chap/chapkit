@@ -163,30 +163,6 @@ class TestRunner:
         except Exception as e:
             return False, f"Error verifying artifact: {e}", None
 
-    def cleanup_resources(self) -> list[str]:
-        """Delete created configs and artifacts. Returns list of errors."""
-        errors: list[str] = []
-
-        # Delete artifacts first (due to hierarchy)
-        for artifact_id in reversed(self.created_artifact_ids):
-            try:
-                response = self.client.delete(f"{self.base_url}/api/v1/artifacts/{artifact_id}")
-                if response.status_code not in (200, 204, 404):
-                    errors.append(f"Failed to delete artifact {artifact_id}")
-            except Exception as e:
-                errors.append(f"Error deleting artifact {artifact_id}: {e}")
-
-        # Then delete configs
-        for config_id in self.created_config_ids:
-            try:
-                response = self.client.delete(f"{self.base_url}/api/v1/configs/{config_id}")
-                if response.status_code not in (200, 204, 404):
-                    errors.append(f"Failed to delete config {config_id}")
-            except Exception as e:
-                errors.append(f"Error deleting config {config_id}: {e}")
-
-        return errors
-
     def close(self) -> None:
         """Close the HTTP client."""
         self.client.close()
@@ -403,10 +379,6 @@ def test_command(
         bool,
         typer.Option("--verbose", "-v", help="Show detailed output including job statuses"),
     ] = False,
-    cleanup: Annotated[
-        bool,
-        typer.Option("--cleanup/--no-cleanup", help="Delete created test artifacts and configs after test"),
-    ] = False,
     delay: Annotated[
         float,
         typer.Option("--delay", "-d", help="Delay in seconds between job submissions"),
@@ -609,17 +581,6 @@ def test_command(
             typer.echo(f"Result: {total_failures} FAILURE(S)", err=True)
         else:
             typer.echo("Result: NO TESTS RUN", err=True)
-
-        # 7. Optional cleanup
-        if cleanup:
-            typer.echo()
-            typer.echo("Cleaning up test resources...")
-            errors = runner.cleanup_resources()
-            if errors:
-                for error in errors:
-                    typer.echo(f"  Warning: {error}", err=True)
-            else:
-                typer.echo("  Cleanup complete")
 
         # Exit with appropriate code
         if total_failures > 0:
