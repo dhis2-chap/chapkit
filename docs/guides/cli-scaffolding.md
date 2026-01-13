@@ -186,12 +186,21 @@ chapkit artifact list --database ./data/chapkit.db --type ml_training_workspace
 
 **Output:**
 
+The output shows artifacts with hierarchy indentation (2 spaces per level) for easier navigation:
+
 ```
-ID                           TYPE                      CONTENT          SIZE       LEVEL
-------------------------------------------------------------------------------------------
-01ABC123456789ABCDEFGHIJ     ml_training_workspace     zip              1.2 MB     0
-01DEF987654321FEDCBA98       ml_prediction             json             45.3 KB    1
+ID                             TYPE                      SIZE       CONFIG         CREATED
+----------------------------------------------------------------------------------------------------
+01ABC123456789ABCDEFGHIJ       ml_training_workspace     1.2 MB     01CFG12345..   2024-01-15 10:30
+  01DEF987654321FEDCBA98       ml_prediction             45.3 KB    01CFG12345..   2024-01-15 10:35
+    01GHI111222333444555       ml_prediction_workspace   2.1 MB     01CFG12345..   2024-01-15 10:36
 ```
+
+- **ID**: Artifact ULID (indented by level)
+- **TYPE**: Artifact type from metadata
+- **SIZE**: Human-readable size
+- **CONFIG**: Config ID from artifact metadata (truncated)
+- **CREATED**: Timestamp in YYYY-MM-DD HH:MM format
 
 ---
 

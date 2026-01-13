@@ -118,14 +118,12 @@ class TestArtifactList:
         result = runner.invoke(app, ["artifact", "list", "--database", str(db_path)])
         assert result.exit_code == 0
         assert "ml_training_workspace" in result.output
-        assert "zip" in result.output.lower()
+        assert str(artifact_id) in result.output
 
     def test_list_filter_by_type(self, db_with_zip_artifact: tuple[Path, ULID]) -> None:
         """Test filtering artifacts by type."""
         db_path, _ = db_with_zip_artifact
-        result = runner.invoke(
-            app, ["artifact", "list", "--database", str(db_path), "--type", "ml_training_workspace"]
-        )
+        result = runner.invoke(app, ["artifact", "list", "--database", str(db_path), "--type", "ml_training_workspace"])
         assert result.exit_code == 0
         assert "ml_training_workspace" in result.output
 
@@ -335,9 +333,7 @@ class TestArtifactDownload:
         assert result.exit_code == 1
         assert "already exists" in result.output
 
-    def test_download_output_exists_with_force(
-        self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path
-    ) -> None:
+    def test_download_output_exists_with_force(self, db_with_zip_artifact: tuple[Path, ULID], tmp_path: Path) -> None:
         """Test download succeeds if output exists with --force."""
         db_path, artifact_id = db_with_zip_artifact
         output_file = tmp_path / "output.zip"

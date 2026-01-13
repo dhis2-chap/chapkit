@@ -53,7 +53,11 @@ async def _fetch_from_database(
                 return False, f"Artifact {artifact_id} has no content", None
 
             if content_type != "application/zip":
-                return False, f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})", None
+                return (
+                    False,
+                    f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})",
+                    None,
+                )
 
             if not isinstance(content, bytes):
                 return False, f"Artifact {artifact_id} content is not bytes", None
@@ -82,7 +86,11 @@ def _fetch_from_url(
 
             content_type = response.headers.get("content-type", "")
             if "application/zip" not in content_type:
-                return False, f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})", None
+                return (
+                    False,
+                    f"Artifact {artifact_id} is not a ZIP file (content_type: {content_type or 'unknown'})",
+                    None,
+                )
 
             return True, "", response.content
 
@@ -138,6 +146,20 @@ def _format_size(size: int | None) -> str:
     return f"{size / (1024 * 1024 * 1024):.1f} GB"
 
 
+def _format_timestamp(timestamp: str | None) -> str:
+    """Format ISO timestamp to short display format."""
+    if timestamp is None or timestamp == "-":
+        return "-"
+    try:
+        # Parse ISO format and format as YYYY-MM-DD HH:MM
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except (ValueError, AttributeError):
+        return "-"
+
+
 async def _list_from_database(database_path: Path) -> tuple[bool, str, list[dict]]:
     """List artifacts from local database."""
     alembic_dir = Path(__file__).parent.parent / "alembic"
@@ -157,6 +179,8 @@ async def _list_from_database(database_path: Path) -> tuple[bool, str, list[dict
             result = []
             for artifact in artifacts:
                 data = artifact.data if isinstance(artifact.data, dict) else {}
+                metadata = data.get("metadata", {})
+                config_id = metadata.get("config_id") if isinstance(metadata, dict) else None
                 result.append(
                     {
                         "id": str(artifact.id),
@@ -166,6 +190,7 @@ async def _list_from_database(database_path: Path) -> tuple[bool, str, list[dict
                         "level": artifact.level,
                         "parent_id": str(artifact.parent_id) if artifact.parent_id else None,
                         "created_at": artifact.created_at.isoformat() if artifact.created_at else "-",
+                        "config_id": config_id,
                     }
                 )
 
@@ -189,6 +214,8 @@ def _list_from_url(base_url: str) -> tuple[bool, str, list[dict]]:
             result = []
             for artifact in artifacts:
                 data = artifact.get("data", {}) if isinstance(artifact.get("data"), dict) else {}
+                metadata = data.get("metadata", {})
+                config_id = metadata.get("config_id") if isinstance(metadata, dict) else None
                 result.append(
                     {
                         "id": artifact.get("id", "-"),
@@ -198,6 +225,7 @@ def _list_from_url(base_url: str) -> tuple[bool, str, list[dict]]:
                         "level": artifact.get("level", 0),
                         "parent_id": artifact.get("parent_id"),
                         "created_at": artifact.get("created_at", "-"),
+                        "config_id": config_id,
                     }
                 )
 
@@ -278,21 +306,37 @@ def list_command(
         return
 
     # Print header
-    typer.echo(f"{'ID':<28} {'TYPE':<25} {'CONTENT':<16} {'SIZE':<10} {'LEVEL'}")
-    typer.echo("-" * 90)
+    typer.echo(f"{'ID':<30} {'TYPE':<25} {'SIZE':<10} {'CONFIG':<14} {'CREATED'}")
+    typer.echo("-" * 100)
 
-    # Print artifacts
+    # Print artifacts with hierarchy indentation
     for artifact in artifacts:
-        artifact_id = artifact["id"][:26] + ".." if len(artifact["id"]) > 28 else artifact["id"]
-        artifact_type_str = artifact["type"][:23] + ".." if len(artifact["type"]) > 25 else artifact["type"]
-        content_type = artifact["content_type"]
-        if content_type != "-":
-            # Shorten content type for display
-            content_type = content_type.split("/")[-1][:14]
-        size = _format_size(artifact["size"])
-        level = str(artifact["level"])
+        level = artifact["level"]
+        indent = "  " * level  # 2 spaces per level
 
-        typer.echo(f"{artifact_id:<28} {artifact_type_str:<25} {content_type:<16} {size:<10} {level}")
+        # Truncate ID accounting for indentation
+        max_id_len = 28 - len(indent)
+        artifact_id = artifact["id"]
+        if len(artifact_id) > max_id_len:
+            artifact_id = artifact_id[: max_id_len - 2] + ".."
+        artifact_id = indent + artifact_id
+
+        # Truncate type
+        artifact_type_str = artifact["type"]
+        if len(artifact_type_str) > 23:
+            artifact_type_str = artifact_type_str[:21] + ".."
+
+        size = _format_size(artifact["size"])
+
+        # Format config_id
+        config_id = artifact.get("config_id") or "-"
+        if config_id != "-" and len(config_id) > 12:
+            config_id = config_id[:10] + ".."
+
+        # Format timestamp
+        created = _format_timestamp(artifact.get("created_at"))
+
+        typer.echo(f"{artifact_id:<30} {artifact_type_str:<25} {size:<10} {config_id:<14} {created}")
 
 
 def download_command(
