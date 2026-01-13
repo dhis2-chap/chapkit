@@ -451,7 +451,7 @@ class TestArtifactListFromUrl:
 
         assert result.exit_code == 0
         assert "ml_training_workspace" in result.output
-        assert "01CFG12345.." in result.output
+        assert "01CFG123456789ABCDEF" in result.output  # Full config ID, no truncation
 
     def test_list_from_url_connection_error(self) -> None:
         """Test list handles connection errors."""

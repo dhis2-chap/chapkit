@@ -294,37 +294,31 @@ def list_command(
         return
 
     # Print header
-    typer.echo(f"{'ID':<30} {'TYPE':<25} {'SIZE':<10} {'CONFIG':<14} {'CREATED'}")
-    typer.echo("-" * 100)
+    typer.echo(f"{'ID':<32} {'TYPE':<25} {'SIZE':<10} {'CONFIG':<28} {'CREATED'}")
+    typer.echo("-" * 115)
 
     # Print artifacts with hierarchy indentation
     for artifact in artifacts:
         level = artifact["level"]
         indent = "  " * level  # 2 spaces per level
 
-        # Truncate ID accounting for indentation
-        max_id_len = 28 - len(indent)
-        artifact_id = artifact["id"]
-        if len(artifact_id) > max_id_len:
-            artifact_id = artifact_id[: max_id_len - 2] + ".."
-        artifact_id = indent + artifact_id
+        # Full ULID with indentation (no truncation - ULIDs are always 26 chars)
+        artifact_id = indent + artifact["id"]
 
-        # Truncate type
+        # Truncate type if needed
         artifact_type_str = artifact["type"]
         if len(artifact_type_str) > 23:
             artifact_type_str = artifact_type_str[:21] + ".."
 
         size = _format_size(artifact["size"])
 
-        # Format config_id
+        # Format config_id (full ULID, no truncation)
         config_id = artifact.get("config_id") or "-"
-        if config_id != "-" and len(config_id) > 12:
-            config_id = config_id[:10] + ".."
 
         # Format timestamp
         created = _format_timestamp(artifact.get("created_at"))
 
-        typer.echo(f"{artifact_id:<30} {artifact_type_str:<25} {size:<10} {config_id:<14} {created}")
+        typer.echo(f"{artifact_id:<32} {artifact_type_str:<25} {size:<10} {config_id:<28} {created}")
 
 
 def download_command(
