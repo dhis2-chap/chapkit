@@ -1,6 +1,7 @@
 """Test runner for orchestrating ML service testing."""
 
 import time
+import traceback
 from typing import Any
 
 import httpx
@@ -9,11 +10,12 @@ import httpx
 class TestRunner:
     """Orchestrates end-to-end ML service testing."""
 
-    def __init__(self, base_url: str, timeout: float = 60.0, verbose: bool = False) -> None:
+    def __init__(self, base_url: str, timeout: float = 60.0, verbose: bool = False, debug: bool = False) -> None:
         """Initialize TestRunner with service URL and options."""
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.verbose = verbose
+        self.debug = debug
         self.client = httpx.Client(timeout=30.0)
 
         # Track created resources for optional cleanup
@@ -24,6 +26,12 @@ class TestRunner:
         self.required_covariates: list[str] = []
         self.requires_geo: bool = False
         self.allow_free_additional_continuous_covariates: bool = False
+
+    def _format_error(self, context: str, exc: Exception) -> str:
+        """Format error message, including traceback if debug is enabled."""
+        if self.debug:
+            return f"{context}: {exc}\n{traceback.format_exc()}"
+        return f"{context}: {exc}"
 
     def check_service_health(self) -> tuple[bool, str]:
         """Verify service is running and healthy."""
@@ -53,7 +61,7 @@ class TestRunner:
                 return True, "Service info fetched"
             return False, f"Failed to fetch service info: {response.text}"
         except Exception as e:
-            return False, f"Error fetching service info: {e}"
+            return False, self._format_error("Error fetching service info", e)
 
     def fetch_config_schema(self) -> tuple[bool, str, dict[str, Any] | None]:
         """Fetch config JSON schema from service."""
@@ -63,7 +71,7 @@ class TestRunner:
                 return True, "Schema fetched", response.json()
             return False, f"Failed to fetch schema: {response.text}", None
         except Exception as e:
-            return False, f"Error fetching schema: {e}", None
+            return False, self._format_error("Error fetching schema", e), None
 
     def create_config(self, name: str, data: dict[str, Any]) -> tuple[bool, str, str | None]:
         """Create a config and return (success, message, config_id)."""
@@ -76,7 +84,7 @@ class TestRunner:
                 return True, f"Created config: {config_id}", config_id
             return False, f"Failed to create config: {response.text}", None
         except Exception as e:
-            return False, f"Error creating config: {e}", None
+            return False, self._format_error("Error creating config", e), None
 
     def submit_training(
         self, config_id: str, data: dict[str, Any], geo: dict[str, Any] | None = None
@@ -93,7 +101,7 @@ class TestRunner:
                 return (True, result["message"], result["job_id"], result["artifact_id"])
             return False, f"Failed to submit training: {response.text}", None, None
         except Exception as e:
-            return False, f"Error submitting training: {e}", None, None
+            return False, self._format_error("Error submitting training", e), None, None
 
     def submit_prediction(
         self,
@@ -114,7 +122,7 @@ class TestRunner:
                 return (True, result["message"], result["job_id"], result["artifact_id"])
             return False, f"Failed to submit prediction: {response.text}", None, None
         except Exception as e:
-            return False, f"Error submitting prediction: {e}", None, None
+            return False, self._format_error("Error submitting prediction", e), None, None
 
     def wait_for_job(self, job_id: str) -> tuple[bool, str, dict[str, Any] | None]:
         """Poll job until completion, return (success, message, job_record)."""
@@ -144,7 +152,7 @@ class TestRunner:
                 poll_interval = min(poll_interval * 1.5, max_poll_interval)
 
             except Exception as e:
-                return False, f"Error polling job: {e}", None
+                return False, self._format_error("Error polling job", e), None
 
         return False, f"Job did not complete within {self.timeout}s", None
 
@@ -164,7 +172,7 @@ class TestRunner:
             self.created_artifact_ids.append(artifact_id)
             return True, "Artifact verified", artifact
         except Exception as e:
-            return False, f"Error verifying artifact: {e}", None
+            return False, self._format_error("Error verifying artifact", e), None
 
     def wait_for_jobs(self, job_ids: list[str]) -> list[tuple[bool, str, dict[str, Any] | None]]:
         """Wait for multiple jobs to complete."""

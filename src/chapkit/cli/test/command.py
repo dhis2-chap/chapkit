@@ -67,6 +67,10 @@ def test_command(
         int,
         typer.Option("--parallel", help="Number of jobs to run in parallel (experimental)"),
     ] = 1,
+    debug: Annotated[
+        bool,
+        typer.Option("--debug", help="Show full stack traces on errors"),
+    ] = False,
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
     service_process: subprocess.Popen[bytes] | None = None
@@ -97,7 +101,7 @@ def test_command(
         typer.echo(f"  [OK] {msg}")
         typer.echo()
 
-    runner = TestRunner(url, timeout=timeout, verbose=verbose)
+    runner = TestRunner(url, timeout=timeout, verbose=verbose, debug=debug)
     generator = TestDataGenerator(seed=42)  # Reproducible data
 
     # Statistics tracking
