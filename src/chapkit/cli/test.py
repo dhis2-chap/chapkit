@@ -458,7 +458,7 @@ def test_command(
         success, message = runner.check_service_health()
         if not success:
             typer.echo(f"  [FAILED] {message}", err=True)
-            typer.echo("Make sure the service is running with: uv run python main.py")
+            typer.echo("Tip: Use --start-service to auto-start the service, or run: uv run python main.py")
             raise typer.Exit(code=1)
         typer.echo(f"  [OK] {message}")
         typer.echo()
