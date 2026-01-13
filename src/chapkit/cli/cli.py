@@ -1,5 +1,8 @@
 """Main CLI application for chapkit."""
 
+import tomllib
+from pathlib import Path
+
 import typer
 
 from chapkit import __version__
@@ -13,6 +16,24 @@ try:
     _servicekit_version = _get_version("servicekit")
 except Exception:
     _servicekit_version = "unknown"
+
+
+def _find_chapkit_project() -> Path | None:
+    """Find chapkit project root by looking for pyproject.toml with chapkit dependency."""
+    cwd = Path.cwd()
+    for parent in [cwd, *cwd.parents]:
+        pyproject = parent / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                with open(pyproject, "rb") as f:
+                    data = tomllib.load(f)
+                deps = data.get("project", {}).get("dependencies", [])
+                if any("chapkit" in dep for dep in deps):
+                    return parent
+            except Exception:
+                pass
+    return None
+
 
 app = typer.Typer(
     name="chapkit",
@@ -36,7 +57,9 @@ def callback(
 
 
 # Register subcommands
-app.command(name="init", help="Initialize a new chapkit ML service project")(init_command)
+# Only show 'init' command when NOT inside a chapkit project
+if _find_chapkit_project() is None:
+    app.command(name="init", help="Initialize a new chapkit ML service project")(init_command)
 app.add_typer(artifact_app, name="artifact")
 
 
