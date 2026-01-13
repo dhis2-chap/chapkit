@@ -1,7 +1,11 @@
 """End-to-end test command for chapkit ML services."""
 
+import os
 import random
+import subprocess
+import sys
 import time
+from pathlib import Path
 from typing import Annotated, Any
 
 import httpx
@@ -325,6 +329,51 @@ class TestDataGenerator:
         return {"type": "FeatureCollection", "features": features}
 
 
+def start_service_subprocess(project_root: Path, port: int = 8000) -> subprocess.Popen[bytes]:
+    """Start the service as a subprocess with in-memory database."""
+    env = os.environ.copy()
+    env["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+
+    process = subprocess.Popen(
+        [sys.executable, "main.py"],
+        cwd=project_root,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    return process
+
+
+def wait_for_service_ready(url: str, timeout: float = 30.0) -> tuple[bool, str]:
+    """Poll health endpoint until service is ready."""
+    start_time = time.time()
+    poll_interval = 0.5
+
+    while time.time() - start_time < timeout:
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(f"{url}/health")
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("status") == "healthy":
+                        return True, "Service is ready"
+        except (httpx.ConnectError, httpx.TimeoutException):
+            pass
+
+        time.sleep(poll_interval)
+
+    return False, f"Service did not become ready within {timeout}s"
+
+
+def find_project_main(start_path: Path) -> Path | None:
+    """Find main.py in the project root."""
+    for parent in [start_path, *start_path.parents]:
+        main_py = parent / "main.py"
+        if main_py.exists():
+            return main_py
+    return None
+
+
 def test_command(
     url: Annotated[
         str,
@@ -358,8 +407,38 @@ def test_command(
         bool,
         typer.Option("--cleanup/--no-cleanup", help="Delete created test artifacts and configs after test"),
     ] = False,
+    delay: Annotated[
+        float,
+        typer.Option("--delay", "-d", help="Delay in seconds between job submissions"),
+    ] = 1.0,
+    start_service: Annotated[
+        bool,
+        typer.Option("--start-service", help="Auto-start service with in-memory database"),
+    ] = False,
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
+    service_process: subprocess.Popen[bytes] | None = None
+
+    # Handle --start-service
+    if start_service:
+        main_py = find_project_main(Path.cwd())
+        if main_py is None:
+            typer.echo("[FAILED] Could not find main.py in project", err=True)
+            raise typer.Exit(code=1)
+
+        project_root = main_py.parent
+        typer.echo(f"Starting service from {project_root}...")
+        service_process = start_service_subprocess(project_root)
+
+        typer.echo(f"  Waiting for service to be ready at {url}...")
+        ready, msg = wait_for_service_ready(url)
+        if not ready:
+            typer.echo(f"  [FAILED] {msg}", err=True)
+            service_process.terminate()
+            raise typer.Exit(code=1)
+        typer.echo(f"  [OK] {msg}")
+        typer.echo()
+
     runner = TestRunner(url, timeout=timeout, verbose=verbose)
     generator = TestDataGenerator(seed=42)  # Reproducible data
 
@@ -456,6 +535,10 @@ def test_command(
                     stats["trainings_failed"] += 1
                     typer.echo(f"  [FAILED] Training job {job_id}: {msg}", err=True)
 
+                # Delay between jobs
+                if delay > 0:
+                    time.sleep(delay)
+
         typer.echo(f"  Completed: {stats['trainings_completed']}, Failed: {stats['trainings_failed']}")
         typer.echo()
 
@@ -495,6 +578,10 @@ def test_command(
                     else:
                         stats["predictions_failed"] += 1
                         typer.echo(f"  [FAILED] Prediction job {job_id}: {msg}", err=True)
+
+                    # Delay between jobs
+                    if delay > 0:
+                        time.sleep(delay)
 
             typer.echo(f"  Completed: {stats['predictions_completed']}, Failed: {stats['predictions_failed']}")
             typer.echo()
@@ -540,3 +627,15 @@ def test_command(
 
     finally:
         runner.close()
+
+        # Terminate service if we started it
+        if service_process is not None:
+            typer.echo()
+            typer.echo("Stopping service...")
+            service_process.terminate()
+            try:
+                service_process.wait(timeout=5.0)
+                typer.echo("  Service stopped")
+            except subprocess.TimeoutExpired:
+                service_process.kill()
+                typer.echo("  Service killed (did not stop gracefully)")
