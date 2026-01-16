@@ -32,6 +32,7 @@ nav:
   - Home: index.md
   - Guides:
       - CLI Scaffolding: guides/cli-scaffolding.md
+      - Testing ML Services: guides/testing-ml-services.md
       - Configuration Management: guides/configuration-management.md
       - Artifact Storage: guides/artifact-storage.md
       - Task Execution: guides/task-execution.md
