@@ -10,13 +10,20 @@ from typing import Any
 
 import httpx
 
+from chapkit.data import DataFrame
+
 
 def save_test_data(directory: Path, filename: str, data: dict[str, Any]) -> None:
-    """Save test data to JSON file."""
+    """Save test data to JSON file, and CSV if it's a dataframe."""
     directory.mkdir(parents=True, exist_ok=True)
     filepath = directory / filename
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
+
+    # Save CSV if data has columns/data structure (dataframe format)
+    if "columns" in data and "data" in data:
+        df = DataFrame(columns=data["columns"], data=data["data"])
+        df.to_csv(filepath.with_suffix(".csv"))
 
 
 def start_service_subprocess(project_root: Path, port: int = 8000) -> subprocess.Popen[bytes]:
