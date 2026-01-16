@@ -22,6 +22,7 @@ class TestDataGenerator:
         required_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         start_year: int = 2020,
+        period_type: str = "monthly",
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
         required_covariates = required_covariates or []
@@ -48,10 +49,15 @@ class TestDataGenerator:
             for loc_idx in range(num_locations):
                 row: list[Any] = []
 
-                # Time period (YYYY-mm format)
-                year = start_year + (period_idx // 12)
-                month = (period_idx % 12) + 1
-                row.append(f"{year}-{month:02d}")
+                # Time period
+                if period_type == "weekly":
+                    year = start_year + (period_idx // 52)
+                    week = (period_idx % 52) + 1
+                    row.append(f"{year}-W{week:02d}")
+                else:  # monthly (default)
+                    year = start_year + (period_idx // 12)
+                    month = (period_idx % 12) + 1
+                    row.append(f"{year}-{month:02d}")
 
                 # Location (matches geojson.properties.id)
                 row.append(f"location_{loc_idx}")
@@ -82,6 +88,7 @@ class TestDataGenerator:
         num_features: int = 3,
         required_covariates: list[str] | None = None,
         extra_covariates: int = 0,
+        period_type: str = "monthly",
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Generate historic and future DataFrames for prediction."""
         required_covariates = required_covariates or []
@@ -113,6 +120,7 @@ class TestDataGenerator:
             required_covariates=required_covariates,
             extra_covariates=extra_covariates,
             start_year=2025,
+            period_type=period_type,
         )
 
         return historic, future

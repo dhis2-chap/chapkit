@@ -71,6 +71,10 @@ def test_command(
         bool,
         typer.Option("--debug", help="Show full stack traces on errors"),
     ] = False,
+    period_type: Annotated[
+        str,
+        typer.Option("--period-type", help="Period format: 'monthly' (YYYY-mm) or 'weekly' (YYYY-Wxx)"),
+    ] = "monthly",
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
     service_process: subprocess.Popen[bytes] | None = None
@@ -209,6 +213,7 @@ def test_command(
                     num_periods=num_rows // 5,  # Use --rows to control total data size
                     required_covariates=runner.required_covariates,
                     extra_covariates=extra_covariates,
+                    period_type=period_type,
                 )
 
                 if save_data_path:
@@ -272,6 +277,7 @@ def test_command(
                         num_periods=2,  # Smaller dataset for prediction
                         required_covariates=runner.required_covariates,
                         extra_covariates=extra_covariates,
+                        period_type=period_type,
                     )
 
                     if save_data_path:
