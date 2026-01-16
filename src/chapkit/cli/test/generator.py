@@ -21,6 +21,7 @@ class TestDataGenerator:
         num_features: int = 3,
         required_covariates: list[str] | None = None,
         extra_covariates: int = 0,
+        start_year: int = 2020,
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
         required_covariates = required_covariates or []
@@ -51,7 +52,7 @@ class TestDataGenerator:
                 row.append(f"location_{loc_idx}")
 
                 # Time period (YYYY-mm format)
-                year = 2020 + (period_idx // 12)
+                year = start_year + (period_idx // 12)
                 month = (period_idx % 12) + 1
                 row.append(f"{year}-{month:02d}")
 
@@ -104,13 +105,14 @@ class TestDataGenerator:
         # Empty historic (matching scaffolded template pattern)
         historic: dict[str, Any] = {"columns": columns, "data": []}
 
-        # Future data to predict (same panel structure)
+        # Future data to predict (same panel structure, future time periods)
         future = self.generate_training_data(
             num_locations=num_locations,
             num_periods=num_periods,
             num_features=num_features,
             required_covariates=required_covariates,
             extra_covariates=extra_covariates,
+            start_year=2025,
         )
 
         return historic, future
