@@ -27,7 +27,7 @@ class TestDataGenerator:
         required_covariates = required_covariates or []
 
         # Build columns list
-        columns: list[str] = ["location", "time_period", "disease_cases"]
+        columns: list[str] = ["time_period", "location", "disease_cases"]
 
         # Feature columns (climate/covariate data)
         for i in range(num_features):
@@ -48,13 +48,13 @@ class TestDataGenerator:
             for loc_idx in range(num_locations):
                 row: list[Any] = []
 
-                # Location (matches geojson.properties.id)
-                row.append(f"location_{loc_idx}")
-
                 # Time period (YYYY-mm format)
                 year = start_year + (period_idx // 12)
                 month = (period_idx % 12) + 1
                 row.append(f"{year}-{month:02d}")
+
+                # Location (matches geojson.properties.id)
+                row.append(f"location_{loc_idx}")
 
                 # Disease cases (health outcome, whole number as float)
                 row.append(float(random.randint(1, 100)))
@@ -87,7 +87,7 @@ class TestDataGenerator:
         required_covariates = required_covariates or []
 
         # Build columns list (same structure as training)
-        columns: list[str] = ["location", "time_period", "disease_cases"]
+        columns: list[str] = ["time_period", "location", "disease_cases"]
 
         # Feature columns
         for i in range(num_features):
