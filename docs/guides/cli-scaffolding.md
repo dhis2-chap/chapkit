@@ -156,6 +156,8 @@ uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
 
 List artifacts stored in a chapkit database or running service.
 
+**Alias:** `chapkit artifact ls`
+
 **Usage:**
 
 ```bash

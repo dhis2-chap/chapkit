@@ -75,14 +75,48 @@ Save generated test data for inspection:
 
 ```bash
 chapkit test --start-service --save-data
-ls target/  # Contains config_*.json, training_*.json, prediction_*.json
+ls target/  # Contains JSON and CSV files for training/prediction data
 ```
+
+The `--save-data` option creates:
+- `config_*.json` - Configuration data
+- `training_*.json` / `training_*.csv` - Training panel data
+- `prediction_*_historic.json` / `.csv` - Historic data for prediction
+- `prediction_*_future.json` / `.csv` - Future data for prediction
+- `geo.json` - GeoJSON with polygon geometries (if service requires geo)
 
 Run jobs in parallel (experimental):
 
 ```bash
 chapkit test --start-service -c 2 -t 4 -p 4 --parallel 4
 ```
+
+Use weekly periods instead of monthly:
+
+```bash
+chapkit test --start-service --period-type weekly --save-data
+# Generates periods like 2020-W01, 2020-W02, etc.
+```
+
+### Generated Data Structure
+
+The test data generator creates panel data for climate-health correlation analysis:
+
+```
+time_period, location, disease_cases, feature_0, feature_1, feature_2
+2020-01,     location_0, 42.0,        23.1,      45.2,      67.3
+2020-01,     location_1, 38.0,        25.3,      41.8,      62.1
+2020-01,     location_2, 51.0,        18.7,      52.1,      71.4
+2020-02,     location_0, 35.0,        21.4,      48.9,      65.8
+...
+```
+
+- **time_period**: Monthly (YYYY-mm) or weekly (YYYY-Wxx) format
+- **location**: Matches GeoJSON `properties.id` values
+- **disease_cases**: Health outcome (positive integer as float)
+- **feature_N**: Climate/covariate data
+
+Training data uses periods starting from 2020, prediction future data uses 2025.
 
 ## Manual Service Startup
 
