@@ -3,7 +3,7 @@
 import subprocess
 import time
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import typer
 from ulid import ULID
@@ -72,7 +72,7 @@ def test_command(
         typer.Option("--debug", help="Show full stack traces on errors"),
     ] = False,
     period_type: Annotated[
-        str,
+        Literal["monthly", "weekly"],
         typer.Option("--period-type", help="Period format: 'monthly' (YYYY-mm) or 'weekly' (YYYY-Wxx)"),
     ] = "monthly",
 ) -> None:

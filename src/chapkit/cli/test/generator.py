@@ -1,7 +1,7 @@
 """Test data generator for ML workflows."""
 
 import random
-from typing import Any
+from typing import Any, Literal
 
 from ulid import ULID
 
@@ -22,7 +22,7 @@ class TestDataGenerator:
         required_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         start_year: int = 2020,
-        period_type: str = "monthly",
+        period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
         required_covariates = required_covariates or []
@@ -88,7 +88,7 @@ class TestDataGenerator:
         num_features: int = 3,
         required_covariates: list[str] | None = None,
         extra_covariates: int = 0,
-        period_type: str = "monthly",
+        period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Generate historic and future DataFrames for prediction."""
         required_covariates = required_covariates or []
