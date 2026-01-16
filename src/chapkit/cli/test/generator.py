@@ -41,10 +41,10 @@ class TestDataGenerator:
         for i in range(extra_covariates):
             columns.append(f"extra_covariate_{i}")
 
-        # Generate panel data: locations x periods
+        # Generate panel data: periods x locations (periods grouped together)
         data: list[list[Any]] = []
-        for loc_idx in range(num_locations):
-            for period_idx in range(num_periods):
+        for period_idx in range(num_periods):
+            for loc_idx in range(num_locations):
                 row: list[Any] = []
 
                 # Location (matches geojson.properties.id)
@@ -55,8 +55,8 @@ class TestDataGenerator:
                 month = (period_idx % 12) + 1
                 row.append(f"{year}-{month:02d}")
 
-                # Disease cases (health outcome, always positive)
-                row.append(random.uniform(1, 100))
+                # Disease cases (health outcome, whole number as float)
+                row.append(float(random.randint(1, 100)))
 
                 # Feature values (climate data)
                 for _ in range(num_features):
