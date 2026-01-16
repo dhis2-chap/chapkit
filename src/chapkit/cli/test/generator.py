@@ -158,18 +158,30 @@ class TestDataGenerator:
             return None
 
     def generate_geo_data(self, num_features: int = 5) -> dict[str, Any]:
-        """Generate simple GeoJSON FeatureCollection with Point geometries."""
+        """Generate simple GeoJSON FeatureCollection with Polygon geometries."""
         features: list[dict[str, Any]] = []
 
         for i in range(num_features):
-            # Random coordinates (longitude, latitude)
-            lon = random.uniform(-180, 180)
-            lat = random.uniform(-90, 90)
+            # Random center point (longitude, latitude)
+            center_lon = random.uniform(-170, 170)
+            center_lat = random.uniform(-80, 80)
+
+            # Small polygon around center (roughly 1 degree square)
+            size = 0.5
+            coordinates = [
+                [
+                    [center_lon - size, center_lat - size],
+                    [center_lon + size, center_lat - size],
+                    [center_lon + size, center_lat + size],
+                    [center_lon - size, center_lat + size],
+                    [center_lon - size, center_lat - size],  # Close the ring
+                ]
+            ]
 
             features.append(
                 {
                     "type": "Feature",
-                    "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                    "geometry": {"type": "Polygon", "coordinates": coordinates},
                     "properties": {"id": f"location_{i}"},
                 }
             )
