@@ -449,4 +449,5 @@ def download_command(
 
 # Register commands
 artifact_app.command(name="list", help="List all artifacts with their type and metadata")(list_command)
+artifact_app.command(name="ls", hidden=True)(list_command)  # Alias for list
 artifact_app.command(name="download", help="Download a ZIP artifact (optionally extract it)")(download_command)
