@@ -40,7 +40,7 @@ This is the easiest way to test your service - it handles starting and stopping 
 | `--configs` | `-c` | `1` | Number of configs to create |
 | `--trainings` | `-t` | `1` | Training jobs per config |
 | `--predictions` | `-p` | `1` | Predictions per trained model |
-| `--rows` | `-r` | `100` | Rows in generated training data |
+| `--rows` | `-r` | `100` | Target rows in training data (locations x periods) |
 | `--timeout` | | `60.0` | Job completion timeout (seconds) |
 | `--delay` | `-d` | `1.0` | Delay between job submissions (seconds) |
 | `--verbose` | `-v` | `false` | Show detailed output |

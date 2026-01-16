@@ -37,7 +37,7 @@ def test_command(
     ] = 1,
     num_rows: Annotated[
         int,
-        typer.Option("--rows", "-r", help="Number of rows in generated training data"),
+        typer.Option("--rows", "-r", help="Target rows in training data (locations x periods)"),
     ] = 100,
     timeout: Annotated[
         float,
@@ -205,7 +205,8 @@ def test_command(
         for config_idx, config_id in enumerate(config_ids):
             for _ in range(num_trainings):
                 training_data = generator.generate_training_data(
-                    num_rows=num_rows,
+                    num_locations=5,
+                    num_periods=num_rows // 5,  # Use --rows to control total data size
                     required_covariates=runner.required_covariates,
                     extra_covariates=extra_covariates,
                 )
@@ -267,7 +268,8 @@ def test_command(
             for artifact_idx, (_, model_artifact_id) in enumerate(model_artifacts):
                 for _ in range(num_predictions):
                     historic, future = generator.generate_prediction_data(
-                        num_rows=10,
+                        num_locations=5,
+                        num_periods=2,  # Smaller dataset for prediction
                         required_covariates=runner.required_covariates,
                         extra_covariates=extra_covariates,
                     )

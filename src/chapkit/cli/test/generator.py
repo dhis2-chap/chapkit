@@ -16,23 +16,19 @@ class TestDataGenerator:
 
     def generate_training_data(
         self,
-        num_rows: int = 100,
-        num_dimensions: int = 2,
+        num_locations: int = 5,
+        num_periods: int = 12,
         num_features: int = 3,
         required_covariates: list[str] | None = None,
         extra_covariates: int = 0,
     ) -> dict[str, Any]:
-        """Generate training DataFrame with dimension and numeric columns."""
+        """Generate training DataFrame with panel data structure for climate-health analysis."""
         required_covariates = required_covariates or []
 
         # Build columns list
-        columns: list[str] = []
+        columns: list[str] = ["location", "time_period", "disease_cases"]
 
-        # Dimension columns
-        for i in range(num_dimensions):
-            columns.append(f"dim_{i}")
-
-        # Feature columns
+        # Feature columns (climate/covariate data)
         for i in range(num_features):
             columns.append(f"feature_{i}")
 
@@ -45,35 +41,43 @@ class TestDataGenerator:
         for i in range(extra_covariates):
             columns.append(f"extra_covariate_{i}")
 
-        # Generate data
+        # Generate panel data: locations x periods
         data: list[list[Any]] = []
-        for _ in range(num_rows):
-            row: list[Any] = []
+        for loc_idx in range(num_locations):
+            for period_idx in range(num_periods):
+                row: list[Any] = []
 
-            # Dimension values (categorical)
-            for i in range(num_dimensions):
-                row.append(f"cat_{i}_{random.randint(0, 4)}")
+                # Location (matches geojson.properties.id)
+                row.append(f"location_{loc_idx}")
 
-            # Feature values (floats)
-            for _ in range(num_features):
-                row.append(random.uniform(0, 100))
+                # Time period (YYYY-mm format)
+                year = 2020 + (period_idx // 12)
+                month = (period_idx % 12) + 1
+                row.append(f"{year}-{month:02d}")
 
-            # Required covariate values (floats)
-            for _ in required_covariates:
-                row.append(random.uniform(0, 100))
+                # Disease cases (health outcome, always positive)
+                row.append(random.uniform(1, 100))
 
-            # Extra covariate values (floats)
-            for _ in range(extra_covariates):
-                row.append(random.uniform(0, 100))
+                # Feature values (climate data)
+                for _ in range(num_features):
+                    row.append(random.uniform(0, 100))
 
-            data.append(row)
+                # Required covariate values
+                for _ in required_covariates:
+                    row.append(random.uniform(0, 100))
+
+                # Extra covariate values
+                for _ in range(extra_covariates):
+                    row.append(random.uniform(0, 100))
+
+                data.append(row)
 
         return {"columns": columns, "data": data}
 
     def generate_prediction_data(
         self,
-        num_rows: int = 10,
-        num_dimensions: int = 2,
+        num_locations: int = 5,
+        num_periods: int = 12,
         num_features: int = 3,
         required_covariates: list[str] | None = None,
         extra_covariates: int = 0,
@@ -81,12 +85,8 @@ class TestDataGenerator:
         """Generate historic and future DataFrames for prediction."""
         required_covariates = required_covariates or []
 
-        # Build columns list (same as training but without target)
-        columns: list[str] = []
-
-        # Dimension columns
-        for i in range(num_dimensions):
-            columns.append(f"dim_{i}")
+        # Build columns list (same structure as training)
+        columns: list[str] = ["location", "time_period", "disease_cases"]
 
         # Feature columns
         for i in range(num_features):
@@ -104,10 +104,10 @@ class TestDataGenerator:
         # Empty historic (matching scaffolded template pattern)
         historic: dict[str, Any] = {"columns": columns, "data": []}
 
-        # Future data to predict
+        # Future data to predict (same panel structure)
         future = self.generate_training_data(
-            num_rows=num_rows,
-            num_dimensions=num_dimensions,
+            num_locations=num_locations,
+            num_periods=num_periods,
             num_features=num_features,
             required_covariates=required_covariates,
             extra_covariates=extra_covariates,
