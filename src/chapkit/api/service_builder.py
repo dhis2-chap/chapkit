@@ -312,7 +312,11 @@ class ServiceBuilder(BaseServiceBuilder):
             async with parent_lifespan(app):
                 # Use InMemoryChapkitScheduler if jobs are enabled
                 if self._job_options is not None:
-                    scheduler = InMemoryChapkitScheduler(max_concurrency=self._job_options.max_concurrency)
+                    # Default to max_concurrency=1 to avoid SQLite write lock issues
+                    max_concurrency = (
+                        self._job_options.max_concurrency if self._job_options.max_concurrency is not None else 1
+                    )
+                    scheduler = InMemoryChapkitScheduler(max_concurrency=max_concurrency)
                     set_scheduler(scheduler)
                     app.state.scheduler = scheduler
 
