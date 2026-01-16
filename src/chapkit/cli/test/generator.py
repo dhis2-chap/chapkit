@@ -167,8 +167,12 @@ class TestDataGenerator:
         else:
             return None
 
-    def generate_geo_data(self, num_features: int = 5) -> dict[str, Any]:
-        """Generate simple GeoJSON FeatureCollection with Polygon geometries."""
+    def generate_geo_data(
+        self,
+        num_features: int = 5,
+        geo_type: Literal["polygon", "point"] = "polygon",
+    ) -> dict[str, Any]:
+        """Generate simple GeoJSON FeatureCollection."""
         features: list[dict[str, Any]] = []
 
         for i in range(num_features):
@@ -176,22 +180,25 @@ class TestDataGenerator:
             center_lon = random.uniform(-170, 170)
             center_lat = random.uniform(-80, 80)
 
-            # Small polygon around center (roughly 1 degree square)
-            size = 0.5
-            coordinates = [
-                [
-                    [center_lon - size, center_lat - size],
-                    [center_lon + size, center_lat - size],
-                    [center_lon + size, center_lat + size],
-                    [center_lon - size, center_lat + size],
-                    [center_lon - size, center_lat - size],  # Close the ring
+            if geo_type == "point":
+                geometry: dict[str, Any] = {"type": "Point", "coordinates": [center_lon, center_lat]}
+            else:  # polygon (default)
+                size = 0.5
+                coordinates = [
+                    [
+                        [center_lon - size, center_lat - size],
+                        [center_lon + size, center_lat - size],
+                        [center_lon + size, center_lat + size],
+                        [center_lon - size, center_lat + size],
+                        [center_lon - size, center_lat - size],  # Close the ring
+                    ]
                 ]
-            ]
+                geometry = {"type": "Polygon", "coordinates": coordinates}
 
             features.append(
                 {
                     "type": "Feature",
-                    "geometry": {"type": "Polygon", "coordinates": coordinates},
+                    "geometry": geometry,
                     "properties": {"id": f"location_{i}"},
                 }
             )

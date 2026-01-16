@@ -75,6 +75,10 @@ def test_command(
         Literal["monthly", "weekly"],
         typer.Option("--period-type", help="Period format: 'monthly' (YYYY-mm) or 'weekly' (YYYY-Wxx)"),
     ] = "monthly",
+    geo_type: Annotated[
+        Literal["polygon", "point"],
+        typer.Option("--geo-type", help="Geometry type: 'polygon' (default) or 'point'"),
+    ] = "polygon",
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
     service_process: subprocess.Popen[bytes] | None = None
@@ -153,7 +157,7 @@ def test_command(
         extra_covariates = 2 if runner.allow_free_additional_continuous_covariates else 0
 
         # Generate geo if required
-        geo_data = generator.generate_geo_data() if runner.requires_geo else None
+        geo_data = generator.generate_geo_data(geo_type=geo_type) if runner.requires_geo else None
         if save_data_path and geo_data:
             save_test_data(save_data_path, "geo.json", geo_data)
 

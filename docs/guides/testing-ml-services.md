@@ -50,6 +50,7 @@ This is the easiest way to test your service - it handles starting and stopping 
 | `--parallel` | | `1` | Number of jobs to run in parallel (experimental) |
 | `--debug` | | `false` | Show full stack traces on errors |
 | `--period-type` | | `monthly` | Period format: `monthly` (YYYY-mm) or `weekly` (YYYY-Wxx) |
+| `--geo-type` | | `polygon` | Geometry type: `polygon` or `point` |
 
 ### Examples
 
@@ -83,7 +84,7 @@ The `--save-data` option creates:
 - `training_*.json` / `training_*.csv` - Training panel data
 - `prediction_*_historic.json` / `.csv` - Historic data for prediction
 - `prediction_*_future.json` / `.csv` - Future data for prediction
-- `geo.json` - GeoJSON with polygon geometries (if service requires geo)
+- `geo.json` - GeoJSON with polygon or point geometries (if service requires geo)
 
 Run jobs in parallel (experimental):
 
@@ -96,6 +97,13 @@ Use weekly periods instead of monthly:
 ```bash
 chapkit test --start-service --period-type weekly --save-data
 # Generates periods like 2020-W01, 2020-W02, etc.
+```
+
+Use point geometries instead of polygons:
+
+```bash
+chapkit test --start-service --geo-type point --save-data
+# Generates Point geometries instead of Polygon in geo.json
 ```
 
 ### Generated Data Structure
