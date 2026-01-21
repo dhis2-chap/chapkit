@@ -302,6 +302,13 @@ class ServiceBuilder(BaseServiceBuilder):
         ml_runner = self._ml_options.runner if self._ml_options else None
         config_schema = self._config_options.schema if self._config_options else None
 
+        # Extract prediction_periods bounds from MLServiceInfo if available
+        min_periods = 0
+        max_periods = 100
+        if isinstance(self.info, MLServiceInfo):
+            min_periods = self.info.min_prediction_periods
+            max_periods = self.info.max_prediction_periods
+
         async def _dependency() -> MLManager:
             if ml_runner is None:
                 raise RuntimeError("ML runner not configured")
@@ -315,7 +322,14 @@ class ServiceBuilder(BaseServiceBuilder):
                 raise RuntimeError("Scheduler must be ChapkitScheduler for ML operations")
             scheduler: ChapkitScheduler = scheduler_base
             database = get_database()
-            return MLManager(runner, scheduler, database, config_schema)
+            return MLManager(
+                runner,
+                scheduler,
+                database,
+                config_schema,
+                min_prediction_periods=min_periods,
+                max_prediction_periods=max_periods,
+            )
 
         return _dependency
 
