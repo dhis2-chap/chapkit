@@ -11,7 +11,7 @@ This example demonstrates:
 """
 
 from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
 
@@ -20,6 +20,7 @@ class DiseaseConfig(BaseConfig):
     """Configuration for disease prediction model."""
 
     # Config fields can be accessed by external scripts via config.yml
+    prediction_periods: int = 3
     min_samples: int = 3
     model_type: str = "linear_regression"
 
@@ -66,10 +67,13 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="ML service using external scripts for train/predict",
     description="Demonstrates language-agnostic ML workflows with file-based data interchange using Python scripts",
-    author="ML Engineering Team",
-    author_note="Language-agnostic approach allows integration with R, Julia, and other tools",
-    author_assessed_status=AssessedStatus.orange,
-    contact_email="mleng@example.com",
+    model_card=ModelCard(
+        author="ML Engineering Team",
+        author_note="Language-agnostic approach allows integration with R, Julia, and other tools",
+        author_assessed_status=AssessedStatus.orange,
+        contact_email="mleng@example.com",
+    ),
+    period_type=PeriodType.monthly,
 )
 
 # Create artifact hierarchy for ML artifacts

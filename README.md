@@ -80,6 +80,7 @@ from chapkit.api import ServiceBuilder, ServiceInfo
 class MyConfig(BaseConfig):
     model_name: str
     threshold: float
+    prediction_periods: int = 3
 
 app = (
     ServiceBuilder(info=ServiceInfo(display_name="ML Service"))
@@ -103,6 +104,7 @@ from chapkit import BaseConfig, ConfigManager
 class AppConfig(BaseConfig):
     api_url: str
     timeout: int = 30
+    prediction_periods: int = 3
 
 # Automatic validation and CRUD endpoints
 app.with_config(AppConfig)

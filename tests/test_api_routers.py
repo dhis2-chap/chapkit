@@ -17,6 +17,7 @@ from tests._stubs import ArtifactManagerStub, ConfigManagerStub, singleton_facto
 class ExampleConfig(BaseConfig):
     """Sample config payload for tests."""
 
+    prediction_periods: int = 3
     enabled: bool
 
 
@@ -87,7 +88,7 @@ def test_config_router_list_returns_records(config_app: tuple[TestClient, Config
     first = payload[0]
     assert first["id"] == str(record.id)
     assert first["name"] == "feature-toggle"
-    assert first["data"] == {"enabled": True}
+    assert first["data"]["enabled"] is True
     assert "created_at" in first
     assert "updated_at" in first
 
@@ -101,7 +102,7 @@ def test_config_router_find_by_id_returns_record(config_app: tuple[TestClient, C
     payload = response.json()
     assert payload["id"] == str(record.id)
     assert payload["name"] == "feature-toggle"
-    assert payload["data"] == {"enabled": True}
+    assert payload["data"]["enabled"] is True
 
 
 def test_config_router_find_by_id_returns_404(config_app: tuple[TestClient, ConfigOut[ExampleConfig]]) -> None:
@@ -347,4 +348,4 @@ def test_artifact_router_get_config_returns_config() -> None:
     config_data = response.json()
     assert config_data["id"] == str(config_id)
     assert config_data["name"] == "test-config"
-    assert config_data["data"] == {"enabled": True}
+    assert config_data["data"]["enabled"] is True

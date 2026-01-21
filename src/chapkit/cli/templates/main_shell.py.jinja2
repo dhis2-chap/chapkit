@@ -4,13 +4,16 @@ import os
 from pathlib import Path
 
 from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
 
 
 class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseConfig):
     """Configuration for {{ PROJECT_NAME }}."""
+
+    # Required: number of prediction periods
+    prediction_periods: int = 3
 
     # Add your model-specific parameters here
     # Config fields can be accessed by external scripts via config.yml
@@ -58,9 +61,12 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="{{ PROJECT_DESCRIPTION }}",
     description="Shell-based ML service using external scripts for train/predict. Scripts can be implemented in any language (Python, R, Julia, etc.)",
-    author="Your Name",
-    author_assessed_status=AssessedStatus.yellow,
-    contact_email="your.email@example.com",
+    model_card=ModelCard(
+        author="Your Name",
+        author_assessed_status=AssessedStatus.yellow,
+        contact_email="your.email@example.com",
+    ),
+    period_type=PeriodType.monthly,
 )
 
 # Create artifact hierarchy for ML artifacts

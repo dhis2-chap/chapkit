@@ -9,7 +9,7 @@ from geojson_pydantic import FeatureCollection
 
 from chapkit import BaseConfig
 from chapkit.data import DataFrame
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import FunctionalModelRunner
 
@@ -18,6 +18,9 @@ log = structlog.get_logger()
 
 class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseConfig):
     """Configuration for {{ PROJECT_NAME }}."""
+
+    # Required: number of prediction periods
+    prediction_periods: int = 3
 
     # Add your model-specific parameters here
     # For example:
@@ -100,9 +103,12 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="{{ PROJECT_DESCRIPTION }}",
     description="A simple ML service template. Customize with your own model implementation.",
-    author="Your Name",
-    author_assessed_status=AssessedStatus.yellow,
-    contact_email="your.email@example.com",
+    model_card=ModelCard(
+        author="Your Name",
+        author_assessed_status=AssessedStatus.yellow,
+        contact_email="your.email@example.com",
+    ),
+    period_type=PeriodType.monthly,
 )
 
 # Create artifact hierarchy for ML artifacts

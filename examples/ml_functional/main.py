@@ -15,7 +15,7 @@ from geojson_pydantic import FeatureCollection
 from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 
 from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner
@@ -26,8 +26,7 @@ log = structlog.get_logger()
 class DiseaseConfig(BaseConfig):
     """Configuration for disease prediction model."""
 
-    # Add any model-specific parameters here if needed
-    # For this simple example, we don't need any extra config
+    prediction_periods: int = 3
 
 
 async def on_train(
@@ -79,9 +78,12 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="ML service for disease prediction using weather data",
     description="Train and predict disease cases based on rainfall and temperature data using Linear Regression",
-    author="ML Team",
-    author_assessed_status=AssessedStatus.yellow,
-    contact_email="ml-team@example.com",
+    model_card=ModelCard(
+        author="ML Team",
+        author_assessed_status=AssessedStatus.yellow,
+        contact_email="ml-team@example.com",
+    ),
+    period_type=PeriodType.monthly,
 )
 
 # Create artifact hierarchy for ML artifacts

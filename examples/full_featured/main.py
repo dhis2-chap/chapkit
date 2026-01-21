@@ -47,6 +47,7 @@ from chapkit.artifact import (
 class MLPipelineConfig(BaseConfig):
     """Configuration schema for ML pipeline settings."""
 
+    prediction_periods: int = Field(default=3, gt=0, description="Number of periods to predict")
     model_type: str = Field(description="Type of ML model (e.g., 'random_forest', 'xgboost')")
     learning_rate: float = Field(default=0.001, gt=0, description="Learning rate for training")
     max_epochs: int = Field(default=100, gt=0, description="Maximum training epochs")

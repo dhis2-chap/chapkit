@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any, Callable, Coroutine, List, Self
 
 from fastapi import Depends, FastAPI
-from pydantic import EmailStr, HttpUrl
+from pydantic import BaseModel, EmailStr, HttpUrl
 from servicekit import SqliteDatabaseBuilder
 from servicekit.api.crud import CrudPermissions
 from servicekit.api.dependencies import get_database, get_scheduler, get_session, set_scheduler
@@ -47,18 +47,39 @@ class AssessedStatus(StrEnum):
     green = "green"  # Validated and ready for production use
 
 
-class MLServiceInfo(ServiceInfo):
-    """Extended service metadata for ML services with author, organization, and assessment info."""
+class PeriodType(StrEnum):
+    """Supported period types for ML services."""
+
+    weekly = "weekly"
+    monthly = "monthly"
+
+
+class ModelCard(BaseModel):
+    """Documentation and metadata about the model."""
 
     author: str | None = None
     author_note: str | None = None
     author_assessed_status: AssessedStatus | None = None
     contact_email: EmailStr | None = None
     organization: str | None = None
-    organization_logo_url: str | HttpUrl | None = None
+    organization_logo_url: HttpUrl | None = None
     citation_info: str | None = None
+    repository_url: HttpUrl | None = None
+    documentation_url: HttpUrl | None = None
+
+
+class MLServiceInfo(ServiceInfo):
+    """Extended service metadata for ML services."""
+
+    # Model documentation (required)
+    model_card: ModelCard
+
+    # Contract: capability constraints
+    period_type: PeriodType
+    min_prediction_periods: int = 0
+    max_prediction_periods: int = 100
     allow_free_additional_continuous_covariates: bool = False
-    required_covariates: List[str] = field(default_factory=list)
+    required_covariates: list[str] = []
     requires_geo: bool = False
 
 

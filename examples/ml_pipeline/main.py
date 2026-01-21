@@ -35,6 +35,7 @@ PREDICTION_ARTIFACT_IDS = [
 class MLConfig(BaseConfig):
     """Machine learning model configuration with training hyperparameters."""
 
+    prediction_periods: int = 3
     model_type: str
     learning_rate: float
     batch_size: int

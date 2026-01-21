@@ -46,6 +46,7 @@ class ExperimentSeed(TypedDict):
 class ExperimentConfig(BaseConfig):
     """Configuration schema for machine learning experiment parameters."""
 
+    prediction_periods: int = 3
     model: str
     learning_rate: float
     epochs: int

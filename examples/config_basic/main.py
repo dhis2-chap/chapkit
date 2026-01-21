@@ -14,6 +14,7 @@ from chapkit.api import ServiceBuilder, ServiceInfo
 class EnvironmentConfig(BaseConfig):
     """Environment configuration for API service settings."""
 
+    prediction_periods: int = 3
     debug: bool
     api_host: str
     api_port: int

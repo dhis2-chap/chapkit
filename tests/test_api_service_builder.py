@@ -17,6 +17,7 @@ from chapkit.api import ServiceBuilder, ServiceInfo
 class ExampleConfig(BaseConfig):
     """Example configuration schema for tests."""
 
+    prediction_periods: int = 3
     enabled: bool
     value: int
 

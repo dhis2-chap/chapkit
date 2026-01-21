@@ -8,6 +8,7 @@ from chapkit import BaseConfig
 class DemoConfig(BaseConfig):
     """Concrete config schema for testing."""
 
+    prediction_periods: int = 3
     x: int
     y: int
     z: int
