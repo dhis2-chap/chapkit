@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.14.1"
+version = "0.15.0"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
