@@ -63,6 +63,8 @@ dev = [
   "mkdocs-material>=9.7.1",
   "mkdocstrings[python]>=0.26.0",
   "types-pyyaml>=6.0.12.20250915",
+  "pandas>=3.0.0",
+  "numpy>=2.4.1",
 ]
 
 [build-system]
