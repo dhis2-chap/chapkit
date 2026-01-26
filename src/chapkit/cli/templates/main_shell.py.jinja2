@@ -103,6 +103,10 @@ app = (
     # Uncomment to automatically register this service with CHAP Core on startup.
     # Replace the URL with your CHAP Core instance.
     #
+    # For Docker deployments, you can set these environment variables instead:
+    #   SERVICEKIT_ORCHESTRATOR_URL - the registration endpoint URL
+    #   SERVICEKIT_REGISTRATION_KEY - the secret key (only if enabled on CHAP Core)
+    #
     # The service will:
     # - Auto-detect hostname (works with Docker container names)
     # - Retry registration on failure (default: 5 retries, 2s delay)
