@@ -413,6 +413,7 @@ MLServiceBuilder(
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | str | Service identifier (required) - lowercase letters, numbers, and hyphens only |
 | `display_name` | str | Service display name (required) |
 | `version` | str | Service version |
 | `summary` | str | Short description |
@@ -424,6 +425,8 @@ MLServiceBuilder(
 | `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |
 | `required_covariates` | list[str] | Required input covariate names |
 | `requires_geo` | bool | Whether the model requires GeoJSON spatial data for training/prediction |
+
+**Note:** The `id` field should be a URL-safe slug derived from your service name. Use lowercase letters, numbers, and hyphens only. Example: `display_name="Disease Prediction Service"` -> `id="disease-prediction-service"`.
 
 ### ModelMetadata Fields
 
