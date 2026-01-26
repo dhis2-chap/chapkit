@@ -15,6 +15,10 @@ class BaseConfig(BaseModel):
 
     model_config = {"extra": "allow"}
 
+    # Reserved parameters (CHAP-interpreted)
+    prediction_periods: int  # Required, no default
+    additional_continuous_covariates: list[str] = []
+
 
 class ConfigIn[DataT: BaseConfig](EntityIn):
     """Input schema for creating or updating configurations."""

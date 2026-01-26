@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any, Callable, Coroutine, List, Self
 
 from fastapi import Depends, FastAPI
-from pydantic import EmailStr, HttpUrl
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
 from servicekit import SqliteDatabaseBuilder
 from servicekit.api.crud import CrudPermissions
 from servicekit.api.dependencies import get_database, get_scheduler, get_session, set_scheduler
@@ -47,18 +47,39 @@ class AssessedStatus(StrEnum):
     green = "green"  # Validated and ready for production use
 
 
-class MLServiceInfo(ServiceInfo):
-    """Extended service metadata for ML services with author, organization, and assessment info."""
+class PeriodType(StrEnum):
+    """Supported period types for ML services."""
+
+    weekly = "weekly"
+    monthly = "monthly"
+
+
+class ModelMetadata(BaseModel):
+    """Documentation and metadata about the model."""
 
     author: str | None = None
     author_note: str | None = None
     author_assessed_status: AssessedStatus | None = None
     contact_email: EmailStr | None = None
     organization: str | None = None
-    organization_logo_url: str | HttpUrl | None = None
+    organization_logo_url: HttpUrl | None = None
     citation_info: str | None = None
+    repository_url: HttpUrl | None = None
+    documentation_url: HttpUrl | None = None
+
+
+class MLServiceInfo(ServiceInfo):
+    """Extended service metadata for ML services."""
+
+    # Model metadata (required)
+    model_metadata: ModelMetadata
+
+    # Contract: capability constraints
+    period_type: PeriodType
+    min_prediction_periods: int = 0
+    max_prediction_periods: int = 100
     allow_free_additional_continuous_covariates: bool = False
-    required_covariates: List[str] = field(default_factory=list)
+    required_covariates: list[str] = Field(default_factory=list)
     requires_geo: bool = False
 
 
@@ -281,6 +302,13 @@ class ServiceBuilder(BaseServiceBuilder):
         ml_runner = self._ml_options.runner if self._ml_options else None
         config_schema = self._config_options.schema if self._config_options else None
 
+        # Extract prediction_periods bounds from MLServiceInfo if available
+        min_periods = 0
+        max_periods = 100
+        if isinstance(self.info, MLServiceInfo):
+            min_periods = self.info.min_prediction_periods
+            max_periods = self.info.max_prediction_periods
+
         async def _dependency() -> MLManager:
             if ml_runner is None:
                 raise RuntimeError("ML runner not configured")
@@ -294,7 +322,14 @@ class ServiceBuilder(BaseServiceBuilder):
                 raise RuntimeError("Scheduler must be ChapkitScheduler for ML operations")
             scheduler: ChapkitScheduler = scheduler_base
             database = get_database()
-            return MLManager(runner, scheduler, database, config_schema)
+            return MLManager(
+                runner,
+                scheduler,
+                database,
+                config_schema,
+                min_prediction_periods=min_periods,
+                max_prediction_periods=max_periods,
+            )
 
         return _dependency
 

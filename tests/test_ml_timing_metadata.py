@@ -25,6 +25,7 @@ else:
 class SimpleConfig(BaseConfig):
     """Simple test config."""
 
+    prediction_periods: int = 3
     value: int = 42
 
 

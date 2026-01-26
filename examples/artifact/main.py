@@ -143,6 +143,7 @@ PIPELINES: tuple[PipelineSeed, ...] = (
 class PipelineMetadata(BaseConfig):
     """Configuration schema for pipeline metadata including owner and notification settings."""
 
+    prediction_periods: int = 3
     owner: str
     stage: str
     notification_channel: str

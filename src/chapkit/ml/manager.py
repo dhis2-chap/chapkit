@@ -35,12 +35,28 @@ class MLManager(Generic[ConfigT]):
         scheduler: ChapkitScheduler,
         database: Database,
         config_schema: type[ConfigT],
+        min_prediction_periods: int = 0,
+        max_prediction_periods: int = 100,
     ) -> None:
         """Initialize ML manager with runner, scheduler, database, and config schema."""
         self.runner = runner
         self.scheduler = scheduler
         self.database = database
         self.config_schema = config_schema
+        self.min_prediction_periods = min_prediction_periods
+        self.max_prediction_periods = max_prediction_periods
+
+    def _validate_prediction_periods(self, config_data: BaseConfig) -> None:
+        """Validate that config prediction_periods is within allowed bounds."""
+        periods = config_data.prediction_periods
+        if periods < self.min_prediction_periods:
+            raise ValueError(
+                f"prediction_periods ({periods}) is below the minimum allowed value ({self.min_prediction_periods})"
+            )
+        if periods > self.max_prediction_periods:
+            raise ValueError(
+                f"prediction_periods ({periods}) exceeds the maximum allowed value ({self.max_prediction_periods})"
+            )
 
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""
@@ -88,6 +104,8 @@ class MLManager(Generic[ConfigT]):
 
             if config is None:
                 raise ValueError(f"Config {request.config_id} not found")
+
+            self._validate_prediction_periods(config.data)
 
         # Train model with timing
         training_started_at = datetime.datetime.now(datetime.UTC)
@@ -229,6 +247,8 @@ class MLManager(Generic[ConfigT]):
 
                 if config is None:
                     raise ValueError(f"Config {config_id} not found")
+
+                self._validate_prediction_periods(config.data)
 
             # Make predictions with timing
             prediction_started_at = datetime.datetime.now(datetime.UTC)

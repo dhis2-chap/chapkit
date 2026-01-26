@@ -13,6 +13,7 @@ class AppConfig(BaseConfig):
     debug: bool
     api_host: str
     api_port: int
+    prediction_periods: int = 3
 
 app = (
     ServiceBuilder(info=ServiceInfo(display_name="My Service"))
@@ -50,6 +51,7 @@ class MLConfig(BaseConfig):
     learning_rate: float = 0.001
     epochs: int = 100
     features: list[str]
+    prediction_periods: int = 3
 ```
 
 **Benefits:**
@@ -89,6 +91,7 @@ class DatabaseConfig(BaseConfig):
     password: str
     database: str
     ssl_enabled: bool = True
+    prediction_periods: int = 3
 ```
 
 **Features:**
@@ -305,6 +308,7 @@ class EnvironmentConfig(BaseConfig):
     database_url: str
     log_level: str = "INFO"
     max_connections: int = 100
+    prediction_periods: int = 3
 
 # Create configs for different environments
 prod_config = ConfigIn(
@@ -343,6 +347,7 @@ class MLModelConfig(BaseConfig):
     epochs: int
     features: list[str]
     hyperparameters: dict[str, float]
+    prediction_periods: int = 3
 
 config = ConfigIn(
     name="weather_model_v2",
@@ -382,6 +387,7 @@ class AppConfig(BaseConfig):
     database: DatabaseSettings
     cache: CacheSettings
     debug: bool = False
+    prediction_periods: int = 3
 
 config = ConfigIn(
     name="app_config",
@@ -471,6 +477,7 @@ class WeatherModelConfig(BaseConfig):
     training_features: list[str]
     prediction_horizon_days: int
     update_frequency: str
+    prediction_periods: int = 3
 ```
 
 ### 2. Build Service
@@ -564,6 +571,7 @@ class TestConfig(BaseConfig):
     """Test configuration schema."""
     setting: str
     value: int
+    prediction_periods: int = 3
 
 @pytest.mark.asyncio
 async def test_config_crud(session):
@@ -671,6 +679,7 @@ configs = [
 class VersionedConfig(BaseConfig):
     version: str
     settings: dict[str, object]
+    prediction_periods: int = 3
 
 config = ConfigIn(
     name="production_model",
@@ -749,6 +758,7 @@ class ValidatedConfig(BaseConfig):
     port: int
     workers: int
     timeout_seconds: int
+    prediction_periods: int = 3
 
     @field_validator("port")
     @classmethod

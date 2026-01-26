@@ -15,6 +15,7 @@ from chapkit.ml import ShellModelRunner
 class MockConfig(BaseConfig):
     """Mock config for testing."""
 
+    prediction_periods: int = 3
     threshold: float = 0.5
     features: list[str] = ["feature1", "feature2"]
 

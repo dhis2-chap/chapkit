@@ -33,6 +33,7 @@ class User(Entity):
 class ApiConfig(BaseConfig):
     """Service configuration using chapkit's BaseConfig."""
 
+    prediction_periods: int = 3
     max_users: int
     registration_enabled: bool
     default_theme: str

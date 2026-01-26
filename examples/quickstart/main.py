@@ -15,6 +15,7 @@ EMAIL_SERVICE_CONFIG_ID = ULID.from_str("01K72P5N5KCRM6MD3BRE4P07N4")
 class EmailServiceConfig(BaseConfig):
     """Email service configuration with sender details and retry settings."""
 
+    prediction_periods: int = 3
     sender_name: str
     sender_address: str
     max_retries: int = 3

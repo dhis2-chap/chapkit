@@ -54,7 +54,10 @@ def test_config_data_setter_accepts_dict() -> None:
     """Config.data setter should accept dict values."""
     config = Config(name="dict_data", data={})
     config.data = DemoConfig(x=1, y=2, z=3, tags=["test"])
-    assert config.data == {"x": 1, "y": 2, "z": 3, "tags": ["test"]}
+    assert config.data["x"] == 1
+    assert config.data["y"] == 2
+    assert config.data["z"] == 3
+    assert config.data["tags"] == ["test"]
 
 
 def test_config_out_retains_dict_without_context() -> None:

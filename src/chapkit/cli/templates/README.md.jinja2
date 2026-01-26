@@ -93,6 +93,8 @@ Edit the configuration class in `main.py`:
 
 ```python
 class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseConfig):
+    # Required: number of prediction periods
+    prediction_periods: int = 3
     # Add your parameters here
     min_samples: int = 5
     learning_rate: float = 0.01

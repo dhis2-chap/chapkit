@@ -31,7 +31,10 @@ async def test_config_repository_find_by_name_round_trip() -> None:
         assert found is not None
         assert found.id == created.id
         assert found.name == "feature"
-        assert found.data == {"x": 1, "y": 2, "z": 3, "tags": ["feature"]}
+        assert found.data["x"] == 1
+        assert found.data["y"] == 2
+        assert found.data["z"] == 3
+        assert found.data["tags"] == ["feature"]
 
     await db.dispose()
 

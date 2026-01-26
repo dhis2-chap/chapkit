@@ -13,6 +13,7 @@ from chapkit.ml import BaseModelRunner
 class MockConfig(BaseConfig):
     """Mock config for testing."""
 
+    prediction_periods: int = 3
     threshold: float = 0.5
 
 

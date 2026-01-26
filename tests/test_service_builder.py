@@ -18,6 +18,7 @@ from chapkit.ml import BaseModelRunner
 class DummyConfig(BaseConfig):
     """Dummy config for testing."""
 
+    prediction_periods: int = 3
     test_value: str = Field(default="test")
 
 

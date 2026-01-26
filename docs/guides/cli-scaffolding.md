@@ -421,7 +421,7 @@ The generated `main.py` varies by template:
 ```python
 class MyServiceConfig(BaseConfig):
     # Add your model parameters here
-    pass
+    prediction_periods: int = 3
 
 async def on_train(config, data, geo=None):
     # Training logic
@@ -502,6 +502,7 @@ class MyServiceConfig(BaseConfig):
     min_samples: int = 5
     learning_rate: float = 0.001
     features: list[str] = ["feature_1", "feature_2"]
+    prediction_periods: int = 3
 ```
 
 ### Add Dependencies
@@ -517,14 +518,19 @@ uv add scikit-learn pandas numpy
 Update the `MLServiceInfo`:
 
 ```python
+from chapkit.api import ModelMetadata, PeriodType
+
 info = MLServiceInfo(
     display_name="Production Model",
     version="2.0.0",
     summary="Production-ready ML service",
     description="Detailed description here",
-    author="Your Team",
-    author_assessed_status=AssessedStatus.green,
-    contact_email="team@example.com",
+    model_metadata=ModelMetadata(
+        author="Your Team",
+        author_assessed_status=AssessedStatus.green,
+        contact_email="team@example.com",
+    ),
+    period_type=PeriodType.monthly,
 )
 ```
 

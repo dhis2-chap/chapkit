@@ -1146,16 +1146,17 @@ class TestDataFramePandasIntegration:
         pd.testing.assert_frame_equal(original_pdf, restored_pdf)
 
     def test_pandas_with_none(self) -> None:
-        """Pandas conversion handles None values."""
+        """Pandas conversion handles None/NaN values."""
         pd = pytest.importorskip("pandas")
         import numpy as np
 
         pdf = pd.DataFrame({"a": [1, np.nan, 3], "b": ["x", None, "z"]})
         df = DataFrame.from_pandas(pdf)
 
-        # np.nan stays as np.nan in the data (not automatically converted to None)
+        # np.nan stays as np.nan in the data
         assert isinstance(df.data[1][0], float) and np.isnan(df.data[1][0])
-        assert df.data[1][1] is None  # None -> None
+        # None in string columns becomes nan with pandas 3.0's default str dtype
+        assert pd.isna(df.data[1][1])
 
 
 class TestDataFramePolarsIntegration:

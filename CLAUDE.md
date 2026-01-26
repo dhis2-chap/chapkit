@@ -94,6 +94,7 @@ class AuthManager:
 - Code coverage should not decrease
 - Descriptive PR title and body
 - **ABSOLUTELY NO EMOJIS in PR titles or descriptions** (when using `gh pr create`, `gh pr edit`, or any other gh command)
+- **NO AI ATTRIBUTION** in PR descriptions (no "Generated with Claude Code" or similar)
 
 ## Project Overview
 
@@ -143,6 +144,7 @@ from chapkit.api import ServiceBuilder, ServiceInfo
 class MyConfig(BaseConfig):
     host: str
     port: int
+    prediction_periods: int = 3
 
 app = (
     ServiceBuilder(info=ServiceInfo(display_name="My Service"))

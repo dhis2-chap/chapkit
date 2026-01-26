@@ -16,7 +16,7 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 class ModelConfig(BaseConfig):
-    pass
+    prediction_periods: int = 3
 
 async def on_train(config: ModelConfig, data: pd.DataFrame, geo=None):
     X = data[["feature1", "feature2"]]
@@ -152,7 +152,7 @@ from chapkit import BaseConfig
 
 class MyConfig(BaseConfig):
     """Your config schema."""
-    pass
+    prediction_periods: int = 3
 
 class MyRunner(BaseModelRunner[MyConfig]):
     async def on_init(self):
@@ -332,16 +332,19 @@ Bundles health, config, artifacts, jobs, and ML in one builder.
 ```python
 from chapkit.artifact import ArtifactHierarchy
 
-from chapkit.api import MLServiceBuilder, MLServiceInfo, AssessedStatus
+from chapkit.api import MLServiceBuilder, MLServiceInfo, AssessedStatus, ModelMetadata, PeriodType
 
 info = MLServiceInfo(
     display_name="Disease Prediction Service",
     version="1.0.0",
     summary="ML service for disease prediction",
     description="Train and predict disease cases using weather data",
-    author="ML Team",
-    author_assessed_status=AssessedStatus.green,
-    contact_email="ml-team@example.com",
+    model_metadata=ModelMetadata(
+        author="ML Team",
+        author_assessed_status=AssessedStatus.green,
+        contact_email="ml-team@example.com",
+    ),
+    period_type=PeriodType.monthly,
     requires_geo=True,  # Model requires GeoJSON spatial data
 )
 
@@ -413,16 +416,27 @@ MLServiceBuilder(
 | `version` | str | Service version |
 | `summary` | str | Short description |
 | `description` | str | Detailed description |
+| `model_metadata` | ModelMetadata | Model documentation (required) |
+| `period_type` | PeriodType | Period type: weekly or monthly (required) |
+| `min_prediction_periods` | int | Minimum prediction periods (default: 0) |
+| `max_prediction_periods` | int | Maximum prediction periods (default: 100) |
+| `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |
+| `required_covariates` | list[str] | Required input covariate names |
+| `requires_geo` | bool | Whether the model requires GeoJSON spatial data for training/prediction |
+
+### ModelMetadata Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `author` | str | Model author or team |
 | `author_note` | str | Additional author notes |
-| `author_assessed_status` | AssessedStatus | Model maturity (red/orange/yellow/green) |
-| `contact_email` | str | Contact email address |
+| `author_assessed_status` | AssessedStatus | Model maturity (red/orange/yellow/green/white) |
+| `contact_email` | EmailStr | Contact email address |
 | `organization` | str | Organization name |
-| `organization_logo_url` | str | URL to organization logo |
+| `organization_logo_url` | HttpUrl | URL to organization logo |
 | `citation_info` | str | How to cite this model |
-| `required_covariates` | list[str] | Required input covariate names |
-| `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |
-| `requires_geo` | bool | Whether the model requires GeoJSON spatial data for training/prediction |
+| `repository_url` | HttpUrl | URL to source code repository |
+| `documentation_url` | HttpUrl | URL to documentation |
 
 ---
 

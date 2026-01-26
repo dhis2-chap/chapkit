@@ -14,6 +14,8 @@ __all__ = ["User", "Order"]
 class AppConfig(BaseConfig):
     """Application configuration."""
 
+    prediction_periods: int = 3
+
 
 class UserRepository(BaseRepository[User]):
     """Repository for User operations."""

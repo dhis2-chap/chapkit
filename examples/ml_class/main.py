@@ -16,7 +16,7 @@ from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
 from chapkit.ml import BaseModelRunner
@@ -27,6 +27,7 @@ log = structlog.get_logger()
 class WeatherConfig(BaseConfig):
     """Configuration for weather-based prediction model."""
 
+    prediction_periods: int = 3
     min_samples: int = 5
     normalize_features: bool = True
 
@@ -190,10 +191,13 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="Class-based ML service with preprocessing",
     description="Train and predict disease cases using normalized weather features with StandardScaler",
-    author="Data Science Team",
-    author_note="Improved feature normalization for better prediction accuracy",
-    author_assessed_status=AssessedStatus.green,
-    contact_email="datascience@example.com",
+    model_metadata=ModelMetadata(
+        author="Data Science Team",
+        author_note="Improved feature normalization for better prediction accuracy",
+        author_assessed_status=AssessedStatus.green,
+        contact_email="datascience@example.com",
+    ),
+    period_type=PeriodType.monthly,
 )
 
 # Create artifact hierarchy for ML artifacts

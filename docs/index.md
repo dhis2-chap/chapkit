@@ -22,6 +22,8 @@ from chapkit.ml import FunctionalModelRunner
 class MyMLConfig(BaseConfig):
     """Configuration for your ML model."""
 
+    prediction_periods: int = 3
+
 
 async def train_model(
     config: MyMLConfig,

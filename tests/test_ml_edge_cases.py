@@ -28,6 +28,7 @@ from chapkit.ml.runner import (
 class MockConfig(BaseConfig):
     """Mock config for testing."""
 
+    prediction_periods: int = 3
     threshold: float = 0.5
 
 
