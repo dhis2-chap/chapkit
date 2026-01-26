@@ -9,7 +9,7 @@ from geojson_pydantic import FeatureCollection
 
 from chapkit import BaseConfig
 from chapkit.data import DataFrame
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import FunctionalModelRunner
 
@@ -103,7 +103,7 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="{{ PROJECT_DESCRIPTION }}",
     description="A simple ML service template. Customize with your own model implementation.",
-    model_card=ModelCard(
+    model_metadata=ModelMetadata(
         author="Your Name",
         author_assessed_status=AssessedStatus.yellow,
         contact_email="your.email@example.com",

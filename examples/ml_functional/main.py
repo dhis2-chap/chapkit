@@ -15,7 +15,7 @@ from geojson_pydantic import FeatureCollection
 from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped]
 
 from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner
@@ -78,7 +78,7 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="ML service for disease prediction using weather data",
     description="Train and predict disease cases based on rainfall and temperature data using Linear Regression",
-    model_card=ModelCard(
+    model_metadata=ModelMetadata(
         author="ML Team",
         author_assessed_status=AssessedStatus.yellow,
         contact_email="ml-team@example.com",

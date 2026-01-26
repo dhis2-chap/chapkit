@@ -11,7 +11,7 @@ This example demonstrates:
 """
 
 from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
 
@@ -67,7 +67,7 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="ML service using external scripts for train/predict",
     description="Demonstrates language-agnostic ML workflows with file-based data interchange using Python scripts",
-    model_card=ModelCard(
+    model_metadata=ModelMetadata(
         author="ML Engineering Team",
         author_note="Language-agnostic approach allows integration with R, Julia, and other tools",
         author_assessed_status=AssessedStatus.orange,

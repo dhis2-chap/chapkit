@@ -16,7 +16,7 @@ from sklearn.linear_model import LinearRegression  # type: ignore[import-untyped
 from sklearn.preprocessing import StandardScaler  # type: ignore[import-untyped]
 
 from chapkit import BaseConfig
-from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelCard, PeriodType
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
 from chapkit.ml import BaseModelRunner
@@ -191,7 +191,7 @@ info = MLServiceInfo(
     version="1.0.0",
     summary="Class-based ML service with preprocessing",
     description="Train and predict disease cases using normalized weather features with StandardScaler",
-    model_card=ModelCard(
+    model_metadata=ModelMetadata(
         author="Data Science Team",
         author_note="Improved feature normalization for better prediction accuracy",
         author_assessed_status=AssessedStatus.green,

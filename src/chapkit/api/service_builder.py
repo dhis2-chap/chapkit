@@ -54,7 +54,7 @@ class PeriodType(StrEnum):
     monthly = "monthly"
 
 
-class ModelCard(BaseModel):
+class ModelMetadata(BaseModel):
     """Documentation and metadata about the model."""
 
     author: str | None = None
@@ -71,8 +71,8 @@ class ModelCard(BaseModel):
 class MLServiceInfo(ServiceInfo):
     """Extended service metadata for ML services."""
 
-    # Model documentation (required)
-    model_card: ModelCard
+    # Model metadata (required)
+    model_metadata: ModelMetadata
 
     # Contract: capability constraints
     period_type: PeriodType
