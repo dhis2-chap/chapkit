@@ -101,9 +101,11 @@ app = (
     # CHAP Core Registration (Optional)
     # ====================================================================================
     # Uncomment to automatically register this service with CHAP Core on startup.
-    # Set SERVICEKIT_ORCHESTRATOR_URL environment variable to your CHAP Core instance.
+    # Replace the URL with your CHAP Core instance.
     #
-    # Example: export SERVICEKIT_ORCHESTRATOR_URL=https://chap.example.org/v2/services/$register
+    # For Docker deployments, you can set these environment variables instead:
+    #   SERVICEKIT_ORCHESTRATOR_URL - the registration endpoint URL
+    #   SERVICEKIT_REGISTRATION_KEY - the secret key (only if enabled on CHAP Core)
     #
     # The service will:
     # - Auto-detect hostname (works with Docker container names)
@@ -111,7 +113,7 @@ app = (
     # - Send keepalive pings to stay registered (default: 10s interval, 30s TTL)
     # - Gracefully deregister on shutdown
     #
-    # .with_registration()
+    # .with_registration(orchestrator_url="https://chap.example.org/v2/services/$register")
     .build()
 )
 
