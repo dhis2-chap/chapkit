@@ -22,7 +22,7 @@ async def get_artifact_manager(session: AsyncSession = Depends(get_session)) -> 
 
 # Build service
 app = (
-    BaseServiceBuilder(info=ServiceInfo(display_name="My Service"))
+    BaseServiceBuilder(info=ServiceInfo(id="my-service", display_name="My Service"))
     .with_health()
     .with_database("sqlite+aiosqlite:///./data.db")
     .build()

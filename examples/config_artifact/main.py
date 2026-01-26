@@ -191,6 +191,7 @@ async def check_flaky_service() -> tuple[HealthState, str | None]:
 
 
 info = MLServiceInfo(
+    id="chapkit-config-artifact-service",
     display_name="Chapkit Config & Artifact Service",
     version="1.0.0",
     summary="Linked config and artifact CRUD example",

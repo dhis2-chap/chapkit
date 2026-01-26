@@ -521,6 +521,7 @@ Update the `MLServiceInfo`:
 from chapkit.api import ModelMetadata, PeriodType
 
 info = MLServiceInfo(
+    id="production-model",
     display_name="Production Model",
     version="2.0.0",
     summary="Production-ready ML service",

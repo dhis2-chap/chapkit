@@ -99,6 +99,7 @@ async def on_predict(
 
 # Create ML service info with metadata
 info = MLServiceInfo(
+    id="{{ PROJECT_SERVICE_ID }}",
     display_name="{{ PROJECT_NAME }}",
     version="1.0.0",
     summary="{{ PROJECT_DESCRIPTION }}",

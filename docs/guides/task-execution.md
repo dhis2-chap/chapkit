@@ -29,7 +29,7 @@ async def process_data(database: Database) -> dict[str, object]:
     return {"status": "processed", "database_url": str(database.url)}
 
 # Build service
-info = ServiceInfo(display_name="Task Service")
+info = ServiceInfo(id="task-service", display_name="Task Service")
 
 def get_task_executor(database: Database = Depends(get_database)) -> TaskExecutor:
     """Provide task executor for dependency injection."""
@@ -756,7 +756,7 @@ task_router = TaskRouter.create(
 
 # Build service with jobs and artifacts
 app: FastAPI = (
-    ServiceBuilder(info=ServiceInfo(display_name="Advanced Task Service"))
+    ServiceBuilder(info=ServiceInfo(id="advanced-task-service", display_name="Advanced Task Service"))
     .with_landing_page()
     .with_logging()
     .with_health()
@@ -1034,7 +1034,7 @@ When using advanced setup with `.with_jobs()`, you can limit concurrent backgrou
 
 ```python
 app = (
-    ServiceBuilder(info=ServiceInfo(display_name="Task Service"))
+    ServiceBuilder(info=ServiceInfo(id="task-service", display_name="Task Service"))
     .with_jobs(max_concurrency=5)  # Max 5 concurrent background jobs
     .with_artifacts(hierarchy=TASK_HIERARCHY)
     .build()

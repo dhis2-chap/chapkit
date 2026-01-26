@@ -63,6 +63,7 @@ runner: ShellModelRunner[DiseaseConfig] = ShellModelRunner(
 
 # Create ML service info with metadata
 info = MLServiceInfo(
+    id="shell-based-disease-prediction-service",
     display_name="Shell-Based Disease Prediction Service",
     version="1.0.0",
     summary="ML service using external scripts for train/predict",

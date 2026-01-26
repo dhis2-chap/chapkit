@@ -55,7 +55,7 @@ async def predict(
 
 app = (
     MLServiceBuilder(
-        info=MLServiceInfo(display_name="Disease Prediction Service"),
+        info=MLServiceInfo(id="disease-prediction-service", display_name="Disease Prediction Service"),
         config_schema=MyMLConfig,
         hierarchy=ArtifactHierarchy(
             name="ml",

@@ -48,7 +48,7 @@ class DummyRunner(BaseModelRunner[DummyConfig]):
 
 def test_ml_without_config_raises_error() -> None:
     """Test that ML without config raises ValueError."""
-    builder = ServiceBuilder(info=ServiceInfo(display_name="Test"))
+    builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     hierarchy = ArtifactHierarchy(name="test")
     runner = DummyRunner()
 
@@ -58,7 +58,7 @@ def test_ml_without_config_raises_error() -> None:
 
 def test_ml_without_artifacts_raises_error() -> None:
     """Test that ML without artifacts raises ValueError."""
-    builder = ServiceBuilder(info=ServiceInfo(display_name="Test"))
+    builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     runner = DummyRunner()
 
     with pytest.raises(ValueError, match="ML operations require artifacts"):
@@ -67,7 +67,7 @@ def test_ml_without_artifacts_raises_error() -> None:
 
 def test_ml_without_jobs_raises_error() -> None:
     """Test that ML without job scheduler raises ValueError."""
-    builder = ServiceBuilder(info=ServiceInfo(display_name="Test"))
+    builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     hierarchy = ArtifactHierarchy(name="test")
     runner = DummyRunner()
 
@@ -77,7 +77,7 @@ def test_ml_without_jobs_raises_error() -> None:
 
 def test_artifacts_config_linking_without_config_raises_error() -> None:
     """Test that artifact config-linking without config raises ValueError."""
-    builder = ServiceBuilder(info=ServiceInfo(display_name="Test"))
+    builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     hierarchy = ArtifactHierarchy(name="test")
 
     with pytest.raises(ValueError, match="Artifact config-linking requires a config schema"):
@@ -86,7 +86,7 @@ def test_artifacts_config_linking_without_config_raises_error() -> None:
 
 def test_valid_ml_service_builds_successfully() -> None:
     """Test that a properly configured ML service builds without errors."""
-    builder = ServiceBuilder(info=ServiceInfo(display_name="Test"))
+    builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     hierarchy = ArtifactHierarchy(name="test")
     runner = DummyRunner()
 
@@ -103,7 +103,7 @@ async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
     from servicekit import InMemoryScheduler
     from servicekit.api.dependencies import set_scheduler
 
-    builder = ServiceBuilder(info=ServiceInfo(display_name="Test"))
+    builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     hierarchy = ArtifactHierarchy(name="test")
     runner = DummyRunner()
 
@@ -142,7 +142,7 @@ def test_ml_service_builder_with_file_database() -> None:
 
         # MLServiceBuilder should auto-configure database with migrations
         app = MLServiceBuilder(
-            info=ServiceInfo(display_name="Test"),
+            info=ServiceInfo(id="test", display_name="Test"),
             config_schema=DummyConfig,
             hierarchy=hierarchy,
             runner=runner,
@@ -159,7 +159,7 @@ def test_ml_service_builder_with_memory_database() -> None:
 
     # MLServiceBuilder should use in-memory database without migrations
     app = MLServiceBuilder(
-        info=ServiceInfo(display_name="Test"),
+        info=ServiceInfo(id="test", display_name="Test"),
         config_schema=DummyConfig,
         hierarchy=hierarchy,
         runner=runner,
