@@ -160,7 +160,10 @@ app = (
     # - Send keepalive pings to stay registered (default: 10s interval, 30s TTL)
     # - Gracefully deregister on shutdown
     #
-    # .with_registration(orchestrator_url="https://chap.example.org/v2/services/$register")
+    # .with_registration(
+    #     orchestrator_url="https://chap.example.org/v2/services/$register",
+    #     registration_key="your-secret-key",  # or use SERVICEKIT_REGISTRATION_KEY env var
+    # )
     .build()
 )
 
