@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any, Callable, Coroutine, List, Self
 
 from fastapi import Depends, FastAPI
-from pydantic import BaseModel, EmailStr, HttpUrl
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
 from servicekit import SqliteDatabaseBuilder
 from servicekit.api.crud import CrudPermissions
 from servicekit.api.dependencies import get_database, get_scheduler, get_session, set_scheduler
@@ -79,7 +79,7 @@ class MLServiceInfo(ServiceInfo):
     min_prediction_periods: int = 0
     max_prediction_periods: int = 100
     allow_free_additional_continuous_covariates: bool = False
-    required_covariates: list[str] = []
+    required_covariates: list[str] = Field(default_factory=list)
     requires_geo: bool = False
 
 
