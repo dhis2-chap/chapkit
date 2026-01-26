@@ -34,7 +34,7 @@ runner = FunctionalModelRunner(on_train=on_train, on_predict=on_predict)
 
 app = (
     MLServiceBuilder(
-        info=MLServiceInfo(display_name="My ML Service"),
+        info=MLServiceInfo(id="my-ml-service", display_name="My ML Service"),
         config_schema=ModelConfig,
         hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training_workspace", 1: "ml_prediction"}),
         runner=runner,
@@ -335,6 +335,7 @@ from chapkit.artifact import ArtifactHierarchy
 from chapkit.api import MLServiceBuilder, MLServiceInfo, AssessedStatus, ModelMetadata, PeriodType
 
 info = MLServiceInfo(
+    id="disease-prediction-service",
     display_name="Disease Prediction Service",
     version="1.0.0",
     summary="ML service for disease prediction",
@@ -380,7 +381,7 @@ For fine-grained control:
 from chapkit.api import ServiceBuilder, ServiceInfo
 
 app = (
-    ServiceBuilder(info=ServiceInfo(display_name="Custom ML Service"))
+    ServiceBuilder(info=ServiceInfo(id="custom-ml-service", display_name="Custom ML Service"))
     .with_health()
     .with_config(ModelConfig)
     .with_artifacts(hierarchy=hierarchy)
@@ -412,6 +413,7 @@ MLServiceBuilder(
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | str | Service identifier (required) - lowercase letters, numbers, and hyphens only |
 | `display_name` | str | Service display name (required) |
 | `version` | str | Service version |
 | `summary` | str | Short description |
@@ -423,6 +425,8 @@ MLServiceBuilder(
 | `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |
 | `required_covariates` | list[str] | Required input covariate names |
 | `requires_geo` | bool | Whether the model requires GeoJSON spatial data for training/prediction |
+
+**Note:** The `id` field should be a URL-safe slug derived from your service name. Use lowercase letters, numbers, and hyphens only. Example: `display_name="Disease Prediction Service"` -> `id="disease-prediction-service"`.
 
 ### ModelMetadata Fields
 

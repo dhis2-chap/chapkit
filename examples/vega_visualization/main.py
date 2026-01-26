@@ -310,6 +310,7 @@ vega_router = VegaRouter.create(
 app = (
     BaseServiceBuilder(
         info=ServiceInfo(
+            id="vega-visualization-service",
             display_name="Vega Visualization Service",
             version="1.0.0",
             summary="Transform DataFrame to Vega-Lite specifications",

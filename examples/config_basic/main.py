@@ -81,6 +81,7 @@ async def seed_configs(app: FastAPI) -> None:
 
 
 info = ConfigServiceInfo(
+    id="chapkit-config-service",
     display_name="Chapkit Config Service",
     summary="Environment configuration CRUD example",
     author="Morten Hansen",

@@ -187,6 +187,7 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
 
 # Create ML service info with metadata
 info = MLServiceInfo(
+    id="weather-based-prediction-service",
     display_name="Weather-Based Prediction Service",
     version="1.0.0",
     summary="Class-based ML service with preprocessing",

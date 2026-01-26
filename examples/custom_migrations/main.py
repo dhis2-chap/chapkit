@@ -27,7 +27,7 @@ class OrderRepository(BaseRepository[Order]):
 
 # Build service
 app = (
-    ServiceBuilder(info=ServiceInfo(display_name="Custom Migrations Example"))
+    ServiceBuilder(info=ServiceInfo(id="custom-migrations-example", display_name="Custom Migrations Example"))
     .with_health()
     .with_database("sqlite+aiosqlite:///./custom_migrations.db")
     .with_config(AppConfig)

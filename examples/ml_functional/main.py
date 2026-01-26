@@ -74,6 +74,7 @@ async def on_predict(
 
 # Create ML service info with metadata
 info = MLServiceInfo(
+    id="disease-prediction-ml-service",
     display_name="Disease Prediction ML Service",
     version="1.0.0",
     summary="ML service for disease prediction using weather data",

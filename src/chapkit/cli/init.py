@@ -26,6 +26,14 @@ def _slugify(text: str) -> str:
     return text
 
 
+def _to_service_id(text: str) -> str:
+    """Convert text to a valid ServiceInfo id (lowercase letters, numbers, hyphens)."""
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_]+", "-", text)
+    return text
+
+
 def _copy_static_file(template_dir: Path, target_dir: Path, filename: str) -> None:
     """Copy a static file from template directory to target directory."""
     src = template_dir / filename
@@ -98,9 +106,12 @@ def init_command(
 
     target_dir.mkdir(parents=True)
 
+    service_id = _to_service_id(project_name)
+
     context = {
         "PROJECT_NAME": project_name,
         "PROJECT_SLUG": project_slug,
+        "PROJECT_SERVICE_ID": service_id,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_MONITORING": with_monitoring,
         "TEMPLATE": template,

@@ -130,6 +130,7 @@ async def seed_data(app: FastAPI) -> None:
 
 
 info = ServiceInfo(
+    id="library-usage-example",
     display_name="Library Usage Example",
     summary="Demonstrates chapkit with custom models",
     version="1.0.0",

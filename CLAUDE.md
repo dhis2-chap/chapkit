@@ -147,7 +147,7 @@ class MyConfig(BaseConfig):
     prediction_periods: int = 3
 
 app = (
-    ServiceBuilder(info=ServiceInfo(display_name="My Service"))
+    ServiceBuilder(info=ServiceInfo(id="my-service", display_name="My Service"))
     .with_health()
     .with_config(MyConfig)
     .with_artifacts(hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training_workspace", 1: "ml_prediction"}))

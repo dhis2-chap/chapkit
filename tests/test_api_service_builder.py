@@ -35,6 +35,7 @@ async def test_database() -> AsyncGenerator[Database, None]:
 def service_info() -> ServiceInfo:
     """Provide basic service info for tests."""
     return ServiceInfo(
+        id="test-service",
         display_name="Test Service",
         version="1.0.0",
         summary="Test service for unit tests",
@@ -273,7 +274,7 @@ def test_service_builder_shutdown_hook(service_info: ServiceInfo) -> None:
 
 def test_service_builder_preserves_summary_as_description(service_info: ServiceInfo) -> None:
     """Test that summary is preserved as description when description is missing."""
-    info = ServiceInfo(display_name="Test", summary="Test summary")
+    info = ServiceInfo(id="test", display_name="Test", summary="Test summary")
     builder = ServiceBuilder(info=info)
 
     assert builder.info.description == "Test summary"
@@ -340,6 +341,7 @@ def test_service_builder_landing_page_with_custom_fields() -> None:
         custom_field: dict[str, object]
 
     info = CustomServiceInfo(
+        id="custom-service",
         display_name="Custom Service",
         version="2.0.0",
         summary="Test with custom fields",

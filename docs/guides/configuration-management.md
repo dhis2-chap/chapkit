@@ -16,7 +16,7 @@ class AppConfig(BaseConfig):
     prediction_periods: int = 3
 
 app = (
-    ServiceBuilder(info=ServiceInfo(display_name="My Service"))
+    ServiceBuilder(info=ServiceInfo(id="my-service", display_name="My Service"))
     .with_health()
     .with_config(AppConfig)
     .build()
@@ -484,7 +484,7 @@ class WeatherModelConfig(BaseConfig):
 
 ```python
 app = (
-    ServiceBuilder(info=ServiceInfo(display_name="Weather Model Service"))
+    ServiceBuilder(info=ServiceInfo(id="weather-model-service", display_name="Weather Model Service"))
     .with_health()
     .with_config(WeatherModelConfig, enable_artifact_operations=True)
     .with_artifacts(hierarchy=ArtifactHierarchy(

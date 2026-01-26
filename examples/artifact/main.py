@@ -193,6 +193,7 @@ async def seed_artifacts(app: FastAPI) -> None:
 
 
 info = ArtifactServiceInfo(
+    id="chapkit-artifact-service",
     display_name="Chapkit Artifact Service",
     summary="Artifact CRUD and tree operations example",
     author="Morten Hansen",
