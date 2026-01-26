@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Callable, Coroutine, List, Self
+from typing import Any, Callable, Coroutine, Self
 
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel, EmailStr, Field, HttpUrl
@@ -89,7 +89,7 @@ class _ConfigOptions:
 
     schema: type[BaseConfig]
     prefix: str = "/api/v1/configs"
-    tags: List[str] = field(default_factory=lambda: ["Config"])
+    tags: list[str] = field(default_factory=lambda: ["Config"])
     permissions: CrudPermissions = field(default_factory=CrudPermissions)
 
 
@@ -99,7 +99,7 @@ class _ArtifactOptions:
 
     hierarchy: ArtifactHierarchy
     prefix: str = "/api/v1/artifacts"
-    tags: List[str] = field(default_factory=lambda: ["Artifacts"])
+    tags: list[str] = field(default_factory=lambda: ["Artifacts"])
     enable_config_linking: bool = False
     permissions: CrudPermissions = field(default_factory=CrudPermissions)
 
@@ -110,7 +110,7 @@ class _MLOptions:
 
     runner: ModelRunnerProtocol
     prefix: str = "/api/v1/ml"
-    tags: List[str] = field(default_factory=lambda: ["ML"])
+    tags: list[str] = field(default_factory=lambda: ["ML"])
 
 
 class ServiceBuilder(BaseServiceBuilder):
@@ -130,7 +130,7 @@ class ServiceBuilder(BaseServiceBuilder):
         schema: type[BaseConfig],
         *,
         prefix: str = "/api/v1/configs",
-        tags: List[str] | None = None,
+        tags: list[str] | None = None,
         permissions: CrudPermissions | None = None,
         allow_create: bool | None = None,
         allow_read: bool | None = None,
@@ -157,7 +157,7 @@ class ServiceBuilder(BaseServiceBuilder):
         *,
         hierarchy: ArtifactHierarchy,
         prefix: str = "/api/v1/artifacts",
-        tags: List[str] | None = None,
+        tags: list[str] | None = None,
         enable_config_linking: bool = False,
         permissions: CrudPermissions | None = None,
         allow_create: bool | None = None,
@@ -186,7 +186,7 @@ class ServiceBuilder(BaseServiceBuilder):
         runner: ModelRunnerProtocol,
         *,
         prefix: str = "/api/v1/ml",
-        tags: List[str] | None = None,
+        tags: list[str] | None = None,
     ) -> Self:
         """Enable ML train/predict endpoints with model runner."""
         self._ml_options = _MLOptions(

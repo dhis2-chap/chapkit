@@ -4,7 +4,7 @@ import re
 import shutil
 from importlib.metadata import version as get_version
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -65,7 +65,7 @@ def _render_template(
 def init_command(
     project_name: Annotated[str, typer.Argument(help="Name of the project to create")],
     path: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(help="Target directory (default: current directory)"),
     ] = None,
     with_monitoring: Annotated[
