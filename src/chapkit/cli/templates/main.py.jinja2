@@ -144,6 +144,21 @@ app = (
 {% if WITH_MONITORING %}
     .with_monitoring()
 {% endif %}
+    # ====================================================================================
+    # CHAP Core Registration (Optional)
+    # ====================================================================================
+    # Uncomment to automatically register this service with CHAP Core on startup.
+    # Set SERVICEKIT_ORCHESTRATOR_URL environment variable to your CHAP Core instance.
+    #
+    # Example: export SERVICEKIT_ORCHESTRATOR_URL=https://chap.example.org/v2/services/$register
+    #
+    # The service will:
+    # - Auto-detect hostname (works with Docker container names)
+    # - Retry registration on failure (default: 5 retries, 2s delay)
+    # - Send keepalive pings to stay registered (default: 10s interval, 30s TTL)
+    # - Gracefully deregister on shutdown
+    #
+    # .with_registration()
     .build()
 )
 
