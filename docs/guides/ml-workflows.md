@@ -338,7 +338,6 @@ info = MLServiceInfo(
     id="disease-prediction-service",
     display_name="Disease Prediction Service",
     version="1.0.0",
-    summary="ML service for disease prediction",
     description="Train and predict disease cases using weather data",
     model_metadata=ModelMetadata(
         author="ML Team",
@@ -416,8 +415,7 @@ MLServiceBuilder(
 | `id` | str | Service identifier (required) - lowercase letters, numbers, and hyphens only |
 | `display_name` | str | Service display name (required) |
 | `version` | str | Service version |
-| `summary` | str | Short description |
-| `description` | str | Detailed description |
+| `description` | str | Service description |
 | `model_metadata` | ModelMetadata | Model documentation (required) |
 | `period_type` | PeriodType | Period type: weekly or monthly (required) |
 | `min_prediction_periods` | int | Minimum prediction periods (default: 0) |

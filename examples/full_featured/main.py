@@ -182,11 +182,8 @@ async def shutdown_hook(app: FastAPI) -> None:
 info = ServiceInfo(
     id="complete-feature-showcase",
     display_name="Complete Feature Showcase",
-    summary="Comprehensive example demonstrating ALL chapkit features",
     version="2.0.0",
-    description="""Complete Chapkit Feature Showcase.""",
-    contact={"name": "Chapkit Team", "email": "support@example.com"},
-    license_info={"name": "MIT"},
+    description="Complete Chapkit Feature Showcase.",
 )
 
 # ==================== Application Builder ====================

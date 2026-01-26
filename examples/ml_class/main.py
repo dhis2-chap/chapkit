@@ -190,7 +190,6 @@ info = MLServiceInfo(
     id="weather-based-prediction-service",
     display_name="Weather-Based Prediction Service",
     version="1.0.0",
-    summary="Class-based ML service with preprocessing",
     description="Train and predict disease cases using normalized weather features with StandardScaler",
     model_metadata=ModelMetadata(
         author="Data Science Team",

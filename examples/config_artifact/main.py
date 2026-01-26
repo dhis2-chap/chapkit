@@ -194,10 +194,9 @@ info = MLServiceInfo(
     id="chapkit-config-artifact-service",
     display_name="Chapkit Config & Artifact Service",
     version="1.0.0",
-    summary="Linked config and artifact CRUD example",
+    description="Linked config and artifact CRUD example",
     author="Morten Hansen",
     contact_email="morten@dhis2.org",
-    contact={"email": "morten@dhis2.org"},
     hierarchy={
         "name": PIPELINE_HIERARCHY.name,
         "level_labels": dict(PIPELINE_HIERARCHY.level_labels),

@@ -313,7 +313,6 @@ app = (
             id="vega-visualization-service",
             display_name="Vega Visualization Service",
             version="1.0.0",
-            summary="Transform DataFrame to Vega-Lite specifications",
             description="Proof of concept for Phase 5.1 Transformation Service Pattern. "
             "Accepts DataFrame input and generates Vega-Lite grammar for various chart types. "
             "Supports data processing including aggregation, filtering, and transformations.",

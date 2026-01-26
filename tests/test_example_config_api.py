@@ -43,7 +43,7 @@ def test_info_endpoint(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["display_name"] == "Chapkit Config Service"
-    assert data["summary"] == "Environment configuration CRUD example"
+    assert data["description"] == "Environment configuration CRUD example"
     assert data["author"] == "Morten Hansen"
     assert "seeded_configs" in data
     assert len(data["seeded_configs"]) == 3

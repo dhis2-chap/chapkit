@@ -66,7 +66,6 @@ info = MLServiceInfo(
     id="shell-based-disease-prediction-service",
     display_name="Shell-Based Disease Prediction Service",
     version="1.0.0",
-    summary="ML service using external scripts for train/predict",
     description="Demonstrates language-agnostic ML workflows with file-based data interchange using Python scripts",
     model_metadata=ModelMetadata(
         author="ML Engineering Team",
