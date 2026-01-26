@@ -41,7 +41,7 @@ def test_info_endpoint(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["display_name"] == "Chapkit Artifact Service"
-    assert data["summary"] == "Artifact CRUD and tree operations example"
+    assert data["description"] == "Artifact CRUD and tree operations example"
     assert "hierarchy" in data
     assert data["hierarchy"]["name"] == "ml_experiment"
     assert "pipelines" in data

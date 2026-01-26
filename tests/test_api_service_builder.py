@@ -38,7 +38,7 @@ def service_info() -> ServiceInfo:
         id="test-service",
         display_name="Test Service",
         version="1.0.0",
-        summary="Test service for unit tests",
+        description="Test service for unit tests",
     )
 
 
@@ -272,14 +272,6 @@ def test_service_builder_shutdown_hook(service_info: ServiceInfo) -> None:
     assert hook_called
 
 
-def test_service_builder_preserves_summary_as_description(service_info: ServiceInfo) -> None:
-    """Test that summary is preserved as description when description is missing."""
-    info = ServiceInfo(id="test", display_name="Test", summary="Test summary")
-    builder = ServiceBuilder(info=info)
-
-    assert builder.info.description == "Test summary"
-
-
 def test_service_builder_landing_page(service_info: ServiceInfo) -> None:
     """Test that with_landing_page() adds root endpoint."""
     app = ServiceBuilder(info=service_info).with_landing_page().build()
@@ -299,7 +291,7 @@ def test_service_builder_landing_page(service_info: ServiceInfo) -> None:
         data = info_response.json()
         assert data["display_name"] == "Test Service"
         assert data["version"] == "1.0.0"
-        assert data["summary"] == "Test service for unit tests"
+        assert data["description"] == "Test service for unit tests"
 
 
 def test_service_builder_without_landing_page(service_info: ServiceInfo) -> None:
@@ -344,7 +336,7 @@ def test_service_builder_landing_page_with_custom_fields() -> None:
         id="custom-service",
         display_name="Custom Service",
         version="2.0.0",
-        summary="Test with custom fields",
+        description="Test with custom fields",
         author="Jane Doe",
         contact_email="jane@example.com",
         custom_field={"key": "value", "count": 42},
@@ -364,7 +356,7 @@ def test_service_builder_landing_page_with_custom_fields() -> None:
         data = info_response.json()
         assert data["display_name"] == "Custom Service"
         assert data["version"] == "2.0.0"
-        assert data["summary"] == "Test with custom fields"
+        assert data["description"] == "Test with custom fields"
         assert data["author"] == "Jane Doe"
         assert data["contact_email"] == "jane@example.com"
         assert data["custom_field"] == {"key": "value", "count": 42}

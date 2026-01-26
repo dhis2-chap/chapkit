@@ -77,7 +77,6 @@ info = MLServiceInfo(
     id="disease-prediction-ml-service",
     display_name="Disease Prediction ML Service",
     version="1.0.0",
-    summary="ML service for disease prediction using weather data",
     description="Train and predict disease cases based on rainfall and temperature data using Linear Regression",
     model_metadata=ModelMetadata(
         author="ML Team",

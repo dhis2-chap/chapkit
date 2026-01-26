@@ -62,7 +62,6 @@ info = ServiceInfo(
     id="task-execution-service",
     display_name="Task Execution Service",
     version="1.0.0",
-    summary="Registry-based task execution with dependency injection",
     description="Example service demonstrating task execution without database persistence",
 )
 

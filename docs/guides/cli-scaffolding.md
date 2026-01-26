@@ -524,7 +524,6 @@ info = MLServiceInfo(
     id="production-model",
     display_name="Production Model",
     version="2.0.0",
-    summary="Production-ready ML service",
     description="Detailed description here",
     model_metadata=ModelMetadata(
         author="Your Team",
