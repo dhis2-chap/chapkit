@@ -15,6 +15,7 @@ from chapkit.config import ConfigManager, ConfigRepository
 from chapkit.config.schemas import BaseConfig
 from chapkit.scheduler import ChapkitScheduler
 
+from .runner import get_temp_dir
 from .schemas import (
     ModelRunnerProtocol,
     PredictRequest,
@@ -203,7 +204,7 @@ class MLManager(Generic[ConfigT]):
                 from io import BytesIO
 
                 workspace_content = training_data["content"]
-                extracted_workspace = Path(tempfile.mkdtemp(prefix="chapkit_workspace_extract_"))
+                extracted_workspace = Path(tempfile.mkdtemp(prefix="chapkit_workspace_extract_", dir=get_temp_dir()))
 
                 # Extract zip to temp directory
                 zip_buffer = BytesIO(workspace_content)
