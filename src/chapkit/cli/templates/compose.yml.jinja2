@@ -11,6 +11,7 @@ services:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
       WORKERS: 1
+      # CHAPKIT_TEMP_DIR: /tmp  # Override temp directory for ML workspaces
     restart: unless-stopped
     healthcheck:
       test:

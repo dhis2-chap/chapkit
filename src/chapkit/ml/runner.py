@@ -30,6 +30,12 @@ type PredictFunction[ConfigT] = Callable[
 
 logger = get_logger(__name__)
 
+
+def get_temp_dir() -> str | None:
+    """Get temp directory from CHAPKIT_TEMP_DIR or use system default."""
+    return os.getenv("CHAPKIT_TEMP_DIR")
+
+
 # Patterns to exclude when copying project to workspace
 WORKSPACE_EXCLUDE_PATTERNS = (
     # Python
@@ -98,7 +104,7 @@ def write_prediction_inputs(
 
 def zip_workspace(workspace_dir: Path) -> bytes:
     """Zip workspace directory and return bytes."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".zip", dir=get_temp_dir()) as tmp:
         zip_file_path = Path(tmp.name)
 
     try:
@@ -280,7 +286,7 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         Returns:
             Dict with keys: content (model), workspace_dir, exit_code, stdout, stderr
         """
-        workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_train_"))
+        workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_train_", dir=get_temp_dir()))
         # Copy full project directory for reproducibility
         prepare_workspace(Path.cwd(), workspace_dir)
         # Write training input files
@@ -313,7 +319,7 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         Returns:
             Dict with keys: content (DataFrame), workspace_dir, exit_code, stdout, stderr
         """
-        workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_predict_"))
+        workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_predict_", dir=get_temp_dir()))
         # Copy full project directory for reproducibility
         prepare_workspace(Path.cwd(), workspace_dir)
         # Write config.yml
@@ -495,7 +501,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model by executing external training script (model file creation is optional)."""
-        temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_train_"))
+        temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_train_", dir=get_temp_dir()))
 
         try:
             # Copy entire project directory to temp workspace for full isolation
@@ -586,7 +592,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Make predictions by executing external prediction script."""
-        temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_"))
+        temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_", dir=get_temp_dir()))
 
         try:
             # Model must be workspace artifact from ShellModelRunner.on_train()
