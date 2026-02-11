@@ -72,6 +72,10 @@ def init_command(
         bool,
         typer.Option(help="Include Prometheus and Grafana monitoring stack"),
     ] = False,
+    with_k8s: Annotated[
+        bool,
+        typer.Option(help="Include Kubernetes Helm chart for deployment"),
+    ] = False,
     template: Annotated[
         str,
         typer.Option(help="Template type: 'ml', 'ml-shell', or 'task'"),
@@ -96,6 +100,8 @@ def init_command(
     typer.echo(f"Template: {template}")
     if with_monitoring:
         typer.echo("Including monitoring stack (Prometheus + Grafana)")
+    if with_k8s:
+        typer.echo("Including Kubernetes Helm chart")
     typer.echo()
 
     template_dir = Path(__file__).parent / "templates"
@@ -114,6 +120,7 @@ def init_command(
         "PROJECT_SERVICE_ID": service_id,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_MONITORING": with_monitoring,
+        "WITH_K8S": with_k8s,
         "TEMPLATE": template,
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }
@@ -206,6 +213,35 @@ def init_command(
 
     _copy_static_file(template_dir, target_dir, ".gitignore")
 
+    if with_k8s:
+        chart_dir = target_dir / "chart"
+        chart_templates_dir = chart_dir / "templates"
+        chart_templates_dir.mkdir(parents=True, exist_ok=True)
+
+        chart_template_dir = template_dir / "chart"
+
+        _render_template(chart_template_dir, chart_dir, "Chart.yaml.jinja2", context, "Chart.yaml")
+        _render_template(chart_template_dir, chart_dir, "values.yaml.jinja2", context, "values.yaml")
+
+        chart_tpl_template_dir = chart_template_dir / "templates"
+        for tpl_name in [
+            "_helpers.tpl",
+            "deployment.yaml",
+            "service.yaml",
+            "pvc.yaml",
+            "configmap.yaml",
+            "secret.yaml",
+            "ingress.yaml",
+            "NOTES.txt",
+        ]:
+            _render_template(
+                chart_tpl_template_dir,
+                chart_templates_dir,
+                f"{tpl_name}.jinja2",
+                context,
+                tpl_name,
+            )
+
     typer.echo()
     typer.echo(f"Successfully created project '{project_name}' at {target_dir}")
     typer.echo()
@@ -219,4 +255,9 @@ def init_command(
     else:
         typer.echo("To start with Docker:")
     typer.echo("  docker compose up --build")
+    if with_k8s:
+        typer.echo()
+        typer.echo("To deploy with Kubernetes:")
+        typer.echo(f"  docker build -t {service_id}:latest .")
+        typer.echo(f"  helm install {service_id} chart/")
     typer.echo()

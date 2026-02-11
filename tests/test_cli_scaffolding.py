@@ -498,6 +498,107 @@ def test_scaffold_with_monitoring_structure(tmp_path: Path, chapkit_root: Path) 
 
 
 @pytest.mark.slow
+def test_scaffold_with_k8s_structure(tmp_path: Path, chapkit_root: Path) -> None:
+    """Test scaffolding with --with-k8s generates all Helm chart files."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-k8s",
+            "--with-k8s",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
+
+    project_dir = tmp_path / "test-k8s"
+
+    # Verify chart directory structure
+    assert (project_dir / "chart").is_dir()
+    assert (project_dir / "chart" / "Chart.yaml").exists()
+    assert (project_dir / "chart" / "values.yaml").exists()
+    assert (project_dir / "chart" / "templates").is_dir()
+    assert (project_dir / "chart" / "templates" / "_helpers.tpl").exists()
+    assert (project_dir / "chart" / "templates" / "deployment.yaml").exists()
+    assert (project_dir / "chart" / "templates" / "service.yaml").exists()
+    assert (project_dir / "chart" / "templates" / "pvc.yaml").exists()
+    assert (project_dir / "chart" / "templates" / "configmap.yaml").exists()
+    assert (project_dir / "chart" / "templates" / "secret.yaml").exists()
+    assert (project_dir / "chart" / "templates" / "ingress.yaml").exists()
+    assert (project_dir / "chart" / "templates" / "NOTES.txt").exists()
+
+    # Verify Chart.yaml contains the project name
+    chart_content = (project_dir / "chart" / "Chart.yaml").read_text()
+    assert "test-k8s" in chart_content
+    assert "apiVersion: v2" in chart_content
+
+    # Verify values.yaml contains expected defaults
+    values_content = (project_dir / "chart" / "values.yaml").read_text()
+    assert "replicaCount: 1" in values_content
+    assert "ClusterIP" in values_content
+    assert "port: 8000" in values_content
+    assert "size: 1Gi" in values_content
+    assert "cpu: 250m" in values_content
+    assert "memory: 512Mi" in values_content
+    assert "LOG_LEVEL: INFO" in values_content
+
+    # Verify deployment.yaml contains Recreate strategy and security settings
+    deployment_content = (project_dir / "chart" / "templates" / "deployment.yaml").read_text()
+    assert "Recreate" in deployment_content
+    assert "runAsUser: 10001" in deployment_content
+    assert "runAsNonRoot: true" in deployment_content
+    assert "readOnlyRootFilesystem: true" in deployment_content
+    assert "terminationGracePeriodSeconds: 35" in deployment_content
+    assert "startupProbe" in deployment_content
+    assert "livenessProbe" in deployment_content
+    assert "readinessProbe" in deployment_content
+
+    # Verify health probes are configured in values.yaml
+    assert "/health" in values_content
+
+    # Verify standard project files still exist
+    assert (project_dir / "main.py").exists()
+    assert (project_dir / "Dockerfile").exists()
+    assert (project_dir / "compose.yml").exists()
+
+
+@pytest.mark.slow
+def test_scaffold_with_k8s_and_monitoring(tmp_path: Path, chapkit_root: Path) -> None:
+    """Test scaffolding with both --with-k8s and --with-monitoring flags."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-k8s-monitor",
+            "--with-k8s",
+            "--with-monitoring",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
+
+    project_dir = tmp_path / "test-k8s-monitor"
+
+    # Verify both chart and monitoring exist
+    assert (project_dir / "chart").is_dir()
+    assert (project_dir / "chart" / "Chart.yaml").exists()
+    assert (project_dir / "monitoring").is_dir()
+    assert (project_dir / "monitoring" / "prometheus" / "prometheus.yml").exists()
+
+
+@pytest.mark.slow
 def test_scaffold_functional_train_predict(
     scaffold_project: Callable[[str, str], Path],
 ) -> None:

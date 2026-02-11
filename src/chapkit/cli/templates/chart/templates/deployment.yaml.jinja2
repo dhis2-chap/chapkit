@@ -1,0 +1,69 @@
+{% raw %}apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chapkit.fullname" . }}
+  labels:
+    {{- include "chapkit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "chapkit.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "chapkit.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 35
+      securityContext:
+        runAsUser: 10001
+        runAsNonRoot: true
+        fsGroup: 10001
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "chapkit.fullname" . }}
+            {{- if .Values.secrets }}
+            - secretRef:
+                name: {{ include "chapkit.fullname" . }}
+            {{- end }}
+          startupProbe:
+            {{- toYaml .Values.startupProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /workspace/data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "chapkit.fullname" . }}
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+        - name: tmp
+          emptyDir: {}{% endraw %}

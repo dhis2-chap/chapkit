@@ -33,6 +33,29 @@ The API will be available at:
 - Grafana: http://localhost:3000 (admin/admin)
 {% endif %}
 
+{% if WITH_K8S %}
+### Kubernetes
+
+Build and push the Docker image, then deploy with Helm:
+
+```bash
+docker build -t {{ PROJECT_SERVICE_ID }}:latest .
+helm install {{ PROJECT_SERVICE_ID }} chart/
+```
+
+Check deployment status:
+
+```bash
+kubectl get pods -l app.kubernetes.io/name={{ PROJECT_SERVICE_ID }}
+```
+
+Customize values:
+
+```bash
+helm install {{ PROJECT_SERVICE_ID }} chart/ -f my-values.yaml
+```
+{% endif %}
+
 ## API Endpoints
 
 ### Health Check
@@ -160,6 +183,9 @@ Edit the `on_predict` function in `main.py` to implement your prediction logic.
 ├── compose.yml          # Docker Compose configuration
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (persisted)
+{% if WITH_K8S %}
+├── chart/               # Kubernetes Helm chart
+{% endif %}
 {% if WITH_MONITORING %}
 └── monitoring/          # Monitoring stack configuration
     ├── prometheus/      # Prometheus configuration
