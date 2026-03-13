@@ -62,6 +62,10 @@ WORKSPACE_EXCLUDE_PATTERNS = (
     "dist",
     "*.so",
     "*.dylib",
+    # Databases
+    "*.db",
+    "*.sqlite",
+    "*.sqlite3",
 )
 
 
