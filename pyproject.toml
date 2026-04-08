@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.16.6"
+version = "0.16.7"
 description = "ML and data service modules built on servicekit - config, artifacts, tasks, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
@@ -18,7 +18,6 @@ keywords = [
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.13",
   "Framework :: FastAPI",
@@ -29,7 +28,7 @@ dependencies = [
   "geojson-pydantic>=2.1.0",
   "typer>=0.21.0",
   "jinja2>=3.1.6",
-  "servicekit>=0.8.1",
+  "servicekit>=0.8.2",
   "httpx>=0.28.1",
 ]
 
@@ -68,7 +67,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.9.0,<0.10.0"]
+requires = ["uv_build>=0.9.0,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
