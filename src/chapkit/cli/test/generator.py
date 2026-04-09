@@ -91,28 +91,18 @@ class TestDataGenerator:
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Generate historic and future DataFrames for prediction."""
-        required_covariates = required_covariates or []
+        # Historic data: actual observations from earlier time periods
+        historic = self.generate_training_data(
+            num_locations=num_locations,
+            num_periods=num_periods,
+            num_features=num_features,
+            required_covariates=required_covariates,
+            extra_covariates=extra_covariates,
+            start_year=2020,
+            period_type=period_type,
+        )
 
-        # Build columns list (same structure as training)
-        columns: list[str] = ["time_period", "location", "disease_cases"]
-
-        # Feature columns
-        for i in range(num_features):
-            columns.append(f"feature_{i}")
-
-        # Required covariates
-        for cov in required_covariates:
-            if cov not in columns:
-                columns.append(cov)
-
-        # Extra covariates
-        for i in range(extra_covariates):
-            columns.append(f"extra_covariate_{i}")
-
-        # Empty historic (matching scaffolded template pattern)
-        historic: dict[str, Any] = {"columns": columns, "data": []}
-
-        # Future data to predict (same panel structure, future time periods)
+        # Future data: generate structure then null out disease_cases for prediction
         future = self.generate_training_data(
             num_locations=num_locations,
             num_periods=num_periods,
@@ -122,6 +112,10 @@ class TestDataGenerator:
             start_year=2025,
             period_type=period_type,
         )
+
+        disease_cases_idx = future["columns"].index("disease_cases")
+        for row in future["data"]:
+            row[disease_cases_idx] = None
 
         return historic, future
 
@@ -150,7 +144,7 @@ class TestDataGenerator:
         field_type = field_schema.get("type", "string")
 
         if field_type == "integer":
-            return variation
+            return max(1, variation)
         elif field_type == "number":
             return variation * 0.1
         elif field_type == "boolean":
