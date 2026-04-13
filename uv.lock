@@ -106,7 +106,7 @@ wheels = [
 
 [[package]]
 name = "chapkit"
-version = "0.17.0"
+version = "0.17.1"
 source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
@@ -162,7 +162,7 @@ requires-dist = [
     { name = "pandas", marker = "extra == 'xarray'", specifier = ">=2.3.3" },
     { name = "polars", marker = "extra == 'dataframe'", specifier = ">=1.34.0" },
     { name = "polars", marker = "extra == 'polars'", specifier = ">=1.34.0" },
-    { name = "servicekit", specifier = ">=0.9.0" },
+    { name = "servicekit", specifier = ">=0.10.0" },
     { name = "typer", specifier = ">=0.21.0" },
     { name = "xarray", marker = "extra == 'dataframe'", specifier = ">=2025.10.1" },
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2025.10.1" },
@@ -1756,7 +1756,7 @@ wheels = [
 
 [[package]]
 name = "servicekit"
-version = "0.9.0"
+version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1773,9 +1773,9 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "structlog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/60/13/e012c4fbb325164b6cde7ab9650f4e582526be43c7da40a887560d799f1d/servicekit-0.9.0.tar.gz", hash = "sha256:99f0c6696e56daf65bd2ccbc6b0095e6833a4e36671c61cde1cccac1dd36e518", size = 41966, upload-time = "2026-04-13T09:46:58.943Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ee/2b/2d930fd244a08ca692f1ca3b46b28693742932aef9e17bcaf932a85ebb52/servicekit-0.10.0.tar.gz", hash = "sha256:bb8ea27a8e33d09d08537446eba678f1711a5be4950b6bbf0abc1a381eec5202", size = 43061, upload-time = "2026-04-13T11:28:49.245Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/05/a1/7bebd16c944b63dfefe14b008be86b41adf06d14187f1c6aa4f147207b75/servicekit-0.9.0-py3-none-any.whl", hash = "sha256:e39b8291f87578c16336bc651b88ebb533ee6753ff724803004cad8a13e2858d", size = 54196, upload-time = "2026-04-13T09:47:00.262Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/d3/e61c9e0523844d3460db67cabcc5bace402fcd25822d291436d52527882c/servicekit-0.10.0-py3-none-any.whl", hash = "sha256:e2e5eb40b41b92b4323a56c2a4107d80f94916d10523b6bf114c64c53501672d", size = 55336, upload-time = "2026-04-13T11:28:47.897Z" },
 ]
 
 [[package]]
