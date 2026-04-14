@@ -430,6 +430,7 @@ def test_scaffold_functional_project_structure(
     assert (project_dir / "compose.yml").exists()
     assert (project_dir / "postman_collection.json").exists()
     assert (project_dir / ".gitignore").exists()
+    assert (project_dir / ".python-version").exists()
 
     # Verify main.py contains functional runner
     main_content = (project_dir / "main.py").read_text()

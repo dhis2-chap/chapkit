@@ -205,6 +205,7 @@ def init_command(
         _render_template(template_dir, target_dir, "compose.yml.jinja2", context, "compose.yml")
 
     _copy_static_file(template_dir, target_dir, ".gitignore")
+    _copy_static_file(template_dir, target_dir, ".python-version")
 
     typer.echo()
     typer.echo(f"Successfully created project '{project_name}' at {target_dir}")
