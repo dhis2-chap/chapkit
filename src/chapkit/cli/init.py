@@ -72,6 +72,15 @@ def init_command(
         bool,
         typer.Option(help="Include Prometheus and Grafana monitoring stack"),
     ] = False,
+    with_validation: Annotated[
+        bool,
+        typer.Option(
+            help=(
+                "Include on_validate_train/on_validate_predict stubs so the $validate endpoint "
+                "can emit domain-specific diagnostics (e.g. n_lags exceeds context). Off by default."
+            ),
+        ),
+    ] = False,
     template: Annotated[
         str,
         typer.Option(help="Template type: 'ml', 'ml-shell', or 'task'"),
@@ -96,6 +105,8 @@ def init_command(
     typer.echo(f"Template: {template}")
     if with_monitoring:
         typer.echo("Including monitoring stack (Prometheus + Grafana)")
+    if with_validation:
+        typer.echo("Including $validate hook stubs (on_validate_train / on_validate_predict)")
     typer.echo()
 
     template_dir = Path(__file__).parent / "templates"
@@ -114,6 +125,7 @@ def init_command(
         "PROJECT_SERVICE_ID": service_id,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_MONITORING": with_monitoring,
+        "WITH_VALIDATION": with_validation,
         "TEMPLATE": template,
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }

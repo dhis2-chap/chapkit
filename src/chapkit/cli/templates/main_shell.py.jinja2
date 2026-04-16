@@ -6,7 +6,13 @@ from pathlib import Path
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
+{% if WITH_VALIDATION %}
+from chapkit.data import DataFrame
+from chapkit.ml import ShellModelRunner, ValidationDiagnostic
+from geojson_pydantic import FeatureCollection
+{% else %}
 from chapkit.ml import ShellModelRunner
+{% endif %}
 
 
 class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseConfig):
@@ -49,10 +55,98 @@ predict_command = (
     "--output {output_file}"
 )
 
+{% if WITH_VALIDATION %}
+# ====================================================================================
+# $validate hooks (optional)
+# ====================================================================================
+# These Python callbacks power POST /api/v1/ml/$validate, which returns
+# structured diagnostics for a train or predict payload WITHOUT running the
+# shell scripts. The frontend can call $validate first to surface problems
+# (e.g. "n_lags exceeds available context") before submitting an expensive
+# training run.
+#
+# Even with a shell-based runner, validation callbacks run in Python — they
+# inspect the payload directly and do NOT invoke your scripts. This keeps the
+# endpoint fast and avoids workspace setup.
+#
+# Both callbacks receive the same inputs as the shell scripts would (config,
+# dataframes, geo) and return a list of ValidationDiagnostic. Returning [] means
+# "no issues found".
+#
+# ValidationDiagnostic fields:
+#   severity: "error" | "warning" | "info"
+#       - error:   blocks submission (response has valid=False)
+#       - warning: surfaces an issue but does not block
+#       - info:    informational only
+#   code: stable machine-readable identifier (use snake_case); the frontend
+#         branches on this for rendering / i18n / documentation links.
+#   message: human-readable fallback — bake specifics into the text.
+#   field: optional dotted path to the offending input — e.g. "config.n_lags",
+#          "data", "historic", or "artifact_id".
+#
+# Framework-level checks (config existence, prediction_periods bounds, empty
+# data, failed training artifacts) are ALREADY performed by chapkit — you only
+# need to add domain checks that chapkit cannot know about.
+#
+# See docs/guides/ml-workflows.md for the full endpoint reference.
+
+
+async def on_validate_train(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    data: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> list[ValidationDiagnostic]:
+    """Return domain-specific diagnostics for a train payload.
+
+    Example - require at least N rows of training data:
+
+        diagnostics: list[ValidationDiagnostic] = []
+        min_rows = 10
+        if len(data) < min_rows:
+            diagnostics.append(ValidationDiagnostic(
+                severity="error",
+                code="insufficient_training_samples",
+                message=f"Got {len(data)} rows, need at least {min_rows}",
+                field="data",
+            ))
+        return diagnostics
+    """
+    return []
+
+
+async def on_validate_predict(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    historic: DataFrame,
+    future: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> list[ValidationDiagnostic]:
+    """Return domain-specific diagnostics for a predict payload.
+
+    Example - require historic to cover at least `lookback` periods:
+
+        diagnostics: list[ValidationDiagnostic] = []
+        lookback = getattr(config, "lookback", 0)
+        if lookback and len(historic) < lookback:
+            diagnostics.append(ValidationDiagnostic(
+                severity="error",
+                code="insufficient_historic_context",
+                message=f"historic has {len(historic)} rows, need {lookback}",
+                field="historic",
+            ))
+        return diagnostics
+    """
+    return []
+
+
+{% endif %}
 # Create shell model runner
 runner: ShellModelRunner[{{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config] = ShellModelRunner(
     train_command=train_command,
     predict_command=predict_command,
+{% if WITH_VALIDATION %}
+    on_validate_train=on_validate_train,
+    on_validate_predict=on_validate_predict,
+{% endif %}
 )
 
 # Create ML service info with metadata

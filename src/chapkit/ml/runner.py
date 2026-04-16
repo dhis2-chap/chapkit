@@ -28,6 +28,12 @@ type TrainFunction[ConfigT] = Callable[[ConfigT, DataFrame, FeatureCollection | 
 type PredictFunction[ConfigT] = Callable[
     [ConfigT, Any, DataFrame, DataFrame, FeatureCollection | None], Awaitable[DataFrame]
 ]
+type ValidateTrainFunction[ConfigT] = Callable[
+    [ConfigT, DataFrame, FeatureCollection | None], Awaitable[list[ValidationDiagnostic]]
+]
+type ValidatePredictFunction[ConfigT] = Callable[
+    [ConfigT, DataFrame, DataFrame, FeatureCollection | None], Awaitable[list[ValidationDiagnostic]]
+]
 
 logger = get_logger(__name__)
 
@@ -294,10 +300,37 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         self,
         on_train: TrainFunction[ConfigT],
         on_predict: PredictFunction[ConfigT],
+        on_validate_train: ValidateTrainFunction[ConfigT] | None = None,
+        on_validate_predict: ValidatePredictFunction[ConfigT] | None = None,
     ) -> None:
-        """Initialize functional runner with train and predict functions."""
+        """Initialize functional runner with train, predict, and optional validate functions."""
         self._on_train = on_train
         self._on_predict = on_predict
+        self._on_validate_train = on_validate_train
+        self._on_validate_predict = on_validate_predict
+
+    async def on_validate_train(
+        self,
+        config: ConfigT,
+        data: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Delegate to the provided validate-train callback, or return no diagnostics."""
+        if self._on_validate_train is None:
+            return []
+        return await self._on_validate_train(config, data, geo)
+
+    async def on_validate_predict(
+        self,
+        config: ConfigT,
+        historic: DataFrame,
+        future: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Delegate to the provided validate-predict callback, or return no diagnostics."""
+        if self._on_validate_predict is None:
+            return []
+        return await self._on_validate_predict(config, historic, future, geo)
 
     async def on_train(
         self,
@@ -457,6 +490,8 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         self,
         train_command: str,
         predict_command: str,
+        on_validate_train: ValidateTrainFunction[ConfigT] | None = None,
+        on_validate_predict: ValidatePredictFunction[ConfigT] | None = None,
     ) -> None:
         """Initialize shell runner with full isolation support.
 
@@ -467,9 +502,13 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         Args:
             train_command: Command template for training (use relative paths)
             predict_command: Command template for prediction (use relative paths)
+            on_validate_train: Optional Python callback for domain-level train validation
+            on_validate_predict: Optional Python callback for domain-level predict validation
         """
         self.train_command = train_command
         self.predict_command = predict_command
+        self._on_validate_train = on_validate_train
+        self._on_validate_predict = on_validate_predict
 
         # Project root is current working directory
         # Users run: fastapi dev main.py (from project dir)
@@ -477,6 +516,29 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         self.project_root = Path.cwd()
 
         logger.info("shell_runner_initialized", project_root=str(self.project_root))
+
+    async def on_validate_train(
+        self,
+        config: ConfigT,
+        data: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Delegate to the provided validate-train callback, or return no diagnostics."""
+        if self._on_validate_train is None:
+            return []
+        return await self._on_validate_train(config, data, geo)
+
+    async def on_validate_predict(
+        self,
+        config: ConfigT,
+        historic: DataFrame,
+        future: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Delegate to the provided validate-predict callback, or return no diagnostics."""
+        if self._on_validate_predict is None:
+            return []
+        return await self._on_validate_predict(config, historic, future, geo)
 
     async def create_training_artifact(
         self,

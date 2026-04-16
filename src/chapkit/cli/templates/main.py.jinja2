@@ -11,7 +11,11 @@ from chapkit import BaseConfig
 from chapkit.data import DataFrame
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
+{% if WITH_VALIDATION %}
+from chapkit.ml import FunctionalModelRunner, ValidationDiagnostic
+{% else %}
 from chapkit.ml import FunctionalModelRunner
+{% endif %}
 
 log = structlog.get_logger()
 
@@ -97,6 +101,92 @@ async def on_predict(
     return DataFrame.from_pandas(future_df)
 
 
+{% if WITH_VALIDATION %}
+# ====================================================================================
+# $validate hooks (optional)
+# ====================================================================================
+# These functions power POST /api/v1/ml/$validate, which returns structured
+# diagnostics for a train or predict payload WITHOUT running a job. The frontend
+# can call $validate first to surface problems (e.g. "n_lags exceeds available
+# context") before submitting an expensive training run.
+#
+# Both functions receive the same inputs as on_train / on_predict and return a
+# list of ValidationDiagnostic. Returning [] means "no issues found".
+#
+# ValidationDiagnostic fields:
+#   severity: "error" | "warning" | "info"
+#       - error:   blocks submission (response has valid=False)
+#       - warning: surfaces an issue but does not block
+#       - info:    informational only
+#   code: stable machine-readable identifier (use snake_case); the frontend
+#         branches on this for rendering / i18n / documentation links.
+#   message: human-readable fallback — bake specifics into the text.
+#   field: optional dotted path to the offending input — e.g. "config.n_lags",
+#          "data", "historic", or "artifact_id".
+#
+# Framework-level checks (config existence, prediction_periods bounds, empty
+# data, failed training artifacts) are ALREADY performed by chapkit — you only
+# need to add domain checks that chapkit cannot know about.
+#
+# See docs/guides/ml-workflows.md for the full endpoint reference.
+
+
+async def on_validate_train(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    data: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> list[ValidationDiagnostic]:
+    """Return domain-specific diagnostics for a train payload.
+
+    Runs synchronously and is called AFTER chapkit's framework checks
+    (config exists, prediction_periods bounds, data non-empty). Add your own
+    checks here.
+
+    Example - require at least N rows of training data:
+
+        diagnostics: list[ValidationDiagnostic] = []
+        min_rows = 10
+        if len(data) < min_rows:
+            diagnostics.append(ValidationDiagnostic(
+                severity="error",
+                code="insufficient_training_samples",
+                message=f"Got {len(data)} rows, need at least {min_rows}",
+                field="data",
+            ))
+        return diagnostics
+    """
+    return []
+
+
+async def on_validate_predict(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    historic: DataFrame,
+    future: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> list[ValidationDiagnostic]:
+    """Return domain-specific diagnostics for a predict payload.
+
+    Runs AFTER framework checks (artifact exists, training did not fail,
+    historic/future non-empty). Typical use: verify historic context length
+    is sufficient for the model's lookback window.
+
+    Example - require historic to cover at least `lookback` periods:
+
+        diagnostics: list[ValidationDiagnostic] = []
+        lookback = getattr(config, "lookback", 0)
+        if lookback and len(historic) < lookback:
+            diagnostics.append(ValidationDiagnostic(
+                severity="error",
+                code="insufficient_historic_context",
+                message=f"historic has {len(historic)} rows, need {lookback}",
+                field="historic",
+            ))
+        return diagnostics
+    """
+    return []
+
+
+{% endif %}
 # Create ML service info with metadata
 info = MLServiceInfo(
     id="{{ PROJECT_SERVICE_ID }}",
@@ -121,7 +211,12 @@ HIERARCHY = ArtifactHierarchy(
 
 # Create functional model runner
 runner: FunctionalModelRunner[{{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config] = FunctionalModelRunner(
-    on_train=on_train, on_predict=on_predict
+    on_train=on_train,
+    on_predict=on_predict,
+{% if WITH_VALIDATION %}
+    on_validate_train=on_validate_train,
+    on_validate_predict=on_validate_predict,
+{% endif %}
 )
 
 # Database configuration

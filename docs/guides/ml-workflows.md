@@ -642,28 +642,59 @@ curl -X POST http://localhost:8000/api/v1/ml/\$validate \
 
 #### Adding model-specific checks
 
-Model authors add domain checks by overriding two optional hooks on `BaseModelRunner` (both default to returning `[]`):
+Model authors add domain checks via two optional hooks. The mechanism is the same across all three runner styles — pick whichever matches your project.
+
+**Functional runner** (most common): pass async callbacks to `FunctionalModelRunner`. Both are optional; omit either one and the endpoint returns no runner diagnostics for that side.
+
+```python
+from chapkit.ml import FunctionalModelRunner, ValidationDiagnostic
+
+async def on_validate_train(config, data, geo=None) -> list[ValidationDiagnostic]:
+    diagnostics: list[ValidationDiagnostic] = []
+    if config.n_lags > len(data):
+        diagnostics.append(ValidationDiagnostic(
+            severity="error",
+            code="n_lags_exceeds_context",
+            message=f"n_lags={config.n_lags} but only {len(data)} rows were provided",
+            field="config.n_lags",
+        ))
+    return diagnostics
+
+runner = FunctionalModelRunner(
+    on_train=on_train,
+    on_predict=on_predict,
+    on_validate_train=on_validate_train,
+    # on_validate_predict=... (optional)
+)
+```
+
+**Shell runner**: same Python callbacks — they run in Python and do **not** invoke your shell scripts, keeping `$validate` fast and avoiding workspace setup.
+
+```python
+runner = ShellModelRunner(
+    train_command="python scripts/train.py --data {data_file}",
+    predict_command="python scripts/predict.py ...",
+    on_validate_train=on_validate_train,
+    on_validate_predict=on_validate_predict,
+)
+```
+
+**Class-based runner**: override the hooks directly.
 
 ```python
 from chapkit.ml import BaseModelRunner, ValidationDiagnostic
 
 class MyRunner(BaseModelRunner[MyConfig]):
     async def on_validate_train(self, config, data, geo=None) -> list[ValidationDiagnostic]:
-        diagnostics: list[ValidationDiagnostic] = []
-        if config.n_lags > len(data):
-            diagnostics.append(ValidationDiagnostic(
-                severity="error",
-                code="n_lags_exceeds_context",
-                message=f"n_lags={config.n_lags} but only {len(data)} rows were provided",
-                field="config.n_lags",
-            ))
-        return diagnostics
+        ...  # same shape
 
     async def on_validate_predict(self, config, historic, future, geo=None) -> list[ValidationDiagnostic]:
         return []
 ```
 
-The manager runs framework checks first and only calls the hook if the config/artifact successfully loaded. The runner's diagnostics are appended to the framework's — they cannot suppress built-in errors.
+The manager runs framework checks first and only calls the hook if the config/artifact successfully loaded. Runner diagnostics are appended to framework diagnostics — they cannot suppress built-in errors.
+
+**Scaffolding tip:** `chapkit init my-service --with-validation` scaffolds both callbacks with well-documented stubs wired into the runner, so you can start from a working example. See [CLI Scaffolding](cli-scaffolding.md#with-validation-hooks).
 
 See `examples/ml_class/main.py` for a working `on_validate_train` override that surfaces `insufficient_training_samples` when `len(data) < config.min_samples`.
 
