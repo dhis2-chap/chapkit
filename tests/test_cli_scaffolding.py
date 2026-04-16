@@ -78,7 +78,7 @@ def scaffold_project(tmp_path: Path, chapkit_root: Path) -> Callable[[str, str],
         # Replace the chapkit dependency with a path-based dependency
         local_path = chapkit_root.absolute()
         content = re.sub(
-            r'"chapkit>=[\d.]+"',
+            r'"chapkit>=[^"]+"',
             f'"chapkit @ file://{local_path}"',
             content,
         )
