@@ -144,7 +144,47 @@
             ]
         },
         {
-            "name": "3. Model Training (External Script)",
+            "name": "3. Model Validation",
+            "description": "Pre-flight checks for train/predict payloads. Runs in Python (does NOT invoke your shell scripts) and returns structured diagnostics without submitting a job. Framework-level checks always run; model-specific checks run when the runner is given on_validate_train / on_validate_predict Python callbacks.",
+            "item": [
+                {
+                    "name": "Validate Train Payload",
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"type\": \"train\",\n  \"config_id\": \"{%raw%}{{config_id}}{%endraw%}\",\n  \"data\": {\n    \"columns\": [\"feature_1\", \"feature_2\", \"target\"],\n    \"data\": [\n      [1.0, 2.0, 3.0],\n      [2.0, 3.0, 5.0],\n      [3.0, 4.0, 7.0],\n      [4.0, 5.0, 9.0]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$validate",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "ml", "$validate"]
+                        },
+                        "description": "Discriminated union body: type=train. Returns {valid: bool, diagnostics: [...]}. Call before $train to catch problems early."
+                    }
+                },
+                {
+                    "name": "Validate Predict Payload",
+                    "request": {
+                        "method": "POST",
+                        "header": [{"key": "Content-Type", "value": "application/json"}],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"type\": \"predict\",\n  \"artifact_id\": \"{%raw%}{{model_artifact_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$validate",
+                            "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
+                            "path": ["api", "v1", "ml", "$validate"]
+                        },
+                        "description": "Discriminated union body: type=predict. Uses {{model_artifact_id}} from a prior $train run."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "4. Model Training (External Script)",
             "item": [
                 {
                     "name": "Train Model via External Script",
@@ -206,7 +246,7 @@
             ]
         },
         {
-            "name": "4. Predictions (External Script)",
+            "name": "5. Predictions (External Script)",
             "item": [
                 {
                     "name": "Make Predictions via External Script",
@@ -319,7 +359,7 @@
             ]
         },
         {
-            "name": "5. Job & Artifact Management",
+            "name": "6. Job & Artifact Management",
             "item": [
                 {
                     "name": "List All Jobs",
