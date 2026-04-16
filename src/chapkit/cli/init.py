@@ -97,6 +97,15 @@ def init_command(
         typer.echo(f"Error: Invalid template '{template}'. Must be 'ml', 'ml-shell', or 'task'", err=True)
         raise typer.Exit(code=1)
 
+    if with_validation and template == "task":
+        typer.echo(
+            "Error: --with-validation is only supported for ML templates "
+            "('ml' or 'ml-shell'). The task template has no ML runner and "
+            "therefore no $validate endpoint.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     project_slug = _slugify(project_name)
 
     typer.echo(f"Creating new chapkit project: {project_name}")

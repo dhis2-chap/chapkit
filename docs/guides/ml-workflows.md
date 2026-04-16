@@ -692,7 +692,7 @@ class MyRunner(BaseModelRunner[MyConfig]):
         return []
 ```
 
-The manager runs framework checks first and only calls the hook if the config/artifact successfully loaded. Runner diagnostics are appended to framework diagnostics — they cannot suppress built-in errors.
+The manager runs framework checks first and **only calls the hook when no framework diagnostic with `severity="error"` was raised**. Your hook therefore only runs against payloads chapkit already considered structurally valid — it does not need to defensively re-check things like "data is non-empty" or "training artifact exists". Warnings and info-severity framework diagnostics do not short-circuit the hook. Runner diagnostics are then appended to framework diagnostics — they cannot suppress built-in errors.
 
 **Scaffolding tip:** `chapkit init my-service --with-validation` scaffolds both callbacks with well-documented stubs wired into the runner, so you can start from a working example. See [CLI Scaffolding](cli-scaffolding.md#with-validation-hooks).
 

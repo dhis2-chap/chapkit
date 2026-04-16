@@ -35,6 +35,11 @@ from .schemas import (
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
 
+def _has_error(diagnostics: list[ValidationDiagnostic]) -> bool:
+    """Return True if any diagnostic has severity='error'."""
+    return any(d.severity == "error" for d in diagnostics)
+
+
 class MLManager(Generic[ConfigT]):
     """Manager for ML train/predict operations with job scheduling and artifact storage."""
 
@@ -103,8 +108,7 @@ class MLManager(Generic[ConfigT]):
             diagnostics = await self._validate_train(request)
         else:
             diagnostics = await self._validate_predict(request)
-        has_error = any(d.severity == "error" for d in diagnostics)
-        return ValidationResponse(valid=not has_error, diagnostics=diagnostics)
+        return ValidationResponse(valid=not _has_error(diagnostics), diagnostics=diagnostics)
 
     async def _validate_train(self, request: ValidateTrainRequest) -> list[ValidationDiagnostic]:
         """Collect diagnostics for a train payload."""
@@ -137,6 +141,9 @@ class MLManager(Generic[ConfigT]):
                     field="data",
                 )
             )
+
+        if _has_error(diagnostics):
+            return diagnostics
 
         runner_diagnostics = await self.runner.on_validate_train(
             config=config.data,
@@ -261,6 +268,9 @@ class MLManager(Generic[ConfigT]):
                     field="future",
                 )
             )
+
+        if _has_error(diagnostics):
+            return diagnostics
 
         runner_diagnostics = await self.runner.on_validate_predict(
             config=config.data,

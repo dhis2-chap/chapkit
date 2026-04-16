@@ -440,6 +440,54 @@ async def test_validate_predict_handles_malformed_config_id_in_metadata() -> Non
         await db.dispose()
 
 
+async def test_validate_train_skips_runner_hook_when_framework_errored() -> None:
+    """Regression: framework errors must short-circuit runner hooks.
+
+    The reviewer filed: a hook that assumes non-empty data crashes
+    $validate when data is empty, even though the framework already
+    caught data_empty. After the fix, the hook must not be called.
+    """
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        from chapkit.config import ConfigManager, ConfigRepository
+        from chapkit.config.schemas import ConfigIn
+        from chapkit.ml.schemas import ValidateTrainRequest
+
+        async with db.session() as session:
+            config_repo = ConfigRepository(session)
+            config_manager: ConfigManager[BaseConfig] = ConfigManager(config_repo, SampleConfig)
+            created = await config_manager.save(ConfigIn(name="seed", data=SampleConfig(prediction_periods=3)))
+            config_id = created.id
+
+        hook_called = {"count": 0}
+
+        async def exploding_hook(config: Any, data: Any, geo: Any = None) -> Any:
+            hook_called["count"] += 1
+            raise RuntimeError("hook assumed non-empty data — must never be called")
+
+        runner = FunctionalModelRunner(
+            on_train=_noop_train,
+            on_predict=_noop_predict,
+            on_validate_train=exploding_hook,
+        )
+        manager = await _build_manager(runner, db)
+
+        response = await manager.validate(
+            ValidateTrainRequest(
+                config_id=config_id,
+                data=DataFrame(columns=["rainfall"], data=[]),
+            )
+        )
+
+        assert response.valid is False
+        assert hook_called["count"] == 0
+        codes = [d.code for d in response.diagnostics]
+        assert codes == ["data_empty"]
+    finally:
+        await db.dispose()
+
+
 async def test_validate_predict_surfaces_corrupt_model_pickle() -> None:
     """Regression: $validate must not report valid=True when $predict would fail on pickle load."""
     db = SqliteDatabaseBuilder.in_memory().build()
