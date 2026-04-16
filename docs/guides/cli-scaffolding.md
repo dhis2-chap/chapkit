@@ -119,7 +119,7 @@ chapkit init PROJECT_NAME [OPTIONS]
 
 - `--path PATH` - Target directory (default: current directory)
 - `--with-monitoring` - Include Prometheus and Grafana monitoring stack
-- `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Off by default.
+- `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Only valid with `--template ml` or `--template ml-shell`; combining it with `--template task` is rejected because task services have no ML runner and no `$validate` endpoint. Off by default.
 - `--template TYPE` - Template type: `ml` (default), `ml-shell`, or `task`
 - `--help` - Show help message
 
@@ -395,17 +395,24 @@ my-service/
 
 ### With Validation Hooks
 
-When using `--with-validation`, the generated `main.py` gains two extra async
-functions and wires them into the runner:
+Applies to the `ml` and `ml-shell` templates only. Passing `--with-validation`
+together with `--template task` is rejected by the CLI because task services
+have no ML runner and no `$validate` endpoint.
+
+When using `--with-validation` with an ML template, the generated `main.py`
+gains two extra async functions and wires them into the runner:
 
 - `on_validate_train(config, data, geo)` - runs on `POST /api/v1/ml/$validate` with `{"type": "train", ...}`
 - `on_validate_predict(config, historic, future, geo)` - runs on `POST /api/v1/ml/$validate` with `{"type": "predict", ...}`
 
 Both return `list[ValidationDiagnostic]`. Framework-level checks (config
 exists, `prediction_periods` bounds, empty data, failed training artifact)
-are run by chapkit before your hook, so you only need to add **domain**
-checks that chapkit cannot know about - for example comparing `config.n_lags`
-to `len(historic)`, or checking that required covariate columns are present.
+are run by chapkit before your hook; your hook is only invoked when no
+framework diagnostic has `severity="error"`, so you do not need to
+defensively re-check things chapkit has already covered. Use the hooks for
+**domain** checks chapkit cannot know about - for example comparing
+`config.n_lags` to `len(historic)`, or checking that required covariate
+columns are present.
 
 Omit `--with-validation` (default) if you do not need domain checks: the
 `$validate` endpoint still works, it just returns only the framework-level
