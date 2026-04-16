@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import datetime
+import pickle
 import shutil
+import zipfile
+from io import BytesIO
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from servicekit import Database
 from ulid import ULID
@@ -204,7 +207,22 @@ class MLManager(Generic[ConfigT]):
             )
             return diagnostics
 
-        config_id = ULID.from_str(config_id_str)
+        try:
+            config_id = ULID.from_str(config_id_str)
+        except ValueError:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="invalid_training_artifact",
+                    message=(
+                        f"Training artifact {request.artifact_id} has a malformed config_id "
+                        f"in metadata: {config_id_str!r}"
+                    ),
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
         async with self.database.session() as session:
             config_repo = ConfigRepository(session)
             config_manager = ConfigManager(config_repo, self.config_schema)
@@ -222,6 +240,8 @@ class MLManager(Generic[ConfigT]):
             return diagnostics
 
         diagnostics.extend(self._check_prediction_periods(config.data))
+
+        diagnostics.extend(self._check_training_workspace(training_data, request.artifact_id))
 
         if len(request.historic) == 0:
             diagnostics.append(
@@ -249,6 +269,85 @@ class MLManager(Generic[ConfigT]):
             geo=request.geo,
         )
         diagnostics.extend(runner_diagnostics)
+        return diagnostics
+
+    def _check_training_workspace(
+        self,
+        training_data: dict[str, Any],
+        artifact_id: ULID,
+    ) -> list[ValidationDiagnostic]:
+        """Mirror the deterministic integrity checks from _predict_task."""
+        from .runner import ShellModelRunner
+
+        diagnostics: list[ValidationDiagnostic] = []
+
+        if training_data.get("content_type") != "application/zip":
+            return diagnostics
+
+        workspace_content = training_data.get("content")
+        if not isinstance(workspace_content, (bytes, bytearray)) or len(workspace_content) == 0:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="training_workspace_corrupted",
+                    message=f"Training artifact {artifact_id} has empty or non-binary workspace content",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        try:
+            with zipfile.ZipFile(BytesIO(workspace_content), "r") as zf:
+                bad_entry = zf.testzip()
+                if bad_entry is not None:
+                    diagnostics.append(
+                        ValidationDiagnostic(
+                            severity="error",
+                            code="training_workspace_corrupted",
+                            message=f"Corrupt file in training workspace ZIP: {bad_entry}",
+                            field="artifact_id",
+                        )
+                    )
+                    return diagnostics
+                names = set(zf.namelist())
+                pickle_bytes = zf.read("model.pickle") if "model.pickle" in names else None
+        except zipfile.BadZipFile as exc:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="training_workspace_corrupted",
+                    message=f"Training artifact workspace is not a valid ZIP: {exc}",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        if isinstance(self.runner, ShellModelRunner):
+            return diagnostics
+
+        if pickle_bytes is None:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="model_pickle_missing",
+                    message="Training artifact workspace is missing model.pickle",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        try:
+            pickle.loads(pickle_bytes)
+        except (pickle.UnpicklingError, EOFError, TypeError, AttributeError, ImportError, ValueError) as exc:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="model_pickle_corrupted",
+                    message=f"Training artifact model.pickle is corrupted or incompatible: {exc}",
+                    field="artifact_id",
+                )
+            )
+
         return diagnostics
 
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
