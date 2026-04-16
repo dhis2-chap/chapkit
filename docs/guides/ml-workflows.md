@@ -556,6 +556,117 @@ ARTIFACT_ID=$(curl -s http://localhost:8000/api/v1/jobs/$JOB_ID | jq -r '.artifa
 curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq
 ```
 
+### POST /api/v1/ml/$validate
+
+Pre-flight check for a train or predict payload. Returns structured diagnostics without running a job, so a frontend can decide whether to proceed before submitting an expensive `$train` / `$predict` call.
+
+The request body is a **discriminated union** on the `type` field:
+
+- `type: "train"` — same fields as `$train` (`config_id`, `data`, `geo`).
+- `type: "predict"` — same fields as `$predict` (`artifact_id`, `historic`, `future`, `geo`).
+
+**Response (200 OK):**
+```json
+{
+  "valid": true,
+  "diagnostics": []
+}
+```
+
+Every call returns `200 OK`. Malformed payloads (missing fields, unknown `type`) still return `422` via normal Pydantic validation.
+
+**Diagnostic shape:**
+```json
+{
+  "severity": "error | warning | info",
+  "code": "data_empty",
+  "message": "Training data is empty",
+  "field": "data"
+}
+```
+
+- `severity` — `error` blocks submission, `warning` and `info` do not.
+- `code` — stable machine-readable identifier for FE branching / i18n.
+- `message` — human-readable fallback.
+- `field` — optional dotted path to the offending input (`config.n_lags`, `historic`, `artifact_id`).
+- `valid` is `true` iff no diagnostic has `severity == "error"` — derived server-side for convenience.
+
+**Built-in framework checks:**
+
+*Train (`type: "train"`):*
+- `config_not_found` — `config_id` does not resolve.
+- `prediction_periods_out_of_bounds` — outside the configured `[min, max]` window.
+- `data_empty` — `data` contains zero rows.
+
+*Predict (`type: "predict"`):*
+- `training_artifact_not_found` — `artifact_id` does not resolve.
+- `invalid_training_artifact` — artifact exists but is not an `ml_training_workspace`.
+- `training_artifact_failed` — the referenced training run failed.
+- `config_not_found` — the artifact references a config that no longer exists.
+- `prediction_periods_out_of_bounds` — same bounds check as train.
+- `historic_empty` / `future_empty` — either payload contains zero rows.
+
+**Train request example:**
+```json
+{
+  "type": "train",
+  "config_id": "01JCONFIG...",
+  "data": {
+    "columns": ["rainfall", "temperature", "cases"],
+    "data": [[10.0, 25.0, 5.0]]
+  }
+}
+```
+
+**Predict request example:**
+```json
+{
+  "type": "predict",
+  "artifact_id": "01MODEL456...",
+  "historic": {"columns": ["rainfall"], "data": [[10.0]]},
+  "future":   {"columns": ["rainfall"], "data": [[12.0]]}
+}
+```
+
+**cURL example:**
+```bash
+curl -X POST http://localhost:8000/api/v1/ml/\$validate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "train",
+    "config_id": "'$CONFIG_ID'",
+    "data": {"columns": ["rainfall"], "data": []}
+  }' | jq
+# -> {"valid": false, "diagnostics": [{"severity": "error", "code": "data_empty", ...}]}
+```
+
+#### Adding model-specific checks
+
+Model authors add domain checks by overriding two optional hooks on `BaseModelRunner` (both default to returning `[]`):
+
+```python
+from chapkit.ml import BaseModelRunner, ValidationDiagnostic
+
+class MyRunner(BaseModelRunner[MyConfig]):
+    async def on_validate_train(self, config, data, geo=None) -> list[ValidationDiagnostic]:
+        diagnostics: list[ValidationDiagnostic] = []
+        if config.n_lags > len(data):
+            diagnostics.append(ValidationDiagnostic(
+                severity="error",
+                code="n_lags_exceeds_context",
+                message=f"n_lags={config.n_lags} but only {len(data)} rows were provided",
+                field="config.n_lags",
+            ))
+        return diagnostics
+
+    async def on_validate_predict(self, config, historic, future, geo=None) -> list[ValidationDiagnostic]:
+        return []
+```
+
+The manager runs framework checks first and only calls the hook if the config/artifact successfully loaded. The runner's diagnostics are appended to the framework's — they cannot suppress built-in errors.
+
+See `examples/ml_class/main.py` for a working `on_validate_train` override that surfaces `insufficient_training_samples` when `len(data) < config.min_samples`.
+
 ---
 
 ## Data Formats

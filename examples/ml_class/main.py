@@ -19,7 +19,7 @@ from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
-from chapkit.ml import BaseModelRunner
+from chapkit.ml import BaseModelRunner, ValidationDiagnostic
 
 log = structlog.get_logger()
 
@@ -118,6 +118,27 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
 
         finally:
             await self.on_cleanup()
+
+    async def on_validate_train(
+        self,
+        config: WeatherConfig,
+        data: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Report a diagnostic when the training set is below config.min_samples."""
+        diagnostics: list[ValidationDiagnostic] = []
+        if len(data) < config.min_samples:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="insufficient_training_samples",
+                    message=(
+                        f"Training data has {len(data)} rows; at least {config.min_samples} are required by min_samples"
+                    ),
+                    field="data",
+                )
+            )
+        return diagnostics
 
     async def on_predict(
         self,

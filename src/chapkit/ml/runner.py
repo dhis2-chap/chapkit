@@ -18,6 +18,7 @@ from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
+from chapkit.ml.schemas import ValidationDiagnostic
 from chapkit.utils import run_shell
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
@@ -265,6 +266,25 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
     ) -> DataFrame:
         """Make predictions using a trained model and return predictions as DataFrame."""
         ...
+
+    async def on_validate_train(
+        self,
+        config: ConfigT,
+        data: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Return domain-specific diagnostics for a train payload (default: empty)."""
+        return []
+
+    async def on_validate_predict(
+        self,
+        config: ConfigT,
+        historic: DataFrame,
+        future: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Return domain-specific diagnostics for a predict payload (default: empty)."""
+        return []
 
 
 class FunctionalModelRunner(BaseModelRunner[ConfigT]):

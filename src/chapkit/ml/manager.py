@@ -22,6 +22,11 @@ from .schemas import (
     PredictResponse,
     TrainRequest,
     TrainResponse,
+    ValidatePredictRequest,
+    ValidateRequest,
+    ValidateTrainRequest,
+    ValidationDiagnostic,
+    ValidationResponse,
 )
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
@@ -58,6 +63,193 @@ class MLManager(Generic[ConfigT]):
             raise ValueError(
                 f"prediction_periods ({periods}) exceeds the maximum allowed value ({self.max_prediction_periods})"
             )
+
+    def _check_prediction_periods(self, config_data: BaseConfig) -> list[ValidationDiagnostic]:
+        """Non-raising variant of prediction-periods bounds check returning diagnostics."""
+        diagnostics: list[ValidationDiagnostic] = []
+        periods = config_data.prediction_periods
+        if periods < self.min_prediction_periods:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="prediction_periods_out_of_bounds",
+                    message=(
+                        f"prediction_periods ({periods}) is below the minimum allowed value "
+                        f"({self.min_prediction_periods})"
+                    ),
+                    field="config.prediction_periods",
+                )
+            )
+        elif periods > self.max_prediction_periods:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="prediction_periods_out_of_bounds",
+                    message=(
+                        f"prediction_periods ({periods}) exceeds the maximum allowed value "
+                        f"({self.max_prediction_periods})"
+                    ),
+                    field="config.prediction_periods",
+                )
+            )
+        return diagnostics
+
+    async def validate(self, request: ValidateRequest) -> ValidationResponse:
+        """Run framework-level and runner validations for a train or predict payload."""
+        if request.type == "train":
+            diagnostics = await self._validate_train(request)
+        else:
+            diagnostics = await self._validate_predict(request)
+        has_error = any(d.severity == "error" for d in diagnostics)
+        return ValidationResponse(valid=not has_error, diagnostics=diagnostics)
+
+    async def _validate_train(self, request: ValidateTrainRequest) -> list[ValidationDiagnostic]:
+        """Collect diagnostics for a train payload."""
+        diagnostics: list[ValidationDiagnostic] = []
+
+        async with self.database.session() as session:
+            config_repo = ConfigRepository(session)
+            config_manager: ConfigManager[ConfigT] = ConfigManager(config_repo, self.config_schema)
+            config = await config_manager.find_by_id(request.config_id)
+
+        if config is None:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="config_not_found",
+                    message=f"Config {request.config_id} not found",
+                    field="config_id",
+                )
+            )
+            return diagnostics
+
+        diagnostics.extend(self._check_prediction_periods(config.data))
+
+        if len(request.data) == 0:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="data_empty",
+                    message="Training data is empty",
+                    field="data",
+                )
+            )
+
+        runner_diagnostics = await self.runner.on_validate_train(
+            config=config.data,
+            data=request.data,
+            geo=request.geo,
+        )
+        diagnostics.extend(runner_diagnostics)
+        return diagnostics
+
+    async def _validate_predict(self, request: ValidatePredictRequest) -> list[ValidationDiagnostic]:
+        """Collect diagnostics for a predict payload."""
+        diagnostics: list[ValidationDiagnostic] = []
+
+        async with self.database.session() as session:
+            artifact_repo = ArtifactRepository(session)
+            artifact_manager = ArtifactManager(artifact_repo)
+            training_artifact = await artifact_manager.find_by_id(request.artifact_id)
+
+        if training_artifact is None:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="training_artifact_not_found",
+                    message=f"Training artifact {request.artifact_id} not found",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        training_data = training_artifact.data
+        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training_workspace":
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="invalid_training_artifact",
+                    message=f"Artifact {request.artifact_id} is not a training artifact",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        training_metadata = training_data.get("metadata", {})
+        training_status = training_metadata.get("status", "unknown")
+        if training_status == "failed":
+            exit_code = training_metadata.get("exit_code", "unknown")
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="training_artifact_failed",
+                    message=(
+                        f"Training artifact {request.artifact_id} failed training "
+                        f"(exit_code={exit_code}); cannot predict with it"
+                    ),
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        config_id_str = training_metadata.get("config_id")
+        if not config_id_str:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="invalid_training_artifact",
+                    message=f"Training artifact {request.artifact_id} is missing config_id in metadata",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        config_id = ULID.from_str(config_id_str)
+        async with self.database.session() as session:
+            config_repo = ConfigRepository(session)
+            config_manager = ConfigManager(config_repo, self.config_schema)
+            config = await config_manager.find_by_id(config_id)
+
+        if config is None:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="config_not_found",
+                    message=f"Config {config_id} referenced by training artifact not found",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        diagnostics.extend(self._check_prediction_periods(config.data))
+
+        if len(request.historic) == 0:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="historic_empty",
+                    message="Historic data is empty",
+                    field="historic",
+                )
+            )
+        if len(request.future) == 0:
+            diagnostics.append(
+                ValidationDiagnostic(
+                    severity="error",
+                    code="future_empty",
+                    message="Future data is empty",
+                    field="future",
+                )
+            )
+
+        runner_diagnostics = await self.runner.on_validate_predict(
+            config=config.data,
+            historic=request.historic,
+            future=request.future,
+            geo=request.geo,
+        )
+        diagnostics.extend(runner_diagnostics)
+        return diagnostics
 
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""

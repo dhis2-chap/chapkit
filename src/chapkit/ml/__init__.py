@@ -9,8 +9,14 @@ from .schemas import (
     ModelRunnerProtocol,
     PredictRequest,
     PredictResponse,
+    Severity,
     TrainRequest,
     TrainResponse,
+    ValidatePredictRequest,
+    ValidateRequest,
+    ValidateTrainRequest,
+    ValidationDiagnostic,
+    ValidationResponse,
 )
 
 __all__ = [
@@ -26,4 +32,10 @@ __all__ = [
     "TrainRequest",
     "TrainResponse",
     "MLTrainingWorkspaceArtifactData",
+    "ValidatePredictRequest",
+    "ValidateRequest",
+    "ValidateTrainRequest",
+    "ValidationDiagnostic",
+    "ValidationResponse",
+    "Severity",
 ]
