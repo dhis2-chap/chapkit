@@ -57,8 +57,7 @@ async def test_functional_runner_calls_validate_train_callback() -> None:
     ) -> list[ValidationDiagnostic]:
         if len(data) < config.min_rows:
             return [
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="too_few_rows",
                     message=f"need {config.min_rows}, got {len(data)}",
                     field="data",
@@ -93,8 +92,7 @@ async def test_functional_runner_calls_validate_predict_callback() -> None:
         geo: FeatureCollection | None = None,
     ) -> list[ValidationDiagnostic]:
         return [
-            ValidationDiagnostic(
-                severity="warning",
+            ValidationDiagnostic.warning(
                 code="runner_saw_predict",
                 message="runner hook invoked",
                 field=None,
@@ -140,8 +138,7 @@ async def test_shell_runner_calls_validate_callbacks() -> None:
         geo: FeatureCollection | None = None,
     ) -> list[ValidationDiagnostic]:
         return [
-            ValidationDiagnostic(
-                severity="error",
+            ValidationDiagnostic.error(
                 code="shell_validate_train",
                 message="called",
                 field="data",
@@ -155,8 +152,7 @@ async def test_shell_runner_calls_validate_callbacks() -> None:
         geo: FeatureCollection | None = None,
     ) -> list[ValidationDiagnostic]:
         return [
-            ValidationDiagnostic(
-                severity="error",
+            ValidationDiagnostic.error(
                 code="shell_validate_predict",
                 message="called",
                 field="future",

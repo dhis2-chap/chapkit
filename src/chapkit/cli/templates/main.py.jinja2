@@ -147,8 +147,7 @@ async def on_validate_train(
         diagnostics: list[ValidationDiagnostic] = []
         min_rows = 10
         if len(data) < min_rows:
-            diagnostics.append(ValidationDiagnostic(
-                severity="error",
+            diagnostics.append(ValidationDiagnostic.error(
                 code="insufficient_training_samples",
                 message=f"Got {len(data)} rows, need at least {min_rows}",
                 field="data",
@@ -175,8 +174,7 @@ async def on_validate_predict(
         diagnostics: list[ValidationDiagnostic] = []
         lookback = getattr(config, "lookback", 0)
         if lookback and len(historic) < lookback:
-            diagnostics.append(ValidationDiagnostic(
-                severity="error",
+            diagnostics.append(ValidationDiagnostic.error(
                 code="insufficient_historic_context",
                 message=f"historic has {len(historic)} rows, need {lookback}",
                 field="historic",

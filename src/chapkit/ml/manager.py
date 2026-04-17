@@ -78,8 +78,7 @@ class MLManager(Generic[ConfigT]):
         periods = config_data.prediction_periods
         if periods < self.min_prediction_periods:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="prediction_periods_out_of_bounds",
                     message=(
                         f"prediction_periods ({periods}) is below the minimum allowed value "
@@ -90,8 +89,7 @@ class MLManager(Generic[ConfigT]):
             )
         elif periods > self.max_prediction_periods:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="prediction_periods_out_of_bounds",
                     message=(
                         f"prediction_periods ({periods}) exceeds the maximum allowed value "
@@ -121,8 +119,7 @@ class MLManager(Generic[ConfigT]):
 
         if config is None:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="config_not_found",
                     message=f"Config {request.config_id} not found",
                     field="config_id",
@@ -134,8 +131,7 @@ class MLManager(Generic[ConfigT]):
 
         if len(request.data) == 0:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="data_empty",
                     message="Training data is empty",
                     field="data",
@@ -164,8 +160,7 @@ class MLManager(Generic[ConfigT]):
 
         if training_artifact is None:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="training_artifact_not_found",
                     message=f"Training artifact {request.artifact_id} not found",
                     field="artifact_id",
@@ -176,8 +171,7 @@ class MLManager(Generic[ConfigT]):
         training_data = training_artifact.data
         if not isinstance(training_data, dict) or training_data.get("type") != "ml_training_workspace":
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="invalid_training_artifact",
                     message=f"Artifact {request.artifact_id} is not a training artifact",
                     field="artifact_id",
@@ -190,8 +184,7 @@ class MLManager(Generic[ConfigT]):
         if training_status == "failed":
             exit_code = training_metadata.get("exit_code", "unknown")
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="training_artifact_failed",
                     message=(
                         f"Training artifact {request.artifact_id} failed training "
@@ -205,8 +198,7 @@ class MLManager(Generic[ConfigT]):
         config_id_str = training_metadata.get("config_id")
         if not config_id_str:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="invalid_training_artifact",
                     message=f"Training artifact {request.artifact_id} is missing config_id in metadata",
                     field="artifact_id",
@@ -218,8 +210,7 @@ class MLManager(Generic[ConfigT]):
             config_id = ULID.from_str(config_id_str)
         except ValueError:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="invalid_training_artifact",
                     message=(
                         f"Training artifact {request.artifact_id} has a malformed config_id "
@@ -237,8 +228,7 @@ class MLManager(Generic[ConfigT]):
 
         if config is None:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="config_not_found",
                     message=f"Config {config_id} referenced by training artifact not found",
                     field="artifact_id",
@@ -252,8 +242,7 @@ class MLManager(Generic[ConfigT]):
 
         if len(request.historic) == 0:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="historic_empty",
                     message="Historic data is empty",
                     field="historic",
@@ -261,8 +250,7 @@ class MLManager(Generic[ConfigT]):
             )
         if len(request.future) == 0:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="future_empty",
                     message="Future data is empty",
                     field="future",
@@ -297,8 +285,7 @@ class MLManager(Generic[ConfigT]):
         workspace_content = training_data.get("content")
         if not isinstance(workspace_content, (bytes, bytearray)) or len(workspace_content) == 0:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="training_workspace_corrupted",
                     message=f"Training artifact {artifact_id} has empty or non-binary workspace content",
                     field="artifact_id",
@@ -311,8 +298,7 @@ class MLManager(Generic[ConfigT]):
                 bad_entry = zf.testzip()
                 if bad_entry is not None:
                     diagnostics.append(
-                        ValidationDiagnostic(
-                            severity="error",
+                        ValidationDiagnostic.error(
                             code="training_workspace_corrupted",
                             message=f"Corrupt file in training workspace ZIP: {bad_entry}",
                             field="artifact_id",
@@ -323,8 +309,7 @@ class MLManager(Generic[ConfigT]):
                 pickle_bytes = zf.read("model.pickle") if "model.pickle" in names else None
         except zipfile.BadZipFile as exc:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="training_workspace_corrupted",
                     message=f"Training artifact workspace is not a valid ZIP: {exc}",
                     field="artifact_id",
@@ -337,8 +322,7 @@ class MLManager(Generic[ConfigT]):
 
         if pickle_bytes is None:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="model_pickle_missing",
                     message="Training artifact workspace is missing model.pickle",
                     field="artifact_id",
@@ -350,8 +334,7 @@ class MLManager(Generic[ConfigT]):
             pickle.loads(pickle_bytes)
         except (pickle.UnpicklingError, EOFError, TypeError, AttributeError, ImportError, ValueError) as exc:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="model_pickle_corrupted",
                     message=f"Training artifact model.pickle is corrupted or incompatible: {exc}",
                     field="artifact_id",

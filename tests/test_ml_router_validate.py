@@ -70,8 +70,7 @@ def test_validate_surfaces_error_diagnostic_with_valid_false() -> None:
         return_value=ValidationResponse(
             valid=False,
             diagnostics=[
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="data_empty",
                     message="Training data is empty",
                     field="data",

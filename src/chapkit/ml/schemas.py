@@ -79,6 +79,21 @@ class ValidationDiagnostic(BaseModel):
         description="Optional dotted path to the offending input, e.g. 'config.n_lags' or 'historic'",
     )
 
+    @classmethod
+    def error(cls, code: str, message: str, *, field: str | None = None) -> ValidationDiagnostic:
+        """Create an error-severity diagnostic."""
+        return cls(severity="error", code=code, message=message, field=field)
+
+    @classmethod
+    def warning(cls, code: str, message: str, *, field: str | None = None) -> ValidationDiagnostic:
+        """Create a warning-severity diagnostic."""
+        return cls(severity="warning", code=code, message=message, field=field)
+
+    @classmethod
+    def info(cls, code: str, message: str, *, field: str | None = None) -> ValidationDiagnostic:
+        """Create an info-severity diagnostic."""
+        return cls(severity="info", code=code, message=message, field=field)
+
 
 class ValidationResponse(BaseModel):
     """Result of a $validate call."""

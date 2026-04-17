@@ -129,8 +129,7 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
         diagnostics: list[ValidationDiagnostic] = []
         if len(data) < config.min_samples:
             diagnostics.append(
-                ValidationDiagnostic(
-                    severity="error",
+                ValidationDiagnostic.error(
                     code="insufficient_training_samples",
                     message=(
                         f"Training data has {len(data)} rows; at least {config.min_samples} are required by min_samples"

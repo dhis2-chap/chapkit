@@ -652,8 +652,7 @@ from chapkit.ml import FunctionalModelRunner, ValidationDiagnostic
 async def on_validate_train(config, data, geo=None) -> list[ValidationDiagnostic]:
     diagnostics: list[ValidationDiagnostic] = []
     if config.n_lags > len(data):
-        diagnostics.append(ValidationDiagnostic(
-            severity="error",
+        diagnostics.append(ValidationDiagnostic.error(
             code="n_lags_exceeds_context",
             message=f"n_lags={config.n_lags} but only {len(data)} rows were provided",
             field="config.n_lags",
