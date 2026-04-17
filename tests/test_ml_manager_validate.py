@@ -18,7 +18,7 @@ from chapkit import Artifact, ArtifactRepository
 from chapkit.config import BaseConfig
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner, MLManager, ShellModelRunner
-from chapkit.ml.schemas import ValidatePredictRequest
+from chapkit.ml.schemas import ValidatePredictRequest, ValidationDiagnostic
 
 
 class SampleConfig(BaseConfig):
@@ -534,3 +534,108 @@ async def test_validate_predict_surfaces_corrupt_model_pickle() -> None:
         assert response.valid is False
     finally:
         await db.dispose()
+
+
+async def test_validate_predict_invalid_artifact_type() -> None:
+    """Artifact with wrong type (not ml_training_workspace) yields invalid_training_artifact."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        artifact_id = await _seed_training_artifact(db, {"type": "generic", "metadata": {}})
+        manager = await _build_manager(FunctionalModelRunner(on_train=_noop_train, on_predict=_noop_predict), db)
+        response = await manager.validate(
+            ValidatePredictRequest(
+                artifact_id=artifact_id,
+                historic=DataFrame(columns=["x"], data=[[1.0]]),
+                future=DataFrame(columns=["x"], data=[[2.0]]),
+            )
+        )
+        assert response.valid is False
+        assert response.diagnostics[0].code == "invalid_training_artifact"
+    finally:
+        await db.dispose()
+
+
+async def test_validate_predict_failed_training_artifact() -> None:
+    """Failed training artifact yields training_artifact_failed."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        artifact_id = await _seed_training_artifact(
+            db,
+            {
+                "type": "ml_training_workspace",
+                "metadata": {"status": "failed", "exit_code": 1},
+            },
+        )
+        manager = await _build_manager(FunctionalModelRunner(on_train=_noop_train, on_predict=_noop_predict), db)
+        response = await manager.validate(
+            ValidatePredictRequest(
+                artifact_id=artifact_id,
+                historic=DataFrame(columns=["x"], data=[[1.0]]),
+                future=DataFrame(columns=["x"], data=[[2.0]]),
+            )
+        )
+        assert response.valid is False
+        assert response.diagnostics[0].code == "training_artifact_failed"
+    finally:
+        await db.dispose()
+
+
+async def test_validate_predict_missing_config_id_in_metadata() -> None:
+    """Training artifact without config_id in metadata yields invalid_training_artifact."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        artifact_id = await _seed_training_artifact(
+            db, {"type": "ml_training_workspace", "metadata": {"status": "success"}}
+        )
+        manager = await _build_manager(FunctionalModelRunner(on_train=_noop_train, on_predict=_noop_predict), db)
+        response = await manager.validate(
+            ValidatePredictRequest(
+                artifact_id=artifact_id,
+                historic=DataFrame(columns=["x"], data=[[1.0]]),
+                future=DataFrame(columns=["x"], data=[[2.0]]),
+            )
+        )
+        assert response.valid is False
+        assert response.diagnostics[0].code == "invalid_training_artifact"
+    finally:
+        await db.dispose()
+
+
+async def test_validate_predict_config_deleted_after_training() -> None:
+    """Config referenced by training artifact no longer exists yields config_not_found."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        nonexistent_config_id = ULID()
+        artifact_id = await _seed_training_artifact(
+            db,
+            {
+                "type": "ml_training_workspace",
+                "metadata": {"status": "success", "config_id": str(nonexistent_config_id)},
+                "content": b"",
+                "content_type": "application/x-pickle",
+            },
+        )
+        manager = await _build_manager(FunctionalModelRunner(on_train=_noop_train, on_predict=_noop_predict), db)
+        response = await manager.validate(
+            ValidatePredictRequest(
+                artifact_id=artifact_id,
+                historic=DataFrame(columns=["x"], data=[[1.0]]),
+                future=DataFrame(columns=["x"], data=[[2.0]]),
+            )
+        )
+        assert response.valid is False
+        assert response.diagnostics[0].code == "config_not_found"
+    finally:
+        await db.dispose()
+
+
+def test_validation_diagnostic_info_classmethod() -> None:
+    """Codecov: exercise the .info() classmethod."""
+    diag = ValidationDiagnostic.info("using_defaults", "No custom config; using defaults")
+    assert diag.severity == "info"
+    assert diag.code == "using_defaults"
+    assert diag.field is None
