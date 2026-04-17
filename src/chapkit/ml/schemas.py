@@ -72,25 +72,29 @@ class ValidationDiagnostic(BaseModel):
     """A single validation finding surfaced by $validate."""
 
     severity: Severity = Field(description="error | warning | info")
-    code: str = Field(description="Stable machine-readable code, e.g. 'n_lags_exceeds_context'")
-    message: str = Field(description="Human-readable message for display")
+    code: str = Field(
+        description="Stable machine-readable code, e.g. 'n_lags_exceeds_context'",
+        max_length=128,
+    )
+    message: str = Field(description="Human-readable message for display", max_length=2048)
     field: str | None = Field(
         default=None,
         description="Optional dotted path to the offending input, e.g. 'config.n_lags' or 'historic'",
+        max_length=256,
     )
 
     @classmethod
-    def error(cls, code: str, message: str, *, field: str | None = None) -> ValidationDiagnostic:
+    def error(cls, *, code: str, message: str, field: str | None = None) -> ValidationDiagnostic:
         """Create an error-severity diagnostic."""
         return cls(severity="error", code=code, message=message, field=field)
 
     @classmethod
-    def warning(cls, code: str, message: str, *, field: str | None = None) -> ValidationDiagnostic:
+    def warning(cls, *, code: str, message: str, field: str | None = None) -> ValidationDiagnostic:
         """Create a warning-severity diagnostic."""
         return cls(severity="warning", code=code, message=message, field=field)
 
     @classmethod
-    def info(cls, code: str, message: str, *, field: str | None = None) -> ValidationDiagnostic:
+    def info(cls, *, code: str, message: str, field: str | None = None) -> ValidationDiagnostic:
         """Create an info-severity diagnostic."""
         return cls(severity="info", code=code, message=message, field=field)
 

@@ -596,9 +596,9 @@ Every call returns `200 OK`. Malformed payloads (missing fields, unknown `type`)
 ```python
 from chapkit.ml import ValidationDiagnostic
 
-ValidationDiagnostic.error("data_empty", "Training data is empty", field="data")
-ValidationDiagnostic.warning("low_sample_count", "Only 3 rows", field="data")
-ValidationDiagnostic.info("using_defaults", "No custom config; using defaults")
+ValidationDiagnostic.error(code="data_empty", message="Training data is empty", field="data")
+ValidationDiagnostic.warning(code="low_sample_count", message="Only 3 rows", field="data")
+ValidationDiagnostic.info(code="using_defaults", message="No custom config; using defaults")
 ```
 
 **Built-in framework checks:**

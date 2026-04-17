@@ -132,4 +132,10 @@ class MLRouter(Router):
             manager: MLManager = Depends(manager_factory),
         ) -> ValidationResponse:
             """Return structured diagnostics for a train or predict payload."""
-            return await manager.validate(request)
+            try:
+                return await manager.validate(request)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Validation failed: {type(exc).__name__}",
+                )

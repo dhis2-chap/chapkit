@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import pickle
 import shutil
@@ -61,16 +62,10 @@ class MLManager(Generic[ConfigT]):
         self.max_prediction_periods = max_prediction_periods
 
     def _validate_prediction_periods(self, config_data: BaseConfig) -> None:
-        """Validate that config prediction_periods is within allowed bounds."""
-        periods = config_data.prediction_periods
-        if periods < self.min_prediction_periods:
-            raise ValueError(
-                f"prediction_periods ({periods}) is below the minimum allowed value ({self.min_prediction_periods})"
-            )
-        if periods > self.max_prediction_periods:
-            raise ValueError(
-                f"prediction_periods ({periods}) exceeds the maximum allowed value ({self.max_prediction_periods})"
-            )
+        """Validate that config prediction_periods is within allowed bounds (raises on failure)."""
+        for diagnostic in self._check_prediction_periods(config_data):
+            if diagnostic.severity == "error":
+                raise ValueError(diagnostic.message)
 
     def _check_prediction_periods(self, config_data: BaseConfig) -> list[ValidationDiagnostic]:
         """Non-raising variant of prediction-periods bounds check returning diagnostics."""
@@ -141,12 +136,14 @@ class MLManager(Generic[ConfigT]):
         if _has_error(diagnostics):
             return diagnostics
 
-        runner_diagnostics = await self.runner.on_validate_train(
-            config=config.data,
-            data=request.data,
-            geo=request.geo,
-        )
-        diagnostics.extend(runner_diagnostics)
+        hook = getattr(self.runner, "on_validate_train", None)
+        if hook is not None:
+            runner_diagnostics = await hook(
+                config=config.data,
+                data=request.data,
+                geo=request.geo,
+            )
+            diagnostics.extend(runner_diagnostics)
         return diagnostics
 
     async def _validate_predict(self, request: ValidatePredictRequest) -> list[ValidationDiagnostic]:
@@ -238,7 +235,7 @@ class MLManager(Generic[ConfigT]):
 
         diagnostics.extend(self._check_prediction_periods(config.data))
 
-        diagnostics.extend(self._check_training_workspace(training_data, request.artifact_id))
+        diagnostics.extend(await asyncio.to_thread(self._check_training_workspace, training_data, request.artifact_id))
 
         if len(request.historic) == 0:
             diagnostics.append(
@@ -260,13 +257,15 @@ class MLManager(Generic[ConfigT]):
         if _has_error(diagnostics):
             return diagnostics
 
-        runner_diagnostics = await self.runner.on_validate_predict(
-            config=config.data,
-            historic=request.historic,
-            future=request.future,
-            geo=request.geo,
-        )
-        diagnostics.extend(runner_diagnostics)
+        hook = getattr(self.runner, "on_validate_predict", None)
+        if hook is not None:
+            runner_diagnostics = await hook(
+                config=config.data,
+                historic=request.historic,
+                future=request.future,
+                geo=request.geo,
+            )
+            diagnostics.extend(runner_diagnostics)
         return diagnostics
 
     def _check_training_workspace(
@@ -332,7 +331,15 @@ class MLManager(Generic[ConfigT]):
 
         try:
             pickle.loads(pickle_bytes)
-        except (pickle.UnpicklingError, EOFError, TypeError, AttributeError, ImportError, ValueError) as exc:
+        except (
+            pickle.UnpicklingError,
+            EOFError,
+            TypeError,
+            AttributeError,
+            ImportError,
+            ValueError,
+            MemoryError,
+        ) as exc:
             diagnostics.append(
                 ValidationDiagnostic.error(
                     code="model_pickle_corrupted",

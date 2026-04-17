@@ -140,3 +140,24 @@ def test_validate_train_wrong_shape_for_predict_returns_422() -> None:
     response = client.post("/api/v1/ml/$validate", json=body)
 
     assert response.status_code == 422
+
+
+def test_validate_unexpected_manager_error_returns_500_with_sanitized_detail() -> None:
+    """Unexpected exceptions from the manager return 500 without leaking stack traces."""
+    mock_manager = Mock(spec=MLManager)
+    mock_manager.validate = AsyncMock(side_effect=RuntimeError("sensitive db password: hunter2"))
+
+    client = _client_with_mock(mock_manager)
+    body = {
+        "type": "train",
+        "config_id": "01K72P5N5KCRM6MD3BRE4P0001",
+        "data": {"columns": ["rainfall"], "data": [[1.0]]},
+    }
+
+    response = client.post("/api/v1/ml/$validate", json=body)
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    # Only the exception class name leaks; no SQL / stack trace / secret in the message.
+    assert detail == "Validation failed: RuntimeError"
+    assert "hunter2" not in detail

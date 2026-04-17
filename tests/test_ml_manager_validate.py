@@ -635,7 +635,45 @@ async def test_validate_predict_config_deleted_after_training() -> None:
 
 def test_validation_diagnostic_info_classmethod() -> None:
     """Codecov: exercise the .info() classmethod."""
-    diag = ValidationDiagnostic.info("using_defaults", "No custom config; using defaults")
+    diag = ValidationDiagnostic.info(code="using_defaults", message="No custom config; using defaults")
     assert diag.severity == "info"
     assert diag.code == "using_defaults"
     assert diag.field is None
+
+
+class _LegacyRunner:
+    """Simulates a pre-PR runner that implements on_train/on_predict but not on_validate_*."""
+
+    async def on_train(self, config: Any, data: Any, geo: Any = None) -> Any:
+        return {}
+
+    async def on_predict(self, config: Any, model: Any, historic: Any, future: Any, geo: Any = None) -> Any:
+        return future
+
+
+async def test_validate_train_with_legacy_runner_missing_hook() -> None:
+    """A runner that predates the validate hooks must not cause AttributeError."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        from chapkit.config import ConfigManager, ConfigRepository
+        from chapkit.config.schemas import ConfigIn
+        from chapkit.ml.schemas import ValidateTrainRequest
+
+        async with db.session() as session:
+            config_manager = ConfigManager(ConfigRepository(session), SampleConfig)
+            created = await config_manager.save(ConfigIn(name="legacy", data=SampleConfig(prediction_periods=3)))
+            config_id = created.id
+
+        manager = await _build_manager(_LegacyRunner(), db)
+
+        response = await manager.validate(
+            ValidateTrainRequest(
+                config_id=config_id,
+                data=DataFrame(columns=["rainfall"], data=[[1.0]]),
+            )
+        )
+        assert response.valid is True
+        assert response.diagnostics == []
+    finally:
+        await db.dispose()
