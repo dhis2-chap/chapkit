@@ -138,7 +138,7 @@ async def on_validate_train(
 ) -> list[ValidationDiagnostic]:
     """Return domain-specific diagnostics for a train payload.
 
-    Runs synchronously and is called AFTER chapkit's framework checks
+    Called in-request (no scheduler) AFTER chapkit's framework checks
     (config exists, prediction_periods bounds, data non-empty). Add your own
     checks here.
 
