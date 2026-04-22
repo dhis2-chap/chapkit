@@ -106,7 +106,7 @@ wheels = [
 
 [[package]]
 name = "chapkit"
-version = "0.18.0"
+version = "0.19.0.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "geojson-pydantic" },
