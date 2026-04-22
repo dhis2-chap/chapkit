@@ -17,7 +17,7 @@ Migration Note:
 from __future__ import annotations
 
 import datetime
-from typing import Any, Protocol, TypeVar
+from typing import Annotated, Any, Literal, Protocol, TypeVar
 
 from geojson_pydantic import FeatureCollection
 from pydantic import BaseModel, Field
@@ -31,6 +31,8 @@ from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig, contravariant=True)
+
+Severity = Literal["error", "warning", "info"]
 
 
 class TrainRequest(BaseModel):
@@ -64,6 +66,69 @@ class PredictResponse(BaseModel):
     job_id: str = Field(description="ID of the prediction job in the scheduler")
     artifact_id: str = Field(description="ID that will contain the prediction artifact")
     message: str = Field(description="Human-readable message")
+
+
+class ValidationDiagnostic(BaseModel):
+    """A single validation finding surfaced by $validate."""
+
+    severity: Severity = Field(description="error | warning | info")
+    code: str = Field(
+        description="Stable machine-readable code, e.g. 'n_lags_exceeds_context'",
+        max_length=128,
+    )
+    message: str = Field(description="Human-readable message for display", max_length=2048)
+    field: str | None = Field(
+        default=None,
+        description="Optional dotted path to the offending input, e.g. 'config.n_lags' or 'historic'",
+        max_length=256,
+    )
+
+    @classmethod
+    def error(cls, *, code: str, message: str, field: str | None = None) -> ValidationDiagnostic:
+        """Create an error-severity diagnostic."""
+        return cls(severity="error", code=code, message=message, field=field)
+
+    @classmethod
+    def warning(cls, *, code: str, message: str, field: str | None = None) -> ValidationDiagnostic:
+        """Create a warning-severity diagnostic."""
+        return cls(severity="warning", code=code, message=message, field=field)
+
+    @classmethod
+    def info(cls, *, code: str, message: str, field: str | None = None) -> ValidationDiagnostic:
+        """Create an info-severity diagnostic."""
+        return cls(severity="info", code=code, message=message, field=field)
+
+
+class ValidationResponse(BaseModel):
+    """Result of a $validate call."""
+
+    valid: bool = Field(description="True iff no diagnostic has severity='error'")
+    diagnostics: list[ValidationDiagnostic] = Field(default_factory=list)
+
+
+class ValidateTrainRequest(BaseModel):
+    """Request schema for validating a train payload."""
+
+    type: Literal["train"] = Field(default="train", frozen=True)
+    config_id: ULID = Field(description="ID of the config to use for training")
+    data: DataFrame = Field(description="Training data as DataFrame")
+    geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+
+
+class ValidatePredictRequest(BaseModel):
+    """Request schema for validating a predict payload."""
+
+    type: Literal["predict"] = Field(default="predict", frozen=True)
+    artifact_id: ULID = Field(description="ID of the artifact containing the trained model")
+    historic: DataFrame = Field(description="Historic data as DataFrame")
+    future: DataFrame = Field(description="Future/prediction data as DataFrame")
+    geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+
+
+ValidateRequest = Annotated[
+    ValidateTrainRequest | ValidatePredictRequest,
+    Field(discriminator="type"),
+]
 
 
 class ModelRunnerProtocol(Protocol[ConfigT]):
@@ -111,12 +176,37 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
         """Create artifact data structure from prediction result."""
         ...
 
+    async def on_validate_train(
+        self,
+        config: ConfigT,
+        data: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Return domain-specific diagnostics for a train payload (default: empty)."""
+        ...
+
+    async def on_validate_predict(
+        self,
+        config: ConfigT,
+        historic: DataFrame,
+        future: DataFrame,
+        geo: FeatureCollection | None = None,
+    ) -> list[ValidationDiagnostic]:
+        """Return domain-specific diagnostics for a predict payload (default: empty)."""
+        ...
+
 
 __all__ = [
     "TrainRequest",
     "TrainResponse",
     "PredictRequest",
     "PredictResponse",
+    "ValidationDiagnostic",
+    "ValidationResponse",
+    "ValidateTrainRequest",
+    "ValidatePredictRequest",
+    "ValidateRequest",
+    "Severity",
     "ModelRunnerProtocol",
     "MLTrainingWorkspaceArtifactData",
     "MLPredictionArtifactData",

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
+import pickle
 import shutil
+import zipfile
+from io import BytesIO
 from pathlib import Path
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from servicekit import Database
 from ulid import ULID
@@ -22,9 +26,19 @@ from .schemas import (
     PredictResponse,
     TrainRequest,
     TrainResponse,
+    ValidatePredictRequest,
+    ValidateRequest,
+    ValidateTrainRequest,
+    ValidationDiagnostic,
+    ValidationResponse,
 )
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
+
+
+def _has_error(diagnostics: list[ValidationDiagnostic]) -> bool:
+    """Return True if any diagnostic has severity='error'."""
+    return any(d.severity == "error" for d in diagnostics)
 
 
 class MLManager(Generic[ConfigT]):
@@ -48,16 +62,293 @@ class MLManager(Generic[ConfigT]):
         self.max_prediction_periods = max_prediction_periods
 
     def _validate_prediction_periods(self, config_data: BaseConfig) -> None:
-        """Validate that config prediction_periods is within allowed bounds."""
+        """Validate that config prediction_periods is within allowed bounds (raises on failure)."""
+        for diagnostic in self._check_prediction_periods(config_data):
+            if diagnostic.severity == "error":
+                raise ValueError(diagnostic.message)
+
+    def _check_prediction_periods(self, config_data: BaseConfig) -> list[ValidationDiagnostic]:
+        """Non-raising variant of prediction-periods bounds check returning diagnostics."""
+        diagnostics: list[ValidationDiagnostic] = []
         periods = config_data.prediction_periods
         if periods < self.min_prediction_periods:
-            raise ValueError(
-                f"prediction_periods ({periods}) is below the minimum allowed value ({self.min_prediction_periods})"
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="prediction_periods_out_of_bounds",
+                    message=(
+                        f"prediction_periods ({periods}) is below the minimum allowed value "
+                        f"({self.min_prediction_periods})"
+                    ),
+                    field="config.prediction_periods",
+                )
             )
-        if periods > self.max_prediction_periods:
-            raise ValueError(
-                f"prediction_periods ({periods}) exceeds the maximum allowed value ({self.max_prediction_periods})"
+        elif periods > self.max_prediction_periods:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="prediction_periods_out_of_bounds",
+                    message=(
+                        f"prediction_periods ({periods}) exceeds the maximum allowed value "
+                        f"({self.max_prediction_periods})"
+                    ),
+                    field="config.prediction_periods",
+                )
             )
+        return diagnostics
+
+    async def validate(self, request: ValidateRequest) -> ValidationResponse:
+        """Run framework-level and runner validations for a train or predict payload."""
+        if request.type == "train":
+            diagnostics = await self._validate_train(request)
+        else:
+            diagnostics = await self._validate_predict(request)
+        return ValidationResponse(valid=not _has_error(diagnostics), diagnostics=diagnostics)
+
+    async def _validate_train(self, request: ValidateTrainRequest) -> list[ValidationDiagnostic]:
+        """Collect diagnostics for a train payload."""
+        diagnostics: list[ValidationDiagnostic] = []
+
+        async with self.database.session() as session:
+            config_repo = ConfigRepository(session)
+            config_manager: ConfigManager[ConfigT] = ConfigManager(config_repo, self.config_schema)
+            config = await config_manager.find_by_id(request.config_id)
+
+        if config is None:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="config_not_found",
+                    message=f"Config {request.config_id} not found",
+                    field="config_id",
+                )
+            )
+            return diagnostics
+
+        diagnostics.extend(self._check_prediction_periods(config.data))
+
+        if len(request.data) == 0:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="data_empty",
+                    message="Training data is empty",
+                    field="data",
+                )
+            )
+
+        if _has_error(diagnostics):
+            return diagnostics
+
+        hook = getattr(self.runner, "on_validate_train", None)
+        if hook is not None:
+            runner_diagnostics = await hook(
+                config=config.data,
+                data=request.data,
+                geo=request.geo,
+            )
+            diagnostics.extend(runner_diagnostics)
+        return diagnostics
+
+    async def _validate_predict(self, request: ValidatePredictRequest) -> list[ValidationDiagnostic]:
+        """Collect diagnostics for a predict payload."""
+        diagnostics: list[ValidationDiagnostic] = []
+
+        async with self.database.session() as session:
+            artifact_repo = ArtifactRepository(session)
+            artifact_manager = ArtifactManager(artifact_repo)
+            training_artifact = await artifact_manager.find_by_id(request.artifact_id)
+
+        if training_artifact is None:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="training_artifact_not_found",
+                    message=f"Training artifact {request.artifact_id} not found",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        training_data = training_artifact.data
+        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training_workspace":
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="invalid_training_artifact",
+                    message=f"Artifact {request.artifact_id} is not a training artifact",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        training_metadata = training_data.get("metadata", {})
+        training_status = training_metadata.get("status", "unknown")
+        if training_status == "failed":
+            exit_code = training_metadata.get("exit_code", "unknown")
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="training_artifact_failed",
+                    message=(
+                        f"Training artifact {request.artifact_id} failed training "
+                        f"(exit_code={exit_code}); cannot predict with it"
+                    ),
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        config_id_str = training_metadata.get("config_id")
+        if not config_id_str:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="invalid_training_artifact",
+                    message=f"Training artifact {request.artifact_id} is missing config_id in metadata",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        try:
+            config_id = ULID.from_str(config_id_str)
+        except ValueError:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="invalid_training_artifact",
+                    message=(
+                        f"Training artifact {request.artifact_id} has a malformed config_id "
+                        f"in metadata: {config_id_str!r}"
+                    ),
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        async with self.database.session() as session:
+            config_repo = ConfigRepository(session)
+            config_manager = ConfigManager(config_repo, self.config_schema)
+            config = await config_manager.find_by_id(config_id)
+
+        if config is None:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="config_not_found",
+                    message=f"Config {config_id} referenced by training artifact not found",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        diagnostics.extend(self._check_prediction_periods(config.data))
+
+        diagnostics.extend(await asyncio.to_thread(self._check_training_workspace, training_data, request.artifact_id))
+
+        if len(request.historic) == 0:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="historic_empty",
+                    message="Historic data is empty",
+                    field="historic",
+                )
+            )
+        if len(request.future) == 0:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="future_empty",
+                    message="Future data is empty",
+                    field="future",
+                )
+            )
+
+        if _has_error(diagnostics):
+            return diagnostics
+
+        hook = getattr(self.runner, "on_validate_predict", None)
+        if hook is not None:
+            runner_diagnostics = await hook(
+                config=config.data,
+                historic=request.historic,
+                future=request.future,
+                geo=request.geo,
+            )
+            diagnostics.extend(runner_diagnostics)
+        return diagnostics
+
+    def _check_training_workspace(
+        self,
+        training_data: dict[str, Any],
+        artifact_id: ULID,
+    ) -> list[ValidationDiagnostic]:
+        """Mirror the deterministic integrity checks from _predict_task."""
+        from .runner import ShellModelRunner
+
+        diagnostics: list[ValidationDiagnostic] = []
+
+        if training_data.get("content_type") != "application/zip":
+            return diagnostics
+
+        workspace_content = training_data.get("content")
+        if not isinstance(workspace_content, (bytes, bytearray)) or len(workspace_content) == 0:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="training_workspace_corrupted",
+                    message=f"Training artifact {artifact_id} has empty or non-binary workspace content",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        try:
+            with zipfile.ZipFile(BytesIO(workspace_content), "r") as zf:
+                bad_entry = zf.testzip()
+                if bad_entry is not None:
+                    diagnostics.append(
+                        ValidationDiagnostic.error(
+                            code="training_workspace_corrupted",
+                            message=f"Corrupt file in training workspace ZIP: {bad_entry}",
+                            field="artifact_id",
+                        )
+                    )
+                    return diagnostics
+                names = set(zf.namelist())
+                pickle_bytes = zf.read("model.pickle") if "model.pickle" in names else None
+        except zipfile.BadZipFile as exc:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="training_workspace_corrupted",
+                    message=f"Training artifact workspace is not a valid ZIP: {exc}",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        if isinstance(self.runner, ShellModelRunner):
+            return diagnostics
+
+        if pickle_bytes is None:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="model_pickle_missing",
+                    message="Training artifact workspace is missing model.pickle",
+                    field="artifact_id",
+                )
+            )
+            return diagnostics
+
+        try:
+            pickle.loads(pickle_bytes)
+        except (
+            pickle.UnpicklingError,
+            EOFError,
+            TypeError,
+            AttributeError,
+            ImportError,
+            ValueError,
+            MemoryError,
+        ) as exc:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="model_pickle_corrupted",
+                    message=f"Training artifact model.pickle is corrupted or incompatible: {exc}",
+                    field="artifact_id",
+                )
+            )
+
+        return diagnostics
 
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""

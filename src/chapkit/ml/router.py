@@ -10,7 +10,14 @@ from servicekit.api.monitoring import get_meter
 from servicekit.api.router import Router
 
 from .manager import MLManager
-from .schemas import PredictRequest, PredictResponse, TrainRequest, TrainResponse
+from .schemas import (
+    PredictRequest,
+    PredictResponse,
+    TrainRequest,
+    TrainResponse,
+    ValidateRequest,
+    ValidationResponse,
+)
 
 # Lazily initialized counters (initialized after monitoring setup)
 _train_counter: Counter | None = None
@@ -111,4 +118,24 @@ class MLRouter(Router):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=str(e),
+                )
+
+        @self.router.post(
+            "/$validate",
+            response_model=ValidationResponse,
+            status_code=status.HTTP_200_OK,
+            summary="Validate a train or predict payload",
+            description="Run framework and runner validations without executing.",
+        )
+        async def validate(
+            request: ValidateRequest,
+            manager: MLManager = Depends(manager_factory),
+        ) -> ValidationResponse:
+            """Return structured diagnostics for a train or predict payload."""
+            try:
+                return await manager.validate(request)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Validation failed: {type(exc).__name__}",
                 )

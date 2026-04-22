@@ -46,23 +46,26 @@ def chapkit_root() -> Path:
 
 
 @pytest.fixture
-def scaffold_project(tmp_path: Path, chapkit_root: Path) -> Callable[[str, str], Path]:
+def scaffold_project(tmp_path: Path, chapkit_root: Path) -> Callable[..., Path]:
     """Scaffold a project and patch to use local chapkit."""
 
-    def _scaffold(name: str, template: str = "ml") -> Path:
-        # Run chapkit init using uv run from the chapkit project root
+    def _scaffold(name: str, template: str = "ml", *, with_validation: bool = False) -> Path:
+        cmd = [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            name,
+            "--template",
+            template,
+            "--path",
+            str(tmp_path),
+        ]
+        if with_validation:
+            cmd.append("--with-validation")
+
         result = subprocess.run(
-            [
-                "uv",
-                "run",
-                "chapkit",
-                "init",
-                name,
-                "--template",
-                template,
-                "--path",
-                str(tmp_path),
-            ],
+            cmd,
             cwd=chapkit_root,
             capture_output=True,
             text=True,
@@ -496,6 +499,152 @@ def test_scaffold_with_monitoring_structure(tmp_path: Path, chapkit_root: Path) 
     compose_content = (project_dir / "compose.yml").read_text()
     assert "prometheus" in compose_content
     assert "grafana" in compose_content
+
+
+@pytest.mark.slow
+def test_scaffold_with_validation_ml_template(tmp_path: Path, chapkit_root: Path) -> None:
+    """Passing --with-validation to the ml template scaffolds the on_validate_* stubs."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-val-ml",
+            "--with-validation",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
+    assert "Including $validate hook stubs" in result.stdout
+
+    project_dir = tmp_path / "test-val-ml"
+    main_content = (project_dir / "main.py").read_text()
+
+    assert "async def on_validate_train" in main_content
+    assert "async def on_validate_predict" in main_content
+    assert "ValidationDiagnostic" in main_content
+    assert "on_validate_train=on_validate_train" in main_content
+    assert "on_validate_predict=on_validate_predict" in main_content
+
+
+@pytest.mark.slow
+def test_scaffold_with_validation_ml_shell_template(tmp_path: Path, chapkit_root: Path) -> None:
+    """Passing --with-validation to the ml-shell template scaffolds the Python callbacks."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-val-ml-shell",
+            "--template",
+            "ml-shell",
+            "--with-validation",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
+
+    project_dir = tmp_path / "test-val-ml-shell"
+    main_content = (project_dir / "main.py").read_text()
+
+    assert "async def on_validate_train" in main_content
+    assert "async def on_validate_predict" in main_content
+    assert "ValidationDiagnostic" in main_content
+    # Wired into ShellModelRunner constructor
+    assert "on_validate_train=on_validate_train" in main_content
+    assert "on_validate_predict=on_validate_predict" in main_content
+
+
+@pytest.mark.slow
+def test_scaffold_without_validation_omits_hook_stubs(tmp_path: Path, chapkit_root: Path) -> None:
+    """Default scaffolding must NOT include hook stubs — flag is opt-in."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-no-val",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+
+    main_content = (tmp_path / "test-no-val" / "main.py").read_text()
+    assert "async def on_validate_train" not in main_content
+    assert "async def on_validate_predict" not in main_content
+    assert "ValidationDiagnostic" not in main_content
+
+
+@pytest.mark.slow
+def test_scaffold_with_validation_task_template_is_rejected(tmp_path: Path, chapkit_root: Path) -> None:
+    """--with-validation + --template task must error clearly — task has no ML endpoints."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-task-val",
+            "--template",
+            "task",
+            "--with-validation",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "--with-validation is only supported for ML templates" in result.stderr
+    # Project directory should not have been created
+    assert not (tmp_path / "test-task-val").exists()
+
+
+@pytest.mark.slow
+def test_scaffold_ml_postman_collection_includes_validate(tmp_path: Path, chapkit_root: Path) -> None:
+    """Postman collection always includes $validate regardless of --with-validation."""
+    import json
+
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-pm-val",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+
+    collection = json.loads((tmp_path / "test-pm-val" / "postman_collection.json").read_text())
+    folder_names = [folder["name"] for folder in collection["item"]]
+    assert any("Model Validation" in name for name in folder_names)
+
+    validation_folder = next(f for f in collection["item"] if "Model Validation" in f["name"])
+    request_names = [item["name"] for item in validation_folder["item"]]
+    assert "Validate Train Payload" in request_names
+    assert "Validate Predict Payload" in request_names
 
 
 @pytest.mark.slow
