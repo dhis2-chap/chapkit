@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -341,7 +341,7 @@ class ServiceBuilder(BaseServiceBuilder):
         database_instance = self._database_instance
 
         @asynccontextmanager
-        async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             """Override scheduler creation to use InMemoryChapkitScheduler."""
             # Call parent lifespan which handles database and most setup
             async with parent_lifespan(app):
