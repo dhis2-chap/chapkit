@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+import yaml
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from chapkit.cli.mlproject import (
@@ -155,37 +156,107 @@ def _language_from_image(image: str) -> str:
     return {"chapkit-py": "python", "chapkit-r": "r", "chapkit-r-inla": "r"}[image]
 
 
-def _extract_user_dependencies(project_path: Path) -> list[str]:
-    """Read [project.dependencies] from the user's pyproject.toml.
+def _dep_name(requirement: str) -> str:
+    """Return the canonical package name from a pep-508 requirement string."""
+    head = requirement.split(";", 1)[0].strip()
+    name = head.split("[", 1)[0]
+    for op in ("==", ">=", "<=", "~=", "!=", ">", "<", " "):
+        name = name.split(op, 1)[0]
+    return name.strip().lower()
 
-    Returns the deps as raw requirement strings (e.g. "pandas>=2.0", "numpy").
-    Entries that reference chapkit itself are dropped; the generated
-    pyproject.toml adds chapkit with its own pinned version. Returns an empty
-    list if the file is missing or unparseable.
+
+# Deprecated or CRAN-style names some MLproject env files use that need
+# rewriting before pip can install them. Keys are lowercase; values are the
+# PyPI name to substitute in the generated pyproject.toml dependencies list.
+_DEP_ALIASES: dict[str, str] = {
+    "sklearn": "scikit-learn",  # "sklearn" on PyPI is a deprecated shim
+}
+
+
+def _rewrite_alias(requirement: str) -> str:
+    """Rewrite the package name in a requirement string if it's a known alias."""
+    name = _dep_name(requirement)
+    alias = _DEP_ALIASES.get(name)
+    if alias is None:
+        return requirement
+    # Replace only the leading package-name token; keep any version/markers.
+    stripped = requirement.lstrip()
+    leading_ws = requirement[: len(requirement) - len(stripped)]
+    tail_start = 0
+    for idx, ch in enumerate(stripped):
+        if ch in "[=<>!~; " or idx >= len(name):
+            tail_start = idx
+            break
+    else:
+        tail_start = len(stripped)
+    return f"{leading_ws}{alias}{stripped[tail_start:]}"
+
+
+def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None = None) -> list[str]:
+    """Collect user's Python dependencies from pyproject.toml and/or pyenv.yaml.
+
+    Returns the deps as raw requirement strings (e.g. "pandas>=2.0", "numpy"),
+    deduplicated by canonical package name (first occurrence wins). Entries
+    that reference chapkit itself are dropped; the generated pyproject.toml
+    adds chapkit with its own pinned version.
+
+    Sources, in order of precedence:
+    1. pyproject.toml [project.dependencies] at the project root
+    2. MLproject's python_env / conda_env file (MLflow-style YAML with a
+       `dependencies:` list). Simple scalar deps are kept verbatim; nested
+       pip-sub-dict entries inside a conda env are flattened.
+
+    Returns an empty list when nothing parseable is found.
     """
-    pyproject = project_path / "pyproject.toml"
-    if not pyproject.is_file():
-        return []
-    try:
-        with pyproject.open("rb") as handle:
-            data = tomllib.load(handle)
-    except (tomllib.TOMLDecodeError, OSError):
-        return []
-    raw = data.get("project", {}).get("dependencies", [])
-    if not isinstance(raw, list):
-        return []
+    seen: set[str] = set()
     kept: list[str] = []
-    for entry in raw:
-        if not isinstance(entry, str):
-            continue
-        head = entry.split(";", 1)[0].strip()
-        # dependency name is everything up to the first version/extra operator
-        name = head.split("[", 1)[0]
-        for op in ("==", ">=", "<=", "~=", "!=", ">", "<", " "):
-            name = name.split(op, 1)[0]
-        if name.strip().lower() == "chapkit":
-            continue
-        kept.append(entry)
+
+    def _add(requirement: object) -> None:
+        if not isinstance(requirement, str):
+            return
+        rewritten = _rewrite_alias(requirement)
+        name = _dep_name(rewritten)
+        if not name or name == "chapkit" or name in seen:
+            return
+        seen.add(name)
+        kept.append(rewritten.strip())
+
+    pyproject = project_path / "pyproject.toml"
+    if pyproject.is_file():
+        try:
+            with pyproject.open("rb") as toml_handle:
+                data = tomllib.load(toml_handle)
+        except (tomllib.TOMLDecodeError, OSError):
+            data = {}
+        raw = data.get("project", {}).get("dependencies", [])
+        if isinstance(raw, list):
+            for entry in raw:
+                _add(entry)
+
+    if mlproject is not None:
+        for env_key in ("python_env", "conda_env"):
+            env_file = mlproject.env_hints.get(env_key)
+            if not env_file:
+                continue
+            env_path = project_path / env_file
+            if not env_path.is_file():
+                continue
+            try:
+                with env_path.open("r", encoding="utf-8") as yaml_handle:
+                    env_data = yaml.safe_load(yaml_handle)
+            except (yaml.YAMLError, OSError):
+                continue
+            if not isinstance(env_data, dict):
+                continue
+            for entry in env_data.get("dependencies", []) or []:
+                # conda envs can have dict entries like {"pip": ["pkg==1.0", ...]}
+                if isinstance(entry, dict):
+                    for sublist in entry.values():
+                        if isinstance(sublist, list):
+                            for sub in sublist:
+                                _add(sub)
+                else:
+                    _add(entry)
     return kept
 
 
@@ -507,7 +578,7 @@ def _run(
     # pyproject.toml, .gitignore, .dockerignore, etc. - they land in _old/.
     renders = list(_GENERATED_FILENAMES)
 
-    user_deps = _extract_user_dependencies(project_path)
+    user_deps = _extract_user_dependencies(project_path, mlproject)
     # Prefer a meta_data description from the MLproject for the service description
     # (e.g. ewars_template has a nice paragraph). Fall back to our generic template.
     meta_description = mlproject.meta_data.get("description")

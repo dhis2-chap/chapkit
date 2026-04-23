@@ -15,12 +15,17 @@ COPY . /work
 # Installs renv first if the base image doesn't ship it; no-op otherwise.
 RUN R -q -e "if (!requireNamespace('renv', quietly = TRUE)) install.packages('renv', repos = 'https://cloud.r-project.org'); renv::restore(prompt = FALSE)"
 {% endif %}
-{% if LANGUAGE == "python" and HAS_USER_PYPROJECT %}
+{% if LANGUAGE == "python" and USER_DEPENDENCIES %}
 # Install the project's Python dependencies (merged from the user's
-# original pyproject.toml) into the chapkit venv. Falls through to
-# apt-installed build tools in the base image if any wheel needs to
-# compile from source.
-RUN uv pip install --python /app/.venv/bin/python .
+# original pyproject.toml / pyenv.yaml / conda env) into the chapkit
+# venv. Listed inline instead of `uv pip install .` because the
+# generated project doesn't need to be installable as a package -
+# it's a service, not a library - and the user's scripts often use a
+# flat layout (multiple top-level .py files) that setuptools can't
+# auto-package. Build tools in the base image handle any source-built
+# wheels.
+RUN uv pip install --python /app/.venv/bin/python {% for dep in USER_DEPENDENCIES %}"{{ dep }}" {% endfor %}
+
 {% endif %}
 
 EXPOSE 8000

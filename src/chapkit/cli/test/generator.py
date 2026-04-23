@@ -26,27 +26,33 @@ class TestDataGenerator:
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
-        required_covariates = required_covariates or []
-        # Additional continuous covariates the config declares (BaseConfig field).
-        # Kept distinct from required_covariates so we can tell why each column is there.
-        additional_covariates = [c for c in (additional_covariates or []) if c not in required_covariates]
-
-        # Build columns list
-        columns: list[str] = ["time_period", "location", "disease_cases"]
+        # chap-core canonical always-present columns: time_period + location (indices),
+        # disease_cases (target), population (non-optional per chap_core.predictor.feature_spec),
+        # and the two common-optional climate covariates many models hardcode.
+        # Emitted unconditionally so most models in the ecosystem Just Work under
+        # `chapkit test` without needing to declare everything in required_covariates.
+        columns: list[str] = [
+            "time_period",
+            "location",
+            "disease_cases",
+            "population",
+            "rainfall",
+            "mean_temperature",
+        ]
 
         # Feature columns (climate/covariate data)
         for i in range(num_features):
             columns.append(f"feature_{i}")
 
-        # Required covariates from service info
+        # Required covariates from service info - dedup against the always-present set.
+        required_covariates = [c for c in (required_covariates or []) if c not in columns]
         for cov in required_covariates:
-            if cov not in columns:
-                columns.append(cov)
+            columns.append(cov)
 
-        # Additional continuous covariates from config
+        # Additional continuous covariates from config - dedup against required + always-present.
+        additional_covariates = [c for c in (additional_covariates or []) if c not in columns]
         for cov in additional_covariates:
-            if cov not in columns:
-                columns.append(cov)
+            columns.append(cov)
 
         # Extra continuous covariates if allowed
         for i in range(extra_covariates):
@@ -73,6 +79,15 @@ class TestDataGenerator:
 
                 # Disease cases (health outcome, whole number as float)
                 row.append(float(random.randint(1, 100)))
+
+                # population (chap-core canonical, non-optional): realistic district-sized integer
+                row.append(random.randint(50_000, 1_500_000))
+
+                # rainfall (mm / period): 0-400 is a reasonable monthly range
+                row.append(random.uniform(0, 400))
+
+                # mean_temperature (degrees Celsius): tropical-to-temperate range
+                row.append(random.uniform(10, 35))
 
                 # Feature values (climate data)
                 for _ in range(num_features):
