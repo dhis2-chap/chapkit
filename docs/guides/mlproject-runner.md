@@ -113,16 +113,21 @@ The published container images (below) set `PATH` correctly so this is a non-iss
 
 ## Running in a Container
 
-Chapkit publishes two base images for `chapkit run`:
+Chapkit publishes three base images for `chapkit run`, all built on `debian:trixie-slim` and owned entirely by this repository (no external base image dependencies):
 
-| Image                                      | Contents                                                   | Architectures        | Typical size |
-| ------------------------------------------ | ---------------------------------------------------------- | -------------------- | ------------ |
-| `ghcr.io/dhis2-chap/chapkit-py:latest`     | Python 3.13, chapkit, uv, `build-essential`, `pkg-config`  | `linux/amd64`, `linux/arm64` | ~920 MB      |
-| `ghcr.io/dhis2-chap/chapkit-r:latest`      | `docker_r_inla` + Python 3.13, chapkit, uv                 | `linux/amd64`        | ~7.7 GB      |
+| Image                                          | Contents                                                                                        | Architectures                  | Typical size |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
+| `ghcr.io/dhis2-chap/chapkit-py:latest`         | Python 3.13, chapkit, uv, `build-essential`, `pkg-config`                                       | `linux/amd64`, `linux/arm64`   | ~920 MB      |
+| `ghcr.io/dhis2-chap/chapkit-r:latest`          | R 4.5 + `renv` + `pak` + common dev libs, Python 3.13, chapkit, uv                              | `linux/amd64`, `linux/arm64`   | ~1.2 GB      |
+| `ghcr.io/dhis2-chap/chapkit-r-inla:latest`     | R 4.5 + INLA + spatial/time-series R stack (sf, spdep, dlnm, tsModel, ...), Python 3.13, chapkit | `linux/amd64` (INLA x86_64 only) | ~3-4 GB      |
 
-`chapkit-r` is a "fat" runtime — it bundles R 4.5 + INLA (and the many R/geospatial packages that `docker_r_inla` carries) alongside Python, so it can host R, Python, or mixed-language MLprojects. `chapkit-py` is much leaner and multi-arch; use it when R isn't needed.
+Which one to pick:
 
-Both images set `WORKDIR /work` and default to `CMD ["chapkit", "run", ".", "--host", "0.0.0.0", "--port", "8000"]`, so mounting your MLproject into `/work` is enough:
+- **Python MLproject?** Use `chapkit-py` — lean and multi-arch.
+- **R MLproject that does not need INLA?** (e.g. `minimalist_example_r`) Use `chapkit-r`. Multi-arch, includes the R toolchain and `renv`/`pak` so you can install additional CRAN packages or restore a lockfile at runtime.
+- **R MLproject that uses INLA?** (e.g. EWARS-style) Use `chapkit-r-inla`. INLA + fmesher + the chap-core R-model parity set (sf, spdep, sn, dlnm, tsModel, xgboost, ...) are pre-installed. amd64 only; you will need Rosetta emulation on Apple Silicon.
+
+All three set `WORKDIR /work` and default to `CMD ["chapkit", "run", ".", "--host", "0.0.0.0", "--port", "8000"]`, so mounting your MLproject into `/work` is enough:
 
 ```bash
 # Python model
@@ -130,10 +135,15 @@ docker run --rm -p 8000:8000 \
   -v "$(pwd):/work" \
   ghcr.io/dhis2-chap/chapkit-py:latest
 
-# R + INLA model (amd64-only; uses Rosetta on Apple Silicon)
-docker run --rm -p 8000:8000 --platform=linux/amd64 \
+# R model without INLA (multi-arch)
+docker run --rm -p 8000:8000 \
   -v "$(pwd):/work" \
   ghcr.io/dhis2-chap/chapkit-r:latest
+
+# R model with INLA (amd64-only; Rosetta on Apple Silicon)
+docker run --rm -p 8000:8000 --platform=linux/amd64 \
+  -v "$(pwd):/work" \
+  ghcr.io/dhis2-chap/chapkit-r-inla:latest
 ```
 
 ### Model-Level Dependencies
