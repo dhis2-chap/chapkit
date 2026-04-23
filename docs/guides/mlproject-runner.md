@@ -113,7 +113,7 @@ The published container images (below) set `PATH` correctly so this is a non-iss
 
 ## Running in a Container
 
-Chapkit publishes three base images for `chapkit run`, all built on `debian:trixie-slim` and owned entirely by this repository (no external base image dependencies):
+Chapkit publishes three base images for `chapkit run`, all built on `debian:trixie-slim`. The Dockerfiles and publish workflow live in the companion [dhis2-chap/chapkit-images](https://github.com/dhis2-chap/chapkit-images) repo so image builds don't block chapkit's own CI:
 
 | Image                                          | Contents                                                                                        | Architectures                  | Typical size |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
