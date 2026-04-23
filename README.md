@@ -48,6 +48,8 @@ uv add chapkit[dataframe] # all of the above
 
 ## CLI Usage
 
+### `chapkit init` - Scaffold a new project
+
 Quickly scaffold a new ML service project using `uvx`:
 
 ```bash
@@ -70,6 +72,27 @@ This creates a ready-to-run service with configuration, artifacts, and API endpo
 - **ml**: Define training/prediction as Python functions in `main.py` (simpler, best for Python-only ML workflows)
 - **ml-shell**: Use external scripts for training/prediction (language-agnostic, supports Python/R/Julia/etc.)
 - **task**: General-purpose task execution with Python functions and shell commands (not ML-specific)
+
+### `chapkit run` - Serve an existing MLproject
+
+If you already have an MLflow-style `MLproject` directory (R, Python, or mixed), `chapkit run` stands it up as a chapkit service with no code generation:
+
+```bash
+chapkit run              # serve the MLproject in the current directory
+chapkit run .            # same
+chapkit run /path/to/mlproject
+```
+
+Or use the published container images (no local chapkit install needed):
+
+```bash
+docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-py:latest    # Python model
+docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r:latest     # R model (no INLA)
+docker run --rm -p 8000:8000 --platform=linux/amd64 \
+    -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r-inla:latest                          # R + INLA
+```
+
+See the [MLproject Runner guide](docs/guides/mlproject-runner.md) for canonical parameter mapping, `user_options` -> dynamic config, env hints, and compose integration with chap-core.
 
 ## Quick Start
 
@@ -195,6 +218,7 @@ See `docs/guides/` for comprehensive guides:
 - [Artifact Storage](docs/guides/artifact-storage.md) - Hierarchical data storage for ML artifacts
 - [Task Execution](docs/guides/task-execution.md) - Python functions and shell command templates
 - [CLI Scaffolding](docs/guides/cli-scaffolding.md) - Project scaffolding with `chapkit init`
+- [MLproject Runner](docs/guides/mlproject-runner.md) - Serve existing MLproject directories with `chapkit run`
 - [Database Migrations](docs/guides/database-migrations.md) - Custom models and Alembic migrations
 
 Full documentation: https://dhis2-chap.github.io/chapkit/
@@ -214,3 +238,4 @@ AGPL-3.0-or-later
 ## Related Projects
 
 - **[servicekit](https://github.com/winterop-com/servicekit)** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.) ([docs](https://winterop-com.github.io/servicekit))
+- **[chapkit-images](https://github.com/dhis2-chap/chapkit-images)** - Dockerfiles and CI for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` runtime images used by `chapkit run`.
