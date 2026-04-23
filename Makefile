@@ -1,4 +1,4 @@
-.PHONY: help install lint test test-slow test-durations coverage clean docker-build docker-run docs docs-serve docs-build
+.PHONY: help install lint test test-slow test-durations coverage clean docker-build docker-build-py docker-build-r docs docs-serve docs-build
 
 # ==============================================================================
 # Venv
@@ -28,8 +28,9 @@ help:
 	@echo "  docs-serve   Serve documentation locally with live reload"
 	@echo "  docs-build   Build documentation site"
 	@echo "  docs         Alias for docs-serve"
-	@echo "  docker-build Build Docker image for examples"
-	@echo "  docker-run   Run example in Docker (use EXAMPLE='config_api')"
+	@echo "  docker-build    Build both chapkit run base images (chapkit-py + chapkit-r)"
+	@echo "  docker-build-py Build the Python MLproject runtime image (chapkit-py:dev)"
+	@echo "  docker-build-r  Build the R+INLA MLproject runtime image (chapkit-r:dev, amd64)"
 	@echo "  clean        Clean up temporary files"
 
 install:
@@ -86,19 +87,15 @@ docs-build:
 
 docs: docs-serve
 
-docker-build:
-	@echo ">>> Building Docker image"
-	@docker build -t chapkit-examples .
+docker-build: docker-build-py docker-build-r
 
-docker-run:
-	@echo ">>> Running Docker container with example: $(EXAMPLE)"
-	@if [ -z "$(EXAMPLE)" ]; then \
-		echo "Error: EXAMPLE not specified. Usage: make docker-run EXAMPLE=config_api"; \
-		exit 1; \
-	fi
-	@docker run --rm -p 8000:8000 \
-		-e EXAMPLE_MODULE=examples.$(EXAMPLE):app \
-		chapkit-examples
+docker-build-py:
+	@echo ">>> Building chapkit-py:dev (Python MLproject runtime)"
+	@docker build -f chapkit-py.Dockerfile -t chapkit-py:dev .
+
+docker-build-r:
+	@echo ">>> Building chapkit-r:dev (R+INLA MLproject runtime, amd64)"
+	@docker build --platform=linux/amd64 -f chapkit-r.Dockerfile -t chapkit-r:dev .
 
 clean:
 	@echo ">>> Cleaning up"
