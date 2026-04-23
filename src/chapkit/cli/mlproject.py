@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import re
 import string
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import create_model
+from pydantic import BaseModel, Field, create_model
 
 from chapkit.config.schemas import BaseConfig
 
@@ -46,22 +45,20 @@ TYPE_MAP: dict[str, type] = {
 }
 
 
-@dataclass
-class EntryPoint:
+class EntryPoint(BaseModel):
     """A single MLproject entry point (train or predict)."""
 
     command: str
-    parameters: dict[str, str] = field(default_factory=dict)
+    parameters: dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass
-class MLProject:
+class MLProject(BaseModel):
     """Parsed MLproject definition."""
 
     name: str
     entry_points: dict[str, EntryPoint]
-    user_options: dict[str, dict[str, Any]] = field(default_factory=dict)
-    env_hints: dict[str, str] = field(default_factory=dict)
+    user_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    env_hints: dict[str, str] = Field(default_factory=dict)
     source_path: Path | None = None
 
 
@@ -83,7 +80,7 @@ def find_mlproject(path: Path) -> Path:
 
 
 def parse_mlproject(path: Path) -> MLProject:
-    """Parse an MLproject file or directory into an MLProject dataclass."""
+    """Parse an MLproject file or directory into an MLProject model."""
     mlproject_file = path if path.is_file() else find_mlproject(path)
     with mlproject_file.open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle)
