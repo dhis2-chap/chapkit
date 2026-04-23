@@ -1,0 +1,20 @@
+FROM ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest
+
+COPY . /work
+WORKDIR /work
+
+{% if HAS_RENV %}
+# Restore the R library declared in renv.lock at image build time so the
+# container starts instantly instead of bootstrapping renv on every run.
+RUN R -q -e "renv::restore(prompt = FALSE)"
+{% endif %}
+{% if LANGUAGE == "python" and HAS_USER_PYPROJECT %}
+# Install the project's own Python dependencies into the chapkit venv
+# alongside chapkit itself. Falls through to apt-installed build tools
+# in the base image if any wheel needs to compile from source.
+RUN uv pip install --python /app/.venv/bin/python -e .
+{% endif %}
+
+EXPOSE 8000
+
+CMD ["chapkit", "run", ".", "--host", "0.0.0.0", "--port", "8000"]

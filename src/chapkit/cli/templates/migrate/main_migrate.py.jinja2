@@ -1,0 +1,53 @@
+"""{{ PROJECT_DESCRIPTION }}."""
+
+from chapkit import BaseConfig
+from chapkit.api import MLServiceBuilder, ServiceInfo
+from chapkit.artifact import ArtifactHierarchy
+from chapkit.ml import ShellModelRunner
+
+
+class {{ PROJECT_IDENTIFIER }}Config(BaseConfig):
+    """Configuration for {{ PROJECT_NAME }}."""
+
+{% for name, py_type, default_repr in CONFIG_FIELDS %}
+    {{ name }}: {{ py_type }} = {{ default_repr }}
+{% endfor %}
+
+
+# Translated from the original MLproject entry points. `chapkit migrate`
+# substituted MLproject parameter placeholders with chapkit's canonical
+# workspace filenames (data.csv, historic.csv, future.csv, predictions.csv,
+# model, config.yml, geo.json). Config fields above are serialised to
+# config.yml at runtime and are available to these commands.
+train_command = "{{ TRAIN_COMMAND }}"
+predict_command = "{{ PREDICT_COMMAND }}"
+
+
+runner: ShellModelRunner[{{ PROJECT_IDENTIFIER }}Config] = ShellModelRunner(
+    train_command=train_command,
+    predict_command=predict_command,
+)
+
+info = ServiceInfo(
+    id="{{ PROJECT_SLUG }}",
+    display_name="{{ PROJECT_NAME }}",
+    description="{{ PROJECT_DESCRIPTION }}",
+)
+
+hierarchy = ArtifactHierarchy(
+    name="{{ PROJECT_IDENTIFIER }}",
+    level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
+)
+
+app = MLServiceBuilder(
+    info=info,
+    config_schema={{ PROJECT_IDENTIFIER }}Config,
+    hierarchy=hierarchy,
+    runner=runner,
+).build()
+
+
+if __name__ == "__main__":
+    from chapkit.api import run_app
+
+    run_app("main:app", host="0.0.0.0", port=8000)

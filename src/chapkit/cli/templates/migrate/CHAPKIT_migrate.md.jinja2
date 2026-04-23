@@ -1,0 +1,67 @@
+# {{ PROJECT_NAME }} — chapkit service
+
+{{ PROJECT_DESCRIPTION }}.
+
+This project was migrated from an MLflow-style `MLproject` directory by
+`chapkit migrate`. The original files are preserved under `_old/` for
+reference. The chapkit wrapper (`main.py`, `Dockerfile`, `compose.yml`,
+`pyproject.toml`) sits alongside your train/predict scripts at the root.
+
+## Quick start
+
+### Local (uv)
+
+```bash
+uv sync                    # install chapkit + deps into .venv
+uv run chapkit run .       # serve on http://127.0.0.1:8000
+```
+
+Open http://127.0.0.1:8000/docs for the OpenAPI UI, or `/health` for a ping.
+
+### Docker
+
+```bash
+docker build -t {{ PROJECT_SLUG }} .
+docker run --rm -p 8000:8000 {{ PROJECT_SLUG }}
+```
+
+The image uses `ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest` as its base.
+{% if BASE_IMAGE == "chapkit-r-inla" %}
+That's an `amd64`-only image (INLA ships x86_64 binaries only); on Apple
+Silicon add `--platform=linux/amd64` to both `docker build` and
+`docker run`.
+{% endif %}
+
+## Running tests
+
+`chapkit test` drives an end-to-end train + predict cycle against the
+running service and prints a short report.
+
+```bash
+# in one terminal:
+uv run chapkit run .
+# in another:
+uv run chapkit test
+```
+
+## Project layout
+
+- `main.py` — chapkit service (generated). Defines the config schema,
+  the `ShellModelRunner`, and the `MLServiceBuilder` wiring.
+- `Dockerfile`, `compose.yml`, `pyproject.toml`, `postman_collection.json` — generated.
+- Your train/predict scripts and helpers — **unchanged**, at the project root.
+- `_old/` — the original `MLproject`, `input/`, `output/`, ad-hoc runners, etc.
+  Preserved as-is for reference; nothing in here is used by the chapkit service.
+
+## Configuration
+
+Edit the `{{ PROJECT_IDENTIFIER }}Config` class in `main.py` to add or adjust
+typed fields. At runtime chapkit serialises the validated config to
+`config.yml` in the workspace; your scripts read it via whatever YAML
+parser they already use (`yaml.load_file` in R, `yaml.safe_load` in Python).
+
+## Links
+
+- [chapkit](https://github.com/dhis2-chap/chapkit)
+- [MLproject Runner guide](https://dhis2-chap.github.io/chapkit/guides/mlproject-runner/)
+- [chapkit-images](https://github.com/dhis2-chap/chapkit-images) — the base image this project builds on
