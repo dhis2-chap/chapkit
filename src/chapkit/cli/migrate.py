@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import shutil
+import tomllib
 from dataclasses import dataclass
 from enum import Enum
 from importlib.metadata import version as _pkg_version
@@ -151,6 +152,40 @@ def _classify_dir(path: Path) -> ClassifiedPath:
 
 def _language_from_image(image: str) -> str:
     return {"chapkit-py": "python", "chapkit-r": "r", "chapkit-r-inla": "r"}[image]
+
+
+def _extract_user_dependencies(project_path: Path) -> list[str]:
+    """Read [project.dependencies] from the user's pyproject.toml.
+
+    Returns the deps as raw requirement strings (e.g. "pandas>=2.0", "numpy").
+    Entries that reference chapkit itself are dropped; the generated
+    pyproject.toml adds chapkit with its own pinned version. Returns an empty
+    list if the file is missing or unparseable.
+    """
+    pyproject = project_path / "pyproject.toml"
+    if not pyproject.is_file():
+        return []
+    try:
+        with pyproject.open("rb") as handle:
+            data = tomllib.load(handle)
+    except (tomllib.TOMLDecodeError, OSError):
+        return []
+    raw = data.get("project", {}).get("dependencies", [])
+    if not isinstance(raw, list):
+        return []
+    kept: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            continue
+        head = entry.split(";", 1)[0].strip()
+        # dependency name is everything up to the first version/extra operator
+        name = head.split("[", 1)[0]
+        for op in ("==", ">=", "<=", "~=", "!=", ">", "<", " "):
+            name = name.split(op, 1)[0]
+        if name.strip().lower() == "chapkit":
+            continue
+        kept.append(entry)
+    return kept
 
 
 def _any_r_script_uses(project_path: Path, packages: tuple[str, ...]) -> bool:
@@ -405,6 +440,8 @@ def _run(
     # pyproject.toml, .gitignore, .dockerignore, etc. - they land in _old/.
     renders = list(_GENERATED_FILENAMES)
 
+    user_deps = _extract_user_dependencies(project_path)
+
     context: dict[str, Any] = {
         "PROJECT_NAME": mlproject.name,
         "PROJECT_SLUG": slugify(mlproject.name),
@@ -416,7 +453,8 @@ def _run(
         "PREDICT_COMMAND": predict_command,
         "CONFIG_FIELDS": build_config_fields(mlproject),
         "HAS_RENV": (project_path / "renv.lock").is_file(),
-        "HAS_USER_PYPROJECT": any(p.name == "pyproject.toml" for p in project_path.iterdir() if p.is_file()),
+        "HAS_USER_PYPROJECT": (project_path / "pyproject.toml").is_file(),
+        "USER_DEPENDENCIES": user_deps,
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }
 
@@ -440,10 +478,10 @@ def _run(
     typer.echo("")
     typer.echo(f"Moved {moved} item(s) to _old/.")
     typer.echo(f"Generated {written} file(s) at project root.")
+    if user_deps:
+        typer.echo(f"Merged {len(user_deps)} dependency(ies) from the original pyproject.toml into the new one.")
     if (old_dir / "pyproject.toml").is_file():
-        typer.echo(
-            "Note: your original pyproject.toml is at _old/pyproject.toml; merge deps into the new one manually."
-        )
+        typer.echo("Your original pyproject.toml is preserved at _old/pyproject.toml for reference.")
     typer.echo("")
     typer.echo("Next steps:")
     typer.echo("  uv sync && uv run chapkit run .")

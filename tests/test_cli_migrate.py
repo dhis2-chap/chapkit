@@ -311,33 +311,88 @@ def test_existing_readme_moves_to_old(tmp_path: Path) -> None:
     assert (tmp_path / "CHAPKIT.md").is_file()
 
 
-def test_existing_user_pyproject_moves_to_old(tmp_path: Path) -> None:
+def test_existing_user_pyproject_moves_to_old_and_deps_merge(tmp_path: Path) -> None:
+    user_pyproject = """\
+[project]
+name = "user-model"
+version = "0.0.1"
+description = "user's model"
+dependencies = [
+    "pandas>=2.0",
+    "scikit-learn>=1.3",
+    "numpy",
+    "chapkit>=0.1",
+]
+"""
     _seed_project(
         tmp_path,
         PYTHON_MLPROJECT,
         {
             "train.py": "...",
             "predict.py": "...",
-            "pyproject.toml": '[project]\nname = "user-model"\nversion = "0.0.1"\n',
+            "pyproject.toml": user_pyproject,
         },
     )
     runner = CliRunner()
     result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
-    # Original user pyproject.toml is preserved under _old/ so deps can be merged.
+    # Original user pyproject.toml is preserved under _old/ for reference.
     assert (tmp_path / "_old" / "pyproject.toml").is_file()
     assert "user-model" in (tmp_path / "_old" / "pyproject.toml").read_text()
 
-    # Root has a fresh chapkit pyproject.toml.
-    assert (tmp_path / "pyproject.toml").is_file()
+    # Generated root pyproject.toml is chapkit-shaped AND includes the user's deps,
+    # except for any chapkit entry (we add chapkit ourselves with a pinned version).
     generated = (tmp_path / "pyproject.toml").read_text()
-    assert "chapkit" in generated
     assert "user-model" not in generated
+    assert "chapkit>=" in generated
+    assert "pandas>=2.0" in generated
+    assert "scikit-learn>=1.3" in generated
+    assert '"numpy"' in generated
+    # Must NOT contain the user's own chapkit entry (our version wins).
+    assert '"chapkit>=0.1"' not in generated
 
-    # Output mentions the _old/pyproject.toml pointer so the user knows where to look.
-    assert "pyproject.toml" in result.output
-    assert "_old" in result.output
+    assert "Merged 3 dependency" in result.output
+    assert "_old/pyproject.toml" in result.output
+
+
+def test_pyproject_without_deps_still_works(tmp_path: Path) -> None:
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "pyproject.toml": '[project]\nname = "nodeps"\nversion = "0.0.1"\n',
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    generated = (tmp_path / "pyproject.toml").read_text()
+    assert "chapkit>=" in generated
+    # No "Merged N dependencies" line when there were none.
+    assert "Merged" not in result.output
+
+
+def test_invalid_pyproject_does_not_crash(tmp_path: Path) -> None:
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "pyproject.toml": "this is: not @@@ valid TOML",
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    generated = (tmp_path / "pyproject.toml").read_text()
+    assert "chapkit>=" in generated
+    # Broken toml was still moved aside, and no deps were merged.
+    assert (tmp_path / "_old" / "pyproject.toml").is_file()
+    assert "Merged" not in result.output
 
 
 def test_unknown_param_hard_errors_with_yes(tmp_path: Path) -> None:

@@ -5,6 +5,9 @@ description = "{{ PROJECT_DESCRIPTION }}"
 requires-python = ">=3.13"
 dependencies = [
     "chapkit>={{ CHAPKIT_VERSION }}",
+{% for dep in USER_DEPENDENCIES %}
+    "{{ dep }}",
+{% endfor %}
 ]
 
 [dependency-groups]

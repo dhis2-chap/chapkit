@@ -83,7 +83,13 @@ Use `--param NAME=FILENAME` (repeatable) to pre-answer the non-canonical-paramet
 
 ## Your own `pyproject.toml`
 
-If your repo already has a `pyproject.toml`, it lands at `_old/pyproject.toml` alongside the rest of the chapkit-owned metadata. Migrate writes a fresh minimal chapkit `pyproject.toml` at root. Merge your dependencies (and any `[tool.*]` config) back into the new file manually — we don't try to guess the right merge. The output summary prints a pointer at `_old/pyproject.toml` so you don't forget.
+If your repo already has a `pyproject.toml`, migrate:
+
+1. Parses `[project.dependencies]` from it (skipping any `chapkit` entry — we add our own).
+2. Writes a fresh chapkit `pyproject.toml` at the project root that includes **both** `chapkit` and the deps pulled from your original.
+3. Moves your original `pyproject.toml` to `_old/pyproject.toml` so it's still available for reference (e.g. if you had optional-dep groups, `[tool.*]` config, or environment markers you want to port over manually).
+
+The migrate output summary tells you how many deps were merged, and points at the preserved original file.
 
 ## Next steps after migrate
 
