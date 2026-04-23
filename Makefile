@@ -1,4 +1,4 @@
-.PHONY: help install lint test test-slow test-durations coverage clean docker-build docker-build-py docker-build-r docker-build-r-inla docs docs-serve docs-build
+.PHONY: help install lint test test-slow test-durations coverage clean docs docs-serve docs-build
 
 # ==============================================================================
 # Venv
@@ -28,11 +28,10 @@ help:
 	@echo "  docs-serve   Serve documentation locally with live reload"
 	@echo "  docs-build   Build documentation site"
 	@echo "  docs         Alias for docs-serve"
-	@echo "  docker-build        Build all three chapkit run base images"
-	@echo "  docker-build-py     Build Python runtime (chapkit-py:dev, multi-arch)"
-	@echo "  docker-build-r      Build R base runtime (chapkit-r:dev, multi-arch, no INLA)"
-	@echo "  docker-build-r-inla Build R+INLA runtime (chapkit-r-inla:dev, amd64)"
 	@echo "  clean        Clean up temporary files"
+	@echo ""
+	@echo "Docker images for 'chapkit run' live in dhis2-chap/chapkit-images;"
+	@echo "this repo no longer builds them."
 
 install:
 	@echo ">>> Installing dependencies"
@@ -87,20 +86,6 @@ docs-build:
 	@$(UV) run mkdocs build
 
 docs: docs-serve
-
-docker-build: docker-build-py docker-build-r docker-build-r-inla
-
-docker-build-py:
-	@echo ">>> Building chapkit-py:dev (Python runtime, multi-arch)"
-	@docker build -f chapkit-py.Dockerfile -t chapkit-py:dev .
-
-docker-build-r:
-	@echo ">>> Building chapkit-r:dev (R base runtime, multi-arch, no INLA)"
-	@docker build -f chapkit-r.Dockerfile -t chapkit-r:dev .
-
-docker-build-r-inla:
-	@echo ">>> Building chapkit-r-inla:dev (R+INLA runtime, amd64)"
-	@docker build --platform=linux/amd64 -f chapkit-r-inla.Dockerfile -t chapkit-r-inla:dev .
 
 clean:
 	@echo ">>> Cleaning up"
