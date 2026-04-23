@@ -48,10 +48,27 @@ uv run chapkit test
 
 - `main.py` — chapkit service (generated). Defines the config schema,
   the `ShellModelRunner`, and the `MLServiceBuilder` wiring.
-- `Dockerfile`, `compose.yml`, `pyproject.toml`, `postman_collection.json` — generated.
-- Your train/predict scripts and helpers — **unchanged**, at the project root.
-- `_old/` — the original `MLproject`, `input/`, `output/`, ad-hoc runners, etc.
-  Preserved as-is for reference; nothing in here is used by the chapkit service.
+- `Dockerfile`, `compose.yml`, `pyproject.toml`, `postman_collection.json`,
+  `README.md`, `.gitignore`, `.dockerignore` — generated.
+- Your train/predict scripts, helpers, Python packages, lockfiles,
+  `LICENSE`, and any arbitrary data/config files (`*.yaml`, `*.json`, ...)
+  — **unchanged**, at the project root.
+- `_old/` — the original `MLproject` plus project metadata that chapkit
+  regenerated (old `README.md`, `.gitignore`, `pyproject.toml`, etc.),
+  example data (`input/`, `output/`, `example_data*/`), and ad-hoc
+  runners (`isolated_run.*`). Preserved as-is for reference; nothing in
+  here is used by the chapkit service.
+{% if HAS_USER_PYPROJECT %}
+
+### Dependencies from your original `pyproject.toml`
+
+Your model's Python dependencies have been auto-merged from
+`_old/pyproject.toml` into the generated `pyproject.toml` at the root,
+alongside the chapkit entry. The original is preserved under `_old/`
+so you can port over anything we did not migrate automatically —
+optional dep groups, `[tool.*]` config (ruff, mypy, etc.), environment
+markers, and custom `[build-system]` backends.
+{% endif %}
 
 ## Configuration
 
