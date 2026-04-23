@@ -72,7 +72,7 @@ markers, and custom `[build-system]` backends.
 
 ## Configuration
 
-Edit the `{{ PROJECT_IDENTIFIER }}Config` class in `main.py` to add or adjust
+Edit the `{{ PROJECT_CLASS_NAME }}Config` class in `main.py` to add or adjust
 typed fields. At runtime chapkit serialises the validated config to
 `config.yml` in the workspace; your scripts read it via whatever YAML
 parser they already use (`yaml.load_file` in R, `yaml.safe_load` in Python).

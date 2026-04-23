@@ -17,7 +17,23 @@ from chapkit.cli.migrate import (
     classify,
     detect_base_image,
 )
-from chapkit.cli.mlproject import MLProject, parse_mlproject
+from chapkit.cli.mlproject import MLProject, _python_class_name, parse_mlproject
+
+
+def test_python_class_name_pascal_cases_snake() -> None:
+    assert _python_class_name("ewars_template") == "EwarsTemplate"
+    assert _python_class_name("minimalist_r") == "MinimalistR"
+    assert _python_class_name("simple_multistep_example") == "SimpleMultistepExample"
+    # Edge cases: leading digit gets ML_ prefix via _python_identifier, then PascalCase.
+    # "123bad" -> "ML_123bad" -> ["ML","123bad"] -> "ML" + "123bad" (digit cannot upper) -> "ML123bad"
+    assert _python_class_name("123bad") == "ML123bad"
+
+
+def test_python_class_name_preserves_internal_caps() -> None:
+    # We uppercase the first letter of each segment and leave the rest alone,
+    # so "foo_BAR" -> "FooBAR" (not "FooBar") - useful for acronyms.
+    assert _python_class_name("foo_BAR") == "FooBAR"
+
 
 MINIMALIST_MLPROJECT = """
 name: minimalist_r
@@ -373,7 +389,7 @@ def test_full_run_moves_chaff_and_writes_outputs(tmp_path: Path) -> None:
     main_py = tmp_path / "main.py"
     assert main_py.is_file()
     source = main_py.read_text()
-    assert "class ewars_templateConfig(BaseConfig)" in source
+    assert "class EwarsTemplateConfig(BaseConfig)" in source
     assert "n_lags: int = 3" in source
     assert "precision: float = 0.01" in source
     assert "Rscript train.R data.csv model config.yml" in source

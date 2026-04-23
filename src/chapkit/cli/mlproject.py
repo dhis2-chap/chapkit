@@ -206,6 +206,14 @@ def _python_identifier(value: str) -> str:
     return cleaned
 
 
+def _python_class_name(value: str) -> str:
+    """Return a PascalCase Python class name derived from value."""
+    identifier = _python_identifier(value)
+    parts = [part for part in identifier.split("_") if part]
+    pascal = "".join(part[:1].upper() + part[1:] for part in parts)
+    return pascal or "MLProject"
+
+
 def build_config_schema(mlproject: MLProject) -> type[BaseConfig]:
     """Build a BaseConfig subclass from MLproject user_options, injecting prediction_periods."""
     fields: dict[str, Any] = {}
@@ -221,7 +229,7 @@ def build_config_schema(mlproject: MLProject) -> type[BaseConfig]:
     if "prediction_periods" not in fields:
         fields["prediction_periods"] = (int, 3)
 
-    model_name = f"{_python_identifier(mlproject.name)}Config"
+    model_name = f"{_python_class_name(mlproject.name)}Config"
     return create_model(model_name, __base__=BaseConfig, **fields)
 
 
