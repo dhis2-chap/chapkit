@@ -117,10 +117,10 @@ Chapkit publishes two base images for `chapkit run`:
 
 | Image                                      | Contents                                                   | Architectures        | Typical size |
 | ------------------------------------------ | ---------------------------------------------------------- | -------------------- | ------------ |
-| `ghcr.io/dhis2-chap/chapkit-py:latest`     | Python 3.13, chapkit, uv, `build-essential`, `pkg-config`  | `linux/amd64`, `linux/arm64` | ~900 MB      |
-| `ghcr.io/dhis2-chap/chapkit-r:latest`      | `docker_r_inla` + Python 3.13, chapkit, uv                 | `linux/amd64`        | ~1.3 GB      |
+| `ghcr.io/dhis2-chap/chapkit-py:latest`     | Python 3.13, chapkit, uv, `build-essential`, `pkg-config`  | `linux/amd64`, `linux/arm64` | ~920 MB      |
+| `ghcr.io/dhis2-chap/chapkit-r:latest`      | `docker_r_inla` + Python 3.13, chapkit, uv                 | `linux/amd64`        | ~7.7 GB      |
 
-`chapkit-r` is a "fat" runtime — it bundles R 4.5 + INLA alongside Python, so it can host R, Python, or mixed-language MLprojects. `chapkit-py` is leaner and multi-arch; use it when R isn't needed.
+`chapkit-r` is a "fat" runtime — it bundles R 4.5 + INLA (and the many R/geospatial packages that `docker_r_inla` carries) alongside Python, so it can host R, Python, or mixed-language MLprojects. `chapkit-py` is much leaner and multi-arch; use it when R isn't needed.
 
 Both images set `WORKDIR /work` and default to `CMD ["chapkit", "run", ".", "--host", "0.0.0.0", "--port", "8000"]`, so mounting your MLproject into `/work` is enough:
 
@@ -159,7 +159,7 @@ The images contain chapkit, Python, and (for `chapkit-r`) R+INLA, but **not** yo
 
 ### Security
 
-`chapkit-py` runs as a non-root `chapkit` user. `chapkit-r` currently runs as root — `docker_r_inla` has no non-root user baked in and R's package paths (INLA `.so` files, renv caches) assume root-owned layout. Non-root hardening for the R image is a planned follow-up; the image is fine in a trusted compose network behind chap-core.
+Both images currently run as `root`. Non-root hardening needs the usual volume-mapping dance (writable `/tmp`, per-user cache dirs, etc. — see `chap-core/compose.yml` for the reference pattern) and is a planned follow-up. The images are intended to sit in a trusted compose network behind chap-core.
 
 ---
 
