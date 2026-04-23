@@ -37,8 +37,28 @@ def test_command(
     ] = 1,
     num_rows: Annotated[
         int,
-        typer.Option("--rows", "-r", help="Target rows in training data (locations x periods)"),
-    ] = 100,
+        typer.Option(
+            "--rows",
+            "-r",
+            help=(
+                "Target rows in training data (locations x periods). Default 250 = "
+                "50 periods x 5 locations, which is ~4 years monthly or ~1 year weekly. "
+                "Most epi / climate-health models need >=2 years of training data; "
+                "increase for weekly models or models with long context windows."
+            ),
+        ),
+    ] = 250,
+    num_predict_rows: Annotated[
+        int,
+        typer.Option(
+            "--predict-rows",
+            help=(
+                "Target rows in historic + future prediction data (locations x periods, each). "
+                "Default 150 = 30 periods x 5 locations, which is ~2.5 years monthly. "
+                "Bump for weekly models or lag-based models with longer context windows."
+            ),
+        ),
+    ] = 150,
     timeout: Annotated[
         float,
         typer.Option("--timeout", help="Job completion timeout in seconds"),
@@ -293,7 +313,7 @@ def test_command(
                 for _ in range(num_predictions):
                     historic, future = generator.generate_prediction_data(
                         num_locations=5,
-                        num_periods=2,  # Smaller dataset for prediction
+                        num_periods=max(1, num_predict_rows // 5),
                         required_covariates=runner.required_covariates,
                         additional_covariates=pred_acc,
                         extra_covariates=extra_covariates,
