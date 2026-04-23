@@ -1,7 +1,13 @@
 FROM ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest
 
-COPY . /work
+# Switch to root so we can write to /app/.venv and install user deps
+# declared in pyproject.toml. chapkit-py currently runs as a non-root user
+# with a root-owned venv (chapkit-images issue tracked separately); staying
+# at root matches chapkit-r / chapkit-r-inla's runtime posture.
+USER root
+
 WORKDIR /work
+COPY . /work
 
 {% if HAS_RENV %}
 # Restore the R library declared in renv.lock at image build time so the
@@ -9,12 +15,13 @@ WORKDIR /work
 RUN R -q -e "renv::restore(prompt = FALSE)"
 {% endif %}
 {% if LANGUAGE == "python" and HAS_USER_PYPROJECT %}
-# Install the project's own Python dependencies into the chapkit venv
-# alongside chapkit itself. Falls through to apt-installed build tools
-# in the base image if any wheel needs to compile from source.
-RUN uv pip install --python /app/.venv/bin/python -e .
+# Install the project's Python dependencies (merged from the user's
+# original pyproject.toml) into the chapkit venv. Falls through to
+# apt-installed build tools in the base image if any wheel needs to
+# compile from source.
+RUN uv pip install --python /app/.venv/bin/python .
 {% endif %}
 
 EXPOSE 8000
 
-CMD ["chapkit", "run", ".", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "main.py"]

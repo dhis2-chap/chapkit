@@ -7,7 +7,6 @@ import shutil
 import tomllib
 from dataclasses import dataclass
 from enum import Enum
-from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -485,7 +484,7 @@ def _run(
         typer.echo("Your original pyproject.toml is preserved at _old/pyproject.toml for reference.")
     typer.echo("")
     typer.echo("Next steps:")
-    typer.echo("  uv sync && uv run chapkit run .")
+    typer.echo("  uv sync && uv run python main.py")
     typer.echo(
         f"  # or: docker build -t {context['PROJECT_SLUG']} . && docker run --rm -p 8000:8000 {context['PROJECT_SLUG']}"
     )
@@ -508,8 +507,14 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
     }
 
 
+#: Floor for the `chapkit>=...` dep that migrate emits into the generated
+#: pyproject.toml. This is the minimum chapkit release that has `chapkit run`
+#: (the command the generated main.py and Dockerfile CMD depend on). It's
+#: explicitly NOT the running chapkit's own version, because that could be a
+#: `.devN` not-yet-published release and would leave the migrated project
+#: with an uninstallable dep.
+_MIN_CHAPKIT_VERSION = "0.19.0"
+
+
 def _get_chapkit_version() -> str:
-    try:
-        return _pkg_version("chapkit")
-    except Exception:
-        return "unknown"
+    return _MIN_CHAPKIT_VERSION

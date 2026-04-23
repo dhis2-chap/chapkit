@@ -13,7 +13,7 @@ reference. The chapkit wrapper (`main.py`, `Dockerfile`, `compose.yml`,
 
 ```bash
 uv sync                    # install chapkit + deps into .venv
-uv run chapkit run .       # serve on http://127.0.0.1:8000
+uv run python main.py       # serve on http://127.0.0.1:8000
 ```
 
 Open http://127.0.0.1:8000/docs for the OpenAPI UI, or `/health` for a ping.
@@ -39,7 +39,7 @@ running service and prints a short report.
 
 ```bash
 # in one terminal:
-uv run chapkit run .
+uv run python main.py
 # in another:
 uv run chapkit test
 ```

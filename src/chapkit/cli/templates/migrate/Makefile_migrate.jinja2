@@ -11,7 +11,7 @@ PLATFORM_FLAG :=
 help:
 	@echo "Targets:"
 	@echo "  install       Install deps into .venv (uv sync)"
-	@echo "  run           Serve the chapkit app locally (chapkit run .)"
+	@echo "  run           Serve the chapkit app locally (python main.py)"
 	@echo "  test          Drive an end-to-end train+predict against a running service (chapkit test)"
 	@echo "  docker-build  Build the container image (\$$IMAGE=$(IMAGE))"
 	@echo "  docker-run    Run the container, publishing \$$PORT=$(PORT)"
@@ -21,7 +21,7 @@ install:
 	uv sync
 
 run:
-	uv run chapkit run .
+	uv run python main.py
 
 test:
 	uv run chapkit test
