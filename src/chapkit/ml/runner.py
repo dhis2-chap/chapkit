@@ -177,6 +177,11 @@ def create_workspace_artifact(
 class BaseModelRunner(ABC, Generic[ConfigT]):
     """Abstract base class for model runners with lifecycle hooks."""
 
+    @property
+    def supports_train(self) -> bool:
+        """Return True when this runner can execute a train step."""
+        return True
+
     async def on_init(self) -> None:
         """Optional initialization hook called before training or prediction."""
         pass
@@ -298,16 +303,21 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
 
     def __init__(
         self,
-        on_train: TrainFunction[ConfigT],
         on_predict: PredictFunction[ConfigT],
+        on_train: TrainFunction[ConfigT] | None = None,
         on_validate_train: ValidateTrainFunction[ConfigT] | None = None,
         on_validate_predict: ValidatePredictFunction[ConfigT] | None = None,
     ) -> None:
-        """Initialize functional runner with train, predict, and optional validate functions."""
+        """Initialize functional runner with predict, and optional train/validate functions."""
         self._on_train = on_train
         self._on_predict = on_predict
         self._on_validate_train = on_validate_train
         self._on_validate_predict = on_validate_predict
+
+    @property
+    def supports_train(self) -> bool:
+        """True when a train callback was supplied."""
+        return self._on_train is not None
 
     async def on_validate_train(
         self,
@@ -343,6 +353,9 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         Returns:
             Dict with keys: content (model), workspace_dir, exit_code, stdout, stderr
         """
+        if self._on_train is None:
+            raise RuntimeError("FunctionalModelRunner has no on_train callback; this runner is stateless")
+
         workspace_dir = Path(tempfile.mkdtemp(prefix="chapkit_functional_train_", dir=get_temp_dir()))
         # Copy full project directory for reproducibility
         prepare_workspace(Path.cwd(), workspace_dir)
@@ -383,8 +396,9 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         (workspace_dir / "config.yml").write_text(yaml.safe_dump(config.model_dump(), indent=2))
         # Write prediction input files
         write_prediction_inputs(workspace_dir, historic, future, geo)
-        # Write model.pickle (input model for prediction)
-        (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
+        # Write model.pickle (input model for prediction; omitted in stateless mode)
+        if model is not None:
+            (workspace_dir / "model.pickle").write_bytes(pickle.dumps(model))
 
         # Execute prediction function
         predictions = await self._on_predict(config, model, historic, future, geo)
@@ -488,8 +502,8 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
 
     def __init__(
         self,
-        train_command: str,
         predict_command: str,
+        train_command: str | None = None,
         on_validate_train: ValidateTrainFunction[ConfigT] | None = None,
         on_validate_predict: ValidatePredictFunction[ConfigT] | None = None,
     ) -> None:
@@ -500,8 +514,9 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         build artifacts.
 
         Args:
-            train_command: Command template for training (use relative paths)
             predict_command: Command template for prediction (use relative paths)
+            train_command: Optional command template for training (use relative paths).
+                           Omit for stateless predict-only services.
             on_validate_train: Optional Python callback for domain-level train validation
             on_validate_predict: Optional Python callback for domain-level predict validation
         """
@@ -516,6 +531,11 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         self.project_root = Path.cwd()
 
         logger.info("shell_runner_initialized", project_root=str(self.project_root))
+
+    @property
+    def supports_train(self) -> bool:
+        """True when a train command was supplied."""
+        return self.train_command is not None
 
     async def on_validate_train(
         self,
@@ -587,6 +607,9 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         geo: FeatureCollection | None = None,
     ) -> Any:
         """Train a model by executing external training script (model file creation is optional)."""
+        if self.train_command is None:
+            raise RuntimeError("ShellModelRunner has no train_command; this runner is stateless")
+
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_train_", dir=get_temp_dir()))
 
         try:
@@ -681,19 +704,22 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         temp_dir = Path(tempfile.mkdtemp(prefix="chapkit_ml_predict_", dir=get_temp_dir()))
 
         try:
-            # Model must be workspace artifact from ShellModelRunner.on_train()
-            if not (isinstance(model, dict) and "workspace_dir" in model):
+            if isinstance(model, dict) and "workspace_dir" in model:
+                # Train-backed: restore workspace from training artifact
+                workspace_dir = Path(model["workspace_dir"])
+                logger.info("predict_using_workspace", workspace_dir=str(workspace_dir))
+                shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
+            elif model is None:
+                # Stateless: build a fresh workspace from the project root
+                logger.info("predict_stateless", project_root=str(self.project_root))
+                prepare_workspace(self.project_root, temp_dir)
+                # Write config.yml so predict scripts can still read it
+                (temp_dir / "config.yml").write_text(yaml.safe_dump(config.model_dump(), indent=2))
+            else:
                 raise ValueError(
-                    "ShellModelRunner.on_predict() requires workspace artifact from ShellModelRunner.on_train(). "
-                    f"Got: {type(model)}"
+                    "ShellModelRunner.on_predict() expects either a workspace dict from on_train() "
+                    f"or None for stateless mode. Got: {type(model)}"
                 )
-
-            # Extract and restore workspace from training artifact
-            workspace_dir = Path(model["workspace_dir"])
-            logger.info("predict_using_workspace", workspace_dir=str(workspace_dir))
-
-            # Copy workspace contents to temp_dir (preserves all training artifacts)
-            shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
 
             # Write prediction input files (always fresh for each prediction)
             write_prediction_inputs(temp_dir, historic, future, geo)

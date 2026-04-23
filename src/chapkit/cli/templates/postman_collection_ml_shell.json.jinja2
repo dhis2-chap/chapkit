@@ -147,6 +147,7 @@
             "name": "3. Model Validation",
             "description": "Pre-flight checks for train/predict payloads. Runs in Python (does NOT invoke your shell scripts) and returns structured diagnostics without submitting a job. Framework-level checks always run; model-specific checks run when the runner is given on_validate_train / on_validate_predict Python callbacks.",
             "item": [
+{% if not PREDICT_ONLY %}
                 {
                     "name": "Validate Train Payload",
                     "request": {
@@ -164,6 +165,7 @@
                         "description": "Discriminated union body: type=train. Returns {valid: bool, diagnostics: [...]}. Call before $train to catch problems early."
                     }
                 },
+{% endif %}
                 {
                     "name": "Validate Predict Payload",
                     "request": {
@@ -171,18 +173,23 @@
                         "header": [{"key": "Content-Type", "value": "application/json"}],
                         "body": {
                             "mode": "raw",
+{% if PREDICT_ONLY %}
+                            "raw": "{\n  \"type\": \"predict\",\n  \"config_id\": \"{%raw%}{{config_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+{% else %}
                             "raw": "{\n  \"type\": \"predict\",\n  \"artifact_id\": \"{%raw%}{{model_artifact_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+{% endif %}
                         },
                         "url": {
                             "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$validate",
                             "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
                             "path": ["api", "v1", "ml", "$validate"]
                         },
-                        "description": "Discriminated union body: type=predict. Uses {{model_artifact_id}} from a prior $train run."
+                        "description": "Discriminated union body: type=predict."
                     }
                 }
             ]
         },
+{% if not PREDICT_ONLY %}
         {
             "name": "4. Model Training (External Script)",
             "item": [
@@ -245,6 +252,7 @@
                 }
             ]
         },
+{% endif %}
         {
             "name": "5. Predictions (External Script)",
             "item": [
@@ -270,14 +278,18 @@
                         "header": [{"key": "Content-Type", "value": "application/json"}],
                         "body": {
                             "mode": "raw",
+{% if PREDICT_ONLY %}
+                            "raw": "{\n  \"config_id\": \"{%raw%}{{config_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+{% else %}
                             "raw": "{\n  \"artifact_id\": \"{%raw%}{{model_artifact_id}}{%endraw%}\",\n  \"historic\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": []\n  },\n  \"future\": {\n    \"columns\": [\"feature_1\", \"feature_2\"],\n    \"data\": [\n      [5.0, 6.0],\n      [6.0, 7.0]\n    ]\n  }\n}"
+{% endif %}
                         },
                         "url": {
                             "raw": "{%raw%}{{baseUrl}}{%endraw%}/api/v1/ml/$predict",
                             "host": ["{%raw%}{{baseUrl}}{%endraw%}"],
                             "path": ["api", "v1", "ml", "$predict"]
                         },
-                        "description": "Executes scripts/predict_model.py (or your custom script).\n\nWorkflow:\n1. Create temp directory\n2. Write config.yml, model.pickle, future.csv\n3. Execute prediction script\n4. Read predictions.csv\n5. Store in artifact"
+                        "description": "Executes scripts/predict_model.py (or your custom script)."
                     }
                 },
                 {

@@ -270,6 +270,7 @@ class ServiceBuilder(BaseServiceBuilder):
                 prefix=ml_options.prefix,
                 tags=ml_options.tags,
                 manager_factory=ml_dep,
+                supports_train=ml_options.runner.supports_train,
             )
             app.include_router(ml_router)
             app.dependency_overrides[default_get_ml_manager] = ml_dep
@@ -365,6 +366,29 @@ class ServiceBuilder(BaseServiceBuilder):
         return lifespan
 
 
+DEFAULT_ML_TRAINING_HIERARCHY = ArtifactHierarchy(
+    name="ml_training_hierarchy",
+    level_labels={
+        0: "ml_training_workspace",
+        1: "ml_prediction",
+        2: "ml_prediction_workspace",
+    },
+)
+
+DEFAULT_ML_STATELESS_HIERARCHY = ArtifactHierarchy(
+    name="ml_stateless_hierarchy",
+    level_labels={
+        0: "ml_prediction",
+        1: "ml_prediction_workspace",
+    },
+)
+
+
+def _default_ml_hierarchy(runner: ModelRunnerProtocol) -> ArtifactHierarchy:
+    """Pick a sensible default hierarchy based on whether the runner supports training."""
+    return DEFAULT_ML_TRAINING_HIERARCHY if runner.supports_train else DEFAULT_ML_STATELESS_HIERARCHY
+
+
 class MLServiceBuilder(ServiceBuilder):
     """Specialized service builder for ML services with all required components pre-configured."""
 
@@ -373,8 +397,8 @@ class MLServiceBuilder(ServiceBuilder):
         *,
         info: ServiceInfo | MLServiceInfo,
         config_schema: type[BaseConfig],
-        hierarchy: ArtifactHierarchy,
         runner: ModelRunnerProtocol,
+        hierarchy: ArtifactHierarchy | None = None,
         database_url: str = "sqlite+aiosqlite:///:memory:",
         include_error_handlers: bool = True,
         include_logging: bool = True,
@@ -406,11 +430,13 @@ class MLServiceBuilder(ServiceBuilder):
         # Configure database with migrations
         self.with_database(db)
 
+        resolved_hierarchy = hierarchy if hierarchy is not None else _default_ml_hierarchy(runner)
+
         # Automatically configure required ML components
         self.with_health()
         self.with_system()
         self.with_config(config_schema)
-        self.with_artifacts(hierarchy=hierarchy, enable_config_linking=True)
+        self.with_artifacts(hierarchy=resolved_hierarchy, enable_config_linking=True)
         self.with_jobs()
         self.with_landing_page()
         self.with_ml(runner=runner)

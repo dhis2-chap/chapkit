@@ -5,7 +5,9 @@ from pathlib import Path
 
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
+{% if not PREDICT_ONLY %}
 from chapkit.artifact import ArtifactHierarchy
+{% endif %}
 {% if WITH_VALIDATION %}
 from chapkit.data import DataFrame
 from chapkit.ml import ShellModelRunner, ValidationDiagnostic
@@ -44,8 +46,10 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
 #   config.yml - YAML config (always available)
 #   model.pickle - Model file (create/use as needed)
 
+{% if not PREDICT_ONLY %}
 # Training command template (using relative path to script)
 train_command = "python scripts/train_model.py --data {data_file}"
+{% endif %}
 
 # Prediction command template (using relative path to script)
 predict_command = (
@@ -56,6 +60,7 @@ predict_command = (
 )
 
 {% if WITH_VALIDATION %}
+{% if not PREDICT_ONLY %}
 # ====================================================================================
 # $validate hooks (optional)
 # ====================================================================================
@@ -136,13 +141,32 @@ async def on_validate_predict(
     return []
 
 
+{% else %}
+# Stateless services expose only on_validate_predict.
+
+
+async def on_validate_predict(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    historic: DataFrame,
+    future: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> list[ValidationDiagnostic]:
+    """Return domain-specific diagnostics for a stateless predict payload."""
+    return []
+
+
+{% endif %}
 {% endif %}
 # Create shell model runner
 runner: ShellModelRunner[{{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config] = ShellModelRunner(
-    train_command=train_command,
     predict_command=predict_command,
+{% if not PREDICT_ONLY %}
+    train_command=train_command,
+{% endif %}
 {% if WITH_VALIDATION %}
+{% if not PREDICT_ONLY %}
     on_validate_train=on_validate_train,
+{% endif %}
     on_validate_predict=on_validate_predict,
 {% endif %}
 )
@@ -163,11 +187,17 @@ info = MLServiceInfo(
     max_prediction_periods=100,
 )
 
+{% if not PREDICT_ONLY %}
 # Create artifact hierarchy for ML artifacts
 HIERARCHY = ArtifactHierarchy(
     name="{{ PROJECT_SLUG }}",
-    level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
+    level_labels={
+        0: "ml_training_workspace",
+        1: "ml_prediction",
+        2: "ml_prediction_workspace",
+    },
 )
+{% endif %}
 
 # Database configuration
 # Uses environment variable or defaults to data/chapkit.db
@@ -182,7 +212,9 @@ app = (
     MLServiceBuilder(
         info=info,
         config_schema={{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+{% if not PREDICT_ONLY %}
         hierarchy=HIERARCHY,
+{% endif %}
         runner=runner,
         database_url=DATABASE_URL,
     )

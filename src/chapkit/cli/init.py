@@ -85,6 +85,16 @@ def init_command(
         str,
         typer.Option(help="Template type: 'ml', 'ml-shell', or 'task'"),
     ] = "ml",
+    predict_only: Annotated[
+        bool,
+        typer.Option(
+            "--predict-only",
+            help=(
+                "Scaffold a stateless service without a train step. $predict takes a config_id "
+                "instead of an artifact_id, and $train is not exposed. Only valid with 'ml' and 'ml-shell'."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Initialize a new chapkit ML service project."""
     target_dir = (path or Path.cwd()) / project_name
@@ -106,6 +116,13 @@ def init_command(
         )
         raise typer.Exit(code=1)
 
+    if predict_only and template == "task":
+        typer.echo(
+            "Error: --predict-only is only valid for ML templates ('ml' or 'ml-shell').",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     project_slug = _slugify(project_name)
 
     typer.echo(f"Creating new chapkit project: {project_name}")
@@ -116,6 +133,8 @@ def init_command(
         typer.echo("Including monitoring stack (Prometheus + Grafana)")
     if with_validation:
         typer.echo("Including $validate hook stubs (on_validate_train / on_validate_predict)")
+    if predict_only:
+        typer.echo("Scaffolding as stateless predict-only service (no train step)")
     typer.echo()
 
     template_dir = Path(__file__).parent / "templates"
@@ -135,6 +154,7 @@ def init_command(
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_MONITORING": with_monitoring,
         "WITH_VALIDATION": with_validation,
+        "PREDICT_ONLY": predict_only,
         "TEMPLATE": template,
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }
@@ -171,13 +191,14 @@ def init_command(
     if template == "ml-shell":
         scripts_dir = target_dir / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
-        _render_template(
-            template_dir / "scripts",
-            scripts_dir,
-            "train_model.py.jinja2",
-            context,
-            "train_model.py",
-        )
+        if not predict_only:
+            _render_template(
+                template_dir / "scripts",
+                scripts_dir,
+                "train_model.py.jinja2",
+                context,
+                "train_model.py",
+            )
         _render_template(
             template_dir / "scripts",
             scripts_dir,

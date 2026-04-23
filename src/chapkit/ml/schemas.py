@@ -17,10 +17,10 @@ Migration Note:
 from __future__ import annotations
 
 import datetime
-from typing import Annotated, Any, Literal, Protocol, TypeVar
+from typing import Annotated, Any, Literal, Protocol, Self, TypeVar
 
 from geojson_pydantic import FeatureCollection
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from ulid import ULID
 
 from chapkit.artifact.schemas import (
@@ -54,10 +54,24 @@ class TrainResponse(BaseModel):
 class PredictRequest(BaseModel):
     """Request schema for making predictions."""
 
-    artifact_id: ULID = Field(description="ID of the artifact containing the trained model")
+    artifact_id: ULID | None = Field(
+        default=None,
+        description="ID of the trained artifact (train-backed services)",
+    )
+    config_id: ULID | None = Field(
+        default=None,
+        description="Config ID to predict against directly (stateless services)",
+    )
     historic: DataFrame = Field(description="Historic data as DataFrame")
     future: DataFrame = Field(description="Future/prediction data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+
+    @model_validator(mode="after")
+    def _exactly_one_id(self) -> Self:
+        """Require exactly one of artifact_id / config_id to be set."""
+        if (self.artifact_id is None) == (self.config_id is None):
+            raise ValueError("Exactly one of 'artifact_id' (train-backed) or 'config_id' (stateless) must be provided")
+        return self
 
 
 class PredictResponse(BaseModel):
@@ -119,10 +133,24 @@ class ValidatePredictRequest(BaseModel):
     """Request schema for validating a predict payload."""
 
     type: Literal["predict"] = Field(default="predict", frozen=True)
-    artifact_id: ULID = Field(description="ID of the artifact containing the trained model")
+    artifact_id: ULID | None = Field(
+        default=None,
+        description="ID of the trained artifact (train-backed services)",
+    )
+    config_id: ULID | None = Field(
+        default=None,
+        description="Config ID to validate against directly (stateless services)",
+    )
     historic: DataFrame = Field(description="Historic data as DataFrame")
     future: DataFrame = Field(description="Future/prediction data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+
+    @model_validator(mode="after")
+    def _exactly_one_id(self) -> Self:
+        """Require exactly one of artifact_id / config_id to be set."""
+        if (self.artifact_id is None) == (self.config_id is None):
+            raise ValueError("Exactly one of 'artifact_id' (train-backed) or 'config_id' (stateless) must be provided")
+        return self
 
 
 ValidateRequest = Annotated[
@@ -133,6 +161,11 @@ ValidateRequest = Annotated[
 
 class ModelRunnerProtocol(Protocol[ConfigT]):
     """Protocol defining the interface for model runners."""
+
+    @property
+    def supports_train(self) -> bool:
+        """Return True when this runner can execute a train step."""
+        ...
 
     async def on_train(
         self,

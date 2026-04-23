@@ -1,0 +1,18 @@
+[project]
+name = "chapkit-demo-ml-stateless"
+version = "0.1.0"
+description = "Stateless ML workflow with a rule-based predictor (no train step)"
+requires-python = ">=3.13"
+dependencies = [
+    "chapkit",
+    "pandas>=2.2.3",
+    "geojson-pydantic>=1.1.2",
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
+
+[tool.uv.sources]
+chapkit = { path = "../..", editable = true }

@@ -10,7 +10,9 @@ from geojson_pydantic import FeatureCollection
 from chapkit import BaseConfig
 from chapkit.data import DataFrame
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
+{% if not PREDICT_ONLY %}
 from chapkit.artifact import ArtifactHierarchy
+{% endif %}
 {% if WITH_VALIDATION %}
 from chapkit.ml import FunctionalModelRunner, ValidationDiagnostic
 {% else %}
@@ -32,6 +34,7 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
     # learning_rate: float = 0.01
 
 
+{% if not PREDICT_ONLY %}
 async def on_train(
     config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
     data: DataFrame,
@@ -99,9 +102,47 @@ async def on_predict(
 
     # Convert back to chapkit DataFrame
     return DataFrame.from_pandas(future_df)
+{% else %}
+async def on_predict(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    model: None,
+    historic: DataFrame,
+    future: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> DataFrame:
+    """Make predictions without a trained model (stateless service).
+
+    Args:
+        config: Model configuration
+        model: Always None for stateless services
+        historic: Historical data
+        future: Future data to make predictions for
+        geo: Optional geographic metadata
+
+    Returns:
+        Future data with predictions added
+    """
+    future_df = future.to_pandas()
+
+    # Simple example: baseline as the mean of historic numeric columns
+    historic_df = historic.to_pandas()
+    numeric = historic_df.select_dtypes(include=["number"])
+    baseline = float(numeric.mean(numeric_only=True).mean()) if not numeric.empty else 0.0
+
+    future_df["sample_0"] = baseline
+
+    log.info(
+        "stateless_predictions_made",
+        sample_count=len(future_df),
+        baseline=baseline,
+    )
+
+    return DataFrame.from_pandas(future_df)
+{% endif %}
 
 
 {% if WITH_VALIDATION %}
+{% if not PREDICT_ONLY %}
 # ====================================================================================
 # $validate hooks (optional)
 # ====================================================================================
@@ -184,6 +225,24 @@ async def on_validate_predict(
     return []
 
 
+{% else %}
+# ====================================================================================
+# $validate hook (optional, stateless)
+# ====================================================================================
+# Stateless services only expose on_validate_predict because there is no train step.
+
+
+async def on_validate_predict(
+    config: {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+    historic: DataFrame,
+    future: DataFrame,
+    geo: FeatureCollection | None = None,
+) -> list[ValidationDiagnostic]:
+    """Return domain-specific diagnostics for a stateless predict payload."""
+    return []
+
+
+{% endif %}
 {% endif %}
 # Create ML service info with metadata
 info = MLServiceInfo(
@@ -201,18 +260,28 @@ info = MLServiceInfo(
     max_prediction_periods=100,
 )
 
+{% if not PREDICT_ONLY %}
 # Create artifact hierarchy for ML artifacts
 HIERARCHY = ArtifactHierarchy(
     name="{{ PROJECT_SLUG }}",
-    level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
+    level_labels={
+        0: "ml_training_workspace",
+        1: "ml_prediction",
+        2: "ml_prediction_workspace",
+    },
 )
+{% endif %}
 
 # Create functional model runner
 runner: FunctionalModelRunner[{{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config] = FunctionalModelRunner(
-    on_train=on_train,
     on_predict=on_predict,
+{% if not PREDICT_ONLY %}
+    on_train=on_train,
+{% endif %}
 {% if WITH_VALIDATION %}
+{% if not PREDICT_ONLY %}
     on_validate_train=on_validate_train,
+{% endif %}
     on_validate_predict=on_validate_predict,
 {% endif %}
 )
@@ -230,7 +299,9 @@ app = (
     MLServiceBuilder(
         info=info,
         config_schema={{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config,
+{% if not PREDICT_ONLY %}
         hierarchy=HIERARCHY,
+{% endif %}
         runner=runner,
         database_url=DATABASE_URL,
     )

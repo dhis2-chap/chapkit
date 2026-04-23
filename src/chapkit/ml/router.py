@@ -15,6 +15,7 @@ from .schemas import (
     PredictResponse,
     TrainRequest,
     TrainResponse,
+    ValidatePredictRequest,
     ValidateRequest,
     ValidationResponse,
 )
@@ -52,10 +53,12 @@ class MLRouter(Router):
         prefix: str,
         tags: list[str],
         manager_factory: Any,
+        supports_train: bool = True,
         **kwargs: Any,
     ) -> None:
         """Initialize ML router with manager factory."""
         self.manager_factory = manager_factory
+        self.supports_train = supports_train
         super().__init__(prefix=prefix, tags=tags, **kwargs)
 
     def _register_routes(self) -> None:
@@ -64,33 +67,35 @@ class MLRouter(Router):
 
         manager_factory = self.manager_factory
 
-        @self.router.post(
-            "/$train",
-            response_model=TrainResponse,
-            status_code=status.HTTP_202_ACCEPTED,
-            summary="Train model",
-            description="Submit a training job to the scheduler",
-        )
-        async def train(
-            request: TrainRequest,
-            manager: MLManager = Depends(manager_factory),
-        ) -> TrainResponse:
-            """Train a model asynchronously and return job/artifact IDs."""
-            try:
-                response = await manager.execute_train(request)
-                train_counter, _ = _get_counters()
-                train_counter.add(1)
-                return response
-            except ValueError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(e),
-                )
-            except RuntimeError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=str(e),
-                )
+        if self.supports_train:
+
+            @self.router.post(
+                "/$train",
+                response_model=TrainResponse,
+                status_code=status.HTTP_202_ACCEPTED,
+                summary="Train model",
+                description="Submit a training job to the scheduler",
+            )
+            async def train(
+                request: TrainRequest,
+                manager: MLManager = Depends(manager_factory),
+            ) -> TrainResponse:
+                """Train a model asynchronously and return job/artifact IDs."""
+                try:
+                    response = await manager.execute_train(request)
+                    train_counter, _ = _get_counters()
+                    train_counter.add(1)
+                    return response
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=str(e),
+                    )
+                except RuntimeError as e:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=str(e),
+                    )
 
         @self.router.post(
             "/$predict",
@@ -120,22 +125,46 @@ class MLRouter(Router):
                     detail=str(e),
                 )
 
-        @self.router.post(
-            "/$validate",
-            response_model=ValidationResponse,
-            status_code=status.HTTP_200_OK,
-            summary="Validate a train or predict payload",
-            description="Run framework and runner validations without executing.",
-        )
-        async def validate(
-            request: ValidateRequest,
-            manager: MLManager = Depends(manager_factory),
-        ) -> ValidationResponse:
-            """Return structured diagnostics for a train or predict payload."""
-            try:
-                return await manager.validate(request)
-            except Exception as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Validation failed: {type(exc).__name__}",
-                )
+        if self.supports_train:
+
+            @self.router.post(
+                "/$validate",
+                response_model=ValidationResponse,
+                status_code=status.HTTP_200_OK,
+                summary="Validate a train or predict payload",
+                description="Run framework and runner validations without executing.",
+            )
+            async def validate(
+                request: ValidateRequest,
+                manager: MLManager = Depends(manager_factory),
+            ) -> ValidationResponse:
+                """Return structured diagnostics for a train or predict payload."""
+                try:
+                    return await manager.validate(request)
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Validation failed: {type(exc).__name__}",
+                    )
+
+        else:
+
+            @self.router.post(
+                "/$validate",
+                response_model=ValidationResponse,
+                status_code=status.HTTP_200_OK,
+                summary="Validate a predict payload",
+                description="Run framework and runner validations for a predict payload without executing.",
+            )
+            async def validate_predict_only(
+                request: ValidatePredictRequest,
+                manager: MLManager = Depends(manager_factory),
+            ) -> ValidationResponse:
+                """Return structured diagnostics for a predict payload (stateless services)."""
+                try:
+                    return await manager.validate(request)
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Validation failed: {type(exc).__name__}",
+                    )

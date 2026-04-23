@@ -49,7 +49,13 @@ def chapkit_root() -> Path:
 def scaffold_project(tmp_path: Path, chapkit_root: Path) -> Callable[..., Path]:
     """Scaffold a project and patch to use local chapkit."""
 
-    def _scaffold(name: str, template: str = "ml", *, with_validation: bool = False) -> Path:
+    def _scaffold(
+        name: str,
+        template: str = "ml",
+        *,
+        with_validation: bool = False,
+        predict_only: bool = False,
+    ) -> Path:
         cmd = [
             "uv",
             "run",
@@ -63,6 +69,8 @@ def scaffold_project(tmp_path: Path, chapkit_root: Path) -> Callable[..., Path]:
         ]
         if with_validation:
             cmd.append("--with-validation")
+        if predict_only:
+            cmd.append("--predict-only")
 
         result = subprocess.run(
             cmd,
@@ -461,6 +469,96 @@ def test_scaffold_shell_project_structure(
     assert "ShellModelRunner" in main_content
     assert "train_command" in main_content
     assert "predict_command" in main_content
+
+
+@pytest.mark.slow
+def test_scaffold_predict_only_ml_project_structure(tmp_path: Path, chapkit_root: Path) -> None:
+    """Scaffolding 'ml' with --predict-only produces a stateless project."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-predict-only",
+            "--template",
+            "ml",
+            "--predict-only",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
+
+    project_dir = tmp_path / "test-predict-only"
+    main_content = (project_dir / "main.py").read_text()
+
+    assert "FunctionalModelRunner" in main_content
+    assert "on_predict" in main_content
+    # No train callback / hierarchy in stateless mode.
+    assert "on_train" not in main_content
+    assert "async def on_train" not in main_content
+    assert "HIERARCHY" not in main_content
+    assert "ArtifactHierarchy" not in main_content
+
+
+@pytest.mark.slow
+def test_scaffold_predict_only_ml_shell_project_structure(tmp_path: Path, chapkit_root: Path) -> None:
+    """Scaffolding 'ml-shell' with --predict-only skips the training script."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-predict-only-shell",
+            "--template",
+            "ml-shell",
+            "--predict-only",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
+
+    project_dir = tmp_path / "test-predict-only-shell"
+    main_content = (project_dir / "main.py").read_text()
+
+    assert "ShellModelRunner" in main_content
+    assert "predict_command" in main_content
+    assert "train_command" not in main_content
+    assert not (project_dir / "scripts" / "train_model.py").exists()
+    assert (project_dir / "scripts" / "predict_model.py").exists()
+
+
+@pytest.mark.slow
+def test_scaffold_predict_only_rejected_on_task_template(tmp_path: Path, chapkit_root: Path) -> None:
+    """`--predict-only` is only valid for ML templates."""
+    result = subprocess.run(
+        [
+            "uv",
+            "run",
+            "chapkit",
+            "init",
+            "test-reject",
+            "--template",
+            "task",
+            "--predict-only",
+            "--path",
+            str(tmp_path),
+        ],
+        cwd=chapkit_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "only valid for ML templates" in result.stderr
 
 
 @pytest.mark.slow

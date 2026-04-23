@@ -148,7 +148,30 @@ class MLManager(Generic[ConfigT]):
 
     async def _validate_predict(self, request: ValidatePredictRequest) -> list[ValidationDiagnostic]:
         """Collect diagnostics for a predict payload."""
+        # Mode mismatch comes before any I/O: surface it as a diagnostic, not a crash.
+        if self.runner.supports_train and request.config_id is not None:
+            return [
+                ValidationDiagnostic.error(
+                    code="unsupported_predict_mode",
+                    message="This service is train-backed; use 'artifact_id' not 'config_id'.",
+                    field="config_id",
+                )
+            ]
+        if not self.runner.supports_train and request.artifact_id is not None:
+            return [
+                ValidationDiagnostic.error(
+                    code="unsupported_predict_mode",
+                    message="This service is stateless; use 'config_id' not 'artifact_id'.",
+                    field="artifact_id",
+                )
+            ]
+
+        if request.config_id is not None:
+            return await self._validate_predict_stateless(request)
+
         diagnostics: list[ValidationDiagnostic] = []
+
+        assert request.artifact_id is not None  # validator enforces exactly one
 
         async with self.database.session() as session:
             artifact_repo = ArtifactRepository(session)
@@ -268,6 +291,63 @@ class MLManager(Generic[ConfigT]):
             diagnostics.extend(runner_diagnostics)
         return diagnostics
 
+    async def _validate_predict_stateless(
+        self,
+        request: ValidatePredictRequest,
+    ) -> list[ValidationDiagnostic]:
+        """Collect diagnostics for a stateless predict payload (config_id only)."""
+        diagnostics: list[ValidationDiagnostic] = []
+
+        assert request.config_id is not None  # caller guarantees stateless mode
+
+        async with self.database.session() as session:
+            config_repo = ConfigRepository(session)
+            config_manager: ConfigManager[ConfigT] = ConfigManager(config_repo, self.config_schema)
+            config = await config_manager.find_by_id(request.config_id)
+
+        if config is None:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="config_not_found",
+                    message=f"Config {request.config_id} not found",
+                    field="config_id",
+                )
+            )
+            return diagnostics
+
+        diagnostics.extend(self._check_prediction_periods(config.data))
+
+        if len(request.historic) == 0:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="historic_empty",
+                    message="Historic data is empty",
+                    field="historic",
+                )
+            )
+        if len(request.future) == 0:
+            diagnostics.append(
+                ValidationDiagnostic.error(
+                    code="future_empty",
+                    message="Future data is empty",
+                    field="future",
+                )
+            )
+
+        if _has_error(diagnostics):
+            return diagnostics
+
+        hook = getattr(self.runner, "on_validate_predict", None)
+        if hook is not None:
+            runner_diagnostics = await hook(
+                config=config.data,
+                historic=request.historic,
+                future=request.future,
+                geo=request.geo,
+            )
+            diagnostics.extend(runner_diagnostics)
+        return diagnostics
+
     def _check_training_workspace(
         self,
         training_data: dict[str, Any],
@@ -352,6 +432,9 @@ class MLManager(Generic[ConfigT]):
 
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""
+        if not self.runner.supports_train:
+            raise ValueError("Runner does not support training; this service is stateless")
+
         # Pre-allocate artifact ID for the trained model
         artifact_id = ULID()
 
@@ -370,6 +453,13 @@ class MLManager(Generic[ConfigT]):
 
     async def execute_predict(self, request: PredictRequest) -> PredictResponse:
         """Submit a prediction job to the scheduler and return job/artifact IDs."""
+        if self.runner.supports_train and request.config_id is not None:
+            raise ValueError(
+                "This service is train-backed; use 'artifact_id' pointing to a trained artifact, not 'config_id'"
+            )
+        if not self.runner.supports_train and request.artifact_id is not None:
+            raise ValueError("This service is stateless; use 'config_id' to identify the config, not 'artifact_id'")
+
         # Pre-allocate artifact ID for predictions
         artifact_id = ULID()
 
@@ -456,80 +546,22 @@ class MLManager(Generic[ConfigT]):
 
     async def _predict_task(self, request: PredictRequest, artifact_id: ULID) -> ULID:
         """Execute prediction task and store predictions in artifact."""
-        # Load training artifact
-        async with self.database.session() as session:
-            artifact_repo = ArtifactRepository(session)
-            artifact_manager = ArtifactManager(artifact_repo)
-            training_artifact = await artifact_manager.find_by_id(request.artifact_id)
-
-            if training_artifact is None:
-                raise ValueError(f"Training artifact {request.artifact_id} not found")
-
-        # Extract model and config_id from artifact
-        training_data = training_artifact.data
-        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training_workspace":
-            raise ValueError(f"Artifact {request.artifact_id} is not a training artifact")
-
-        # Check training status - block prediction on failed training
-        training_metadata = training_data.get("metadata", {})
-        training_status = training_metadata.get("status", "unknown")
-
-        if training_status == "failed":
-            exit_code = training_metadata.get("exit_code", "unknown")
-            raise ValueError(
-                f"Cannot predict using failed training artifact {request.artifact_id}. "
-                f"Training script exited with code {exit_code}."
-            )
-
-        # Check if artifact is workspace (ZIP) or pickled model
-        is_workspace = training_data.get("content_type") == "application/zip"
-        extracted_workspace = None
-        prediction_workspace_dir = None
+        extracted_workspace: Path | None = None
+        prediction_workspace_dir: Path | None = None
 
         try:
-            if is_workspace:
-                # Extract workspace from zip
-                import pickle
-                import tempfile
-                import zipfile
-                from io import BytesIO
-
-                workspace_content = training_data["content"]
-                extracted_workspace = Path(tempfile.mkdtemp(prefix="chapkit_workspace_extract_", dir=get_temp_dir()))
-
-                # Extract zip to temp directory
-                zip_buffer = BytesIO(workspace_content)
-                with zipfile.ZipFile(zip_buffer, "r") as zf:
-                    zf.extractall(extracted_workspace)
-
-                # Determine how to pass model based on runner type
-                from .runner import ShellModelRunner
-
-                if isinstance(self.runner, ShellModelRunner):
-                    # ShellModelRunner: pass workspace directory to runner
-                    trained_model = {
-                        "workspace_dir": str(extracted_workspace),
-                    }
-                else:
-                    # FunctionalModelRunner with workspace: load pickled model from workspace
-                    model_pickle_path = extracted_workspace / "model.pickle"
-                    if model_pickle_path.exists():
-                        try:
-                            trained_model = pickle.loads(model_pickle_path.read_bytes())
-                        except (pickle.UnpicklingError, EOFError, TypeError) as e:
-                            raise ValueError(
-                                f"Failed to load model from {model_pickle_path}: "
-                                f"corrupted or incompatible pickle file. {e}"
-                            ) from e
-                    else:
-                        raise ValueError(
-                            f"Training artifact workspace missing model.pickle file at {model_pickle_path}"
-                        )
+            if request.config_id is not None:
+                # Stateless path: no training artifact, no model
+                config_id = request.config_id
+                trained_model: Any = None
+                parent_id: ULID | None = None
+                prediction_level = 0
             else:
-                # Pickled model handling (FunctionalModelRunner without workspace)
-                trained_model = training_data["content"]
-
-            config_id = ULID.from_str(training_metadata["config_id"])
+                # Train-backed path: resolve model + config from the training artifact
+                assert request.artifact_id is not None  # PredictRequest validator enforces this
+                trained_model, config_id, extracted_workspace = await self._load_training_model(request.artifact_id)
+                parent_id = request.artifact_id
+                prediction_level = 1
 
             # Load config
             async with self.database.session() as session:
@@ -556,20 +588,14 @@ class MLManager(Generic[ConfigT]):
 
             # Extract predictions from result (handles both new dict format and legacy DataFrame)
             if isinstance(prediction_result, dict) and "content" in prediction_result:
-                # New unified format: {content, workspace_dir, exit_code, stdout, stderr}
                 predictions = prediction_result["content"]
                 workspace_dir_str = prediction_result.get("workspace_dir")
             else:
-                # Legacy format: BaseModelRunner subclasses return DataFrame directly
                 predictions = prediction_result
                 workspace_dir_str = None
 
-            # Create workspace artifact if workspace was created (both runners can produce workspace)
             if workspace_dir_str:
                 prediction_workspace_dir = Path(workspace_dir_str)
-
-                # Create workspace artifact data (zips workspace)
-                # Runner returns ml_prediction_workspace type for debugging artifacts
                 workspace_artifact_dict = await self.runner.create_prediction_artifact(
                     prediction_result=prediction_result,
                     config_id=str(config_id),
@@ -580,7 +606,6 @@ class MLManager(Generic[ConfigT]):
             else:
                 workspace_artifact_dict = None
 
-            # Create prediction artifact with DataFrame (same for both runners)
             from chapkit.artifact.schemas import MLMetadata, MLPredictionArtifactData
 
             metadata = MLMetadata(
@@ -591,7 +616,6 @@ class MLManager(Generic[ConfigT]):
                 duration_seconds=round(prediction_duration, 2),
             )
 
-            # Create and validate artifact data structure with Pydantic
             artifact_data_model = MLPredictionArtifactData(
                 type="ml_prediction",
                 metadata=metadata,
@@ -604,7 +628,7 @@ class MLManager(Generic[ConfigT]):
             artifact_data_dict = {
                 "type": artifact_data_model.type,
                 "metadata": artifact_data_model.metadata.model_dump(),
-                "content": predictions,  # Keep as Python object (DataFrame)
+                "content": predictions,
                 "content_type": artifact_data_model.content_type,
                 "content_size": artifact_data_model.content_size,
             }
@@ -614,17 +638,16 @@ class MLManager(Generic[ConfigT]):
                 artifact_repo = ArtifactRepository(session)
                 artifact_manager = ArtifactManager(artifact_repo)
 
-                # 1. Store prediction artifact (level 1, parent = training artifact)
                 await artifact_manager.save(
                     ArtifactIn(
                         id=artifact_id,
                         data=artifact_data_dict,
-                        parent_id=request.artifact_id,
-                        level=1,
+                        parent_id=parent_id,
+                        level=prediction_level,
                     )
                 )
 
-                # 2. Store workspace artifact if workspace was created (level 2, parent = prediction artifact)
+                # Workspace artifact is always stored one level below the prediction artifact
                 if workspace_artifact_dict is not None:
                     workspace_artifact_id = ULID()
                     await artifact_manager.save(
@@ -632,16 +655,78 @@ class MLManager(Generic[ConfigT]):
                             id=workspace_artifact_id,
                             data=workspace_artifact_dict,
                             parent_id=artifact_id,
-                            level=2,
+                            level=prediction_level + 1,
                         )
                     )
 
         finally:
-            # Cleanup extracted training workspace
             if extracted_workspace and extracted_workspace.exists():
                 shutil.rmtree(extracted_workspace, ignore_errors=True)
-            # Cleanup prediction workspace (created by ShellModelRunner)
             if prediction_workspace_dir and prediction_workspace_dir.exists():
                 shutil.rmtree(prediction_workspace_dir, ignore_errors=True)
 
         return artifact_id
+
+    async def _load_training_model(
+        self,
+        artifact_id: ULID,
+    ) -> tuple[Any, ULID, Path | None]:
+        """Load the model + config_id from a training artifact; return (model, config_id, extracted_workspace)."""
+        async with self.database.session() as session:
+            artifact_repo = ArtifactRepository(session)
+            artifact_manager = ArtifactManager(artifact_repo)
+            training_artifact = await artifact_manager.find_by_id(artifact_id)
+
+            if training_artifact is None:
+                raise ValueError(f"Training artifact {artifact_id} not found")
+
+        training_data = training_artifact.data
+        if not isinstance(training_data, dict) or training_data.get("type") != "ml_training_workspace":
+            raise ValueError(f"Artifact {artifact_id} is not a training artifact")
+
+        training_metadata = training_data.get("metadata", {})
+        training_status = training_metadata.get("status", "unknown")
+
+        if training_status == "failed":
+            exit_code = training_metadata.get("exit_code", "unknown")
+            raise ValueError(
+                f"Cannot predict using failed training artifact {artifact_id}. "
+                f"Training script exited with code {exit_code}."
+            )
+
+        config_id = ULID.from_str(training_metadata["config_id"])
+        is_workspace = training_data.get("content_type") == "application/zip"
+        extracted_workspace: Path | None = None
+
+        if is_workspace:
+            import pickle
+            import tempfile
+            import zipfile
+            from io import BytesIO
+
+            workspace_content = training_data["content"]
+            extracted_workspace = Path(tempfile.mkdtemp(prefix="chapkit_workspace_extract_", dir=get_temp_dir()))
+
+            zip_buffer = BytesIO(workspace_content)
+            with zipfile.ZipFile(zip_buffer, "r") as zf:
+                zf.extractall(extracted_workspace)
+
+            from .runner import ShellModelRunner
+
+            if isinstance(self.runner, ShellModelRunner):
+                trained_model: Any = {"workspace_dir": str(extracted_workspace)}
+            else:
+                model_pickle_path = extracted_workspace / "model.pickle"
+                if model_pickle_path.exists():
+                    try:
+                        trained_model = pickle.loads(model_pickle_path.read_bytes())
+                    except (pickle.UnpicklingError, EOFError, TypeError) as e:
+                        raise ValueError(
+                            f"Failed to load model from {model_pickle_path}: corrupted or incompatible pickle file. {e}"
+                        ) from e
+                else:
+                    raise ValueError(f"Training artifact workspace missing model.pickle file at {model_pickle_path}")
+        else:
+            trained_model = training_data["content"]
+
+        return trained_model, config_id, extracted_workspace
