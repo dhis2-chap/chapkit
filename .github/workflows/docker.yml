@@ -7,8 +7,8 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'Dockerfile.py'
-      - 'Dockerfile.r'
+      - 'chapkit-py.Dockerfile'
+      - 'chapkit-r.Dockerfile'
       - 'src/**'
       - 'pyproject.toml'
       - 'uv.lock'
@@ -57,7 +57,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.py
+          file: chapkit-py.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
@@ -99,7 +99,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.r
+          file: chapkit-r.Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}

@@ -1,4 +1,5 @@
-FROM --platform=linux/amd64 ghcr.io/dhis2-chap/docker_r_inla:master
+ARG BASE_PLATFORM=linux/amd64
+FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/docker_r_inla:master
 
 COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /uvx /usr/local/bin/
 

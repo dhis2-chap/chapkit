@@ -91,11 +91,11 @@ docker-build: docker-build-py docker-build-r
 
 docker-build-py:
 	@echo ">>> Building chapkit-py:dev (Python MLproject runtime)"
-	@docker build -f Dockerfile.py -t chapkit-py:dev .
+	@docker build -f chapkit-py.Dockerfile -t chapkit-py:dev .
 
 docker-build-r:
 	@echo ">>> Building chapkit-r:dev (R+INLA MLproject runtime, amd64)"
-	@docker build --platform=linux/amd64 -f Dockerfile.r -t chapkit-r:dev .
+	@docker build --platform=linux/amd64 -f chapkit-r.Dockerfile -t chapkit-r:dev .
 
 clean:
 	@echo ">>> Cleaning up"
