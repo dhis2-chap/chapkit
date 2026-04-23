@@ -22,6 +22,25 @@ CANONICAL_FILENAMES: dict[str, str] = {
     "polygons": "geo.json",
 }
 
+# Maps canonical MLproject parameter names to ShellModelRunner's own template
+# vocabulary (curly-braced placeholders) where applicable, or to literal paths
+# that ShellModelRunner guarantees at train/predict time. Used by `chapkit
+# migrate` to emit commands in runner-template form instead of fully-literal,
+# so the generated main.py is insulated from future ShellModelRunner filename
+# changes and reads more idiomatically.
+RUNNER_PLACEHOLDERS: dict[str, str] = {
+    "train_data": "{data_file}",
+    "historic_data": "{historic_file}",
+    "future_data": "{future_file}",
+    "out_file": "{output_file}",
+    "polygons": "{geo_file}",
+    # Literals - ShellModelRunner has no placeholder for these; it just
+    # writes `config.yml` to the workspace root and lets scripts save/load
+    # `model` as they see fit.
+    "model": "model",
+    "model_config": "config.yml",
+}
+
 ENV_FIELDS: tuple[str, ...] = (
     "docker_env",
     "renv_env",
@@ -172,7 +191,23 @@ def parse_mlproject(path: Path) -> MLProject:
 
 def translate_command(command: str, overrides: dict[str, str] | None = None) -> str:
     """Substitute MLproject {param} placeholders with chapkit workspace filenames."""
-    mapping: dict[str, str] = {**CANONICAL_FILENAMES, **(overrides or {})}
+    return _apply_param_mapping(command, {**CANONICAL_FILENAMES, **(overrides or {})})
+
+
+def translate_to_runner_template(command: str, overrides: dict[str, str] | None = None) -> str:
+    """Substitute MLproject {param} placeholders with ShellModelRunner's template form.
+
+    Unlike `translate_command`, which yields a fully-literal command, this
+    returns a string that still contains curly-braced placeholders
+    (`{data_file}`, `{historic_file}`, etc.) where ShellModelRunner does its
+    own substitution at train/predict time. Literal paths (`model`,
+    `config.yml`) are inlined because ShellModelRunner has no templating
+    hook for them. This is what `chapkit migrate` embeds in main.py.
+    """
+    return _apply_param_mapping(command, {**RUNNER_PLACEHOLDERS, **(overrides or {})})
+
+
+def _apply_param_mapping(command: str, mapping: dict[str, str]) -> str:
     formatter = string.Formatter()
     unknown: list[str] = []
     for _, field_name, _, _ in formatter.parse(command):
@@ -187,6 +222,9 @@ def translate_command(command: str, overrides: dict[str, str] | None = None) -> 
         raise MLProjectError(
             f"Unknown MLproject parameter(s): {missing}. Known: {known}. Use --param NAME=FILENAME to override."
         )
+    # Escape any literal curly braces in the command that are NOT our placeholders,
+    # then format(**mapping). Since `format` uses {key} syntax, all placeholders we
+    # care about are already mapped; any stray `{{` / `}}` should survive.
     return command.format(**mapping)
 
 

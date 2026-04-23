@@ -24,7 +24,7 @@ from chapkit.cli.mlproject import (
     find_mlproject,
     parse_mlproject,
     slugify,
-    translate_command,
+    translate_to_runner_template,
 )
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates" / "migrate"
@@ -290,10 +290,10 @@ def build_service_info_context(mlproject: MLProject) -> dict[str, Any]:
     }
 
 
-def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str]]:
-    """Turn MLproject user_options into (field_name, python_type, default_repr) tuples."""
+def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str, str | None]]:
+    """Turn MLproject user_options into (field_name, python_type, default_repr, description?) tuples."""
     type_names = {int: "int", float: "float", str: "str", bool: "bool"}
-    fields: list[tuple[str, str, str]] = []
+    fields: list[tuple[str, str, str, str | None]] = []
     seen: set[str] = set()
     for opt_name, opt_body in mlproject.user_options.items():
         declared_type = str(opt_body.get("type", "string")).lower()
@@ -304,10 +304,15 @@ def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str]]:
             default_repr = repr(coerced)
         else:
             default_repr = "..."
-        fields.append((opt_name, type_name, default_repr))
+        raw_desc = opt_body.get("description")
+        description = str(raw_desc).strip() if isinstance(raw_desc, str) and raw_desc.strip() else None
+        fields.append((opt_name, type_name, default_repr, description))
         seen.add(opt_name)
     if "prediction_periods" not in seen:
-        fields.insert(0, ("prediction_periods", "int", "3"))
+        fields.insert(
+            0,
+            ("prediction_periods", "int", "3", "Number of periods to predict into the future."),
+        )
     return fields
 
 
@@ -487,8 +492,10 @@ def _run(
     overrides = _parse_param_overrides(param)
     overrides = _resolve_unknown_params(mlproject, overrides, assume_yes)
 
-    train_command = translate_command(mlproject.entry_points["train"].command, overrides)
-    predict_command = translate_command(mlproject.entry_points["predict"].command, overrides)
+    # Emit commands in ShellModelRunner-template form ({data_file}, etc.) so the
+    # generated main.py is decoupled from the concrete workspace filenames.
+    train_command = translate_to_runner_template(mlproject.entry_points["train"].command, overrides)
+    predict_command = translate_to_runner_template(mlproject.entry_points["predict"].command, overrides)
 
     resolved_base_image, language = _resolve_base_image(project_path, mlproject, base_image, assume_yes)
 

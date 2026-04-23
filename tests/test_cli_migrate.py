@@ -331,17 +331,45 @@ def test_build_config_fields_ewars_user_options(tmp_path: Path) -> None:
     (tmp_path / "MLproject").write_text(EWARS_MLPROJECT)
     mlproject = parse_mlproject(tmp_path)
     fields = build_config_fields(mlproject)
-    by_name = {name: (ty, default) for name, ty, default in fields}
-    assert by_name["prediction_periods"] == ("int", "3")
-    assert by_name["n_lags"] == ("int", "3")
-    assert by_name["precision"] == ("float", "0.01")
+    by_name = {name: (ty, default, desc) for name, ty, default, desc in fields}
+    # prediction_periods is injected automatically; its description is set by migrate.
+    assert by_name["prediction_periods"][:2] == ("int", "3")
+    assert by_name["prediction_periods"][2] is not None
+    # user_options without descriptions carry None forward (ewars_template's n_lags/precision
+    # in the test fixture declare no description).
+    assert by_name["n_lags"] == ("int", "3", None)
+    assert by_name["precision"] == ("float", "0.01", None)
+
+
+def test_build_config_fields_description_pulled_from_user_option(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(
+        """
+name: with_descriptions
+user_options:
+  n_lags:
+    type: integer
+    default: 3
+    description: Number of temporal lags included in the INLA basis.
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    )
+    mlproject = parse_mlproject(tmp_path)
+    fields = {name: desc for name, _ty, _default, desc in build_config_fields(mlproject)}
+    assert fields["n_lags"] == "Number of temporal lags included in the INLA basis."
 
 
 def test_build_config_fields_minimalist_only_prediction_periods(tmp_path: Path) -> None:
     (tmp_path / "MLproject").write_text(MINIMALIST_MLPROJECT)
     mlproject = parse_mlproject(tmp_path)
     fields = build_config_fields(mlproject)
-    assert fields == [("prediction_periods", "int", "3")]
+    # Just the auto-injected prediction_periods, with its canned description.
+    assert len(fields) == 1
+    assert fields[0][:3] == ("prediction_periods", "int", "3")
+    assert fields[0][3] is not None
 
 
 def test_dry_run_changes_nothing(tmp_path: Path) -> None:
@@ -390,9 +418,18 @@ def test_full_run_moves_chaff_and_writes_outputs(tmp_path: Path) -> None:
     assert main_py.is_file()
     source = main_py.read_text()
     assert "class EwarsTemplateConfig(BaseConfig)" in source
+    # Config fields without user-option descriptions stay as plain `name: type = default`;
+    # description-carrying ones get wrapped in Field(...).
     assert "n_lags: int = 3" in source
     assert "precision: float = 0.01" in source
-    assert "Rscript train.R data.csv model config.yml" in source
+    # Commands use ShellModelRunner's template vocabulary, not literal filenames.
+    assert "Rscript train.R {data_file} model config.yml" in source
+    assert "Rscript predict.R model {historic_file} {future_file} {output_file} config.yml" in source
+    # Persistent SQLite block is always emitted.
+    assert 'os.getenv("DATABASE_URL"' in source
+    assert "db_path.parent.mkdir" in source
+    # Hint comment for additional_continuous_covariates is present.
+    assert "additional_continuous_covariates" in source
     ast.parse(source)
 
     dockerfile = (tmp_path / "Dockerfile").read_text()

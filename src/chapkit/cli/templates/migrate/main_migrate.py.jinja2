@@ -1,31 +1,53 @@
 """{{ PROJECT_DESCRIPTION }}."""
 
+import os
+from pathlib import Path
+
 from chapkit import BaseConfig
 from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
+from pydantic import Field
 
 
 class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
     """Configuration for {{ PROJECT_NAME }}."""
 
-{% for name, py_type, default_repr in CONFIG_FIELDS %}
+{% for name, py_type, default_repr, description in CONFIG_FIELDS %}
+{% if description %}
+    {{ name }}: {{ py_type }} = Field(
+{% if default_repr == '...' %}
+        ...,
+{% else %}
+        default={{ default_repr }},
+{% endif %}
+        description={{ description | tojson }},
+    )
+{% else %}
     {{ name }}: {{ py_type }} = {{ default_repr }}
+{% endif %}
 {% endfor %}
 
+    # BaseConfig provides `additional_continuous_covariates: list[str] = []`.
+    # If your scripts expect specific climate covariates out of the box
+    # (e.g. rainfall + mean_temperature for an EWARS-style model), pin the
+    # default here so callers don't have to set it on every config POST:
+    #
+    #     additional_continuous_covariates: list[str] = Field(
+    #         default_factory=lambda: ["rainfall", "mean_temperature"],
+    #         description="Continuous covariates to include as lagged predictors.",
+    #     )
 
-# Translated from the original MLproject entry points. `chapkit migrate`
-# substituted MLproject parameter placeholders with chapkit's canonical
-# workspace filenames (data.csv, historic.csv, future.csv, predictions.csv,
-# model, config.yml, geo.json). Config fields above are serialised to
-# config.yml at runtime and are available to these commands.
-train_command = "{{ TRAIN_COMMAND }}"
-predict_command = "{{ PREDICT_COMMAND }}"
 
-
+# Commands are rendered in ShellModelRunner's template vocabulary
+# ({data_file}, {historic_file}, {future_file}, {output_file}, {geo_file}).
+# ShellModelRunner substitutes those with workspace-root filenames at train /
+# predict time. Literal paths `model` (your script saves/loads it; preserved
+# across train -> predict via workspace copy) and `config.yml` (always written
+# by chapkit from the config above) stay verbatim.
 runner: ShellModelRunner[{{ PROJECT_CLASS_NAME }}Config] = ShellModelRunner(
-    train_command=train_command,
-    predict_command=predict_command,
+    train_command="{{ TRAIN_COMMAND }}",
+    predict_command="{{ PREDICT_COMMAND }}",
 )
 
 info = MLServiceInfo(
@@ -80,12 +102,21 @@ hierarchy = ArtifactHierarchy(
     level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
 )
 
+# Persistent SQLite database by default so artifacts, configs, and jobs
+# survive container restarts. Override with DATABASE_URL for a different
+# SQLite file or a hosted Postgres (e.g. when deployed next to chap-core).
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/chapkit.db")
+if DATABASE_URL.startswith("sqlite") and ":///" in DATABASE_URL:
+    db_path = Path(DATABASE_URL.split("///")[1])
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
 app = (
     MLServiceBuilder(
         info=info,
         config_schema={{ PROJECT_CLASS_NAME }}Config,
         hierarchy=hierarchy,
         runner=runner,
+        database_url=DATABASE_URL,
     )
     # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
     # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
