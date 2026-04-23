@@ -12,7 +12,8 @@ COPY . /work
 {% if HAS_RENV %}
 # Restore the R library declared in renv.lock at image build time so the
 # container starts instantly instead of bootstrapping renv on every run.
-RUN R -q -e "renv::restore(prompt = FALSE)"
+# Installs renv first if the base image doesn't ship it; no-op otherwise.
+RUN R -q -e "if (!requireNamespace('renv', quietly = TRUE)) install.packages('renv', repos = 'https://cloud.r-project.org'); renv::restore(prompt = FALSE)"
 {% endif %}
 {% if LANGUAGE == "python" and HAS_USER_PYPROJECT %}
 # Install the project's Python dependencies (merged from the user's
@@ -23,5 +24,8 @@ RUN uv pip install --python /app/.venv/bin/python .
 {% endif %}
 
 EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()" || exit 1
 
 CMD ["python", "main.py"]
