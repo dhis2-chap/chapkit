@@ -1,0 +1,37 @@
+.PHONY: help install run test docker-build docker-run clean
+
+IMAGE ?= {{ PROJECT_SLUG }}
+PORT ?= 8000
+{% if BASE_IMAGE == "chapkit-r-inla" %}
+PLATFORM_FLAG := --platform=linux/amd64
+{% else %}
+PLATFORM_FLAG :=
+{% endif %}
+
+help:
+	@echo "Targets:"
+	@echo "  install       Install deps into .venv (uv sync)"
+	@echo "  run           Serve the chapkit app locally (chapkit run .)"
+	@echo "  test          Drive an end-to-end train+predict against a running service (chapkit test)"
+	@echo "  docker-build  Build the container image (\$$IMAGE=$(IMAGE))"
+	@echo "  docker-run    Run the container, publishing \$$PORT=$(PORT)"
+	@echo "  clean         Remove .venv and common caches"
+
+install:
+	uv sync
+
+run:
+	uv run chapkit run .
+
+test:
+	uv run chapkit test
+
+docker-build:
+	docker build $(PLATFORM_FLAG) -t $(IMAGE) .
+
+docker-run:
+	docker run --rm -p $(PORT):8000 $(PLATFORM_FLAG) $(IMAGE)
+
+clean:
+	rm -rf .venv .ruff_cache .pytest_cache .mypy_cache
+	find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
