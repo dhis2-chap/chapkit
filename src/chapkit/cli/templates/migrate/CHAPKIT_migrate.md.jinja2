@@ -70,6 +70,31 @@ optional dep groups, `[tool.*]` config (ruff, mypy, etc.), environment
 markers, and custom `[build-system]` backends.
 {% endif %}
 
+## Registering with chap-core
+
+The generated `main.py` calls `.with_registration()` on the builder, so when
+the service starts with `SERVICEKIT_ORCHESTRATOR_URL` set in the environment
+it registers itself with chap-core and sends keepalive pings. Example
+docker-compose fragment:
+
+```yaml
+services:
+  {{ PROJECT_SLUG }}:
+    build: .
+{% if BASE_IMAGE == "chapkit-r-inla" %}
+    platform: linux/amd64
+{% endif %}
+    environment:
+      SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
+      # SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}  # shared secret, optional
+    depends_on:
+      chap:
+        condition: service_healthy
+```
+
+Without those env vars the call no-ops — `python main.py` locally just runs
+the service without trying to register.
+
 ## Configuration
 
 Edit the `{{ PROJECT_CLASS_NAME }}Config` class in `main.py` to add or adjust

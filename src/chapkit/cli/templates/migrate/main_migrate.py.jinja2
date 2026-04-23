@@ -80,12 +80,22 @@ hierarchy = ArtifactHierarchy(
     level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
 )
 
-app = MLServiceBuilder(
-    info=info,
-    config_schema={{ PROJECT_CLASS_NAME }}Config,
-    hierarchy=hierarchy,
-    runner=runner,
-).build()
+app = (
+    MLServiceBuilder(
+        info=info,
+        config_schema={{ PROJECT_CLASS_NAME }}Config,
+        hierarchy=hierarchy,
+        runner=runner,
+    )
+    # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
+    # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
+    # local `python main.py` runs without any extra config. Optional env vars:
+    #   SERVICEKIT_ORCHESTRATOR_URL   e.g. http://chap:8000/v2/services/$register
+    #   SERVICEKIT_REGISTRATION_KEY   shared secret if chap has one set
+    #   SERVICEKIT_HOST, SERVICEKIT_PORT   override the advertised endpoint
+    .with_registration()
+    .build()
+)
 
 
 if __name__ == "__main__":
