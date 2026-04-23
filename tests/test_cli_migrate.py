@@ -428,8 +428,12 @@ def test_full_run_moves_chaff_and_writes_outputs(tmp_path: Path) -> None:
     # Persistent SQLite block is always emitted.
     assert 'os.getenv("DATABASE_URL"' in source
     assert "db_path.parent.mkdir" in source
-    # Hint comment for additional_continuous_covariates is present.
+    # chap-core ecosystem default for additional_continuous_covariates is pinned
+    # to rainfall + mean_temperature (with a comment telling users to delete the
+    # block if the model doesn't use climate covariates).
     assert "additional_continuous_covariates" in source
+    assert 'default_factory=lambda: ["rainfall", "mean_temperature"]' in source
+    assert "DELETE the whole" in source  # the "remove if not intended" note
     ast.parse(source)
 
     dockerfile = (tmp_path / "Dockerfile").read_text()
