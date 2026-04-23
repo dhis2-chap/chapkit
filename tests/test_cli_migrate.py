@@ -432,7 +432,7 @@ def test_full_run_moves_chaff_and_writes_outputs(tmp_path: Path) -> None:
     # to rainfall + mean_temperature (with a comment telling users to delete the
     # block if the model doesn't use climate covariates).
     assert "additional_continuous_covariates" in source
-    assert 'default_factory=lambda: ["rainfall", "mean_temperature"]' in source
+    assert 'default=["rainfall", "mean_temperature"]' in source
     assert "DELETE the whole" in source  # the "remove if not intended" note
     ast.parse(source)
 

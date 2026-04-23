@@ -37,7 +37,7 @@ class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
     # POST /api/v1/configs (don't edit here unless the new defaults are
     # genuinely the model's intended defaults).
     additional_continuous_covariates: list[str] = Field(
-        default_factory=lambda: ["rainfall", "mean_temperature"],
+        default=["rainfall", "mean_temperature"],
         description="Continuous covariates to include as lagged predictors.",
     )
 

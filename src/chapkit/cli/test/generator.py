@@ -20,12 +20,16 @@ class TestDataGenerator:
         num_periods: int = 12,
         num_features: int = 3,
         required_covariates: list[str] | None = None,
+        additional_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         start_year: int = 2020,
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
         required_covariates = required_covariates or []
+        # Additional continuous covariates the config declares (BaseConfig field).
+        # Kept distinct from required_covariates so we can tell why each column is there.
+        additional_covariates = [c for c in (additional_covariates or []) if c not in required_covariates]
 
         # Build columns list
         columns: list[str] = ["time_period", "location", "disease_cases"]
@@ -36,6 +40,11 @@ class TestDataGenerator:
 
         # Required covariates from service info
         for cov in required_covariates:
+            if cov not in columns:
+                columns.append(cov)
+
+        # Additional continuous covariates from config
+        for cov in additional_covariates:
             if cov not in columns:
                 columns.append(cov)
 
@@ -73,6 +82,10 @@ class TestDataGenerator:
                 for _ in required_covariates:
                     row.append(random.uniform(0, 100))
 
+                # Additional continuous covariate values
+                for _ in additional_covariates:
+                    row.append(random.uniform(0, 100))
+
                 # Extra covariate values
                 for _ in range(extra_covariates):
                     row.append(random.uniform(0, 100))
@@ -87,6 +100,7 @@ class TestDataGenerator:
         num_periods: int = 12,
         num_features: int = 3,
         required_covariates: list[str] | None = None,
+        additional_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -97,6 +111,7 @@ class TestDataGenerator:
             num_periods=num_periods,
             num_features=num_features,
             required_covariates=required_covariates,
+            additional_covariates=additional_covariates,
             extra_covariates=extra_covariates,
             start_year=2020,
             period_type=period_type,
@@ -108,6 +123,7 @@ class TestDataGenerator:
             num_periods=num_periods,
             num_features=num_features,
             required_covariates=required_covariates,
+            additional_covariates=additional_covariates,
             extra_covariates=extra_covariates,
             start_year=2025,
             period_type=period_type,

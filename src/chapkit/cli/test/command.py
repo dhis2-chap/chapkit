@@ -164,6 +164,11 @@ def test_command(
         # 4. Create configs
         typer.echo(f"Creating {num_configs} config(s)...")
         config_ids: list[str] = []
+        # Track each config's `additional_continuous_covariates` so the data generator
+        # can emit matching columns; the service's config schema default (e.g.
+        # ["rainfall", "mean_temperature"] for chapkit-migrate output) is the source
+        # of truth, not MLServiceInfo.required_covariates.
+        config_acc_lists: list[list[str]] = []
         for i in range(num_configs):
             config_name = f"test_config_{ULID()}"
             config_data = generator.generate_config_data_from_schema(config_schema, variation=i)
@@ -171,9 +176,14 @@ def test_command(
             if save_data_path:
                 save_test_data(save_data_path, f"config_{i}.json", config_data)
 
+            acc = config_data.get("additional_continuous_covariates") or []
+            if not isinstance(acc, list):
+                acc = []
+
             success, message, config_id = runner.create_config(config_name, config_data)
             if success and config_id:
                 config_ids.append(config_id)
+                config_acc_lists.append([str(c) for c in acc])
                 stats["configs_created"] += 1
                 if verbose:
                     typer.echo(f"  [OK] {message}")
@@ -211,11 +221,13 @@ def test_command(
                     typer.echo(f"  [FAILED] Training job {job_id}: {msg}", err=True)
 
         for config_idx, config_id in enumerate(config_ids):
+            config_acc = config_acc_lists[config_idx]
             for _ in range(num_trainings):
                 training_data = generator.generate_training_data(
                     num_locations=5,
                     num_periods=num_rows // 5,  # Use --rows to control total data size
                     required_covariates=runner.required_covariates,
+                    additional_covariates=config_acc,
                     extra_covariates=extra_covariates,
                     period_type=period_type,
                 )
@@ -274,12 +286,16 @@ def test_command(
                         stats["predictions_failed"] += 1
                         typer.echo(f"  [FAILED] Prediction job {job_id}: {msg}", err=True)
 
-            for artifact_idx, (_, model_artifact_id) in enumerate(model_artifacts):
+            for artifact_idx, (model_cfg_id, model_artifact_id) in enumerate(model_artifacts):
+                # Look up the ACC list for the config that produced this training artifact
+                # so historic/future have matching covariate columns.
+                pred_acc = config_acc_lists[config_ids.index(model_cfg_id)] if model_cfg_id in config_ids else []
                 for _ in range(num_predictions):
                     historic, future = generator.generate_prediction_data(
                         num_locations=5,
                         num_periods=2,  # Smaller dataset for prediction
                         required_covariates=runner.required_covariates,
+                        additional_covariates=pred_acc,
                         extra_covariates=extra_covariates,
                         period_type=period_type,
                     )
