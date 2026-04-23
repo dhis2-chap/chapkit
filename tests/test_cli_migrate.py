@@ -13,6 +13,7 @@ from chapkit.cli.migrate import (
     Action,
     MigrateError,
     build_config_fields,
+    build_service_info_context,
     classify,
     detect_base_image,
 )
@@ -38,6 +39,20 @@ entry_points:
 
 EWARS_MLPROJECT = """
 name: ewars_template
+target: disease_cases
+required_covariates:
+  - population
+supported_period_type: any
+allow_free_additional_continuous_covariates: true
+meta_data:
+  display_name: CHAP-EWARS Model
+  description: Modified version of the WHO EWARS model.
+  author: CHAP team
+  author_assessed_status: orange
+  organization: HISP Centre, University of Oslo
+  organization_logo_url: https://example.org/logo.png
+  contact_email: knut.rand@dhis2.org
+  citation_info: Cite me.
 docker_env:
   image: ghcr.io/dhis2-chap/docker_r_inla:master
 user_options:
@@ -208,6 +223,92 @@ def test_detect_base_image_requires_scripts(tmp_path: Path) -> None:
     mlproject = _seed_project(tmp_path, PYTHON_MLPROJECT, {})
     with pytest.raises(MigrateError):
         detect_base_image(tmp_path, mlproject, override=None)
+
+
+def test_build_service_info_context_ewars(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(EWARS_MLPROJECT)
+    mlproject = parse_mlproject(tmp_path)
+    ctx = build_service_info_context(mlproject)
+
+    assert ctx["META_AUTHOR"] == "CHAP team"
+    assert ctx["META_ASSESSED_STATUS"] == "orange"
+    assert ctx["META_CONTACT_EMAIL"] == "knut.rand@dhis2.org"
+    assert ctx["META_ORGANIZATION"] == "HISP Centre, University of Oslo"
+    assert ctx["META_ORGANIZATION_LOGO_URL"] == "https://example.org/logo.png"
+    assert ctx["META_CITATION_INFO"] == "Cite me."
+    # supported_period_type: any -> monthly (chapkit's PeriodType only has weekly/monthly).
+    assert ctx["PERIOD_TYPE"] == "monthly"
+    assert ctx["REQUIRED_COVARIATES"] == ["population"]
+    assert ctx["ALLOW_FREE_COVARIATES"] is True
+    assert ctx["REQUIRES_GEO"] is False
+
+
+def test_build_service_info_context_minimalist_defaults(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(MINIMALIST_MLPROJECT)
+    mlproject = parse_mlproject(tmp_path)
+    ctx = build_service_info_context(mlproject)
+
+    assert ctx["META_AUTHOR"] is None
+    assert ctx["META_ASSESSED_STATUS"] is None
+    assert ctx["PERIOD_TYPE"] == "monthly"  # default when supported_period_type absent
+    assert ctx["REQUIRED_COVARIATES"] == []
+    assert ctx["ALLOW_FREE_COVARIATES"] is False
+
+
+def test_build_service_info_context_invalid_assessed_status(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(
+        """
+name: magenta_model
+meta_data:
+  author_assessed_status: magenta
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    )
+    mlproject = parse_mlproject(tmp_path)
+    ctx = build_service_info_context(mlproject)
+    # Unknown status falls back to None so the template emits the TODO default.
+    assert ctx["META_ASSESSED_STATUS"] is None
+
+
+def test_build_service_info_context_weekly_period(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(
+        """
+name: weekly_model
+supported_period_type: weekly
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    )
+    mlproject = parse_mlproject(tmp_path)
+    assert build_service_info_context(mlproject)["PERIOD_TYPE"] == "weekly"
+
+
+def test_build_service_info_context_drops_non_url_logo(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(
+        """
+name: bad_url_model
+meta_data:
+  organization_logo_url: /local/path/logo.png
+  repository_url: not-a-url
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    )
+    mlproject = parse_mlproject(tmp_path)
+    ctx = build_service_info_context(mlproject)
+    # Non-http(s) values get dropped so MLServiceInfo's HttpUrl validation doesn't blow up.
+    assert ctx["META_ORGANIZATION_LOGO_URL"] is None
+    assert ctx["META_REPOSITORY_URL"] is None
 
 
 def test_build_config_fields_ewars_user_options(tmp_path: Path) -> None:

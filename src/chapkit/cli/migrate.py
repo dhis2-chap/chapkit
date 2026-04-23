@@ -230,6 +230,65 @@ def detect_base_image(
     raise MigrateError("No Python (.py) or R (.r/.R) scripts at the project root; cannot pick a base image.")
 
 
+_VALID_ASSESSED_STATUS = {"gray", "red", "orange", "yellow", "green"}
+_VALID_PERIOD_TYPES = {"weekly", "monthly"}
+
+
+def build_service_info_context(mlproject: MLProject) -> dict[str, Any]:
+    """Build the ModelMetadata + capability-constraints block for MLServiceInfo.
+
+    Handles the MLproject -> chapkit vocabulary mismatches:
+    - MLproject `supported_period_type: any` becomes `monthly` (chapkit's
+      PeriodType only has weekly/monthly); otherwise the declared value
+      passes through if recognised, else `monthly`.
+    - `author_assessed_status` is validated against chapkit's AssessedStatus
+      enum; unknown values fall back to None.
+    - URL-typed fields (organization_logo_url, repository_url,
+      documentation_url) are only emitted if the value looks like a URL
+      (starts with http:// or https://) - MLServiceInfo validates them as
+      HttpUrl and we don't want to crash on a free-text slot.
+    """
+    meta = mlproject.meta_data
+
+    def _str_or_none(key: str) -> str | None:
+        value = meta.get(key)
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    def _url_or_none(key: str) -> str | None:
+        value = _str_or_none(key)
+        if value and (value.startswith("http://") or value.startswith("https://")):
+            return value
+        return None
+
+    assessed_raw = _str_or_none("author_assessed_status")
+    assessed_status = assessed_raw if assessed_raw in _VALID_ASSESSED_STATUS else None
+
+    period_raw = (mlproject.supported_period_type or "").strip().lower()
+    if period_raw in _VALID_PERIOD_TYPES:
+        period_type = period_raw
+    else:
+        period_type = "monthly"
+
+    return {
+        "META_AUTHOR": _str_or_none("author"),
+        "META_AUTHOR_NOTE": _str_or_none("author_note") or _str_or_none("description"),
+        "META_ASSESSED_STATUS": assessed_status,
+        "META_CONTACT_EMAIL": _str_or_none("contact_email"),
+        "META_ORGANIZATION": _str_or_none("organization"),
+        "META_ORGANIZATION_LOGO_URL": _url_or_none("organization_logo_url"),
+        "META_CITATION_INFO": _str_or_none("citation_info"),
+        "META_REPOSITORY_URL": _url_or_none("repository_url") or _url_or_none("source_url"),
+        "META_DOCUMENTATION_URL": _url_or_none("documentation_url"),
+        "PERIOD_TYPE": period_type,
+        "REQUIRED_COVARIATES": list(mlproject.required_covariates),
+        "ALLOW_FREE_COVARIATES": mlproject.allow_free_additional_continuous_covariates,
+        "REQUIRES_GEO": mlproject.requires_geo,
+    }
+
+
 def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str]]:
     """Turn MLproject user_options into (field_name, python_type, default_repr) tuples."""
     type_names = {int: "int", float: "float", str: "str", bool: "bool"}
@@ -441,12 +500,25 @@ def _run(
     renders = list(_GENERATED_FILENAMES)
 
     user_deps = _extract_user_dependencies(project_path)
+    # Prefer a meta_data description from the MLproject for the service description
+    # (e.g. ewars_template has a nice paragraph). Fall back to our generic template.
+    meta_description = mlproject.meta_data.get("description")
+    if isinstance(meta_description, str) and meta_description.strip():
+        project_description = meta_description.strip()
+    else:
+        project_description = f"chapkit service migrated from the {mlproject.name} MLproject"
+    meta_display_name = mlproject.meta_data.get("display_name")
+    if isinstance(meta_display_name, str) and meta_display_name.strip():
+        project_display_name = meta_display_name.strip()
+    else:
+        project_display_name = mlproject.name
 
     context: dict[str, Any] = {
         "PROJECT_NAME": mlproject.name,
+        "PROJECT_DISPLAY_NAME": project_display_name,
         "PROJECT_SLUG": slugify(mlproject.name),
         "PROJECT_IDENTIFIER": _python_identifier(mlproject.name),
-        "PROJECT_DESCRIPTION": f"chapkit service migrated from the {mlproject.name} MLproject",
+        "PROJECT_DESCRIPTION": project_description,
         "BASE_IMAGE": resolved_base_image,
         "LANGUAGE": language,
         "TRAIN_COMMAND": train_command,
@@ -456,6 +528,7 @@ def _run(
         "HAS_USER_PYPROJECT": (project_path / "pyproject.toml").is_file(),
         "USER_DEPENDENCIES": user_deps,
         "CHAPKIT_VERSION": _get_chapkit_version(),
+        **build_service_info_context(mlproject),
     }
 
     rendered = _render_all(context)

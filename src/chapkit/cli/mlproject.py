@@ -59,6 +59,12 @@ class MLProject(BaseModel):
     entry_points: dict[str, EntryPoint]
     user_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
     env_hints: dict[str, str] = Field(default_factory=dict)
+    meta_data: dict[str, Any] = Field(default_factory=dict)
+    supported_period_type: str | None = None
+    required_covariates: list[str] = Field(default_factory=list)
+    allow_free_additional_continuous_covariates: bool = False
+    requires_geo: bool = False
+    target: str | None = None
     source_path: Path | None = None
 
 
@@ -137,11 +143,29 @@ def parse_mlproject(path: Path) -> MLProject:
         else:
             env_hints[env_field] = str(value)
 
+    raw_meta = raw.get("meta_data") or {}
+    meta_data = dict(raw_meta) if isinstance(raw_meta, dict) else {}
+
+    required_covariates_raw = raw.get("required_covariates") or []
+    required_covariates: list[str] = (
+        [str(c) for c in required_covariates_raw] if isinstance(required_covariates_raw, list) else []
+    )
+
+    supported_period_type = raw.get("supported_period_type")
+    if supported_period_type is not None:
+        supported_period_type = str(supported_period_type)
+
     return MLProject(
         name=name.strip(),
         entry_points=entry_points,
         user_options=user_options,
         env_hints=env_hints,
+        meta_data=meta_data,
+        supported_period_type=supported_period_type,
+        required_covariates=required_covariates,
+        allow_free_additional_continuous_covariates=bool(raw.get("allow_free_additional_continuous_covariates", False)),
+        requires_geo=bool(raw.get("requires_geo", False)),
+        target=str(raw["target"]) if "target" in raw and raw["target"] is not None else None,
         source_path=mlproject_file,
     )
 

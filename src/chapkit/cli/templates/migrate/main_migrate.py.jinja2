@@ -1,7 +1,7 @@
 """{{ PROJECT_DESCRIPTION }}."""
 
 from chapkit import BaseConfig
-from chapkit.api import MLServiceBuilder, ServiceInfo
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.ml import ShellModelRunner
 
@@ -28,10 +28,51 @@ runner: ShellModelRunner[{{ PROJECT_IDENTIFIER }}Config] = ShellModelRunner(
     predict_command=predict_command,
 )
 
-info = ServiceInfo(
+info = MLServiceInfo(
     id="{{ PROJECT_SLUG }}",
-    display_name="{{ PROJECT_NAME }}",
-    description="{{ PROJECT_DESCRIPTION }}",
+    display_name="{{ PROJECT_DISPLAY_NAME }}",
+    description={{ PROJECT_DESCRIPTION | tojson }},
+    model_metadata=ModelMetadata(
+{% if META_AUTHOR %}
+        author={{ META_AUTHOR | tojson }},
+{% endif %}
+{% if META_AUTHOR_NOTE %}
+        author_note={{ META_AUTHOR_NOTE | tojson }},
+{% endif %}
+{% if META_ASSESSED_STATUS %}
+        author_assessed_status=AssessedStatus.{{ META_ASSESSED_STATUS }},
+{% else %}
+        author_assessed_status=AssessedStatus.yellow,  # TODO: assess and set (gray/red/orange/yellow/green)
+{% endif %}
+{% if META_CONTACT_EMAIL %}
+        contact_email={{ META_CONTACT_EMAIL | tojson }},
+{% endif %}
+{% if META_ORGANIZATION %}
+        organization={{ META_ORGANIZATION | tojson }},
+{% endif %}
+{% if META_ORGANIZATION_LOGO_URL %}
+        organization_logo_url={{ META_ORGANIZATION_LOGO_URL | tojson }},
+{% endif %}
+{% if META_CITATION_INFO %}
+        citation_info={{ META_CITATION_INFO | tojson }},
+{% endif %}
+{% if META_REPOSITORY_URL %}
+        repository_url={{ META_REPOSITORY_URL | tojson }},
+{% endif %}
+{% if META_DOCUMENTATION_URL %}
+        documentation_url={{ META_DOCUMENTATION_URL | tojson }},
+{% endif %}
+    ),
+    period_type=PeriodType.{{ PERIOD_TYPE }},
+{% if REQUIRED_COVARIATES %}
+    required_covariates={{ REQUIRED_COVARIATES | tojson }},
+{% endif %}
+{% if ALLOW_FREE_COVARIATES %}
+    allow_free_additional_continuous_covariates=True,
+{% endif %}
+{% if REQUIRES_GEO %}
+    requires_geo=True,
+{% endif %}
 )
 
 hierarchy = ArtifactHierarchy(
