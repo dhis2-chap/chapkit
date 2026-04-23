@@ -1,3 +1,10 @@
+# Chapkit "fat" runtime: R 4.5 + INLA + Python 3.13 + chapkit + uv.
+# Can host R, Python, or mixed-language MLproject models.
+#
+# Security: runs as root for now. docker_r_inla has no non-root user and
+# R's package paths (INLA .so files, renv caches) assume a root-owned layout.
+# Non-root hardening is a follow-up; safe in a trusted compose network behind chap-core.
+
 ARG BASE_PLATFORM=linux/amd64
 FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/docker_r_inla:master
 

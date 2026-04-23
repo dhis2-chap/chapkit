@@ -7,7 +7,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt update && apt install -y --no-install-recommends git && \
+    apt update && apt install -y --no-install-recommends \
+        git build-essential pkg-config && \
     apt clean && rm -rf /var/lib/apt/lists/* && \
     useradd --no-create-home --shell /usr/sbin/nologin chapkit
 
