@@ -31,7 +31,36 @@ _SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 _VALID_BASE_IMAGES = ("chapkit-py", "chapkit-r", "chapkit-r-inla")
 
-_CHAFF_FILENAMES = {"MLproject", "MLproject.yaml", "MLproject.yml", ".Rprofile", "Makefile"}
+# Blocklist. Anything not explicitly chaff stays at root, because migrated
+# scripts may read arbitrary data / config files at runtime (e.g. a YAML
+# schema loaded by train.py, a JSON config source()d from an R helper). The
+# only things we move are the user's chapkit-project-metadata (so our
+# freshly-generated main.py / Dockerfile / README win) and obvious ad-hoc
+# runners + stale data.
+_CHAFF_FILENAMES = {
+    # original MLproject definition
+    "MLproject",
+    "MLproject.yaml",
+    "MLproject.yml",
+    # user's existing project metadata - we regenerate these
+    "README.md",
+    "README.rst",
+    "README",
+    "README.txt",
+    ".gitignore",
+    ".dockerignore",
+    ".python-version",
+    "pyproject.toml",
+    # chapkit scaffold artefacts from a prior greenfield init
+    "Makefile",
+    "Dockerfile",
+    "compose.yml",
+    "compose.yaml",
+    "postman_collection.json",
+    "CHAPKIT.md",
+    # R profile
+    ".Rprofile",
+}
 _CHAFF_DIRS = {"input", "output", "renv"}
 _CHAFF_DIR_PATTERNS = ("example_data*", "examples")
 _CHAFF_GLOBS_AT_ROOT = (
@@ -46,16 +75,19 @@ _CHAFF_GLOBS_AT_ROOT = (
     "future_data*.csv",
     "historic_data*.csv",
 )
-_IGNORE_NAMES = {".git", ".github", ".venv", "venv", "__pycache__", ".pytest_cache", ".DS_Store", ".ruff_cache"}
-_GENERATED_FILENAMES = (
+
+_IGNORE_NAMES = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".DS_Store", ".ruff_cache"}
+_GENERATED_FILENAMES: tuple[str, ...] = (
     "main.py",
     "pyproject.toml",
     "Dockerfile",
     "compose.yml",
     "CHAPKIT.md",
     "postman_collection.json",
+    "README.md",
+    ".gitignore",
+    ".dockerignore",
 )
-_CONDITIONAL_GENERATED = ("README.md", ".gitignore", ".dockerignore")
 
 
 class MigrateError(MLProjectError):
@@ -100,11 +132,11 @@ def classify(project_path: Path) -> list[ClassifiedPath]:
 def _classify_file(path: Path) -> ClassifiedPath:
     name = path.name
     if name in _CHAFF_FILENAMES:
-        return ClassifiedPath(path, Action.MOVE_TO_OLD, f"original {name}")
+        return ClassifiedPath(path, Action.MOVE_TO_OLD, f"chapkit-owned metadata ({name})")
     for pattern in _CHAFF_GLOBS_AT_ROOT:
         if fnmatch.fnmatch(name, pattern):
             return ClassifiedPath(path, Action.MOVE_TO_OLD, f"matches chaff pattern {pattern!r}")
-    return ClassifiedPath(path, Action.KEEP, "source / helper / lockfile at root")
+    return ClassifiedPath(path, Action.KEEP, "kept at root")
 
 
 def _classify_dir(path: Path) -> ClassifiedPath:
@@ -264,7 +296,7 @@ def _resolve_base_image(
 def _print_plan(
     project_path: Path,
     plan: list[ClassifiedPath],
-    renders: list[tuple[str, bool]],
+    renders: list[str],
     base_image: str,
 ) -> None:
     typer.echo("")
@@ -278,10 +310,9 @@ def _print_plan(
         marker = "keep" if item.action is Action.KEEP else "-> _old/"
         typer.echo(f"    {marker:9s} {item.path.name}  ({item.reason})")
     typer.echo("")
-    typer.echo("  Files to generate:")
-    for filename, will_write in renders:
-        marker = "write" if will_write else "skip "
-        typer.echo(f"    {marker}  {filename}")
+    typer.echo("  Files to generate at root:")
+    for filename in renders:
+        typer.echo(f"    write  {filename}")
     typer.echo("")
 
 
@@ -298,16 +329,12 @@ def _execute_moves(plan: list[ClassifiedPath], old_dir: Path) -> int:
 
 def _execute_writes(
     project_path: Path,
-    renders: list[tuple[str, bool]],
+    renders: list[str],
     rendered: dict[str, str],
 ) -> int:
-    written = 0
-    for filename, will_write in renders:
-        if not will_write:
-            continue
+    for filename in renders:
         (project_path / filename).write_text(rendered[filename])
-        written += 1
-    return written
+    return len(renders)
 
 
 def migrate_command(
@@ -372,9 +399,11 @@ def _run(
 
     plan = classify(project_path)
 
-    renders = _plan_renders(project_path)
-
-    _check_generated_collisions(project_path, renders)
+    # Everything except source files / lockfiles / LICENSE / .github/ has been
+    # bucketed as MOVE_TO_OLD, so by the time we generate files at root there
+    # is nothing left to collide with. That includes any existing README.md,
+    # pyproject.toml, .gitignore, .dockerignore, etc. - they land in _old/.
+    renders = list(_GENERATED_FILENAMES)
 
     context: dict[str, Any] = {
         "PROJECT_NAME": mlproject.name,
@@ -387,7 +416,7 @@ def _run(
         "PREDICT_COMMAND": predict_command,
         "CONFIG_FIELDS": build_config_fields(mlproject),
         "HAS_RENV": (project_path / "renv.lock").is_file(),
-        "HAS_USER_PYPROJECT": (project_path / "pyproject.toml").is_file(),
+        "HAS_USER_PYPROJECT": any(p.name == "pyproject.toml" for p in project_path.iterdir() if p.is_file()),
         "CHAPKIT_VERSION": _get_chapkit_version(),
     }
 
@@ -406,14 +435,15 @@ def _run(
 
     old_dir.mkdir()
     moved = _execute_moves(plan, old_dir)
-    pyproject_renamed = _rename_user_pyproject(project_path)
     written = _execute_writes(project_path, renders, rendered)
 
     typer.echo("")
     typer.echo(f"Moved {moved} item(s) to _old/.")
-    if pyproject_renamed:
-        typer.echo("Renamed existing pyproject.toml -> pyproject.original.toml (merge deps manually).")
     typer.echo(f"Generated {written} file(s) at project root.")
+    if (old_dir / "pyproject.toml").is_file():
+        typer.echo(
+            "Note: your original pyproject.toml is at _old/pyproject.toml; merge deps into the new one manually."
+        )
     typer.echo("")
     typer.echo("Next steps:")
     typer.echo("  uv sync && uv run chapkit run .")
@@ -421,45 +451,6 @@ def _run(
         f"  # or: docker build -t {context['PROJECT_SLUG']} . && docker run --rm -p 8000:8000 {context['PROJECT_SLUG']}"
     )
     typer.echo("See CHAPKIT.md for more.")
-
-
-def _plan_renders(project_path: Path) -> list[tuple[str, bool]]:
-    renders: list[tuple[str, bool]] = [(name, True) for name in _GENERATED_FILENAMES]
-    for name in _CONDITIONAL_GENERATED:
-        exists = (project_path / name).exists()
-        renders.append((name, not exists))
-    return renders
-
-
-def _check_generated_collisions(project_path: Path, renders: list[tuple[str, bool]]) -> None:
-    # pyproject.toml collision is handled specially: the user's file is kept
-    # and renamed to pyproject.original.toml at execute time. See _rename_user_pyproject.
-    collisions: list[str] = []
-    for filename, will_write in renders:
-        if not will_write:
-            continue
-        if filename == "pyproject.toml" and (project_path / "pyproject.toml").exists():
-            if (project_path / "pyproject.original.toml").exists():
-                collisions.append("pyproject.original.toml (would hold the original; already exists)")
-            continue
-        if (project_path / filename).exists():
-            collisions.append(filename)
-    if collisions:
-        raise MigrateError(
-            "Files already exist at the project root and would be overwritten: "
-            + ", ".join(collisions)
-            + ". Rename or remove them and re-run."
-        )
-
-
-def _rename_user_pyproject(project_path: Path) -> bool:
-    """If a user pyproject.toml exists, rename it to pyproject.original.toml. Return True if renamed."""
-    original = project_path / "pyproject.toml"
-    if not original.is_file():
-        return False
-    backup = project_path / "pyproject.original.toml"
-    original.rename(backup)
-    return True
 
 
 def _render_all(context: dict[str, Any]) -> dict[str, str]:

@@ -84,37 +84,59 @@ def _seed_project(root: Path, mlproject_yaml: str, files: dict[str, str]) -> MLP
     return parse_mlproject(root)
 
 
-def test_classify_separates_chaff_from_keep_from_ignore(tmp_path: Path) -> None:
-    (tmp_path / "MLproject").write_text("name: x\nentry_points: {}\n")
+def test_classify_chaff_metadata_moves_to_old_user_data_stays(tmp_path: Path) -> None:
+    # Source / helpers / lockfiles / LICENSE / arbitrary user data files stay.
     (tmp_path / "train.r").write_text("# train\n")
     (tmp_path / "predict.r").write_text("# predict\n")
     (tmp_path / "lib.R").write_text("# helpers\n")
     (tmp_path / "renv.lock").write_text("{}\n")
-    (tmp_path / ".Rprofile").write_text("# .Rprofile\n")
-    (tmp_path / "isolated_run.r").write_text("# dev runner\n")
-    (tmp_path / "Makefile").write_text("all:\n\ttrue\n")
+    (tmp_path / "LICENSE").write_text("MIT\n")
+    (tmp_path / "schema.yaml").write_text("kind: config\n")  # arbitrary config script may read
+    (tmp_path / "my_package").mkdir()
+    (tmp_path / "my_package" / "__init__.py").write_text("\n")
+    (tmp_path / ".github").mkdir()
+
+    # Project metadata, MLproject, ad-hoc runners, stale data -> _old/.
+    (tmp_path / "MLproject").write_text("name: x\nentry_points: {}\n")
     (tmp_path / "README.md").write_text("# doc\n")
+    (tmp_path / ".gitignore").write_text("__pycache__/\n")
+    (tmp_path / ".dockerignore").write_text(".venv\n")
+    (tmp_path / ".python-version").write_text("3.13\n")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname="x"\nversion="0"\n')
+    (tmp_path / ".Rprofile").write_text("# profile\n")
+    (tmp_path / "Makefile").write_text("all:\n\ttrue\n")
+    (tmp_path / "isolated_run.r").write_text("# dev runner\n")
     (tmp_path / "input").mkdir()
     (tmp_path / "output").mkdir()
     (tmp_path / "example_data_monthly").mkdir()
+
+    # Ignored.
     (tmp_path / ".git").mkdir()
     (tmp_path / "__pycache__").mkdir()
 
     result = {c.path.name: c.action for c in classify(tmp_path)}
 
-    assert result["MLproject"] is Action.MOVE_TO_OLD
-    assert result["Makefile"] is Action.MOVE_TO_OLD
-    assert result[".Rprofile"] is Action.MOVE_TO_OLD
-    assert result["isolated_run.r"] is Action.MOVE_TO_OLD
-    assert result["input"] is Action.MOVE_TO_OLD
-    assert result["output"] is Action.MOVE_TO_OLD
-    assert result["example_data_monthly"] is Action.MOVE_TO_OLD
-
     assert result["train.r"] is Action.KEEP
     assert result["predict.r"] is Action.KEEP
     assert result["lib.R"] is Action.KEEP
     assert result["renv.lock"] is Action.KEEP
-    assert result["README.md"] is Action.KEEP
+    assert result["LICENSE"] is Action.KEEP
+    assert result["schema.yaml"] is Action.KEEP  # user data file, not chapkit metadata
+    assert result["my_package"] is Action.KEEP
+    assert result[".github"] is Action.KEEP
+
+    assert result["MLproject"] is Action.MOVE_TO_OLD
+    assert result["README.md"] is Action.MOVE_TO_OLD
+    assert result[".gitignore"] is Action.MOVE_TO_OLD
+    assert result[".dockerignore"] is Action.MOVE_TO_OLD
+    assert result[".python-version"] is Action.MOVE_TO_OLD
+    assert result["pyproject.toml"] is Action.MOVE_TO_OLD
+    assert result[".Rprofile"] is Action.MOVE_TO_OLD
+    assert result["Makefile"] is Action.MOVE_TO_OLD
+    assert result["isolated_run.r"] is Action.MOVE_TO_OLD
+    assert result["input"] is Action.MOVE_TO_OLD
+    assert result["output"] is Action.MOVE_TO_OLD
+    assert result["example_data_monthly"] is Action.MOVE_TO_OLD
 
     assert result[".git"] is Action.IGNORE
     assert result["__pycache__"] is Action.IGNORE
@@ -274,7 +296,7 @@ def test_old_dir_already_exists_errors(tmp_path: Path) -> None:
     assert "_old" in result.output
 
 
-def test_existing_readme_preserved(tmp_path: Path) -> None:
+def test_existing_readme_moves_to_old(tmp_path: Path) -> None:
     _seed_project(
         tmp_path,
         PYTHON_MLPROJECT,
@@ -283,23 +305,13 @@ def test_existing_readme_preserved(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
-    assert (tmp_path / "README.md").read_text() == "# user readme\n"
+    assert (tmp_path / "_old" / "README.md").read_text() == "# user readme\n"
+    assert (tmp_path / "README.md").is_file()
+    assert (tmp_path / "README.md").read_text() != "# user readme\n"
     assert (tmp_path / "CHAPKIT.md").is_file()
 
 
-def test_generated_file_collision_errors(tmp_path: Path) -> None:
-    _seed_project(
-        tmp_path,
-        PYTHON_MLPROJECT,
-        {"train.py": "...", "predict.py": "...", "main.py": "# existing\n"},
-    )
-    runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
-    assert result.exit_code == 1
-    assert "main.py" in result.output
-
-
-def test_existing_user_pyproject_renamed_to_original(tmp_path: Path) -> None:
+def test_existing_user_pyproject_moves_to_old(tmp_path: Path) -> None:
     _seed_project(
         tmp_path,
         PYTHON_MLPROJECT,
@@ -313,30 +325,19 @@ def test_existing_user_pyproject_renamed_to_original(tmp_path: Path) -> None:
     result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
-    assert (tmp_path / "pyproject.original.toml").is_file()
-    assert "user-model" in (tmp_path / "pyproject.original.toml").read_text()
+    # Original user pyproject.toml is preserved under _old/ so deps can be merged.
+    assert (tmp_path / "_old" / "pyproject.toml").is_file()
+    assert "user-model" in (tmp_path / "_old" / "pyproject.toml").read_text()
 
+    # Root has a fresh chapkit pyproject.toml.
     assert (tmp_path / "pyproject.toml").is_file()
     generated = (tmp_path / "pyproject.toml").read_text()
     assert "chapkit" in generated
     assert "user-model" not in generated
 
-
-def test_pyproject_original_collision_errors(tmp_path: Path) -> None:
-    _seed_project(
-        tmp_path,
-        PYTHON_MLPROJECT,
-        {
-            "train.py": "...",
-            "predict.py": "...",
-            "pyproject.toml": "[project]\nname='x'\nversion='0'\n",
-            "pyproject.original.toml": "# blocker\n",
-        },
-    )
-    runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
-    assert result.exit_code == 1
-    assert "pyproject.original.toml" in result.output
+    # Output mentions the _old/pyproject.toml pointer so the user knows where to look.
+    assert "pyproject.toml" in result.output
+    assert "_old" in result.output
 
 
 def test_unknown_param_hard_errors_with_yes(tmp_path: Path) -> None:

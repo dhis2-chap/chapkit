@@ -2,7 +2,7 @@
 
 `chapkit migrate` turns an existing MLflow-style `MLproject` directory into a first-class chapkit project in place. It's the code-generating sibling of [`chapkit run`](mlproject-runner.md): where `run` adapts an MLproject at runtime without writing anything, `migrate` gives you a `main.py`, a `Dockerfile` pointing at the right [chapkit-images](https://github.com/dhis2-chap/chapkit-images) base, a `pyproject.toml`, a `compose.yml`, and a `CHAPKIT.md` that you can commit, extend, and ship.
 
-Your existing train/predict scripts and helpers are **not moved or modified**. Chaff (input CSVs, ad-hoc runner scripts, `MLproject` itself once we've parsed it, `.Rprofile`, etc.) is swept into `_old/` so nothing is lost.
+Your existing train/predict scripts, helpers, and arbitrary config / data files are **not moved or modified**. Project metadata that chapkit regenerates (`README.md`, `.gitignore`, `pyproject.toml`, `Dockerfile`, `compose.yml`, `.python-version`, `Makefile`, the `MLproject` itself), plus obvious chaff (`input/`, `output/`, `example_data*/`, `isolated_run.*`, stale data CSVs, serialised model files, `renv/`), are swept into `_old/` so nothing is lost — your original repo state is fully recoverable from there.
 
 ## When to use which
 
@@ -28,11 +28,14 @@ After a successful run, the project root holds your unchanged source files along
 | Kind | Destination | Examples |
 | --- | --- | --- |
 | Original MLproject definition | `_old/` | `MLproject`, `MLproject.yaml` |
-| Built-for-dev runners | `_old/` | `isolated_run.r`, `isolated_run.R`, `evaluate_one_step.py`, `slides.md`, `Makefile` |
-| Example / demo data | `_old/` | `input/`, `output/`, `example_data/`, `example_data_monthly/`, root-level `training_data*.csv`, `predictions*.csv`, `*.pickle`, `*.rds`, `*.model` |
+| User's project metadata (chapkit regenerates these) | `_old/` | `README.md`, `.gitignore`, `.dockerignore`, `.python-version`, `pyproject.toml`, `Makefile`, `Dockerfile`, `compose.yml`, `postman_collection.json`, `CHAPKIT.md` |
+| Built-for-dev runners | `_old/` | `isolated_run.r`, `isolated_run.R`, `evaluate_one_step.py`, `slides.md` |
+| Example / demo data | `_old/` | `input/`, `output/`, `example_data/`, `example_data_monthly/`, root-level `training_data*.csv`, `predictions*.csv`, `future_data*.csv`, `historic_data*.csv`, `*.pickle`, `*.rds`, `*.model` |
 | R environment-local state | `_old/` | `renv/`, `.Rprofile` |
-| Source code and lockfiles | kept at root | `train.r`, `predict.r`, `train.py`, `predict.py`, `lib.R`, `transformations.py`, Python packages, `renv.lock`, `uv.lock`, `LICENSE`, `README.md` |
+| Source code, user data, lockfiles, LICENSE | kept at root | `train.r`, `predict.r`, `train.py`, `predict.py`, `lib.R`, `transformations.py`, Python packages, arbitrary `*.yaml` / `*.json` / `*.toml` config your scripts read, `renv.lock`, `uv.lock`, `LICENSE`, `.github/` |
 | Git / venv / caches | ignored | `.git/`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `.ruff_cache/` |
+
+Arbitrary files at the project root that aren't in the chaff list stay put — scripts that read `schema.yaml`, `model_params.json`, etc. at startup continue to work. The user's original `pyproject.toml` lands at `_old/pyproject.toml`; merge its dependencies into the generated chapkit `pyproject.toml` manually.
 
 ## Base image auto-detection
 
@@ -80,7 +83,7 @@ Use `--param NAME=FILENAME` (repeatable) to pre-answer the non-canonical-paramet
 
 ## Your own `pyproject.toml`
 
-If your repo already has a `pyproject.toml`, migrate renames it to `pyproject.original.toml` and writes a fresh minimal chapkit `pyproject.toml` alongside. Merge your dependencies (and any `[tool.*]` config) back into the new file manually — we don't try to guess the right merge.
+If your repo already has a `pyproject.toml`, it lands at `_old/pyproject.toml` alongside the rest of the chapkit-owned metadata. Migrate writes a fresh minimal chapkit `pyproject.toml` at root. Merge your dependencies (and any `[tool.*]` config) back into the new file manually — we don't try to guess the right merge. The output summary prints a pointer at `_old/pyproject.toml` so you don't forget.
 
 ## Next steps after migrate
 
