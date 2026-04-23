@@ -82,6 +82,10 @@ class MLServiceInfo(ServiceInfo):
     required_covariates: list[str] = Field(default_factory=list)
     requires_geo: bool = False
 
+    # Derived from the runner at build time; clients read this to decide whether
+    # to send artifact_id (default, train-backed) or config_id (predict-only) on $predict.
+    predict_only: bool = False
+
 
 @dataclass(slots=True)
 class _ConfigOptions:
@@ -270,7 +274,7 @@ class ServiceBuilder(BaseServiceBuilder):
                 prefix=ml_options.prefix,
                 tags=ml_options.tags,
                 manager_factory=ml_dep,
-                supports_train=ml_options.runner.supports_train,
+                predict_only=ml_options.runner.predict_only,
             )
             app.include_router(ml_router)
             app.dependency_overrides[default_get_ml_manager] = ml_dep
@@ -385,8 +389,8 @@ DEFAULT_ML_STATELESS_HIERARCHY = ArtifactHierarchy(
 
 
 def _default_ml_hierarchy(runner: ModelRunnerProtocol) -> ArtifactHierarchy:
-    """Pick a sensible default hierarchy based on whether the runner supports training."""
-    return DEFAULT_ML_TRAINING_HIERARCHY if runner.supports_train else DEFAULT_ML_STATELESS_HIERARCHY
+    """Pick a sensible default hierarchy based on whether the runner has a train step."""
+    return DEFAULT_ML_STATELESS_HIERARCHY if runner.predict_only else DEFAULT_ML_TRAINING_HIERARCHY
 
 
 class MLServiceBuilder(ServiceBuilder):
@@ -420,6 +424,11 @@ class MLServiceBuilder(ServiceBuilder):
                 .with_migrations(enabled=True, alembic_dir=get_alembic_dir())
                 .build()
             )
+
+        # Mirror the runner's capability on MLServiceInfo so /api/v1/info tells
+        # FE clients which $predict shape to use (config_id vs artifact_id).
+        if isinstance(info, MLServiceInfo):
+            info = info.model_copy(update={"predict_only": runner.predict_only})
 
         super().__init__(
             info=info,

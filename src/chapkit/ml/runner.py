@@ -178,9 +178,9 @@ class BaseModelRunner(ABC, Generic[ConfigT]):
     """Abstract base class for model runners with lifecycle hooks."""
 
     @property
-    def supports_train(self) -> bool:
-        """Return True when this runner can execute a train step."""
-        return True
+    def predict_only(self) -> bool:
+        """Return True when this runner has no train step (stateless predict)."""
+        return False
 
     async def on_init(self) -> None:
         """Optional initialization hook called before training or prediction."""
@@ -315,9 +315,9 @@ class FunctionalModelRunner(BaseModelRunner[ConfigT]):
         self._on_validate_predict = on_validate_predict
 
     @property
-    def supports_train(self) -> bool:
-        """True when a train callback was supplied."""
-        return self._on_train is not None
+    def predict_only(self) -> bool:
+        """True when no train callback was supplied."""
+        return self._on_train is None
 
     async def on_validate_train(
         self,
@@ -533,9 +533,9 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         logger.info("shell_runner_initialized", project_root=str(self.project_root))
 
     @property
-    def supports_train(self) -> bool:
-        """True when a train command was supplied."""
-        return self.train_command is not None
+    def predict_only(self) -> bool:
+        """True when no train command was supplied."""
+        return self.train_command is None
 
     async def on_validate_train(
         self,

@@ -163,8 +163,8 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
     """Protocol defining the interface for model runners."""
 
     @property
-    def supports_train(self) -> bool:
-        """Return True when this runner can execute a train step."""
+    def predict_only(self) -> bool:
+        """Return True when this runner has no train step (stateless predict)."""
         ...
 
     async def on_train(

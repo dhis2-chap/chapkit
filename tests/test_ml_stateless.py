@@ -10,11 +10,16 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from geojson_pydantic import FeatureCollection
-from servicekit.api.service_builder import ServiceInfo
 from ulid import ULID
 
 from chapkit import BaseConfig
-from chapkit.api import MLServiceBuilder
+from chapkit.api import (
+    AssessedStatus,
+    MLServiceBuilder,
+    MLServiceInfo,
+    ModelMetadata,
+    PeriodType,
+)
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner
 
@@ -43,11 +48,25 @@ async def _train_that_should_never_run(config: Any, data: Any, geo: Any = None) 
     return {"status": "trained"}
 
 
+def _ml_service_info(service_id: str, display_name: str) -> MLServiceInfo:
+    """Build a minimal MLServiceInfo so /api/v1/info uses the ML subclass."""
+    return MLServiceInfo(
+        id=service_id,
+        display_name=display_name,
+        model_metadata=ModelMetadata(
+            author="test",
+            author_assessed_status=AssessedStatus.yellow,
+            contact_email="test@example.com",
+        ),
+        period_type=PeriodType.monthly,
+    )
+
+
 def _build_stateless_app() -> FastAPI:
     """Build an ML app with a stateless runner (on_train omitted)."""
     runner = FunctionalModelRunner(on_predict=_rule_based_predict)
     return MLServiceBuilder(
-        info=ServiceInfo(id="stateless-test", display_name="Stateless Test"),
+        info=_ml_service_info("stateless-test", "Stateless Test"),
         config_schema=StatelessConfig,
         runner=runner,
     ).build()
@@ -60,7 +79,7 @@ def _build_train_backed_app() -> FastAPI:
         on_train=_train_that_should_never_run,
     )
     return MLServiceBuilder(
-        info=ServiceInfo(id="train-backed-test", display_name="Train-Backed Test"),
+        info=_ml_service_info("train-backed-test", "Train-Backed Test"),
         config_schema=StatelessConfig,
         runner=runner,
     ).build()
@@ -199,7 +218,7 @@ def test_mode_mismatch_artifact_id_on_stateless(stateless_client: TestClient) ->
         },
     )
     assert response.status_code == 400
-    assert "stateless" in response.json()["detail"].lower()
+    assert "predict-only" in response.json()["detail"].lower()
 
 
 def test_mode_mismatch_config_id_on_train_backed(train_backed_client: TestClient) -> None:
@@ -291,3 +310,21 @@ def test_stateless_hierarchy_labels_in_tree(stateless_client: TestClient) -> Non
 
     # Level 0 should be labelled as prediction, not training.
     assert tree["level_label"] == "ml_prediction"
+
+
+def test_info_endpoint_exposes_predict_only_true_for_stateless(
+    stateless_client: TestClient,
+) -> None:
+    """Stateless services advertise predict_only=True via /api/v1/info."""
+    response = stateless_client.get("/api/v1/info")
+    assert response.status_code == 200
+    assert response.json()["predict_only"] is True
+
+
+def test_info_endpoint_exposes_predict_only_false_for_train_backed(
+    train_backed_client: TestClient,
+) -> None:
+    """Train-backed services advertise predict_only=False via /api/v1/info."""
+    response = train_backed_client.get("/api/v1/info")
+    assert response.status_code == 200
+    assert response.json()["predict_only"] is False

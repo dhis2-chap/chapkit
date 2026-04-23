@@ -53,12 +53,12 @@ class MLRouter(Router):
         prefix: str,
         tags: list[str],
         manager_factory: Any,
-        supports_train: bool = True,
+        predict_only: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize ML router with manager factory."""
         self.manager_factory = manager_factory
-        self.supports_train = supports_train
+        self.predict_only = predict_only
         super().__init__(prefix=prefix, tags=tags, **kwargs)
 
     def _register_routes(self) -> None:
@@ -67,7 +67,7 @@ class MLRouter(Router):
 
         manager_factory = self.manager_factory
 
-        if self.supports_train:
+        if not self.predict_only:
 
             @self.router.post(
                 "/$train",
@@ -125,7 +125,7 @@ class MLRouter(Router):
                     detail=str(e),
                 )
 
-        if self.supports_train:
+        if not self.predict_only:
 
             @self.router.post(
                 "/$validate",

@@ -906,7 +906,7 @@ async def test_mlmanager_train_cleans_up_workspace_on_error() -> None:
         assert not created_workspace_dir.exists(), "Workspace should be cleaned up after error"
 
 
-# --- Regression tests: supports_train property on runners ---
+# --- Regression tests: predict_only property on runners ---
 
 
 async def _train_stub(config: Any, data: Any, geo: Any = None) -> Any:
@@ -919,21 +919,21 @@ async def _predict_stub(config: Any, model: Any, historic: DataFrame, future: Da
     return future
 
 
-def test_functional_runner_with_on_train_reports_supports_train_true() -> None:
-    """A FunctionalModelRunner constructed with on_train should advertise train support."""
+def test_functional_runner_with_on_train_reports_not_predict_only() -> None:
+    """A FunctionalModelRunner constructed with on_train is train-backed."""
     runner = FunctionalModelRunner(on_train=_train_stub, on_predict=_predict_stub)
-    assert runner.supports_train is True
+    assert runner.predict_only is False
 
 
-def test_functional_runner_without_on_train_reports_supports_train_false() -> None:
-    """A FunctionalModelRunner constructed without on_train is stateless."""
+def test_functional_runner_without_on_train_reports_predict_only() -> None:
+    """A FunctionalModelRunner constructed without on_train is predict-only."""
     runner = FunctionalModelRunner(on_predict=_predict_stub)
-    assert runner.supports_train is False
+    assert runner.predict_only is True
 
 
 @pytest.mark.asyncio
 async def test_functional_runner_without_on_train_raises_on_train_call() -> None:
-    """Calling on_train on a stateless FunctionalModelRunner is a programmer error."""
+    """Calling on_train on a predict-only FunctionalModelRunner is a programmer error."""
     runner = FunctionalModelRunner(on_predict=_predict_stub)
     with pytest.raises(RuntimeError, match="stateless"):
         await runner.on_train(
@@ -943,20 +943,20 @@ async def test_functional_runner_without_on_train_raises_on_train_call() -> None
         )
 
 
-def test_shell_runner_with_train_command_reports_supports_train_true() -> None:
-    """A ShellModelRunner with a train_command advertises train support."""
+def test_shell_runner_with_train_command_reports_not_predict_only() -> None:
+    """A ShellModelRunner with a train_command is train-backed."""
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(predict_command="true", train_command="true")
-    assert runner.supports_train is True
+    assert runner.predict_only is False
 
 
-def test_shell_runner_without_train_command_reports_supports_train_false() -> None:
-    """A ShellModelRunner without train_command is stateless."""
+def test_shell_runner_without_train_command_reports_predict_only() -> None:
+    """A ShellModelRunner without train_command is predict-only."""
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(predict_command="true")
-    assert runner.supports_train is False
+    assert runner.predict_only is True
 
 
-def test_base_model_runner_default_supports_train() -> None:
-    """BaseModelRunner subclasses default to supports_train=True."""
+def test_base_model_runner_default_is_not_predict_only() -> None:
+    """BaseModelRunner subclasses default to predict_only=False."""
 
     class DummyRunner(BaseModelRunner[MockConfig]):
         async def on_train(self, config: MockConfig, data: DataFrame, geo: Any = None) -> Any:
@@ -972,4 +972,4 @@ def test_base_model_runner_default_supports_train() -> None:
         ) -> DataFrame:
             return future
 
-    assert DummyRunner().supports_train is True
+    assert DummyRunner().predict_only is False

@@ -149,7 +149,7 @@ class MLManager(Generic[ConfigT]):
     async def _validate_predict(self, request: ValidatePredictRequest) -> list[ValidationDiagnostic]:
         """Collect diagnostics for a predict payload."""
         # Mode mismatch comes before any I/O: surface it as a diagnostic, not a crash.
-        if self.runner.supports_train and request.config_id is not None:
+        if not self.runner.predict_only and request.config_id is not None:
             return [
                 ValidationDiagnostic.error(
                     code="unsupported_predict_mode",
@@ -157,11 +157,11 @@ class MLManager(Generic[ConfigT]):
                     field="config_id",
                 )
             ]
-        if not self.runner.supports_train and request.artifact_id is not None:
+        if self.runner.predict_only and request.artifact_id is not None:
             return [
                 ValidationDiagnostic.error(
                     code="unsupported_predict_mode",
-                    message="This service is stateless; use 'config_id' not 'artifact_id'.",
+                    message="This service is predict-only; use 'config_id' not 'artifact_id'.",
                     field="artifact_id",
                 )
             ]
@@ -432,8 +432,8 @@ class MLManager(Generic[ConfigT]):
 
     async def execute_train(self, request: TrainRequest) -> TrainResponse:
         """Submit a training job to the scheduler and return job/artifact IDs."""
-        if not self.runner.supports_train:
-            raise ValueError("Runner does not support training; this service is stateless")
+        if self.runner.predict_only:
+            raise ValueError("Runner does not support training; this service is predict-only")
 
         # Pre-allocate artifact ID for the trained model
         artifact_id = ULID()
@@ -453,12 +453,14 @@ class MLManager(Generic[ConfigT]):
 
     async def execute_predict(self, request: PredictRequest) -> PredictResponse:
         """Submit a prediction job to the scheduler and return job/artifact IDs."""
-        if self.runner.supports_train and request.config_id is not None:
+        if not self.runner.predict_only and request.config_id is not None:
             raise ValueError(
                 "This service is train-backed; use 'artifact_id' pointing to a trained artifact, not 'config_id'"
             )
-        if not self.runner.supports_train and request.artifact_id is not None:
-            raise ValueError("This service is stateless; use 'config_id' to identify the config, not 'artifact_id'")
+        if self.runner.predict_only and request.artifact_id is not None:
+            raise ValueError(
+                "This service is predict-only; use 'config_id' to identify the config, not 'artifact_id'"
+            )
 
         # Pre-allocate artifact ID for predictions
         artifact_id = ULID()
