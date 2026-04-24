@@ -2,110 +2,102 @@
 
 {{ PROJECT_DESCRIPTION }}.
 
-This project was migrated from an MLflow-style `MLproject` directory by
-`chapkit migrate`. The original files are preserved under `_old/` for
-reference. The chapkit wrapper (`main.py`, `Dockerfile`, `compose.yml`,
-`pyproject.toml`) sits alongside your train/predict scripts at the root.
+This project is now a [**chapkit**](https://github.com/dhis2-chap/chapkit) service — a small FastAPI app that wraps your existing train/predict scripts and exposes them to the [chap-core](https://github.com/dhis2-chap/chap-core) orchestrator as a standard HTTP service.
 
-## Quick start
+[`chapkit migrate`](https://dhis2-chap.github.io/chapkit/guides/mlproject-migrate/) generated the wrapper; your scripts are untouched. The original `MLproject` and anything chapkit regenerated (README, pyproject, etc.) are preserved under `_old/`.
 
-### Local (uv)
+## TL;DR
+
+| Do this | You get |
+| --- | --- |
+| [`uv sync && uv run python main.py`](#run-it-locally) | Service on http://127.0.0.1:8000 |
+| [`docker build -t {{ PROJECT_SLUG }} .`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images) |
+| [`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) | End-to-end train + predict smoke test |
+| [`/docs`](http://127.0.0.1:8000/docs) | Live OpenAPI UI for the service |
+
+## Run it locally
 
 ```bash
-uv sync                    # install chapkit + deps into .venv
-uv run python main.py       # serve on http://127.0.0.1:8000
+uv sync                # installs chapkit + your deps into .venv
+uv run python main.py   # serves on http://127.0.0.1:8000
 ```
 
-Open http://127.0.0.1:8000/docs for the OpenAPI UI, or `/health` for a ping.
+Poke at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for the OpenAPI UI, or `/health` for a heartbeat.
 
-### Docker
+## Run it in Docker
 
 ```bash
 docker build -t {{ PROJECT_SLUG }} .
 docker run --rm -p 8000:8000 {{ PROJECT_SLUG }}
 ```
 
-The image uses `ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest` as its base.
+The image builds on [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://github.com/dhis2-chap/chapkit-images), one of the pre-baked [chapkit base images](https://github.com/dhis2-chap/chapkit-images) with Python/R and the common ML stack ready to go.
 {% if BASE_IMAGE == "chapkit-r-inla" %}
-That's an `amd64`-only image (INLA ships x86_64 binaries only); on Apple
-Silicon add `--platform=linux/amd64` to both `docker build` and
-`docker run`.
+> **Note:** `chapkit-r-inla` is `amd64`-only (INLA ships only x86_64 binaries). On Apple Silicon add `--platform=linux/amd64` to both `docker build` and `docker run`.
 {% endif %}
 
-## Running tests
+## Smoke-test the service
 
-`chapkit test` drives an end-to-end train + predict cycle against the
-running service and prints a short report.
+[`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) POSTs a synthetic config, drives a full train → predict cycle, and reports back. Useful right after migrating to confirm the wiring is sound.
 
 ```bash
-# in one terminal:
+# terminal 1:
 uv run python main.py
-# in another:
+
+# terminal 2:
 uv run chapkit test
 ```
 
-## Project layout
+The generator produces [chap-core-shaped panel data](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/#generated-data-structure) (`time_period`, `location`, `disease_cases`, `population`, `rainfall`, `mean_temperature`, plus any [`required_covariates`](#covariates) your model declares).
 
-- `main.py` — chapkit service (generated). Defines the config schema,
-  the `ShellModelRunner`, and the `MLServiceBuilder` wiring.
-- `Dockerfile`, `compose.yml`, `pyproject.toml`, `postman_collection.json`,
-  `README.md`, `.gitignore`, `.dockerignore` — generated.
-- Your train/predict scripts, helpers, Python packages, lockfiles,
-  `LICENSE`, and any arbitrary data/config files (`*.yaml`, `*.json`, ...)
-  — **unchanged**, at the project root.
-- `_old/` — the original `MLproject` plus project metadata that chapkit
-  regenerated (old `README.md`, `.gitignore`, `pyproject.toml`, etc.),
-  example data (`input/`, `output/`, `example_data*/`), and ad-hoc
-  runners (`isolated_run.*`). Preserved as-is for reference; nothing in
-  here is used by the chapkit service.
+## What's in the box
+
+- **`main.py`** — the generated chapkit service. Defines your [`{{ PROJECT_CLASS_NAME }}Config`](https://dhis2-chap.github.io/chapkit/guides/configuration-management/), wires a [`ShellModelRunner`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#shellmodelrunner) to your scripts, and hands everything to [`MLServiceBuilder`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlservicebuilder-recommended).
+- **`Dockerfile`**, **`compose.yml`**, **`pyproject.toml`**, **`postman_collection.json`**, **`README.md`**, **`.gitignore`**, **`.dockerignore`** — all generated, all yours to edit.
+- **Your train/predict scripts**, helpers, Python packages, lockfiles, `LICENSE`, and any arbitrary `*.yaml`/`*.json` config files your scripts read — **untouched**, at the project root.
+- **`_old/`** — safety net: original `MLproject`, pre-existing metadata files chapkit regenerated, example input/output, ad-hoc runners (`isolated_run.*`). Nothing here is loaded at runtime; browse freely, copy anything worth porting back.
 {% if HAS_USER_PYPROJECT %}
 
 ### Dependencies from your original `pyproject.toml`
 
-Your model's Python dependencies have been auto-merged from
-`_old/pyproject.toml` into the generated `pyproject.toml` at the root,
-alongside the chapkit entry. The original is preserved under `_old/`
-so you can port over anything we did not migrate automatically —
-optional dep groups, `[tool.*]` config (ruff, mypy, etc.), environment
-markers, and custom `[build-system]` backends.
+Your runtime deps (`[project.dependencies]`) have been auto-merged into the new `pyproject.toml` alongside the `chapkit` entry. The original file is at `_old/pyproject.toml` — check it for anything we didn't port automatically: optional dep groups, `[tool.ruff]`/`[tool.mypy]` config, environment markers, custom `[build-system]` backends.
 {% endif %}
 
-## Registering with chap-core
+## Key concepts (all generated into `main.py`)
 
-The generated `main.py` calls `.with_registration()` on the builder, so when
-the service starts with `SERVICEKIT_ORCHESTRATOR_URL` set in the environment
-it registers itself with chap-core and sends keepalive pings. Example
-docker-compose fragment:
+### [`MLServiceInfo`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlserviceinfo-fields) — who you are
 
-```yaml
-services:
-  {{ PROJECT_SLUG }}:
-    build: .
-{% if BASE_IMAGE == "chapkit-r-inla" %}
-    platform: linux/amd64
-{% endif %}
-    environment:
-      SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
-      # SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}  # shared secret, optional
-    depends_on:
-      chap:
-        condition: service_healthy
-```
+The service's public identity and contract: `id`, `display_name`, `description`, [`model_metadata`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#modelmetadata-fields), [`period_type`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlserviceinfo-fields) (`monthly` / `weekly`), [`required_covariates`](#covariates). This is what chap-core reads via `/api/v1/info` when it decides whether to dispatch a dataset to your model.
 
-Without those env vars the call no-ops — `python main.py` locally just runs
-the service without trying to register.
+### [`ModelMetadata.author_assessed_status`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#modelmetadata-fields) — traffic-light maturity
 
-## Configuration
+One of `green` / `yellow` / `orange` / `red` / `gray`. Self-assessed by you, the model author; visible to anyone browsing chap-core. Rough semantics:
 
-Edit the `{{ PROJECT_CLASS_NAME }}Config` class in `main.py` to add or adjust
-typed fields. At runtime chapkit serialises the validated config to
-`config.yml` in the workspace; your scripts read it via whatever YAML
-parser they already use (`yaml.load_file` in R, `yaml.safe_load` in Python).
+| Status | Meaning |
+| --- | --- |
+| `green` | Validated, recommended for production use |
+| `yellow` | Works, but results should be reviewed |
+| `orange` | Experimental; correctness not guaranteed |
+| `red` | Known issues; don't use in production |
+| `gray` | Not yet assessed |
 
-### `config.yml` layout (`config_format`)
+Migrate defaults to `yellow` when the MLproject doesn't set one — bump it up (or down) to match reality.
 
-`ShellModelRunner` is wired with `config_format="chap_core"` so the generated
-`config.yml` matches chap-core's `ModelConfiguration` shape:
+### [`{{ PROJECT_CLASS_NAME }}Config`](https://dhis2-chap.github.io/chapkit/guides/configuration-management/) — your tunable knobs
+
+A [`BaseConfig`](https://dhis2-chap.github.io/chapkit/api-reference/#chapkit.config.schemas.BaseConfig) subclass with typed fields derived from your MLproject's `user_options`. Each POSTed config becomes a row in the service's DB and feeds into train/predict via `config.yml` (see [`config.yml` layout](#configyml-layout)).
+
+### [`ShellModelRunner`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#shellmodelrunner) — runs your scripts
+
+Wraps `train_command` / `predict_command`. For each train or predict job chapkit copies your project into a temp workspace, writes `data.csv` / `historic.csv` / `future.csv` / `config.yml` / `geo.json`, runs your script there, and captures the whole workspace as an [artifact](#artifacts).
+
+### [`ArtifactHierarchy`](https://dhis2-chap.github.io/chapkit/guides/artifact-storage/) — keeps your runs
+
+Every train and predict call produces an [artifact](https://dhis2-chap.github.io/chapkit/guides/artifact-storage/) (a zipped workspace with logs, the trained model, predictions, etc.). They're linked parent-child so you can trace a prediction back to the training run that produced it.
+
+## `config.yml` layout
+
+Your scripts receive a `config.yml` in the working directory on every train/predict call. The generated `main.py` picks `config_format="chap_core"` so the file matches [chap-core's `ModelConfiguration` shape](https://github.com/dhis2-chap/chap-core/blob/master/chap_core/database/model_templates_and_config_tables.py):
 
 ```yaml
 prediction_periods: 3
@@ -115,29 +107,50 @@ user_option_values:
   precision: 0.01
 ```
 
-Reserved fields (`prediction_periods`, `additional_continuous_covariates`) stay
-at the top level; everything else you add to the config class nests under
-`user_option_values`. This is what MLproject-authored scripts from the
-`chap-models` ecosystem already expect — they reach for
-`config["user_option_values"]["<option>"]` (Python) or
-`config$user_option_values$<option>` (R) unchanged.
+- `prediction_periods` and `additional_continuous_covariates` are **reserved** — always at the top level.
+- Anything else you put on the Config class nests under `user_option_values`.
 
-If your scripts are new or you prefer a flat layout, change `config_format` to
-`"flat"` in `main.py` and read fields directly as top-level keys:
+That's the shape scripts ported from the `chap-models` ecosystem already expect — they read `config["user_option_values"]["<option>"]` (Python) or `config$user_option_values$<option>` (R) unchanged.
+
+**Prefer flat?** Switch `config_format="flat"` in `main.py` and keys land at the top level — good fit when you own the scripts and don't need chap-core compatibility. This is the default for [`chapkit init`](https://dhis2-chap.github.io/chapkit/guides/cli-scaffolding/) scaffolds.
+
+## Covariates
+
+Two fields, two different jobs:
+
+| Field | Lives on | When to use |
+| --- | --- | --- |
+| [`MLServiceInfo.required_covariates`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlserviceinfo-fields) | The service | The model cannot function without these columns. chap-core refuses to dispatch if they're missing. Use when your scripts hardcode feature names. |
+| [`{{ PROJECT_CLASS_NAME }}Config.additional_continuous_covariates`](https://dhis2-chap.github.io/chapkit/guides/configuration-management/) | Per config | Extra climate covariates to lag as predictors. Set per-deployment via a POSTed config; the default in `main.py` is the fallback. |
+
+When in doubt, **prefer `required_covariates`** — it's the stricter contract and the one chap-core checks at dispatch time.
+
+## Artifacts
+
+Each train/predict call leaves a zipped workspace behind, browsable at [`/api/v1/artifacts`](http://127.0.0.1:8000/docs#/artifacts). Jobs are scheduled via [`/api/v1/jobs`](http://127.0.0.1:8000/docs#/jobs) so you can POST training and poll for completion. Full API reference: [`/docs`](http://127.0.0.1:8000/docs) once the service is running, or the [ML workflows guide](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#api-reference).
+
+## Registering with chap-core
+
+The generated `main.py` calls `.with_registration()`, so when the service starts with `SERVICEKIT_ORCHESTRATOR_URL` set, it auto-registers with chap-core and sends keepalive pings. No env var → silently no-ops, so local `python main.py` just runs the service.
 
 ```yaml
-prediction_periods: 3
-additional_continuous_covariates: [rainfall, mean_temperature]
-n_lags: 3
-precision: 0.01
+# compose fragment
+services:
+  {{ PROJECT_SLUG }}:
+    build: .
+{% if BASE_IMAGE == "chapkit-r-inla" %}
+    platform: linux/amd64
+{% endif %}
+    environment:
+      SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
+      # SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}   # optional shared secret
+    depends_on:
+      chap:
+        condition: service_healthy
 ```
-
-The flat layout is the default for `chapkit init` scaffolds; it's a good fit
-when you control the scripts and don't need chap-core compatibility. Pick one
-layout and keep your scripts aligned with it.
 
 ## Links
 
-- [chapkit](https://github.com/dhis2-chap/chapkit)
-- [MLproject Runner guide](https://dhis2-chap.github.io/chapkit/guides/mlproject-runner/)
-- [chapkit-images](https://github.com/dhis2-chap/chapkit-images) — the base image this project builds on
+- **chapkit docs** → [user guides](https://dhis2-chap.github.io/chapkit/) · [ML workflows](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/) · [configuration](https://dhis2-chap.github.io/chapkit/guides/configuration-management/) · [artifacts](https://dhis2-chap.github.io/chapkit/guides/artifact-storage/) · [testing](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) · [API reference](https://dhis2-chap.github.io/chapkit/api-reference/)
+- **CLI** → [`chapkit migrate`](https://dhis2-chap.github.io/chapkit/guides/mlproject-migrate/) · [`chapkit run`](https://dhis2-chap.github.io/chapkit/guides/mlproject-runner/) · [`chapkit init`](https://dhis2-chap.github.io/chapkit/guides/cli-scaffolding/) · [`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/)
+- **Ecosystem** → [chapkit on GitHub](https://github.com/dhis2-chap/chapkit) · [chap-core](https://github.com/dhis2-chap/chap-core) · [chapkit base images](https://github.com/dhis2-chap/chapkit-images) · [chap-models catalogue](https://github.com/chap-models)
