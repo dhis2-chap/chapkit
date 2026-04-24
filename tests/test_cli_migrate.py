@@ -724,6 +724,60 @@ def test_requirements_txt_url_forms_pass_through_unchanged(tmp_path: Path) -> No
     assert "--find-links file:///opt/wheels" in generated_reqs
 
 
+def test_migrate_errors_when_entry_points_reference_main_py(tmp_path: Path) -> None:
+    """If the MLproject's entry_points call `python main.py train/predict`, migrate refuses.
+
+    chapkit migrate always writes a main.py (the FastAPI service). A script-style main.py
+    collides with it, so we fail fast BEFORE any files move - the user needs to rename
+    their runner and update entry_points upstream.
+    """
+    mlproject_yaml = """
+name: hmc_style_model
+entry_points:
+  train:
+    command: "python main.py train {train_data} {model}"
+  predict:
+    command: "python main.py predict {model} {historic_data} {future_data} {out_file}"
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"main.py": "# user's CLI runner\n"})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 1
+    output = (result.output or "") + (result.stderr or "")
+    assert "reference main.py" in output
+    assert "Rename your script" in output
+    # No side effects: the user's main.py is untouched, no _old/ was created.
+    assert (tmp_path / "main.py").is_file()
+    assert (tmp_path / "main.py").read_text() == "# user's CLI runner\n"
+    assert not (tmp_path / "_old").exists()
+
+
+def test_existing_main_py_moves_to_old_during_remigrate(tmp_path: Path) -> None:
+    """A stale main.py at the project root is preserved under _old/ before regeneration.
+
+    This is the re-migrate safety case: without moving the prior main.py, a second
+    `chapkit migrate` on an already-migrated project would silently overwrite user edits.
+    """
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "main.py": "# previous chapkit service\n",
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    # Fresh chapkit main.py exists at root.
+    new_main = (tmp_path / "main.py").read_text()
+    assert "ShellModelRunner" in new_main
+    # The previous main.py is preserved for reference under _old/.
+    old_main = (tmp_path / "_old" / "main.py").read_text()
+    assert old_main == "# previous chapkit service\n"
+
+
 def test_requirements_txt_cycle_does_not_loop(tmp_path: Path) -> None:
     """Circular `-r` references are short-circuited via a visited-file set."""
     _seed_project(
