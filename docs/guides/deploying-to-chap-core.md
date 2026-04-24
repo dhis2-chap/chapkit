@@ -237,6 +237,7 @@ To put the DB somewhere else, set an absolute `DATABASE_URL` (note the four slas
 ## Appendix — reference files
 
 - [`chapkit_ewars_model/main.py`](https://github.com/chap-models/chapkit_ewars_model/blob/main/main.py) — `MLServiceInfo`, `ShellModelRunner`, `.with_registration()`.
+- [`chapkit_ewars_model/Dockerfile`](https://github.com/chap-models/chapkit_ewars_model/blob/main/Dockerfile) — short `FROM ghcr.io/dhis2-chap/chapkit-r-inla:latest` + `uv sync` layer; a concrete example of extending a chapkit-images base with model-specific Python deps.
 - [`chapkit_ewars_model/.github/workflows/publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) — a fuller GHCR publish workflow with cache, semver tags, and SLSA attestations.
 - [`chap-core/compose.ewars.yml`](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml) — the overlay that drops the image onto the chap-core network and triggers self-registration.
 - [`dhis2-chap/chapkit-images`](https://github.com/dhis2-chap/chapkit-images) — Dockerfiles and publish workflow for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` base images referenced throughout this guide.
