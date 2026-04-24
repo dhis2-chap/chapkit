@@ -81,6 +81,7 @@ class MLProject(BaseModel):
     meta_data: dict[str, Any] = Field(default_factory=dict)
     supported_period_type: str | None = None
     required_covariates: list[str] = Field(default_factory=list)
+    additional_continuous_covariates: list[str] = Field(default_factory=list)
     allow_free_additional_continuous_covariates: bool = False
     requires_geo: bool = False
     target: str | None = None
@@ -170,6 +171,13 @@ def parse_mlproject(path: Path) -> MLProject:
         [str(c) for c in required_covariates_raw] if isinstance(required_covariates_raw, list) else []
     )
 
+    additional_continuous_covariates_raw = raw.get("additional_continuous_covariates") or []
+    additional_continuous_covariates: list[str] = (
+        [str(c) for c in additional_continuous_covariates_raw]
+        if isinstance(additional_continuous_covariates_raw, list)
+        else []
+    )
+
     supported_period_type = raw.get("supported_period_type")
     if supported_period_type is not None:
         supported_period_type = str(supported_period_type)
@@ -182,6 +190,7 @@ def parse_mlproject(path: Path) -> MLProject:
         meta_data=meta_data,
         supported_period_type=supported_period_type,
         required_covariates=required_covariates,
+        additional_continuous_covariates=additional_continuous_covariates,
         allow_free_additional_continuous_covariates=bool(raw.get("allow_free_additional_continuous_covariates", False)),
         requires_geo=bool(raw.get("requires_geo", False)),
         target=str(raw["target"]) if "target" in raw and raw["target"] is not None else None,

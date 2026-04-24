@@ -268,7 +268,55 @@ def test_build_service_info_context_minimalist_defaults(tmp_path: Path) -> None:
     assert ctx["META_ASSESSED_STATUS"] is None
     assert ctx["PERIOD_TYPE"] == "monthly"  # default when supported_period_type absent
     assert ctx["REQUIRED_COVARIATES"] == []
+    assert ctx["ADDITIONAL_CONTINUOUS_COVARIATES"] == []
     assert ctx["ALLOW_FREE_COVARIATES"] is False
+
+
+def test_additional_continuous_covariates_from_mlproject_flow_to_config_default(tmp_path: Path) -> None:
+    """Migrate carries an MLproject-declared additional_continuous_covariates list into the generated Config default."""
+    mlproject_yaml = """
+name: three_climate_model
+additional_continuous_covariates:
+  - rainfall
+  - mean_temperature
+  - mean_relative_humidity
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    source = (tmp_path / "main.py").read_text()
+    # MLproject-declared list wins; fallback comment about chap-core ecosystem pin is suppressed.
+    assert 'default=["rainfall", "mean_temperature", "mean_relative_humidity"]' in source
+    assert "Default list sourced from MLproject" in source
+    assert "chap-core ecosystem convention" not in source
+    ast.parse(source)
+
+
+def test_additional_continuous_covariates_fallback_default_when_mlproject_silent(tmp_path: Path) -> None:
+    """When MLproject does not declare the list, migrate keeps the chap-core-oriented fallback default."""
+    mlproject_yaml = """
+name: silent_model
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    source = (tmp_path / "main.py").read_text()
+    assert 'default=["rainfall", "mean_temperature"]' in source
+    assert "chap-core ecosystem convention" in source
+    assert "Default list sourced from MLproject" not in source
+    ast.parse(source)
 
 
 def test_build_service_info_context_invalid_assessed_status(tmp_path: Path) -> None:

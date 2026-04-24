@@ -102,6 +102,26 @@ typed fields. At runtime chapkit serialises the validated config to
 `config.yml` in the workspace; your scripts read it via whatever YAML
 parser they already use (`yaml.load_file` in R, `yaml.safe_load` in Python).
 
+### Covariates: `required_covariates` vs `additional_continuous_covariates`
+
+Two places declare covariate columns — they mean different things:
+
+- **`MLServiceInfo.required_covariates`** (service-level contract) — columns the
+  model cannot function without. chap-core refuses to dispatch to the model if
+  a dataset lacks any of these. Sourced from `required_covariates:` in the
+  MLproject.
+- **`{{ PROJECT_CLASS_NAME }}Config.additional_continuous_covariates`**
+  (per-config default) — climate covariates the model lags as predictors.
+  Orchestrators can POST a config overriding the default per run. Sourced from
+  `additional_continuous_covariates:` in the MLproject when declared, otherwise
+  pinned to `["rainfall", "mean_temperature"]` (the chap-core ecosystem default).
+
+A column belongs in `required_covariates` if removing it would break your
+scripts (e.g. hardcoded feature names in `train.py`); in
+`additional_continuous_covariates` if your scripts read the list from
+`config.yml` and adapt. When in doubt, prefer `required_covariates` — it's the
+stricter contract.
+
 ### `config.yml` layout (`config_format`)
 
 `ShellModelRunner` is wired with `config_format="chap_core"` so the generated
