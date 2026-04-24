@@ -217,22 +217,27 @@ _REQUIREMENTS_INDEX_DIRECTIVES = (
 
 def _parse_requirements_file(
     path: Path,
+    project_root: Path,
     seen_files: set[Path],
     add_dep: Callable[[str], None],
     add_index_option: Callable[[str], None],
 ) -> None:
-    """Parse a requirements.txt file, recursing into `-r`/`-c` includes.
+    """Parse a requirements.txt file, recursing into `-r` includes.
 
-    Follows pip's semantics: `-r other.txt` / `--requirement other.txt` and
-    `-c constraints.txt` / `--constraint constraints.txt` are resolved relative
-    to the including file and pulled in transitively. Cycles are short-circuited
-    via `seen_files` (resolved Path identity).
+    Follows pip's semantics: `-r other.txt` / `--requirement other.txt` resolves
+    relative to the including file and is pulled in transitively (cycles are
+    short-circuited via `seen_files`). `-c constraints.txt` is preserved as an
+    index option, with the path rewritten to be relative to `project_root` so
+    the generated root-level requirements.txt resolves it correctly - a
+    nested file's `-c constraints.txt` means `<nested_dir>/constraints.txt`,
+    which from the root requirements.txt needs to become e.g.
+    `-c sub/constraints.txt`.
 
     Installable requirements are handed to `add_dep`; index-configuration
-    directives (`--extra-index-url`, etc.) are handed to `add_index_option`
-    for verbatim emission into the generated requirements.txt. Unrecognized
-    directives are printed as a warning rather than silently dropped, so the
-    user notices anything we couldn't translate.
+    directives (`--extra-index-url`, `-c`, ...) are handed to
+    `add_index_option` for verbatim emission into the generated
+    requirements.txt. Unrecognized directives print a warning rather than
+    getting silently dropped, so users notice anything we couldn't translate.
     """
     resolved = path.resolve()
     if resolved in seen_files or not resolved.is_file():
@@ -242,6 +247,19 @@ def _parse_requirements_file(
         raw_text = resolved.read_text(encoding="utf-8")
     except OSError:
         return
+
+    def _rewrite_path_for_root(value: str) -> str:
+        """Turn a path relative to the current file into one relative to project_root."""
+        candidate = Path(value)
+        if candidate.is_absolute():
+            return str(candidate)
+        abs_path = (resolved.parent / candidate).resolve()
+        try:
+            return abs_path.relative_to(project_root.resolve()).as_posix()
+        except ValueError:
+            # Path escapes project_root (e.g. `../sibling/foo.txt`) - keep absolute.
+            return str(abs_path)
+
     for raw_line in raw_text.splitlines():
         stripped_leading = raw_line.lstrip()
         if not stripped_leading or stripped_leading.startswith("#"):
@@ -254,15 +272,17 @@ def _parse_requirements_file(
         # Directive handling.
         # - `-r` / `--requirement` recurses: its entries are installable deps,
         #   we inline them so the generated requirements.txt is self-contained.
-        # - `-c` / `--constraint` is preserved verbatim (emitted in the index
-        #   options block at the top of the generated requirements.txt) but NOT
+        # - `-c` / `--constraint` is preserved (emitted in the index options
+        #   block at the top of the generated requirements.txt) but NOT
         #   recursed into. Constraint files bound versions for packages pulled
-        #   in elsewhere; treating their entries as deps would install packages
-        #   the user didn't ask for. The original constraint file stays at
-        #   root (not in chaff) so uv resolves the `-c` reference at build time.
+        #   in elsewhere; treating their entries as deps would install
+        #   packages the user didn't ask for. Path is rewritten relative to
+        #   the project root so the generated root-level requirements.txt
+        #   points at the right file regardless of how deep the originating
+        #   `-c` was nested.
         # - Index directives (`--extra-index-url`, ...) are preserved verbatim.
-        # - `-e .` is silently skipped (migrated project is a service, not an
-        #   installable package).
+        # - `-e .` is silently skipped (migrated project is a service, not
+        #   an installable package).
         # - Anything else prints a warning.
         if line.startswith("-"):
             tokens = line.split(None, 1)
@@ -275,6 +295,7 @@ def _parse_requirements_file(
                 if rest:
                     _parse_requirements_file(
                         (resolved.parent / rest).resolve(),
+                        project_root,
                         seen_files,
                         add_dep,
                         add_index_option,
@@ -282,7 +303,7 @@ def _parse_requirements_file(
                 continue
             if flag in ("-c", "--constraint"):
                 if rest:
-                    add_index_option(f"-c {rest}")
+                    add_index_option(f"-c {_rewrite_path_for_root(rest)}")
                 continue
             if flag in _REQUIREMENTS_INDEX_DIRECTIVES:
                 add_index_option(line if rest else flag)
@@ -361,7 +382,7 @@ def _extract_user_dependencies(
 
     requirements_path = project_path / "requirements.txt"
     if requirements_path.is_file():
-        _parse_requirements_file(requirements_path, set(), _add, _add_index_option)
+        _parse_requirements_file(requirements_path, project_path, set(), _add, _add_index_option)
 
     # Candidate env files: first the ones the MLproject explicitly points at,
     # then a fallback scan for conventional filenames at the project root when

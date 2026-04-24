@@ -597,6 +597,34 @@ pandas>=2.0
     assert "only-if-someone-else-needs-me" not in generated_pyproject
 
 
+def test_requirements_txt_nested_constraint_path_rewritten_to_project_root(tmp_path: Path) -> None:
+    """A `-c constraints.txt` in a nested -r'd file must be re-expressed relative to the project root.
+
+    The generated requirements.txt lives at the project root, so a naive verbatim pass-through of
+    `-c constraints.txt` from `sub/requirements.txt` would make uv look for
+    `<root>/constraints.txt` when it should be pointing at `<root>/sub/constraints.txt`.
+    """
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "constraints.txt").write_text("django<5\n")
+    (tmp_path / "sub" / "requirements.txt").write_text("-c constraints.txt\npandas>=2.0\n")
+    (tmp_path / "requirements.txt").write_text("-r sub/requirements.txt\n")
+    _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    generated_reqs = (tmp_path / "requirements.txt").read_text()
+    # Path was rewritten relative to the root where the generated requirements.txt lives.
+    assert "-c sub/constraints.txt" in generated_reqs
+    # The original `-c constraints.txt` form (which would resolve to root/constraints.txt) must NOT leak.
+    assert "\n-c constraints.txt\n" not in generated_reqs
+    # Real dep from the nested file still flowed through.
+    assert "pandas>=2.0" in generated_reqs
+    # Constraint file is still at its original nested location; uv resolves the rewritten path.
+    assert (tmp_path / "sub" / "constraints.txt").is_file()
+
+
 def test_requirements_txt_cycle_does_not_loop(tmp_path: Path) -> None:
     """Circular `-r` references are short-circuited via a visited-file set."""
     _seed_project(
