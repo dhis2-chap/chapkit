@@ -656,6 +656,22 @@ def _run(
         typer.echo(f"Merged {len(user_deps)} dependency(ies) from the original pyproject.toml into the new one.")
     if (old_dir / "pyproject.toml").is_file():
         typer.echo("Your original pyproject.toml is preserved at _old/pyproject.toml for reference.")
+
+    # Unpinned runtime deps resolve to latest PyPI at docker build, which can
+    # silently break scripts that rely on older APIs (e.g. pandas 2.1 removed
+    # fillna(method=...)). We don't invent pins - that would be guessing - but
+    # we do point at the deps so the model author can pin them before shipping.
+    unpinned = [dep for dep in user_deps if _dep_name(dep) == dep.strip().lower()]
+    if unpinned:
+        typer.echo("")
+        typer.echo(
+            f"Note: {len(unpinned)} dependency(ies) are unpinned - "
+            "docker build will resolve them to whatever is latest on PyPI. "
+            "Pin them in pyproject.toml (or upstream in pyenv.yaml / conda.yaml / python_env) "
+            "to lock reproducible builds:"
+        )
+        for dep in unpinned:
+            typer.echo(f"  - {dep}")
     typer.echo("")
     typer.echo("Next steps:")
     typer.echo("  uv sync && uv run python main.py")
