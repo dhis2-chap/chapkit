@@ -517,6 +517,50 @@ dependencies = [
     assert "_old/pyproject.toml" in result.output
 
 
+def test_pyenv_yaml_fallback_when_mlproject_uses_docker_env_only(tmp_path: Path) -> None:
+    """pyenv.yaml at project root is picked up even when MLproject declares only docker_env.
+
+    Repos like chap-models/rwanda_sarimax ship pyenv.yaml alongside a docker_env-only
+    MLproject; without this fallback, the image would lack pandas/statsmodels/joblib
+    and train.py would crash on import. Falls back only when the MLproject is silent
+    about python_env / conda_env so explicit declarations stay authoritative.
+    """
+    docker_env_only_mlproject = """
+name: docker_env_only_model
+docker_env:
+  image: ghcr.io/dhis2-chap/python_base_image:master
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+"""
+    pyenv_yaml = """
+python: "3.11.3"
+dependencies:
+  - pandas
+  - statsmodels
+  - joblib
+"""
+    _seed_project(
+        tmp_path,
+        docker_env_only_mlproject,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "pyenv.yaml": pyenv_yaml,
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    generated = (tmp_path / "pyproject.toml").read_text()
+    assert '"pandas"' in generated
+    assert '"statsmodels"' in generated
+    assert '"joblib"' in generated
+
+
 def test_pyproject_without_deps_still_works(tmp_path: Path) -> None:
     _seed_project(
         tmp_path,

@@ -233,30 +233,51 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
             for entry in raw:
                 _add(entry)
 
+    # Candidate env files: first the ones the MLproject explicitly points at,
+    # then a fallback scan for conventional filenames at the project root when
+    # the MLproject is silent about its Python env (e.g. uses docker_env only).
+    # Many chap-models repos ship a pyenv.yaml alongside a docker_env-only
+    # MLproject, so without the fallback their deps never reach the image.
+    env_candidates: list[Path] = []
     if mlproject is not None:
         for env_key in ("python_env", "conda_env"):
             env_file = mlproject.env_hints.get(env_key)
-            if not env_file:
-                continue
-            env_path = project_path / env_file
-            if not env_path.is_file():
-                continue
-            try:
-                with env_path.open("r", encoding="utf-8") as yaml_handle:
-                    env_data = yaml.safe_load(yaml_handle)
-            except (yaml.YAMLError, OSError):
-                continue
-            if not isinstance(env_data, dict):
-                continue
-            for entry in env_data.get("dependencies", []) or []:
-                # conda envs can have dict entries like {"pip": ["pkg==1.0", ...]}
-                if isinstance(entry, dict):
-                    for sublist in entry.values():
-                        if isinstance(sublist, list):
-                            for sub in sublist:
-                                _add(sub)
-                else:
-                    _add(entry)
+            if env_file:
+                env_candidates.append(project_path / env_file)
+
+    if not env_candidates:
+        for conventional in (
+            "pyenv.yaml",
+            "pyenv.yml",
+            "conda.yaml",
+            "conda.yml",
+            "environment.yaml",
+            "environment.yml",
+        ):
+            fallback_path = project_path / conventional
+            if fallback_path.is_file():
+                env_candidates.append(fallback_path)
+                break
+
+    for env_path in env_candidates:
+        if not env_path.is_file():
+            continue
+        try:
+            with env_path.open("r", encoding="utf-8") as yaml_handle:
+                env_data = yaml.safe_load(yaml_handle)
+        except (yaml.YAMLError, OSError):
+            continue
+        if not isinstance(env_data, dict):
+            continue
+        for entry in env_data.get("dependencies", []) or []:
+            # conda envs can have dict entries like {"pip": ["pkg==1.0", ...]}
+            if isinstance(entry, dict):
+                for sublist in entry.values():
+                    if isinstance(sublist, list):
+                        for sub in sublist:
+                            _add(sub)
+            else:
+                _add(entry)
     return kept
 
 
