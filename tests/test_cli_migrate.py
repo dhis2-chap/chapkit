@@ -629,6 +629,54 @@ def test_no_requirements_txt_when_no_user_deps(tmp_path: Path) -> None:
     assert "uv pip install" not in dockerfile
 
 
+def test_dockerfile_runs_install_packages_r_when_present(tmp_path: Path) -> None:
+    """R repos that ship install_packages.R (chap-models convention) get it baked into the image.
+
+    Many chap-models R repos declare their R deps in install_packages.R (a helper that
+    calls install.packages(...) for a fixed list) instead of renv.lock. Without a
+    `RUN Rscript install_packages.R` step at image build time, the container would
+    hit `there is no package called 'dplyr'` at the first train call.
+    """
+    _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {
+            "train.r": "library(dplyr)\n",
+            "predict.r": "library(dplyr)\n",
+            "install_packages.R": 'packages <- c("dplyr")\ninstall.packages(packages, repos = "https://cloud.r-project.org")\n',
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    dockerfile = (tmp_path / "Dockerfile").read_text()
+    assert "RUN Rscript install_packages.R" in dockerfile
+    # The renv block is mutually exclusive - this repo has no renv.lock.
+    assert "renv::restore" not in dockerfile
+
+
+def test_dockerfile_prefers_renv_over_install_packages_r(tmp_path: Path) -> None:
+    """If a repo has both renv.lock and install_packages.R, renv wins (it's the proper lockfile)."""
+    _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {
+            "train.r": "library(dplyr)\n",
+            "predict.r": "library(dplyr)\n",
+            "renv.lock": "{}\n",
+            "install_packages.R": 'install.packages("dplyr")\n',
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    dockerfile = (tmp_path / "Dockerfile").read_text()
+    assert "renv::restore" in dockerfile
+    assert "RUN Rscript install_packages.R" not in dockerfile
+
+
 def test_no_requirements_txt_for_r_projects(tmp_path: Path) -> None:
     """R projects use renv, so chapkit migrate doesn't emit a Python requirements.txt."""
     _seed_project(

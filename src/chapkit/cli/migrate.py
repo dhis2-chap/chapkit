@@ -704,6 +704,7 @@ def _run(
         "PREDICT_COMMAND": predict_command,
         "CONFIG_FIELDS": build_config_fields(mlproject),
         "HAS_RENV": (project_path / "renv.lock").is_file(),
+        "HAS_INSTALL_PACKAGES_R": (project_path / "install_packages.R").is_file(),
         "HAS_USER_PYPROJECT": (project_path / "pyproject.toml").is_file(),
         "USER_DEPENDENCIES": user_deps,
         "CHAPKIT_VERSION": _get_chapkit_version(),
