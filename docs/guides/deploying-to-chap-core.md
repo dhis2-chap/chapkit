@@ -92,7 +92,7 @@ docker run --rm -p 8000:8000 my-model:dev
 
 chap-core pulls your image by tag from a container registry. GHCR is the path of least resistance: it needs no repo secrets and is already wired to your repo's `GITHUB_TOKEN`.
 
-Copy this workflow into `.github/workflows/publish-docker.yml` (adapted from the ewars model's [`publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml)):
+Drop this workflow into `.github/workflows/publish-docker.yml`:
 
 ```yaml
 name: Publish Docker image
@@ -100,8 +100,6 @@ name: Publish Docker image
 on:
   push:
     branches: [main]
-    tags: ["v*.*.*"]
-  workflow_dispatch:
 
 jobs:
   build-and-push:
@@ -109,12 +107,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
         with:
@@ -122,36 +116,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - id: push
-        uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - uses: actions/attest-build-provenance@v2
-        with:
-          subject-name: ghcr.io/${{ github.repository }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          tags: ghcr.io/${{ github.repository }}:latest
 ```
 
-Push to `main` and your image is published at `ghcr.io/<owner>/<repo>:latest`. No secrets configuration is required.
+Every push to `main` publishes `ghcr.io/<owner>/<repo>:latest`. No secrets configuration is required — the built-in `GITHUB_TOKEN` is enough thanks to `permissions: packages: write`.
+
+Want more — SHA tags for traceability, semver releases, build cache, SLSA attestations? See the ewars model's [`publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) for a fuller example to copy from.
 
 ## Step 6 — Wire it into chap-core with a compose overlay
 
