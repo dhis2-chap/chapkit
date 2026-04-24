@@ -388,9 +388,6 @@ user_options:
   class:
     type: string
     default: forecast
-  1st_period:
-    type: integer
-    default: 1
 entry_points:
   train:
     command: "echo {train_data}"
@@ -405,8 +402,6 @@ entry_points:
     assert by_alias["n-lags"] == "n_lags"
     # Python keyword suffixed.
     assert by_alias["class"] == "class_"
-    # Leading digit prefixed.
-    assert by_alias["1st_period"] == "_1st_period"
 
 
 def test_generated_main_py_emits_alias_when_option_name_has_hyphen(tmp_path: Path) -> None:

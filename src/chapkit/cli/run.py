@@ -112,9 +112,15 @@ def run_command(
     from chapkit.ml import ShellModelRunner
 
     config_schema = build_config_schema(mlproject)
+    # Match `chapkit migrate`'s default: emit config.yml in chap-core's
+    # ModelConfiguration shape (reserved keys at top level, everything else
+    # nested under user_option_values). Keeps runtime and code-generated
+    # services consistent so scripts written for the chap-models ecosystem
+    # behave the same regardless of which CLI spawned the service.
     runner: ShellModelRunner[BaseConfig] = ShellModelRunner(
         train_command=train_command,
         predict_command=predict_command,
+        config_format="chap_core",
     )
 
     info = ServiceInfo(

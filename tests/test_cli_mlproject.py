@@ -222,6 +222,64 @@ def test_build_config_schema_minimalist_has_only_prediction_periods(tmp_path: Pa
     assert set(schema.model_fields) >= {"prediction_periods"}
 
 
+def test_build_config_schema_aliases_non_identifier_option_names(tmp_path: Path) -> None:
+    """Runtime Config schema (used by chapkit run) normalizes hyphenated / keyword names.
+
+    Python attribute gets the sanitized form; wire-format POST keys + config.yml keys
+    keep the MLproject original via Pydantic Field(alias=...).
+    """
+    contents = """
+name: hyphens_live_here
+user_options:
+  n-lags:
+    type: integer
+    default: 3
+  class:
+    type: string
+    default: forecast
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    _write_mlproject(tmp_path, contents)
+    mlproject = parse_mlproject(tmp_path)
+    schema: Any = build_config_schema(mlproject)
+
+    # Instantiate via wire-format kwargs (what a POST body would carry).
+    instance = schema.model_validate({"n-lags": 7, "class": "ensemble"})
+    # Python attribute uses the sanitized name.
+    assert instance.n_lags == 7
+    assert instance.class_ == "ensemble"
+
+    # model_dump(by_alias=True) round-trips the wire names (what ShellModelRunner's
+    # dump_config_yaml uses when writing config.yml for scripts to read).
+    dumped = instance.model_dump(by_alias=True)
+    assert dumped["n-lags"] == 7
+    assert dumped["class"] == "ensemble"
+
+
+def test_build_config_schema_rejects_leading_digit_option_names(tmp_path: Path) -> None:
+    """Leading-digit option names cannot be mapped to a valid Pydantic field - reject with a clear error."""
+    contents = """
+name: leading_digit_model
+user_options:
+  1st_period:
+    type: integer
+    default: 1
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    _write_mlproject(tmp_path, contents)
+    mlproject = parse_mlproject(tmp_path)
+    with pytest.raises(MLProjectError, match="starts with a digit"):
+        build_config_schema(mlproject)
+
+
 def test_build_config_schema_required_option_without_default(tmp_path: Path) -> None:
     contents = """
 name: needs_input

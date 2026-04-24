@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import fnmatch
 import json
-import keyword
 import re
 import shutil
 import tomllib
@@ -27,6 +26,7 @@ from chapkit.cli.mlproject import (
     _python_identifier,
     find_mlproject,
     parse_mlproject,
+    python_field_name,
     slugify,
     translate_to_runner_template,
 )
@@ -435,23 +435,6 @@ def build_service_info_context(mlproject: MLProject) -> dict[str, Any]:
     }
 
 
-def _python_field_name(raw: str) -> str:
-    """Normalize an MLproject user_option name to a valid Python identifier.
-
-    Replaces invalid characters (hyphens, dots, spaces, etc.) with underscores,
-    prefixes a leading digit with an underscore, and suffixes Python keywords.
-    Raises MigrateError if the name cannot be sanitized.
-    """
-    normalized = re.sub(r"[^A-Za-z0-9_]+", "_", raw).strip("_")
-    if normalized and normalized[0].isdigit():
-        normalized = "_" + normalized
-    if keyword.iskeyword(normalized):
-        normalized = normalized + "_"
-    if not normalized or not normalized.isidentifier():
-        raise MigrateError(f"user_option name {raw!r} cannot be sanitized to a valid Python identifier")
-    return normalized
-
-
 def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str, str | None, str | None]]:
     """Turn MLproject user_options into (field_name, python_type, default_repr, description, alias) tuples.
 
@@ -474,7 +457,7 @@ def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str, str |
             default_repr = "..."
         raw_desc = opt_body.get("description")
         description = str(raw_desc).strip() if isinstance(raw_desc, str) and raw_desc.strip() else None
-        field_name = _python_field_name(opt_name)
+        field_name = python_field_name(opt_name)
         alias = opt_name if field_name != opt_name else None
         if field_name in seen:
             raise MigrateError(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import keyword
 import re
 import string
 from pathlib import Path
@@ -252,17 +253,56 @@ def _python_class_name(value: str) -> str:
     return pascal or "MLProject"
 
 
+def python_field_name(raw: str) -> str:
+    """Normalize an MLproject user_option name to a valid Python / Pydantic field name.
+
+    Replaces non-identifier characters (hyphens, dots, spaces, ...) with underscores
+    and suffixes Python keywords with a trailing underscore. Names starting with a
+    digit are rejected outright - Pydantic forbids leading underscores on field
+    names, so there's no safe prefix that wouldn't collide with real user names.
+
+    Raises MLProjectError if the name cannot be sanitized.
+    """
+    normalized = re.sub(r"[^A-Za-z0-9_]+", "_", raw).strip("_")
+    if not normalized:
+        raise MLProjectError(f"user_option name {raw!r} cannot be sanitized to a valid Python identifier")
+    if normalized[0].isdigit():
+        raise MLProjectError(
+            f"user_option name {raw!r} starts with a digit; rename it to start with a letter "
+            "(Pydantic field names cannot have a leading underscore, so there is no safe mapping)"
+        )
+    if keyword.iskeyword(normalized):
+        normalized = normalized + "_"
+    if not normalized.isidentifier():
+        raise MLProjectError(f"user_option name {raw!r} cannot be sanitized to a valid Python identifier")
+    return normalized
+
+
 def build_config_schema(mlproject: MLProject) -> type[BaseConfig]:
-    """Build a BaseConfig subclass from MLproject user_options, injecting prediction_periods."""
+    """Build a BaseConfig subclass from MLproject user_options, injecting prediction_periods.
+
+    Non-identifier option names (hyphens, keywords, leading digits) are normalized to
+    valid Python identifiers. The original name is preserved via Pydantic `Field(alias=...)`
+    so POSTed configs and emitted config.yml keep the wire contract the MLproject declared.
+    """
     fields: dict[str, Any] = {}
+    seen: set[str] = set()
     for opt_name, opt_body in mlproject.user_options.items():
         declared_type = str(opt_body.get("type", "string")).lower()
         py_type = TYPE_MAP.get(declared_type, str)
+        field_name = python_field_name(opt_name)
+        if field_name in seen:
+            raise MLProjectError(
+                f"user_option {opt_name!r} normalizes to {field_name!r}, which collides with an earlier option"
+            )
+        seen.add(field_name)
+        alias = opt_name if field_name != opt_name else None
         if "default" in opt_body:
             coerced_default = _coerce_default(opt_body["default"], py_type)
-            fields[opt_name] = (py_type, coerced_default)
+            field_info = Field(default=coerced_default, alias=alias) if alias else coerced_default
         else:
-            fields[opt_name] = (py_type, ...)
+            field_info = Field(..., alias=alias) if alias else ...
+        fields[field_name] = (py_type, field_info)
 
     if "prediction_periods" not in fields:
         fields["prediction_periods"] = (int, 3)
