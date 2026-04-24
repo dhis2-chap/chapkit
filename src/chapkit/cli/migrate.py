@@ -1052,7 +1052,7 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
 #: explicitly NOT the running chapkit's own version, because that could be a
 #: `.devN` not-yet-published release and would leave the migrated project
 #: with an uninstallable dep.
-_MIN_CHAPKIT_VERSION = "0.19.0"
+_MIN_CHAPKIT_VERSION = "0.20.0"
 
 
 def _get_chapkit_version() -> str:
