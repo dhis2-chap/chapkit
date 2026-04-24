@@ -241,10 +241,17 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
 
     # requirements.txt is a second common source of runtime deps - some Python
     # repos ship only this file, and migrate would lose their deps if we only
-    # consulted pyproject.toml and env YAMLs. Parse strictly: one PEP 508
-    # requirement per line, strip inline `#` comments, skip blank lines and
-    # pip directive lines (`-r other.txt`, `-e .`, `--extra-index-url ...`)
-    # which aren't installable requirements on their own.
+    # consulted pyproject.toml and env YAMLs. Parse with pip's comment rules
+    # (see https://pip.pypa.io/en/stable/reference/requirements-file-format/):
+    # a line starting with `#` is a whole-line comment; `#` is only an inline
+    # comment marker when preceded by whitespace. Bare `#` mid-requirement is
+    # part of the value, which matters for direct-URL deps like
+    #   pkg @ https://example.org/pkg.whl#sha256=abc...
+    #   pkg @ git+https://github.com/x/y@rev#subdirectory=src
+    # where the fragment carries integrity / subdirectory info that must NOT
+    # be stripped. Also skip pip directive lines (`-r other.txt`, `-e .`,
+    # `--extra-index-url ...`) which aren't installable requirements.
+    _REQUIREMENTS_INLINE_COMMENT = re.compile(r"\s+#.*$")
     requirements_path = project_path / "requirements.txt"
     if requirements_path.is_file():
         try:
@@ -252,7 +259,10 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
         except OSError:
             raw_text = ""
         for line in raw_text.splitlines():
-            head = line.split("#", 1)[0].strip()
+            stripped_leading = line.lstrip()
+            if not stripped_leading or stripped_leading.startswith("#"):
+                continue
+            head = _REQUIREMENTS_INLINE_COMMENT.sub("", line).strip()
             if not head or head.startswith("-"):
                 continue
             _add(head)

@@ -538,6 +538,49 @@ importlib-metadata; python_version < "3.10"
     assert "--extra-index-url" not in generated_reqs
 
 
+def test_requirements_txt_preserves_url_fragments_in_direct_deps(tmp_path: Path) -> None:
+    """# in a requirement is only a comment marker when preceded by whitespace.
+
+    Direct-URL deps and VCS installs legitimately carry `#sha256=...` or
+    `#subdirectory=...` fragments that must survive the pass - stripping them
+    would break hash-pinned installs and drop subdirectory info.
+    """
+    requirements = """\
+# whole-line comment
+pandas>=2.0   # pinned-ish  (this IS an inline comment - whitespace-hash)
+pkg-hash @ https://example.org/wheels/pkg_hash-1.0-py3-none-any.whl#sha256=abc123def456
+pkg-vcs @ git+https://github.com/example/repo@v1.0#subdirectory=src
+# another whole-line
+statsmodels  # trailing-comment keeper
+"""
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "requirements.txt": requirements,
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    generated_reqs = (tmp_path / "requirements.txt").read_text()
+    # URL fragment preserved verbatim (most important case).
+    assert "pkg-hash @ https://example.org/wheels/pkg_hash-1.0-py3-none-any.whl#sha256=abc123def456" in generated_reqs
+    # VCS fragment preserved.
+    assert "pkg-vcs @ git+https://github.com/example/repo@v1.0#subdirectory=src" in generated_reqs
+    # Inline comments (space+hash) still get stripped from plain deps.
+    assert "pandas>=2.0" in generated_reqs
+    assert "pinned-ish" not in generated_reqs
+    assert "statsmodels" in generated_reqs
+    assert "trailing-comment keeper" not in generated_reqs
+    # Whole-line comments don't leak.
+    assert "whole-line comment" not in generated_reqs
+    assert "another whole-line" not in generated_reqs
+
+
 def test_generated_requirements_txt_preserves_pep508_markers_with_quotes(tmp_path: Path) -> None:
     """Deps with PEP 508 markers containing nested quotes survive into requirements.txt verbatim.
 
