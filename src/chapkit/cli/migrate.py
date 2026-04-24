@@ -56,6 +56,7 @@ _CHAFF_FILENAMES = {
     ".dockerignore",
     ".python-version",
     "pyproject.toml",
+    "requirements.txt",
     # chapkit scaffold artefacts from a prior greenfield init
     "Makefile",
     "Dockerfile",
@@ -91,6 +92,7 @@ _GENERATED_FILENAMES: tuple[str, ...] = (
     "CHAPKIT.md",
     "postman_collection.json",
     "README.md",
+    "requirements.txt",
     ".gitignore",
     ".dockerignore",
 )
@@ -581,9 +583,16 @@ def _execute_writes(
     renders: list[str],
     rendered: dict[str, str],
 ) -> int:
+    # `renders` lists every filename chapkit might generate; `rendered` only
+    # contains the ones actually produced (e.g. requirements.txt is skipped
+    # for R projects or Python projects with no user deps). Only write what
+    # was rendered - skipping a filename just means it isn't needed here.
+    written = 0
     for filename in renders:
-        (project_path / filename).write_text(rendered[filename])
-    return len(renders)
+        if filename in rendered:
+            (project_path / filename).write_text(rendered[filename])
+            written += 1
+    return written
 
 
 def migrate_command(
@@ -691,7 +700,11 @@ def _run(
 
     rendered = _render_all(context)
 
-    _print_plan(project_path, plan, renders, resolved_base_image)
+    # Only show files we will actually render in the plan output. requirements.txt
+    # is Python-and-has-deps conditional (see _render_all); other filenames are
+    # unconditional but this keeps the plan honest if we ever add more.
+    planned_renders = [name for name in renders if name in rendered]
+    _print_plan(project_path, plan, planned_renders, resolved_base_image)
 
     if dry_run:
         typer.echo("Dry run: no files changed.")
@@ -740,7 +753,7 @@ def _run(
 
 def _render_all(context: dict[str, Any]) -> dict[str, str]:
     t = _TEMPLATE_DIR
-    return {
+    rendered: dict[str, str] = {
         "main.py": _render(t, "main_migrate.py.jinja2", context),
         "pyproject.toml": _render(t, "pyproject_migrate.toml.jinja2", context),
         "Dockerfile": _render(t, "Dockerfile_migrate.jinja2", context),
@@ -752,6 +765,12 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
         ".gitignore": _render(t, "gitignore_migrate.jinja2", context),
         ".dockerignore": _render(t, "dockerignore_migrate.jinja2", context),
     }
+    # Only emit requirements.txt for Python projects with deps - R projects
+    # use renv, and a deps-less Python project has nothing to install anyway.
+    # The Dockerfile gates the `uv pip install -r` step on the same condition.
+    if context.get("LANGUAGE") == "python" and context.get("USER_DEPENDENCIES"):
+        rendered["requirements.txt"] = _render(t, "requirements_migrate.txt.jinja2", context)
+    return rendered
 
 
 #: Floor for the `chapkit>=...` dep that migrate emits into the generated

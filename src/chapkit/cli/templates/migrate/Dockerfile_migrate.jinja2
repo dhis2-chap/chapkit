@@ -18,13 +18,14 @@ RUN R -q -e "if (!requireNamespace('renv', quietly = TRUE)) install.packages('re
 {% if LANGUAGE == "python" and USER_DEPENDENCIES %}
 # Install the project's Python dependencies (merged from the user's
 # original pyproject.toml / pyenv.yaml / conda env) into the chapkit
-# venv. Listed inline instead of `uv pip install .` because the
-# generated project doesn't need to be installable as a package -
-# it's a service, not a library - and the user's scripts often use a
-# flat layout (multiple top-level .py files) that setuptools can't
-# auto-package. Build tools in the base image handle any source-built
-# wheels.
-RUN uv pip install --python /app/.venv/bin/python {% for dep in USER_DEPENDENCIES %}"{{ dep }}" {% endfor %}
+# venv. Reads from the generated requirements.txt instead of passing
+# each dep inline so PEP 508 markers with nested quotes (e.g.
+# `importlib-metadata; python_version < "3.10"`) install cleanly - the
+# inline form would see the quotes as shell-command terminators.
+# `uv pip install .` is avoided because the generated project is a
+# service, not an installable package, and the user's scripts often use
+# a flat layout that setuptools can't auto-package.
+RUN uv pip install --python /app/.venv/bin/python -r requirements.txt
 
 {% endif %}
 

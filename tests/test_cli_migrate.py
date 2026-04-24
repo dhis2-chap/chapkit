@@ -489,6 +489,72 @@ entry_points:
     assert 'with "quoted" metadata' in parsed["project"]["description"]
 
 
+def test_generated_requirements_txt_preserves_pep508_markers_with_quotes(tmp_path: Path) -> None:
+    """Deps with PEP 508 markers containing nested quotes survive into requirements.txt verbatim.
+
+    The generated Dockerfile does `uv pip install -r requirements.txt`, not an inline shell
+    command, so markers like `importlib-metadata; python_version < "3.10"` don't need any
+    shell escaping - they just land in the file as written.
+    """
+    tricky_dep = 'importlib-metadata; python_version < "3.10"'
+    user_pyproject = f"""\
+[project]
+name = "marker-demo"
+version = "0.0.1"
+dependencies = [
+    "pandas>=2.0",
+    {tricky_dep!r},
+]
+"""
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "pyproject.toml": user_pyproject,
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    # requirements.txt is generated; each dep on its own line, verbatim.
+    requirements = (tmp_path / "requirements.txt").read_text()
+    assert "pandas>=2.0" in requirements
+    assert tricky_dep in requirements
+
+    # Dockerfile installs via -r requirements.txt, not inline quoted args.
+    dockerfile = (tmp_path / "Dockerfile").read_text()
+    assert "uv pip install --python /app/.venv/bin/python -r requirements.txt" in dockerfile
+    # Sanity: no leaked raw shell-quoted dep.
+    assert f'"{tricky_dep}"' not in dockerfile
+
+
+def test_no_requirements_txt_when_no_user_deps(tmp_path: Path) -> None:
+    """Python projects with no user deps don't get a requirements.txt, and the Dockerfile skips the install step."""
+    _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    assert not (tmp_path / "requirements.txt").exists()
+    dockerfile = (tmp_path / "Dockerfile").read_text()
+    assert "uv pip install" not in dockerfile
+
+
+def test_no_requirements_txt_for_r_projects(tmp_path: Path) -> None:
+    """R projects use renv, so chapkit migrate doesn't emit a Python requirements.txt."""
+    _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.r": "df <- read.csv('x')\n", "predict.r": "df <- read.csv('x')\n", "renv.lock": "{}\n"},
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    assert not (tmp_path / "requirements.txt").exists()
+
+
 def test_conda_env_only_extracts_pip_sublist(tmp_path: Path) -> None:
     """conda.yaml's dependencies mix conda scalars and a nested pip list - only pip entries are used."""
     mlproject_yaml = """
