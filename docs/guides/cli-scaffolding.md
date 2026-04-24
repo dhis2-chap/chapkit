@@ -685,7 +685,7 @@ After scaffolding your project:
 4. **Test locally**: Run with `uv run python main.py`
 5. **Dockerize**: Build and test with `docker compose up --build`
 6. **Add tests**: Create tests for your training and prediction logic
-7. **Deploy**: Use the generated Dockerfile for deployment
+7. **Deploy**: See [Deploying to chap-core](deploying-to-chap-core.md) for the end-to-end walkthrough from a scaffolded project to a model registered with chap-core and visible in the DHIS2 Modeling App.
 
 ## Examples
 
@@ -711,6 +711,7 @@ The `examples/` directory contains working examples for each template type:
 
 ## Related Documentation
 
+- [Deploying to chap-core](deploying-to-chap-core.md) - End-to-end deploy from scaffold to DHIS2
 - [ML Workflows](ml-workflows.md) - Learn about model training and prediction
 - [Configuration Management](configuration-management.md) - Working with configs
 - [Artifact Storage](artifact-storage.md) - Managing models and predictions

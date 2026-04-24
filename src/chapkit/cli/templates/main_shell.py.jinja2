@@ -189,26 +189,14 @@ app = (
 {% if WITH_MONITORING %}
     .with_monitoring()
 {% endif %}
-    # ====================================================================================
-    # CHAP Core Registration (Optional)
-    # ====================================================================================
-    # Uncomment to automatically register this service with CHAP Core on startup.
-    # Replace the URL with your CHAP Core instance.
-    #
-    # For Docker deployments, you can set these environment variables instead:
-    #   SERVICEKIT_ORCHESTRATOR_URL - the registration endpoint URL
-    #   SERVICEKIT_REGISTRATION_KEY - the secret key (only if enabled on CHAP Core)
-    #
-    # The service will:
-    # - Auto-detect hostname (works with Docker container names)
-    # - Retry registration on failure (default: 5 retries, 2s delay)
-    # - Send keepalive pings to stay registered (default: 10s interval, 30s TTL)
-    # - Gracefully deregister on shutdown
-    #
-    # .with_registration(
-    #     orchestrator_url="https://chap.example.org/v2/services/$register",
-    #     registration_key="your-secret-key",  # or use SERVICEKIT_REGISTRATION_KEY env var
-    # )
+    # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
+    # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
+    # local `python main.py` runs without any extra config. Optional env vars:
+    #   SERVICEKIT_ORCHESTRATOR_URL   e.g. http://chap:8000/v2/services/$register
+    #   SERVICEKIT_REGISTRATION_KEY   shared secret if chap has one set
+    #   SERVICEKIT_HOST, SERVICEKIT_PORT   override the advertised endpoint
+    # See docs/guides/deploying-to-chap-core.md for the full walkthrough.
+    .with_registration()
     .build()
 )
 
