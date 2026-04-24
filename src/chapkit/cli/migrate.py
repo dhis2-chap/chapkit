@@ -249,7 +249,17 @@ def _parse_requirements_file(
         return
 
     def _rewrite_path_for_root(value: str) -> str:
-        """Turn a path relative to the current file into one relative to project_root."""
+        """Turn a path relative to the current file into one relative to project_root.
+
+        URLs (anything containing `://`, including `file://`, `http(s)://`,
+        `git+https://`) and absolute filesystem paths pass through unchanged.
+        Everything else is resolved against the current file's parent and
+        re-expressed relative to project_root; when the target escapes the
+        project root (e.g. `../sibling/foo.txt`) we fall back to the absolute
+        form rather than emit a misleading relative path.
+        """
+        if "://" in value:
+            return value
         candidate = Path(value)
         if candidate.is_absolute():
             return str(candidate)
@@ -257,7 +267,6 @@ def _parse_requirements_file(
         try:
             return abs_path.relative_to(project_root.resolve()).as_posix()
         except ValueError:
-            # Path escapes project_root (e.g. `../sibling/foo.txt`) - keep absolute.
             return str(abs_path)
 
     for raw_line in raw_text.splitlines():
@@ -272,15 +281,16 @@ def _parse_requirements_file(
         # Directive handling.
         # - `-r` / `--requirement` recurses: its entries are installable deps,
         #   we inline them so the generated requirements.txt is self-contained.
-        # - `-c` / `--constraint` is preserved (emitted in the index options
-        #   block at the top of the generated requirements.txt) but NOT
-        #   recursed into. Constraint files bound versions for packages pulled
-        #   in elsewhere; treating their entries as deps would install
-        #   packages the user didn't ask for. Path is rewritten relative to
-        #   the project root so the generated root-level requirements.txt
-        #   points at the right file regardless of how deep the originating
-        #   `-c` was nested.
-        # - Index directives (`--extra-index-url`, ...) are preserved verbatim.
+        # - `-c` / `--constraint` and `--find-links` carry paths that the user
+        #   wrote relative to the including file. We preserve them as index
+        #   options but rewrite relative paths to be relative to project_root
+        #   (the generated root-level requirements.txt's directory), so uv
+        #   resolves them regardless of how deeply nested the original
+        #   directive was. URL forms (`file://`, `https://`, ...) pass
+        #   through untouched.
+        # - Other index directives (`--extra-index-url`, `--index-url`,
+        #   `--trusted-host`, `--no-index`, `--pre`) are URL- or flag-only
+        #   and preserved verbatim.
         # - `-e .` is silently skipped (migrated project is a service, not
         #   an installable package).
         # - Anything else prints a warning.
@@ -304,6 +314,10 @@ def _parse_requirements_file(
             if flag in ("-c", "--constraint"):
                 if rest:
                     add_index_option(f"-c {_rewrite_path_for_root(rest)}")
+                continue
+            if flag == "--find-links":
+                if rest:
+                    add_index_option(f"--find-links {_rewrite_path_for_root(rest)}")
                 continue
             if flag in _REQUIREMENTS_INDEX_DIRECTIVES:
                 add_index_option(line if rest else flag)

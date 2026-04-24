@@ -625,6 +625,53 @@ def test_requirements_txt_nested_constraint_path_rewritten_to_project_root(tmp_p
     assert (tmp_path / "sub" / "constraints.txt").is_file()
 
 
+def test_requirements_txt_nested_find_links_path_rewritten_to_project_root(tmp_path: Path) -> None:
+    """Nested `--find-links wheels/` paths must be rewritten the same way `-c` paths are.
+
+    Without rewriting, a `--find-links wheels` inside `sub/requirements.txt` ends up in
+    the generated root requirements.txt verbatim, resolving to `<root>/wheels` when the
+    author meant `<root>/sub/wheels`.
+    """
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "wheels").mkdir()
+    (tmp_path / "sub" / "requirements.txt").write_text("--find-links wheels\npandas>=2.0\n")
+    (tmp_path / "requirements.txt").write_text("-r sub/requirements.txt\n")
+    _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    generated_reqs = (tmp_path / "requirements.txt").read_text()
+    # Path rewritten for the root-level generated requirements.txt.
+    assert "--find-links sub/wheels" in generated_reqs
+    # Original unrewritten form (which would resolve to <root>/wheels) must NOT leak.
+    assert "--find-links wheels\n" not in generated_reqs
+    assert "pandas>=2.0" in generated_reqs
+
+
+def test_requirements_txt_url_forms_pass_through_unchanged(tmp_path: Path) -> None:
+    """URL-form values on --find-links / --extra-index-url are preserved verbatim.
+
+    They're not paths, so the relative-path rewrite machinery must not touch them.
+    """
+    (tmp_path / "requirements.txt").write_text(
+        "--find-links https://example.org/wheels/\n"
+        "--extra-index-url https://internal.example.org/simple\n"
+        "--find-links file:///opt/wheels\n"
+        "pandas>=2.0\n"
+    )
+    _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    generated_reqs = (tmp_path / "requirements.txt").read_text()
+    assert "--find-links https://example.org/wheels/" in generated_reqs
+    assert "--extra-index-url https://internal.example.org/simple" in generated_reqs
+    assert "--find-links file:///opt/wheels" in generated_reqs
+
+
 def test_requirements_txt_cycle_does_not_loop(tmp_path: Path) -> None:
     """Circular `-r` references are short-circuited via a visited-file set."""
     _seed_project(
