@@ -4,6 +4,9 @@
 
 Your existing train/predict scripts, helpers, and arbitrary config / data files are **not moved or modified**. Project metadata that chapkit regenerates (`README.md`, `.gitignore`, `pyproject.toml`, `Dockerfile`, `compose.yml`, `.python-version`, `Makefile`, the `MLproject` itself), plus obvious chaff (`input/`, `output/`, `example_data*/`, `isolated_run.*`, stale data CSVs, serialised model files, `renv/`), are swept into `_old/` so nothing is lost — your original repo state is fully recoverable from there.
 
+!!! tip "Before and after migrate: the lifecycle checklist"
+    The more your MLproject tells chapkit up front (`required_covariates`, `user_options`, pinned Python deps, service flags), the less hand-editing you need afterwards. The [Migration Checklist](mlproject-migration-checklist.md) walks through both the pre-migration prep and the post-migration smoke-test / iterate / ship steps — ten minutes there saves the "why did `chapkit test` fail" loop after.
+
 ## When to use which
 
 | Command | Writes files | Good for |
