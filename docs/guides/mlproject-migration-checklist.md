@@ -199,16 +199,41 @@ If the unpinned-deps note is non-empty, decide whether to pin them at the source
 
 ### 12. Smoke-test with `chapkit test`
 
-```bash
-# terminal 1:
-uv sync
-uv run python main.py
+**Python models — one-shot:**
 
-# terminal 2 (from the same project dir):
-uv run chapkit test
+```bash
+make test                          # uv run chapkit test --start-service
 ```
 
-`chapkit test` POSTs a synthetic config, drives a full train → predict cycle, and reports back. A clean run looks like:
+`--start-service` spawns `python main.py` in the local uv venv, runs the smoke test, tears the service down. Only works for Python-based models — see the R caveat below.
+
+**Python models — two-terminal (when you want to inspect the live service):**
+
+```bash
+# terminal 1:
+make run
+
+# terminal 2 (from the same project dir):
+make test-remote
+```
+
+!!! warning "R models: Docker only"
+    `chapkit test --start-service` (and the `make test` / `make run` paths underneath) spawn `main.py` in the **host's Python environment** via `subprocess.Popen([sys.executable, "main.py"], ...)`. For an R model, `main.py` then shells out to `Rscript train.R` — which fails unless R and every package in `renv.lock` are installed on the host. That is essentially never what a developer has locally.
+
+    For R models, use Docker instead:
+
+    ```bash
+    # terminal 1:
+    make docker-build
+    make docker-run
+
+    # terminal 2 (once the container reports healthy):
+    make test-remote
+    ```
+
+    The generated Docker image (built on [`chapkit-r`](https://github.com/dhis2-chap/chapkit-images) or [`chapkit-r-inla`](https://github.com/dhis2-chap/chapkit-images)) ships R and pre-restores `renv.lock` so your scripts run in the environment they were written for.
+
+A clean run looks like:
 
 ```
 Configs created:       1
@@ -219,7 +244,7 @@ Predictions failed:    0
 Result: ALL TESTS PASSED
 ```
 
-If something failed, the container logs hold the actual stderr (`docker logs <container>` or the terminal running `main.py`). See [Iterating on `chapkit test` failures](#14-iterating-on-chapkit-test-failures) below.
+If something failed, the **service logs** hold the actual stderr — the terminal running `make run` for local runs, or `docker logs <container>` for Docker. See [Iterating on `chapkit test` failures](#14-iterating-on-chapkit-test-failures) below.
 
 ### 13. Build and run in Docker
 

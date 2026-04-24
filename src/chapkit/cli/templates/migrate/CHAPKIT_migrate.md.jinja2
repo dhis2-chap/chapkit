@@ -8,23 +8,46 @@ This project is now a [**chapkit**](https://github.com/dhis2-chap/chapkit) servi
 
 ## TL;DR
 
+{% if LANGUAGE == "python" %}
 | Do this | You get |
 | --- | --- |
 | [`make install && make run`](#run-it-locally) | Service on http://127.0.0.1:8000 |
 | [`make test`](#smoke-test-with-chapkit-test) | One-shot smoke test (auto-starts an in-memory service) |
 | [`make docker-build && make docker-run`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images), container on `:8000` |
 | [`/docs`](http://127.0.0.1:8000/docs) | Live OpenAPI UI for the service |
+{% else %}
+| Do this | You get |
+| --- | --- |
+| [`make docker-build && make docker-run`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images), container on `:8000` |
+| [`make test-remote`](#smoke-test-with-chapkit-test) | Smoke test driving the running container |
+| [`/docs`](http://127.0.0.1:8000/docs) | Live OpenAPI UI for the service |
 
-All four have longer-form equivalents with explanations below. `make help` in the repo root lists every target.
+This is an R model — Docker is the supported path because `main.py` spawns R scripts that need R + `renv.lock` packages installed. The Docker image ships both; your host probably doesn't. `make test` (via `--start-service`) is Python-only and won't work here.
+{% endif %}
+
+`make help` in the repo root lists every target.
 
 ## Run it locally
-
+{% if LANGUAGE == "python" %}
 ```bash
 uv sync                # installs chapkit + your deps into .venv
 uv run python main.py   # serves on http://127.0.0.1:8000
 ```
 
 Poke at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for the OpenAPI UI, or `/health` for a heartbeat.
+{% else %}
+!!! warning "R model — prefer Docker"
+    `main.py` invokes your `train.R` / `predict.R` scripts via `subprocess`, so the host needs R plus every package in `renv.lock` restored. Unless you actively develop R on this machine, **use [Docker](#run-it-in-docker) instead** — the base image has R and the packages pre-installed.
+
+If you *do* have R set up locally (with `Rscript` on `$PATH` and `renv.lock` already restored into a project-local library):
+
+```bash
+uv sync                # installs chapkit + Python deps into .venv
+uv run python main.py   # serves on http://127.0.0.1:8000 — calls into your R scripts
+```
+
+Poke at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for the OpenAPI UI, or `/health` for a heartbeat.
+{% endif %}
 
 ## Run it in Docker
 
@@ -41,7 +64,7 @@ The image builds on [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://githu
 ## Smoke-test with `chapkit test`
 
 [`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) is the first thing to run after migrating. It POSTs a synthetic config, generates synthetic [panel data](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/#generated-data-structure), drives a full train → predict cycle, and reports back. A clean run means your MLproject translated cleanly and your scripts read the config shape they expected.
-
+{% if LANGUAGE == "python" %}
 ### The fastest path
 
 ```bash
@@ -54,13 +77,33 @@ Equivalent to `uv run chapkit test --start-service` — auto-boots the service w
 
 ```bash
 # terminal 1:
-make run        # uv run python main.py
+make run           # uv run python main.py
 
 # terminal 2 (from the same project dir):
 make test-remote   # uv run chapkit test --url http://localhost:8000
 ```
 
 Use this when you want to poke at the live service (http://127.0.0.1:8000/docs) between test runs, or tail the server logs while the test drives it.
+{% else %}
+### Docker-first (required for this R-based model)
+
+`chapkit test --start-service` and `make run` spawn `main.py` in the **host's Python environment** via `subprocess.Popen([sys.executable, "main.py"], ...)`. That's fine for Python-based models — `uv sync` pulls their deps into `.venv` and the scripts run locally.
+
+**This is an R model.** Your `train.R` / `predict.R` need R itself plus every package in `renv.lock` installed on the host. That's almost never what a developer has sitting around, but the Docker image has it all baked in. So the one-shot `make test` path does not apply here; go through Docker instead:
+
+```bash
+# terminal 1 (builds the image + runs the container on :8000):
+make docker-build
+make docker-run
+
+# terminal 2 (once the container is healthy):
+make test-remote   # uv run chapkit test --url http://localhost:8000
+```
+
+`make docker-run` uses the same base image [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://github.com/dhis2-chap/chapkit-images) described above, which ships with R and pre-restores `renv.lock`, so the scripts execute in the environment they were written for.
+
+If you really want to run `main.py` on the host (rare), you need R, a working `Rscript`, and an `renv::restore()` against your `renv.lock` — at that point you can also use `make test` and `make run` as documented in the Python flow.
+{% endif %}
 
 ### What a clean run looks like
 
@@ -83,7 +126,7 @@ Result: ALL TESTS PASSED
 
 | Flag | Default | When to use |
 | --- | --- | --- |
-| `--start-service` | off | One-shot runs without managing the server yourself |
+| `--start-service` | off | Python models only — spawns `python main.py` in the host's uv venv. R models must use the Docker path instead (see above). |
 | `-c / --configs N` | `1` | Stress-test multiple config variations |
 | `-t / --trainings N` | `1` | Train multiple times per config |
 | `-p / --predictions N` | `1` | Predict multiple times per trained model |
