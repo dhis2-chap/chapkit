@@ -710,3 +710,96 @@ async def test_uses_relative_paths() -> None:
         # Cleanup
         if lib_file.exists():
             lib_file.unlink()
+
+
+def test_dump_config_yaml_flat_default() -> None:
+    """Flat format writes every BaseConfig field at the top level."""
+    import yaml
+
+    from chapkit.ml.runner import dump_config_yaml
+
+    config = MockConfig(prediction_periods=4, threshold=0.9, features=["a", "b"])
+    parsed = yaml.safe_load(dump_config_yaml(config))
+
+    assert parsed == {
+        "prediction_periods": 4,
+        "threshold": 0.9,
+        "features": ["a", "b"],
+        "additional_continuous_covariates": [],
+    }
+
+
+def test_dump_config_yaml_chap_core_wraps_user_options() -> None:
+    """chap_core format keeps reserved fields flat and nests everything else."""
+    import yaml
+
+    from chapkit.ml.runner import dump_config_yaml
+
+    config = MockConfig(prediction_periods=4, threshold=0.9, features=["a", "b"])
+    parsed = yaml.safe_load(dump_config_yaml(config, format="chap_core"))
+
+    assert parsed == {
+        "prediction_periods": 4,
+        "additional_continuous_covariates": [],
+        "user_option_values": {
+            "threshold": 0.9,
+            "features": ["a", "b"],
+        },
+    }
+
+
+def test_dump_config_yaml_chap_core_omits_user_options_when_empty() -> None:
+    """chap_core format skips the user_option_values key when there are no user fields."""
+    import yaml
+
+    from chapkit.ml.runner import dump_config_yaml
+
+    class BareConfig(BaseConfig):
+        """Config with no user fields beyond BaseConfig reserved ones."""
+
+    config = BareConfig(prediction_periods=3)
+    parsed = yaml.safe_load(dump_config_yaml(config, format="chap_core"))
+
+    assert parsed == {"prediction_periods": 3, "additional_continuous_covariates": []}
+    assert "user_option_values" not in parsed
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_chap_core_config_format_end_to_end(tmp_path: Path) -> None:
+    """ShellModelRunner with config_format='chap_core' writes nested config.yml readable by ported scripts."""
+    import os
+
+    import yaml
+
+    # Script that reads config.yml the way a chap-core-ported model does.
+    script = tmp_path / "train.py"
+    script.write_text(
+        "import sys, yaml, pickle\n"
+        "with open('config.yml') as f:\n"
+        "    cfg = yaml.safe_load(f)\n"
+        "assert cfg['prediction_periods'] == 5\n"
+        "assert cfg['user_option_values']['threshold'] == 0.25\n"
+        "pickle.dump('ok', open('model.pickle', 'wb'))\n"
+    )
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command=f"python {script}",
+        predict_command="true",
+        config_format="chap_core",
+    )
+    config = MockConfig(prediction_periods=5, threshold=0.25)
+    data = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        runner.project_root = tmp_path
+        result = await runner.on_train(config, data)
+    finally:
+        os.chdir(cwd)
+
+    assert result["exit_code"] == 0, result.get("stderr")
+    written = yaml.safe_load((Path(result["workspace_dir"]) / "config.yml").read_text())
+    assert written["prediction_periods"] == 5
+    assert written["user_option_values"] == {"threshold": 0.25, "features": ["feature1", "feature2"]}
+    shutil.rmtree(result["workspace_dir"], ignore_errors=True)

@@ -115,11 +115,11 @@ The published container images (below) set `PATH` correctly so this is a non-iss
 
 Chapkit publishes three base images for `chapkit run`, all built on `debian:trixie-slim`. The Dockerfiles and publish workflow live in the companion [dhis2-chap/chapkit-images](https://github.com/dhis2-chap/chapkit-images) repo so image builds don't block chapkit's own CI:
 
-| Image                                          | Contents                                                                                        | Architectures                  | Typical size |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
-| `ghcr.io/dhis2-chap/chapkit-py:latest`         | Python 3.13, chapkit, uv, `build-essential`, `pkg-config`                                       | `linux/amd64`, `linux/arm64`   | ~920 MB      |
-| `ghcr.io/dhis2-chap/chapkit-r:latest`          | R 4.5 + `renv` + `pak` + common dev libs, Python 3.13, chapkit, uv                              | `linux/amd64`, `linux/arm64`   | ~1.2 GB      |
-| `ghcr.io/dhis2-chap/chapkit-r-inla:latest`     | R 4.5 + INLA + spatial/time-series R stack (sf, spdep, dlnm, tsModel, ...), Python 3.13, chapkit | `linux/amd64` (INLA x86_64 only) | ~3-4 GB      |
+| Image                                          | Contents                                                                                        | Architectures                  | Typical size (amd64) |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ | -------------------- |
+| `ghcr.io/dhis2-chap/chapkit-py:latest`         | Python 3.13, chapkit, uv                                                                         | `linux/amd64`, `linux/arm64`   | ~220 MB              |
+| `ghcr.io/dhis2-chap/chapkit-r:latest`          | R 4.5 + `renv` + `pak`, Python 3.13, chapkit, uv                                                 | `linux/amd64`, `linux/arm64`   | ~400 MB              |
+| `ghcr.io/dhis2-chap/chapkit-r-inla:latest`     | R 4.5 + INLA + spatial/time-series R stack (sf, spdep, dlnm, tsModel, sn, xgboost, ...), Python 3.13, chapkit | `linux/amd64` (INLA x86_64 only) | ~570 MB              |
 
 Which one to pick:
 
@@ -199,7 +199,7 @@ No chapkit-side configuration is needed — if `SERVICEKIT_ORCHESTRATOR_URL` is 
 
 ---
 
-## Limitations and When to Prefer `chapkit init`
+## Limitations and When to Prefer `chapkit migrate` or `chapkit init`
 
 `chapkit run` is a thin runtime wrapper: it does not generate, edit, or version any files in your MLproject. That keeps it ideal for:
 
@@ -207,10 +207,12 @@ No chapkit-side configuration is needed — if `SERVICEKIT_ORCHESTRATOR_URL` is 
 - Running a model in a docker-compose network alongside chap-core without a port to chapkit.
 - Models whose train/predict logic is stable and already well-tested outside chapkit.
 
-Use `chapkit init` instead when you want:
+When you're ready to **own** the service code (commit it, extend it, ship it as your own image), reach for [`chapkit migrate`](mlproject-migrate.md): it's the code-generating sibling of `run` that adopts your MLproject in place and produces a committable `main.py`, `Dockerfile`, `pyproject.toml` (with your deps merged in), `compose.yml`, and `CHAPKIT.md`. Your train/predict scripts stay put; only chapkit-owned metadata and chaff moves to `_old/`.
 
-- Validation callbacks with custom diagnostics (`on_validate_train` / `on_validate_predict`).
-- Python-typed config, business logic, or multi-artifact ML workflows beyond MLproject's entry-point model.
-- A real chapkit project you can evolve (tests, migrations, additional endpoints).
+Use [`chapkit init`](cli-scaffolding.md) instead when you want to start a **greenfield** chapkit project — no existing MLproject to adopt, full template choice (`ml`, `ml-shell`, `task`), optional monitoring stack, validation-hook stubs.
 
-A dedicated `chapkit convert` command for upgrading an MLproject repo into a full chapkit project (code generation, including per-model Dockerfiles) is on the roadmap.
+| You have… | Use |
+| --- | --- |
+| An MLproject you want to quickly evaluate | `chapkit run` |
+| An MLproject you want to own as a chapkit project | `chapkit migrate` |
+| Nothing yet | `chapkit init` |

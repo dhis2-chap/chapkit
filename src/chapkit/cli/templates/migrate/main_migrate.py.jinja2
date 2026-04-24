@@ -1,0 +1,148 @@
+"""{{ PROJECT_DESCRIPTION }}."""
+
+import os
+from pathlib import Path
+
+from chapkit import BaseConfig
+from chapkit.api import AssessedStatus, MLServiceBuilder, MLServiceInfo, ModelMetadata, PeriodType
+from chapkit.artifact import ArtifactHierarchy
+from chapkit.ml import ShellModelRunner
+from pydantic import Field
+
+
+class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
+    """Configuration for {{ PROJECT_NAME }}."""
+
+{% for name, py_type, default_repr, description, alias in CONFIG_FIELDS %}
+{% if description or alias %}
+    {{ name }}: {{ py_type }} = Field(
+{% if default_repr == '...' %}
+        ...,
+{% else %}
+        default={{ default_repr }},
+{% endif %}
+{% if description %}
+        description={{ description | tojson }},
+{% endif %}
+{% if alias %}
+        alias={{ alias | tojson }},
+{% endif %}
+    )
+{% else %}
+    {{ name }}: {{ py_type }} = {{ default_repr }}
+{% endif %}
+{% endfor %}
+
+    # chap-core ecosystem convention: most disease-surveillance models
+    # (EWARS and friends) take rainfall + mean_temperature as lagged
+    # climate predictors, so `chapkit migrate` pins them here by default.
+    # If this model doesn't use climate covariates, DELETE the whole
+    # block below - BaseConfig's inherited default is an empty list.
+    # To keep the field but change it, override per-config via
+    # POST /api/v1/configs (don't edit here unless the new defaults are
+    # genuinely the model's intended defaults).
+    additional_continuous_covariates: list[str] = Field(
+        default=["rainfall", "mean_temperature"],
+        description="Continuous covariates to include as lagged predictors.",
+    )
+
+
+# Commands are rendered in ShellModelRunner's template vocabulary
+# ({data_file}, {historic_file}, {future_file}, {output_file}, {geo_file}).
+# ShellModelRunner substitutes those with workspace-root filenames at train /
+# predict time. Literal paths `model` (your script saves/loads it; preserved
+# across train -> predict via workspace copy) and `config.yml` (always written
+# by chapkit from the config above) stay verbatim.
+# config_format="chap_core" writes config.yml in chap-core's ModelConfiguration
+# shape (prediction_periods + additional_continuous_covariates at the top level,
+# remaining fields nested under user_option_values) so scripts ported from
+# chap-models repos can read config["user_option_values"][...] unchanged.
+runner: ShellModelRunner[{{ PROJECT_CLASS_NAME }}Config] = ShellModelRunner(
+    train_command={{ TRAIN_COMMAND | tojson }},
+    predict_command={{ PREDICT_COMMAND | tojson }},
+    config_format="chap_core",
+)
+
+info = MLServiceInfo(
+    id="{{ PROJECT_SLUG }}",
+    display_name="{{ PROJECT_DISPLAY_NAME }}",
+    description={{ PROJECT_DESCRIPTION | tojson }},
+    model_metadata=ModelMetadata(
+{% if META_AUTHOR %}
+        author={{ META_AUTHOR | tojson }},
+{% endif %}
+{% if META_AUTHOR_NOTE %}
+        author_note={{ META_AUTHOR_NOTE | tojson }},
+{% endif %}
+{% if META_ASSESSED_STATUS %}
+        author_assessed_status=AssessedStatus.{{ META_ASSESSED_STATUS }},
+{% else %}
+        author_assessed_status=AssessedStatus.yellow,  # TODO: assess and set (gray/red/orange/yellow/green)
+{% endif %}
+{% if META_CONTACT_EMAIL %}
+        contact_email={{ META_CONTACT_EMAIL | tojson }},
+{% endif %}
+{% if META_ORGANIZATION %}
+        organization={{ META_ORGANIZATION | tojson }},
+{% endif %}
+{% if META_ORGANIZATION_LOGO_URL %}
+        organization_logo_url={{ META_ORGANIZATION_LOGO_URL | tojson }},
+{% endif %}
+{% if META_CITATION_INFO %}
+        citation_info={{ META_CITATION_INFO | tojson }},
+{% endif %}
+{% if META_REPOSITORY_URL %}
+        repository_url={{ META_REPOSITORY_URL | tojson }},
+{% endif %}
+{% if META_DOCUMENTATION_URL %}
+        documentation_url={{ META_DOCUMENTATION_URL | tojson }},
+{% endif %}
+    ),
+    period_type=PeriodType.{{ PERIOD_TYPE }},
+{% if REQUIRED_COVARIATES %}
+    required_covariates={{ REQUIRED_COVARIATES | tojson }},
+{% endif %}
+{% if ALLOW_FREE_COVARIATES %}
+    allow_free_additional_continuous_covariates=True,
+{% endif %}
+{% if REQUIRES_GEO %}
+    requires_geo=True,
+{% endif %}
+)
+
+hierarchy = ArtifactHierarchy(
+    name="{{ PROJECT_IDENTIFIER }}",
+    level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
+)
+
+# Persistent SQLite database by default so artifacts, configs, and jobs
+# survive container restarts. Override with DATABASE_URL for a different
+# SQLite file or a hosted Postgres (e.g. when deployed next to chap-core).
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///data/chapkit.db")
+if DATABASE_URL.startswith("sqlite") and ":///" in DATABASE_URL:
+    db_path = Path(DATABASE_URL.split("///")[1])
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+app = (
+    MLServiceBuilder(
+        info=info,
+        config_schema={{ PROJECT_CLASS_NAME }}Config,
+        hierarchy=hierarchy,
+        runner=runner,
+        database_url=DATABASE_URL,
+    )
+    # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
+    # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
+    # local `python main.py` runs without any extra config. Optional env vars:
+    #   SERVICEKIT_ORCHESTRATOR_URL   e.g. http://chap:8000/v2/services/$register
+    #   SERVICEKIT_REGISTRATION_KEY   shared secret if chap has one set
+    #   SERVICEKIT_HOST, SERVICEKIT_PORT   override the advertised endpoint
+    .with_registration()
+    .build()
+)
+
+
+if __name__ == "__main__":
+    from chapkit.api import run_app
+
+    run_app("main:app", host="0.0.0.0", port=8000)

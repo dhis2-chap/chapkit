@@ -1,0 +1,54 @@
+[project]
+name = {{ PROJECT_IDENTIFIER | tojson }}
+version = "0.1.0"
+description = {{ PROJECT_DESCRIPTION | tojson }}
+requires-python = ">=3.13"
+dependencies = [
+    {{ ("chapkit>=" ~ CHAPKIT_VERSION) | tojson }},
+{% for dep in USER_DEPENDENCIES %}
+    {{ dep | tojson }},
+{% endfor %}
+]
+
+[dependency-groups]
+dev = [
+    "uvicorn[standard]>=0.30.0",
+]
+{% if UV_INDEX_URL or UV_EXTRA_INDEX_URLS or UV_FIND_LINKS or UV_CONSTRAINT_DEPENDENCIES or UV_NO_INDEX or UV_PRE %}
+
+# Lifted from the original requirements.txt / pyenv.yaml so `uv sync` honours the
+# same install context as the generated Dockerfile (`uv pip install -r
+# requirements.txt`). Without this block the two paths could diverge - private
+# indexes unreachable, constraint pins ignored.
+[tool.uv]
+{% if UV_INDEX_URL %}
+index-url = {{ UV_INDEX_URL | tojson }}
+{% endif %}
+{% if UV_EXTRA_INDEX_URLS %}
+extra-index-url = [
+{% for url in UV_EXTRA_INDEX_URLS %}
+    {{ url | tojson }},
+{% endfor %}
+]
+{% endif %}
+{% if UV_FIND_LINKS %}
+find-links = [
+{% for link in UV_FIND_LINKS %}
+    {{ link | tojson }},
+{% endfor %}
+]
+{% endif %}
+{% if UV_CONSTRAINT_DEPENDENCIES %}
+constraint-dependencies = [
+{% for constraint in UV_CONSTRAINT_DEPENDENCIES %}
+    {{ constraint | tojson }},
+{% endfor %}
+]
+{% endif %}
+{% if UV_NO_INDEX %}
+no-index = true
+{% endif %}
+{% if UV_PRE %}
+prerelease = "allow"
+{% endif %}
+{% endif %}

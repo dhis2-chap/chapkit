@@ -20,24 +20,39 @@ class TestDataGenerator:
         num_periods: int = 12,
         num_features: int = 3,
         required_covariates: list[str] | None = None,
+        additional_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         start_year: int = 2020,
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
-        required_covariates = required_covariates or []
-
-        # Build columns list
-        columns: list[str] = ["time_period", "location", "disease_cases"]
+        # chap-core canonical always-present columns: time_period + location (indices),
+        # disease_cases (target), population (non-optional per chap_core.predictor.feature_spec),
+        # and the two common-optional climate covariates many models hardcode.
+        # Emitted unconditionally so most models in the ecosystem Just Work under
+        # `chapkit test` without needing to declare everything in required_covariates.
+        columns: list[str] = [
+            "time_period",
+            "location",
+            "disease_cases",
+            "population",
+            "rainfall",
+            "mean_temperature",
+        ]
 
         # Feature columns (climate/covariate data)
         for i in range(num_features):
             columns.append(f"feature_{i}")
 
-        # Required covariates from service info
+        # Required covariates from service info - dedup against the always-present set.
+        required_covariates = [c for c in (required_covariates or []) if c not in columns]
         for cov in required_covariates:
-            if cov not in columns:
-                columns.append(cov)
+            columns.append(cov)
+
+        # Additional continuous covariates from config - dedup against required + always-present.
+        additional_covariates = [c for c in (additional_covariates or []) if c not in columns]
+        for cov in additional_covariates:
+            columns.append(cov)
 
         # Extra continuous covariates if allowed
         for i in range(extra_covariates):
@@ -65,12 +80,25 @@ class TestDataGenerator:
                 # Disease cases (health outcome, whole number as float)
                 row.append(float(random.randint(1, 100)))
 
+                # population (chap-core canonical, non-optional): realistic district-sized integer
+                row.append(random.randint(50_000, 1_500_000))
+
+                # rainfall (mm / period): 0-400 is a reasonable monthly range
+                row.append(random.uniform(0, 400))
+
+                # mean_temperature (degrees Celsius): tropical-to-temperate range
+                row.append(random.uniform(10, 35))
+
                 # Feature values (climate data)
                 for _ in range(num_features):
                     row.append(random.uniform(0, 100))
 
                 # Required covariate values
                 for _ in required_covariates:
+                    row.append(random.uniform(0, 100))
+
+                # Additional continuous covariate values
+                for _ in additional_covariates:
                     row.append(random.uniform(0, 100))
 
                 # Extra covariate values
@@ -87,6 +115,7 @@ class TestDataGenerator:
         num_periods: int = 12,
         num_features: int = 3,
         required_covariates: list[str] | None = None,
+        additional_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -97,6 +126,7 @@ class TestDataGenerator:
             num_periods=num_periods,
             num_features=num_features,
             required_covariates=required_covariates,
+            additional_covariates=additional_covariates,
             extra_covariates=extra_covariates,
             start_year=2020,
             period_type=period_type,
@@ -108,6 +138,7 @@ class TestDataGenerator:
             num_periods=num_periods,
             num_features=num_features,
             required_covariates=required_covariates,
+            additional_covariates=additional_covariates,
             extra_covariates=extra_covariates,
             start_year=2025,
             period_type=period_type,

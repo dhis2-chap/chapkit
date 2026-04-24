@@ -10,7 +10,7 @@ import tempfile
 import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Generic, Literal, TypeVar
 
 import yaml
 from geojson_pydantic import FeatureCollection
@@ -18,8 +18,16 @@ from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
-from chapkit.ml.schemas import ValidationDiagnostic
 from chapkit.utils import run_shell
+
+if TYPE_CHECKING:
+    # Typing-only: every use of ValidationDiagnostic below is a type annotation
+    # (stringified via `from __future__ import annotations`) or a lazily-evaluated
+    # PEP 695 `type` alias. Keeping the import guarded means this module loads
+    # cleanly even when installed alongside an older chapkit where
+    # ValidationDiagnostic did not yet exist - which matters when a container
+    # ships a pinned chapkit version and we volume-mount this file on top.
+    from chapkit.ml.schemas import ValidationDiagnostic
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
@@ -87,14 +95,40 @@ def prepare_workspace(source_dir: Path, dest_dir: Path) -> None:
     logger.info("copied_project_directory", src=str(source_dir), dest=str(dest_dir))
 
 
+# Top-level keys chap-core keeps flat in config.yml; everything else nests under
+# user_option_values to match chap-core's ModelConfiguration schema.
+_CHAP_CORE_RESERVED_FIELDS: frozenset[str] = frozenset({"prediction_periods", "additional_continuous_covariates"})
+
+
+def dump_config_yaml(config: BaseConfig, format: Literal["flat", "chap_core"] = "flat") -> str:
+    """Serialize a config to YAML for workspace config.yml.
+
+    Dumps with by_alias=True so fields declared with `Field(alias="...")` emit the
+    wire-format name instead of the Python attribute name. That keeps the YAML in
+    sync with the contract scripts expect - for instance, an MLproject user_option
+    `n-lags` is stored on the Python class as `n_lags` (Field(alias="n-lags")) but
+    scripts read `config["user_option_values"]["n-lags"]`, so the YAML must use
+    the hyphen form. Fields without aliases are unaffected.
+    """
+    payload = config.model_dump(by_alias=True)
+    if format == "chap_core":
+        top: dict[str, Any] = {k: payload[k] for k in _CHAP_CORE_RESERVED_FIELDS if k in payload}
+        user_option_values = {k: v for k, v in payload.items() if k not in _CHAP_CORE_RESERVED_FIELDS}
+        if user_option_values:
+            top["user_option_values"] = user_option_values
+        payload = top
+    return yaml.safe_dump(payload, indent=2)
+
+
 def write_training_inputs(
     workspace_dir: Path,
     config: BaseConfig,
     data: DataFrame,
     geo: FeatureCollection | None,
+    config_format: Literal["flat", "chap_core"] = "flat",
 ) -> None:
     """Write training input files (config.yml, data.csv, geo.json) to workspace."""
-    (workspace_dir / "config.yml").write_text(yaml.safe_dump(config.model_dump(), indent=2))
+    (workspace_dir / "config.yml").write_text(dump_config_yaml(config, config_format))
     data.to_csv(workspace_dir / "data.csv")
     if geo:
         (workspace_dir / "geo.json").write_text(geo.model_dump_json(indent=2))
@@ -492,6 +526,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         predict_command: str,
         on_validate_train: ValidateTrainFunction[ConfigT] | None = None,
         on_validate_predict: ValidatePredictFunction[ConfigT] | None = None,
+        config_format: Literal["flat", "chap_core"] = "flat",
     ) -> None:
         """Initialize shell runner with full isolation support.
 
@@ -504,11 +539,18 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             predict_command: Command template for prediction (use relative paths)
             on_validate_train: Optional Python callback for domain-level train validation
             on_validate_predict: Optional Python callback for domain-level predict validation
+            config_format: Layout for generated config.yml. "flat" (default) writes every
+                BaseConfig field at the top level. "chap_core" keeps prediction_periods and
+                additional_continuous_covariates at the top level and nests remaining fields
+                under user_option_values, matching chap-core's ModelConfiguration schema so
+                scripts ported from chap-models repos can read config["user_option_values"][...]
+                unchanged.
         """
         self.train_command = train_command
         self.predict_command = predict_command
         self._on_validate_train = on_validate_train
         self._on_validate_predict = on_validate_predict
+        self.config_format: Literal["flat", "chap_core"] = config_format
 
         # Project root is current working directory
         # Users run: fastapi dev main.py (from project dir)
@@ -593,7 +635,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Copy entire project directory to temp workspace for full isolation
             prepare_workspace(self.project_root, temp_dir)
             # Write training input files
-            write_training_inputs(temp_dir, config, data, geo)
+            write_training_inputs(temp_dir, config, data, geo, config_format=self.config_format)
 
             # Substitute variables in command (use relative paths)
             command = self.train_command.format(

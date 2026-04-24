@@ -1,0 +1,42 @@
+FROM ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest
+
+# Switch to root so we can write to /app/.venv and install user deps
+# declared in pyproject.toml. chapkit-py currently runs as a non-root user
+# with a root-owned venv (chapkit-images issue tracked separately); staying
+# at root matches chapkit-r / chapkit-r-inla's runtime posture.
+USER root
+
+WORKDIR /work
+COPY . /work
+
+{% if HAS_RENV %}
+# Restore the R library declared in renv.lock at image build time so the
+# container starts instantly instead of bootstrapping renv on every run.
+# Installs renv first if the base image doesn't ship it; no-op otherwise.
+RUN R -q -e "if (!requireNamespace('renv', quietly = TRUE)) install.packages('renv', repos = 'https://cloud.r-project.org'); renv::restore(prompt = FALSE)"
+{% elif HAS_INSTALL_PACKAGES_R %}
+# The repo ships an install_packages.R helper (chap-models convention for R
+# models without renv). Run it at image build time so the packages it
+# declares are baked into the image and the container starts instantly.
+RUN Rscript install_packages.R
+{% endif %}
+{% if LANGUAGE == "python" and USER_DEPENDENCIES %}
+# Install the project's Python dependencies (merged from the user's
+# original pyproject.toml / pyenv.yaml / conda env) into the chapkit
+# venv. Reads from the generated requirements.txt instead of passing
+# each dep inline so PEP 508 markers with nested quotes (e.g.
+# `importlib-metadata; python_version < "3.10"`) install cleanly - the
+# inline form would see the quotes as shell-command terminators.
+# `uv pip install .` is avoided because the generated project is a
+# service, not an installable package, and the user's scripts often use
+# a flat layout that setuptools can't auto-package.
+RUN uv pip install --python /app/.venv/bin/python -r requirements.txt
+
+{% endif %}
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl --fail http://localhost:8000/health || exit 1
+
+CMD ["python", "main.py"]

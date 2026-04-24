@@ -8,6 +8,7 @@ import typer
 from chapkit import __version__
 from chapkit.cli.artifact import artifact_app
 from chapkit.cli.init import init_command
+from chapkit.cli.migrate import migrate_command
 from chapkit.cli.run import run_command
 from chapkit.cli.test import test_command
 
@@ -66,6 +67,7 @@ if _find_chapkit_project() is None:
 if _find_chapkit_project() is not None:
     app.command(name="test", help="Run end-to-end test of the ML service workflow")(test_command)
 app.command(name="run", help="Run an MLproject directory as a chapkit service")(run_command)
+app.command(name="migrate", help="Migrate an MLproject directory into a chapkit project")(migrate_command)
 app.add_typer(artifact_app, name="artifact")
 
 

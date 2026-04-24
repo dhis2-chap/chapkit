@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import keyword
 import re
 import string
 from pathlib import Path
@@ -20,6 +21,25 @@ CANONICAL_FILENAMES: dict[str, str] = {
     "model": "model",
     "model_config": "config.yml",
     "polygons": "geo.json",
+}
+
+# Maps canonical MLproject parameter names to ShellModelRunner's own template
+# vocabulary (curly-braced placeholders) where applicable, or to literal paths
+# that ShellModelRunner guarantees at train/predict time. Used by `chapkit
+# migrate` to emit commands in runner-template form instead of fully-literal,
+# so the generated main.py is insulated from future ShellModelRunner filename
+# changes and reads more idiomatically.
+RUNNER_PLACEHOLDERS: dict[str, str] = {
+    "train_data": "{data_file}",
+    "historic_data": "{historic_file}",
+    "future_data": "{future_file}",
+    "out_file": "{output_file}",
+    "polygons": "{geo_file}",
+    # Literals - ShellModelRunner has no placeholder for these; it just
+    # writes `config.yml` to the workspace root and lets scripts save/load
+    # `model` as they see fit.
+    "model": "model",
+    "model_config": "config.yml",
 }
 
 ENV_FIELDS: tuple[str, ...] = (
@@ -59,6 +79,12 @@ class MLProject(BaseModel):
     entry_points: dict[str, EntryPoint]
     user_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
     env_hints: dict[str, str] = Field(default_factory=dict)
+    meta_data: dict[str, Any] = Field(default_factory=dict)
+    supported_period_type: str | None = None
+    required_covariates: list[str] = Field(default_factory=list)
+    allow_free_additional_continuous_covariates: bool = False
+    requires_geo: bool = False
+    target: str | None = None
     source_path: Path | None = None
 
 
@@ -137,18 +163,52 @@ def parse_mlproject(path: Path) -> MLProject:
         else:
             env_hints[env_field] = str(value)
 
+    raw_meta = raw.get("meta_data") or {}
+    meta_data = dict(raw_meta) if isinstance(raw_meta, dict) else {}
+
+    required_covariates_raw = raw.get("required_covariates") or []
+    required_covariates: list[str] = (
+        [str(c) for c in required_covariates_raw] if isinstance(required_covariates_raw, list) else []
+    )
+
+    supported_period_type = raw.get("supported_period_type")
+    if supported_period_type is not None:
+        supported_period_type = str(supported_period_type)
+
     return MLProject(
         name=name.strip(),
         entry_points=entry_points,
         user_options=user_options,
         env_hints=env_hints,
+        meta_data=meta_data,
+        supported_period_type=supported_period_type,
+        required_covariates=required_covariates,
+        allow_free_additional_continuous_covariates=bool(raw.get("allow_free_additional_continuous_covariates", False)),
+        requires_geo=bool(raw.get("requires_geo", False)),
+        target=str(raw["target"]) if "target" in raw and raw["target"] is not None else None,
         source_path=mlproject_file,
     )
 
 
 def translate_command(command: str, overrides: dict[str, str] | None = None) -> str:
     """Substitute MLproject {param} placeholders with chapkit workspace filenames."""
-    mapping: dict[str, str] = {**CANONICAL_FILENAMES, **(overrides or {})}
+    return _apply_param_mapping(command, {**CANONICAL_FILENAMES, **(overrides or {})})
+
+
+def translate_to_runner_template(command: str, overrides: dict[str, str] | None = None) -> str:
+    """Substitute MLproject {param} placeholders with ShellModelRunner's template form.
+
+    Unlike `translate_command`, which yields a fully-literal command, this
+    returns a string that still contains curly-braced placeholders
+    (`{data_file}`, `{historic_file}`, etc.) where ShellModelRunner does its
+    own substitution at train/predict time. Literal paths (`model`,
+    `config.yml`) are inlined because ShellModelRunner has no templating
+    hook for them. This is what `chapkit migrate` embeds in main.py.
+    """
+    return _apply_param_mapping(command, {**RUNNER_PLACEHOLDERS, **(overrides or {})})
+
+
+def _apply_param_mapping(command: str, mapping: dict[str, str]) -> str:
     formatter = string.Formatter()
     unknown: list[str] = []
     for _, field_name, _, _ in formatter.parse(command):
@@ -163,6 +223,9 @@ def translate_command(command: str, overrides: dict[str, str] | None = None) -> 
         raise MLProjectError(
             f"Unknown MLproject parameter(s): {missing}. Known: {known}. Use --param NAME=FILENAME to override."
         )
+    # Escape any literal curly braces in the command that are NOT our placeholders,
+    # then format(**mapping). Since `format` uses {key} syntax, all placeholders we
+    # care about are already mapped; any stray `{{` / `}}` should survive.
     return command.format(**mapping)
 
 
@@ -182,22 +245,69 @@ def _python_identifier(value: str) -> str:
     return cleaned
 
 
+def _python_class_name(value: str) -> str:
+    """Return a PascalCase Python class name derived from value."""
+    identifier = _python_identifier(value)
+    parts = [part for part in identifier.split("_") if part]
+    pascal = "".join(part[:1].upper() + part[1:] for part in parts)
+    return pascal or "MLProject"
+
+
+def python_field_name(raw: str) -> str:
+    """Normalize an MLproject user_option name to a valid Python / Pydantic field name.
+
+    Replaces non-identifier characters (hyphens, dots, spaces, ...) with underscores
+    and suffixes Python keywords with a trailing underscore. Names starting with a
+    digit are rejected outright - Pydantic forbids leading underscores on field
+    names, so there's no safe prefix that wouldn't collide with real user names.
+
+    Raises MLProjectError if the name cannot be sanitized.
+    """
+    normalized = re.sub(r"[^A-Za-z0-9_]+", "_", raw).strip("_")
+    if not normalized:
+        raise MLProjectError(f"user_option name {raw!r} cannot be sanitized to a valid Python identifier")
+    if normalized[0].isdigit():
+        raise MLProjectError(
+            f"user_option name {raw!r} starts with a digit; rename it to start with a letter "
+            "(Pydantic field names cannot have a leading underscore, so there is no safe mapping)"
+        )
+    if keyword.iskeyword(normalized):
+        normalized = normalized + "_"
+    if not normalized.isidentifier():
+        raise MLProjectError(f"user_option name {raw!r} cannot be sanitized to a valid Python identifier")
+    return normalized
+
+
 def build_config_schema(mlproject: MLProject) -> type[BaseConfig]:
-    """Build a BaseConfig subclass from MLproject user_options, injecting prediction_periods."""
+    """Build a BaseConfig subclass from MLproject user_options, injecting prediction_periods.
+
+    Non-identifier option names (hyphens, keywords, leading digits) are normalized to
+    valid Python identifiers. The original name is preserved via Pydantic `Field(alias=...)`
+    so POSTed configs and emitted config.yml keep the wire contract the MLproject declared.
+    """
     fields: dict[str, Any] = {}
+    seen: set[str] = set()
     for opt_name, opt_body in mlproject.user_options.items():
         declared_type = str(opt_body.get("type", "string")).lower()
         py_type = TYPE_MAP.get(declared_type, str)
+        field_name = python_field_name(opt_name)
+        if field_name in seen:
+            raise MLProjectError(
+                f"user_option {opt_name!r} normalizes to {field_name!r}, which collides with an earlier option"
+            )
+        seen.add(field_name)
+        alias = opt_name if field_name != opt_name else None
         if "default" in opt_body:
             coerced_default = _coerce_default(opt_body["default"], py_type)
-            fields[opt_name] = (py_type, coerced_default)
+            field_info = Field(default=coerced_default, alias=alias) if alias else coerced_default
         else:
-            fields[opt_name] = (py_type, ...)
+            field_info = Field(..., alias=alias) if alias else ...
+        fields[field_name] = (py_type, field_info)
 
     if "prediction_periods" not in fields:
         fields["prediction_periods"] = (int, 3)
 
-    model_name = f"{_python_identifier(mlproject.name)}Config"
+    model_name = f"{_python_class_name(mlproject.name)}Config"
     return create_model(model_name, __base__=BaseConfig, **fields)
 
 

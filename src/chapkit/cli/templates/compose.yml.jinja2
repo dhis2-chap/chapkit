@@ -13,18 +13,6 @@ services:
       WORKERS: 1
       # CHAPKIT_TEMP_DIR: /tmp  # Override temp directory for ML workspaces
     restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     networks:
       - ck_{{ PROJECT_SLUG }}
 

@@ -83,6 +83,19 @@ chapkit run .            # same
 chapkit run /path/to/mlproject
 ```
 
+### `chapkit migrate` - Adopt an existing MLproject as a chapkit project
+
+When you're ready to own the service code (commit it, containerise it, extend it with validation hooks), `chapkit migrate` generates `main.py`, a `Dockerfile` pointing at the right [chapkit-images](https://github.com/dhis2-chap/chapkit-images) base, a `pyproject.toml`, a `compose.yml`, and a `CHAPKIT.md`. Chaff (input data, ad-hoc runners, the `MLproject` file itself) is swept to `_old/`; your train/predict scripts stay where they are:
+
+```bash
+cd /path/to/your/mlproject
+chapkit migrate --dry-run   # preview
+chapkit migrate             # execute interactively
+chapkit migrate --yes       # non-interactive (scripts / CI)
+```
+
+See the [MLproject Migrate guide](docs/guides/mlproject-migrate.md) for the classification table, base-image detection, and deferred features.
+
 Or use the published container images (no local chapkit install needed):
 
 ```bash
@@ -219,6 +232,7 @@ See `docs/guides/` for comprehensive guides:
 - [Task Execution](docs/guides/task-execution.md) - Python functions and shell command templates
 - [CLI Scaffolding](docs/guides/cli-scaffolding.md) - Project scaffolding with `chapkit init`
 - [MLproject Runner](docs/guides/mlproject-runner.md) - Serve existing MLproject directories with `chapkit run`
+- [MLproject Migrate](docs/guides/mlproject-migrate.md) - Adopt an MLproject as a chapkit project with `chapkit migrate`
 - [Database Migrations](docs/guides/database-migrations.md) - Custom models and Alembic migrations
 
 Full documentation: https://dhis2-chap.github.io/chapkit/

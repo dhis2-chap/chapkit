@@ -40,7 +40,8 @@ This is the easiest way to test your service - it handles starting and stopping 
 | `--configs` | `-c` | `1` | Number of configs to create |
 | `--trainings` | `-t` | `1` | Training jobs per config |
 | `--predictions` | `-p` | `1` | Predictions per trained model |
-| `--rows` | `-r` | `100` | Target rows in training data (locations x periods) |
+| `--rows` | `-r` | `250` | Target rows in training data (locations x periods). Default is 50 periods x 5 locations (~4 years monthly, ~1 year weekly). Most epi / climate-health models expect >=2 years of training data; bump for weekly period types or long-context models. |
+| `--predict-rows` | | `150` | Target rows in historic + future prediction data (each). Default is 30 periods x 5 locations (~2.5 years monthly). Enough headroom for lag-based models with up to ~6 target lags; bump for models with longer context windows or weekly period types. |
 | `--timeout` | | `60.0` | Job completion timeout (seconds) |
 | `--delay` | `-d` | `1.0` | Delay between job submissions (seconds) |
 | `--verbose` | `-v` | `false` | Show detailed output |
@@ -97,6 +98,20 @@ Use weekly periods instead of monthly:
 ```bash
 chapkit test --start-service --period-type weekly --save-data
 # Generates periods like 2020-W01, 2020-W02, etc.
+```
+
+For weekly models, bump the row counts so you still get >=2 years of context:
+
+```bash
+# 2 years weekly = 104 periods x 5 locations = 520 rows of training,
+# with a 60-period (~1.15 year) historic+future window for prediction.
+chapkit test --period-type weekly --rows 520 --predict-rows 300
+```
+
+Models that use lag-based feature transformations (e.g. multistep forecasters with `N_TARGET_LAGS` > 6) can fail at the predict stage if the historic data window is smaller than the training window — the derived-feature column count won't match. If you see an error like `X in predict methods must have same columns as X in fit`, increase `--predict-rows` so historic has at least as many periods as the model's largest lag:
+
+```bash
+chapkit test --rows 500 --predict-rows 250  # longer-context model
 ```
 
 Use point geometries instead of polygons:
