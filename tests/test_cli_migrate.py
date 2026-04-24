@@ -425,6 +425,9 @@ def test_full_run_moves_chaff_and_writes_outputs(tmp_path: Path) -> None:
     # Commands use ShellModelRunner's template vocabulary, not literal filenames.
     assert "Rscript train.R {data_file} model config.yml" in source
     assert "Rscript predict.R model {historic_file} {future_file} {output_file} config.yml" in source
+    # Migrated projects opt into chap-core's nested config.yml shape so ported
+    # train/predict scripts can read config["user_option_values"][...] unchanged.
+    assert 'config_format="chap_core"' in source
     # Persistent SQLite block is always emitted.
     assert 'os.getenv("DATABASE_URL"' in source
     assert "db_path.parent.mkdir" in source

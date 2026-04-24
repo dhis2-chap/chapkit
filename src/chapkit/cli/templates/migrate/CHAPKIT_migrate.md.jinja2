@@ -102,6 +102,40 @@ typed fields. At runtime chapkit serialises the validated config to
 `config.yml` in the workspace; your scripts read it via whatever YAML
 parser they already use (`yaml.load_file` in R, `yaml.safe_load` in Python).
 
+### `config.yml` layout (`config_format`)
+
+`ShellModelRunner` is wired with `config_format="chap_core"` so the generated
+`config.yml` matches chap-core's `ModelConfiguration` shape:
+
+```yaml
+prediction_periods: 3
+additional_continuous_covariates: [rainfall, mean_temperature]
+user_option_values:
+  n_lags: 3
+  precision: 0.01
+```
+
+Reserved fields (`prediction_periods`, `additional_continuous_covariates`) stay
+at the top level; everything else you add to the config class nests under
+`user_option_values`. This is what MLproject-authored scripts from the
+`chap-models` ecosystem already expect — they reach for
+`config["user_option_values"]["<option>"]` (Python) or
+`config$user_option_values$<option>` (R) unchanged.
+
+If your scripts are new or you prefer a flat layout, change `config_format` to
+`"flat"` in `main.py` and read fields directly as top-level keys:
+
+```yaml
+prediction_periods: 3
+additional_continuous_covariates: [rainfall, mean_temperature]
+n_lags: 3
+precision: 0.01
+```
+
+The flat layout is the default for `chapkit init` scaffolds; it's a good fit
+when you control the scripts and don't need chap-core compatibility. Pick one
+layout and keep your scripts aligned with it.
+
 ## Links
 
 - [chapkit](https://github.com/dhis2-chap/chapkit)

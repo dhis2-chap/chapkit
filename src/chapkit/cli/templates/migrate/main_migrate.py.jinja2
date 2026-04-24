@@ -48,9 +48,14 @@ class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
 # predict time. Literal paths `model` (your script saves/loads it; preserved
 # across train -> predict via workspace copy) and `config.yml` (always written
 # by chapkit from the config above) stay verbatim.
+# config_format="chap_core" writes config.yml in chap-core's ModelConfiguration
+# shape (prediction_periods + additional_continuous_covariates at the top level,
+# remaining fields nested under user_option_values) so scripts ported from
+# chap-models repos can read config["user_option_values"][...] unchanged.
 runner: ShellModelRunner[{{ PROJECT_CLASS_NAME }}Config] = ShellModelRunner(
     train_command="{{ TRAIN_COMMAND }}",
     predict_command="{{ PREDICT_COMMAND }}",
+    config_format="chap_core",
 )
 
 info = MLServiceInfo(
