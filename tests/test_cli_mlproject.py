@@ -337,6 +337,49 @@ def test_python_identifier_is_valid() -> None:
     assert _python_identifier("") == "MLProject"
 
 
+def test_suggest_chapkit_image_picks_r_for_r_scripts(tmp_path: Path) -> None:
+    """Light-touch detection used by chapkit run's docker hint picks chapkit-r for bare R."""
+    from chapkit.cli.run import _suggest_chapkit_image
+
+    _write_mlproject(tmp_path, MINIMALIST_MLPROJECT)
+    (tmp_path / "train.r").write_text("df <- read.csv('x')\n")
+    (tmp_path / "predict.r").write_text("df <- read.csv('x')\n")
+    mlproject = parse_mlproject(tmp_path)
+    assert _suggest_chapkit_image(tmp_path, mlproject) == "chapkit-r"
+
+
+def test_suggest_chapkit_image_picks_r_inla_when_INLA_used(tmp_path: Path) -> None:
+    """library(INLA) in an R script bumps the suggestion to chapkit-r-inla."""
+    from chapkit.cli.run import _suggest_chapkit_image
+
+    _write_mlproject(tmp_path, MINIMALIST_MLPROJECT)
+    (tmp_path / "train.R").write_text("library(INLA)\n")
+    (tmp_path / "predict.R").write_text("library(INLA)\n")
+    mlproject = parse_mlproject(tmp_path)
+    assert _suggest_chapkit_image(tmp_path, mlproject) == "chapkit-r-inla"
+
+
+def test_suggest_chapkit_image_picks_py_for_python(tmp_path: Path) -> None:
+    """Python-only MLproject picks chapkit-py."""
+    from chapkit.cli.run import _suggest_chapkit_image
+
+    _write_mlproject(
+        tmp_path,
+        """
+name: py_model
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+""",
+    )
+    (tmp_path / "train.py").write_text("import pandas\n")
+    (tmp_path / "predict.py").write_text("import pandas\n")
+    mlproject = parse_mlproject(tmp_path)
+    assert _suggest_chapkit_image(tmp_path, mlproject) == "chapkit-py"
+
+
 def test_run_command_errors_cleanly_when_no_mlproject(tmp_path: Path) -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["run", str(tmp_path)])

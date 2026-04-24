@@ -52,6 +52,59 @@ def _warn_about_env(mlproject: MLProject) -> None:
     typer.echo("", err=True)
 
 
+def _suggest_chapkit_image(project_dir: Path, mlproject: MLProject) -> str:
+    """Pick the chapkit-images base image best suited to this MLproject.
+
+    Light-touch variant of migrate's detect_base_image - just returns the
+    `chapkit-py` / `chapkit-r` / `chapkit-r-inla` suffix so we can print a
+    ready-made `docker run` one-liner. R + INLA detection mirrors migrate:
+    `library(INLA)` / `library(fmesher)` in any root-level R script, or a
+    `docker_r_inla` image in the MLproject's docker_env.
+    """
+    has_r = any(project_dir.glob("*.r")) or any(project_dir.glob("*.R"))
+    has_py = any(project_dir.glob("*.py"))
+    docker_env_image = mlproject.env_hints.get("docker_env", "")
+    uses_inla = docker_env_image.startswith("ghcr.io/dhis2-chap/docker_r_inla")
+    if not uses_inla and has_r:
+        for script in project_dir.glob("*.[rR]"):
+            try:
+                text = script.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if "library(INLA)" in text or "library(fmesher)" in text or 'library("INLA")' in text:
+                uses_inla = True
+                break
+    if has_r and uses_inla:
+        return "chapkit-r-inla"
+    if has_r:
+        return "chapkit-r"
+    if has_py:
+        return "chapkit-py"
+    # Ambiguous (no .r/.R/.py at root); default to Python - works for MLprojects that
+    # call into compiled binaries or do all work inside the entry-point commands.
+    return "chapkit-py"
+
+
+def _print_docker_hint(project_dir: Path, mlproject: MLProject, port: int) -> None:
+    """Tell the user how to run the same MLproject via the prebuilt chapkit-images.
+
+    Skipped when the host already looks like a chapkit container so we don't nest
+    the hint inside itself.
+    """
+    if Path("/app/.venv/bin/chapkit").exists():
+        return
+    image = _suggest_chapkit_image(project_dir, mlproject)
+    platform_flag = " --platform=linux/amd64" if image == "chapkit-r-inla" else ""
+    typer.echo("")
+    typer.echo("Tip: to run the same MLproject in Docker (no local R/Python env needed):")
+    typer.echo(
+        f"  docker run --rm -p {port}:8000{platform_flag} -v {project_dir}:/work ghcr.io/dhis2-chap/{image}:latest"
+    )
+    typer.echo("  # chapkit-images ship WORKDIR=/work + CMD=chapkit run . built-in; model-specific R / Python")
+    typer.echo("  # packages need to be installed separately (e.g. `chapkit migrate` + `docker build`).")
+    typer.echo("")
+
+
 def run_command(
     path: Annotated[
         Path,
@@ -102,6 +155,8 @@ def run_command(
     typer.echo(f"  source: {mlproject_file}")
     typer.echo(f"  train:   {train_command}")
     typer.echo(f"  predict: {predict_command}")
+
+    _print_docker_hint(project_dir, mlproject, port)
 
     os.chdir(project_dir)
 

@@ -115,11 +115,11 @@ The published container images (below) set `PATH` correctly so this is a non-iss
 
 Chapkit publishes three base images for `chapkit run`, all built on `debian:trixie-slim`. The Dockerfiles and publish workflow live in the companion [dhis2-chap/chapkit-images](https://github.com/dhis2-chap/chapkit-images) repo so image builds don't block chapkit's own CI:
 
-| Image                                          | Contents                                                                                        | Architectures                  | Typical size |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
-| `ghcr.io/dhis2-chap/chapkit-py:latest`         | Python 3.13, chapkit, uv, `build-essential`, `pkg-config`                                       | `linux/amd64`, `linux/arm64`   | ~920 MB      |
-| `ghcr.io/dhis2-chap/chapkit-r:latest`          | R 4.5 + `renv` + `pak` + common dev libs, Python 3.13, chapkit, uv                              | `linux/amd64`, `linux/arm64`   | ~1.2 GB      |
-| `ghcr.io/dhis2-chap/chapkit-r-inla:latest`     | R 4.5 + INLA + spatial/time-series R stack (sf, spdep, dlnm, tsModel, ...), Python 3.13, chapkit | `linux/amd64` (INLA x86_64 only) | ~3-4 GB      |
+| Image                                          | Contents                                                                                        | Architectures                  | Typical size (amd64) |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ | -------------------- |
+| `ghcr.io/dhis2-chap/chapkit-py:latest`         | Python 3.13, chapkit, uv                                                                         | `linux/amd64`, `linux/arm64`   | ~220 MB              |
+| `ghcr.io/dhis2-chap/chapkit-r:latest`          | R 4.5 + `renv` + `pak`, Python 3.13, chapkit, uv                                                 | `linux/amd64`, `linux/arm64`   | ~400 MB              |
+| `ghcr.io/dhis2-chap/chapkit-r-inla:latest`     | R 4.5 + INLA + spatial/time-series R stack (sf, spdep, dlnm, tsModel, sn, xgboost, ...), Python 3.13, chapkit | `linux/amd64` (INLA x86_64 only) | ~570 MB              |
 
 Which one to pick:
 
