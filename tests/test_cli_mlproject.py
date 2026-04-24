@@ -131,36 +131,6 @@ def test_parse_ewars(tmp_path: Path) -> None:
     assert mlproject.env_hints == {"docker_env": "ghcr.io/dhis2-chap/docker_r_inla:master"}
 
 
-def test_parse_additional_continuous_covariates(tmp_path: Path) -> None:
-    """MLproject's additional_continuous_covariates list is parsed into the model."""
-    contents = """
-name: three_climate_model
-additional_continuous_covariates:
-  - rainfall
-  - mean_temperature
-  - mean_relative_humidity
-entry_points:
-  train:
-    command: "python train.py {train_data} {model}"
-  predict:
-    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
-"""
-    _write_mlproject(tmp_path, contents)
-    mlproject = parse_mlproject(tmp_path)
-    assert mlproject.additional_continuous_covariates == [
-        "rainfall",
-        "mean_temperature",
-        "mean_relative_humidity",
-    ]
-
-
-def test_parse_additional_continuous_covariates_absent_is_empty(tmp_path: Path) -> None:
-    """When MLproject omits the field the parser returns an empty list."""
-    _write_mlproject(tmp_path, MINIMALIST_MLPROJECT)
-    mlproject = parse_mlproject(tmp_path)
-    assert mlproject.additional_continuous_covariates == []
-
-
 def test_parse_rejects_missing_train_entry_point(tmp_path: Path) -> None:
     contents = """
 name: broken

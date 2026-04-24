@@ -377,7 +377,6 @@ def build_service_info_context(mlproject: MLProject) -> dict[str, Any]:
         "META_DOCUMENTATION_URL": _url_or_none("documentation_url"),
         "PERIOD_TYPE": period_type,
         "REQUIRED_COVARIATES": list(mlproject.required_covariates),
-        "ADDITIONAL_CONTINUOUS_COVARIATES": list(mlproject.additional_continuous_covariates),
         "ALLOW_FREE_COVARIATES": mlproject.allow_free_additional_continuous_covariates,
         "REQUIRES_GEO": mlproject.requires_geo,
     }

@@ -75,34 +75,6 @@ class ewars_templateConfig(BaseConfig):
 
 `prediction_periods: int = 3` is injected automatically if your MLproject doesn't declare it — chapkit's ML runner requires it.
 
-## Covariate declarations
-
-Migrate recognises three covariate-related fields on the MLproject and carries them into the correct home in the generated `main.py`:
-
-| MLproject field | Emitted at | Purpose |
-|-----------------|------------|---------|
-| `required_covariates: [...]` | `MLServiceInfo.required_covariates` | Columns the model cannot function without. chap-core refuses to dispatch to the model if a dataset is missing any of these. Use when your train/predict scripts hardcode feature names. |
-| `additional_continuous_covariates: [...]` | `<Name>Config.additional_continuous_covariates` default | The list of *configurable* climate covariates the model will use unless an orchestrator POSTs a config overriding it. Use when the model genuinely flexes with the list (scripts read the list from `config.yml` rather than hardcoding). |
-| `allow_free_additional_continuous_covariates: true` | `MLServiceInfo.allow_free_additional_continuous_covariates` | Gates whether the orchestrator may POST a config with climate covariates your model didn't declare. Off by default. |
-
-Example MLproject:
-
-```yaml
-name: my_model
-required_covariates:
-  - disease_cases
-  - population
-additional_continuous_covariates:
-  - rainfall
-  - mean_temperature
-  - mean_relative_humidity
-allow_free_additional_continuous_covariates: true
-```
-
-If your MLproject does not declare `additional_continuous_covariates`, the generated Config class falls back to `["rainfall", "mean_temperature"]` (the common chap-core ecosystem pin for disease-surveillance models). Delete or edit that block post-migrate if it doesn't match your model.
-
-**Picking the right bucket.** A column belongs in `required_covariates` if removing it would break the model; in `additional_continuous_covariates` if the model will happily run without it but lags it as a predictor when supplied. When in doubt, prefer `required_covariates` — it's the stricter contract and chap-core will gate dispatch on it.
-
 ## Interactive prompts
 
 By default migrate asks for confirmation before executing the plan, asks for missing filename mappings if a placeholder like `{dataset}` isn't in the canonical set (`train_data`, `historic_data`, `future_data`, `out_file`, `model`, `model_config`, `polygons`), and asks before accepting an ambiguous base-image pick. `--yes` skips all prompts with the sensible defaults; `--dry-run` never prompts.
