@@ -35,6 +35,7 @@ nav:
       - MLproject Runner: guides/mlproject-runner.md
       - MLproject Migration Checklist: guides/mlproject-migration-checklist.md
       - MLproject Migrate: guides/mlproject-migrate.md
+      - Deploying to chap-core: guides/deploying-to-chap-core.md
       - Testing ML Services: guides/testing-ml-services.md
       - Configuration Management: guides/configuration-management.md
       - Artifact Storage: guides/artifact-storage.md
