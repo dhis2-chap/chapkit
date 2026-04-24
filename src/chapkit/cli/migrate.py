@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import fnmatch
+import json
+import keyword
+import re
 import shutil
 import tomllib
 from dataclasses import dataclass
@@ -269,13 +272,32 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
             continue
         if not isinstance(env_data, dict):
             continue
-        for entry in env_data.get("dependencies", []) or []:
-            # conda envs can have dict entries like {"pip": ["pkg==1.0", ...]}
+        raw_deps = env_data.get("dependencies", []) or []
+        # Detect conda-style: any dict-entry with a `pip:` list, or conventional
+        # conda filenames, or MLproject's conda_env pointer. In conda files the
+        # top-level `dependencies:` mixes conda packages (python=3.11, bare
+        # `pip`, conda-forge::pkg, ...) with a nested `{pip: [...]}` block - only
+        # the pip block is pip-installable, the rest is conda-native syntax that
+        # would break `uv pip install` if passed through.
+        is_conda = (
+            env_path.name in ("conda.yaml", "conda.yml", "environment.yaml", "environment.yml")
+            or (
+                mlproject is not None
+                and mlproject.env_hints.get("conda_env")
+                and (project_path / mlproject.env_hints["conda_env"]).resolve() == env_path.resolve()
+            )
+            or any(isinstance(entry, dict) and "pip" in entry for entry in raw_deps)
+        )
+        for entry in raw_deps:
             if isinstance(entry, dict):
-                for sublist in entry.values():
-                    if isinstance(sublist, list):
+                for key, sublist in entry.items():
+                    if key == "pip" and isinstance(sublist, list):
                         for sub in sublist:
                             _add(sub)
+            elif is_conda:
+                # Skip conda-native scalars (python=3.11, pip, conda-forge::pkg, ...)
+                # that aren't pip-installable as-is.
+                continue
             else:
                 _add(entry)
     return kept
@@ -382,10 +404,33 @@ def build_service_info_context(mlproject: MLProject) -> dict[str, Any]:
     }
 
 
-def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str, str | None]]:
-    """Turn MLproject user_options into (field_name, python_type, default_repr, description?) tuples."""
+def _python_field_name(raw: str) -> str:
+    """Normalize an MLproject user_option name to a valid Python identifier.
+
+    Replaces invalid characters (hyphens, dots, spaces, etc.) with underscores,
+    prefixes a leading digit with an underscore, and suffixes Python keywords.
+    Raises MigrateError if the name cannot be sanitized.
+    """
+    normalized = re.sub(r"[^A-Za-z0-9_]+", "_", raw).strip("_")
+    if normalized and normalized[0].isdigit():
+        normalized = "_" + normalized
+    if keyword.iskeyword(normalized):
+        normalized = normalized + "_"
+    if not normalized or not normalized.isidentifier():
+        raise MigrateError(f"user_option name {raw!r} cannot be sanitized to a valid Python identifier")
+    return normalized
+
+
+def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str, str | None, str | None]]:
+    """Turn MLproject user_options into (field_name, python_type, default_repr, description, alias) tuples.
+
+    `alias` is populated only when the MLproject option name is not already a valid Python
+    identifier - the generated Field then uses `alias="<original>"` so the wire contract
+    (POSTed configs, config.yml keys) keeps the original name while Python code uses the
+    sanitized identifier.
+    """
     type_names = {int: "int", float: "float", str: "str", bool: "bool"}
-    fields: list[tuple[str, str, str, str | None]] = []
+    fields: list[tuple[str, str, str, str | None, str | None]] = []
     seen: set[str] = set()
     for opt_name, opt_body in mlproject.user_options.items():
         declared_type = str(opt_body.get("type", "string")).lower()
@@ -398,12 +443,18 @@ def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str, str |
             default_repr = "..."
         raw_desc = opt_body.get("description")
         description = str(raw_desc).strip() if isinstance(raw_desc, str) and raw_desc.strip() else None
-        fields.append((opt_name, type_name, default_repr, description))
-        seen.add(opt_name)
+        field_name = _python_field_name(opt_name)
+        alias = opt_name if field_name != opt_name else None
+        if field_name in seen:
+            raise MigrateError(
+                f"user_option {opt_name!r} normalizes to {field_name!r}, which collides with an earlier option"
+            )
+        fields.append((field_name, type_name, default_repr, description, alias))
+        seen.add(field_name)
     if "prediction_periods" not in seen:
         fields.insert(
             0,
-            ("prediction_periods", "int", "3", "Number of periods to predict into the future."),
+            ("prediction_periods", "int", "3", "Number of periods to predict into the future.", None),
         )
     return fields
 
@@ -415,6 +466,12 @@ def _render(template_dir: Path, template_name: str, context: dict[str, Any]) -> 
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    # Jinja's built-in `tojson` filter always wraps output with htmlsafe_json_dumps,
+    # which escapes <, >, &, ' as unicode sequences (`>` -> `>`). That's correct
+    # for HTML but unreadable in Python / TOML / YAML output, turning `chapkit>=0.19`
+    # into `chapkit>=0.19`. Override `tojson` with plain json.dumps so literals
+    # stay readable; our templates are never HTML.
+    env.filters["tojson"] = json.dumps
     return env.get_template(template_name).render(**context)
 
 

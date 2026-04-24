@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -331,14 +332,16 @@ def test_build_config_fields_ewars_user_options(tmp_path: Path) -> None:
     (tmp_path / "MLproject").write_text(EWARS_MLPROJECT)
     mlproject = parse_mlproject(tmp_path)
     fields = build_config_fields(mlproject)
-    by_name = {name: (ty, default, desc) for name, ty, default, desc in fields}
+    by_name = {name: (ty, default, desc, alias) for name, ty, default, desc, alias in fields}
     # prediction_periods is injected automatically; its description is set by migrate.
     assert by_name["prediction_periods"][:2] == ("int", "3")
     assert by_name["prediction_periods"][2] is not None
+    assert by_name["prediction_periods"][3] is None
     # user_options without descriptions carry None forward (ewars_template's n_lags/precision
-    # in the test fixture declare no description).
-    assert by_name["n_lags"] == ("int", "3", None)
-    assert by_name["precision"] == ("float", "0.01", None)
+    # in the test fixture declare no description). Both names are already valid Python
+    # identifiers, so alias is None.
+    assert by_name["n_lags"] == ("int", "3", None, None)
+    assert by_name["precision"] == ("float", "0.01", None, None)
 
 
 def test_build_config_fields_description_pulled_from_user_option(tmp_path: Path) -> None:
@@ -358,7 +361,7 @@ entry_points:
 """
     )
     mlproject = parse_mlproject(tmp_path)
-    fields = {name: desc for name, _ty, _default, desc in build_config_fields(mlproject)}
+    fields = {name: desc for name, _ty, _default, desc, _alias in build_config_fields(mlproject)}
     assert fields["n_lags"] == "Number of temporal lags included in the INLA basis."
 
 
@@ -370,6 +373,159 @@ def test_build_config_fields_minimalist_only_prediction_periods(tmp_path: Path) 
     assert len(fields) == 1
     assert fields[0][:3] == ("prediction_periods", "int", "3")
     assert fields[0][3] is not None
+    assert fields[0][4] is None
+
+
+def test_build_config_fields_aliases_nonidentifier_names(tmp_path: Path) -> None:
+    """MLproject option names that aren't Python identifiers get aliased."""
+    (tmp_path / "MLproject").write_text(
+        """
+name: hyphens_in_options
+user_options:
+  n-lags:
+    type: integer
+    default: 3
+  class:
+    type: string
+    default: forecast
+  1st_period:
+    type: integer
+    default: 1
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    )
+    mlproject = parse_mlproject(tmp_path)
+    fields = build_config_fields(mlproject)
+    by_alias = {alias: name for name, _ty, _default, _desc, alias in fields if alias is not None}
+    # Hyphens become underscores; alias preserves the wire name.
+    assert by_alias["n-lags"] == "n_lags"
+    # Python keyword suffixed.
+    assert by_alias["class"] == "class_"
+    # Leading digit prefixed.
+    assert by_alias["1st_period"] == "_1st_period"
+
+
+def test_generated_main_py_emits_alias_when_option_name_has_hyphen(tmp_path: Path) -> None:
+    """Migrated projects with hyphenated user_options produce valid Python main.py with Field(alias=...)."""
+    mlproject_yaml = """
+name: hyphens_in_options
+user_options:
+  n-lags:
+    type: integer
+    default: 3
+    description: Temporal lags.
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    source = (tmp_path / "main.py").read_text()
+    # Python field name is the normalized identifier.
+    assert "n_lags: int = Field(" in source
+    # Wire-format name preserved via alias.
+    assert 'alias="n-lags"' in source
+    # And the generated source parses cleanly.
+    ast.parse(source)
+
+
+def test_train_predict_commands_with_quotes_render_as_valid_python(tmp_path: Path) -> None:
+    """MLproject commands containing quotes round-trip through tojson into valid Python."""
+    mlproject_yaml = r"""
+name: quoted_flags
+entry_points:
+  train:
+    command: 'python train.py --flag "a b" {train_data} {model}'
+  predict:
+    command: 'python predict.py --mode "x" {model} {historic_data} {future_data} {out_file}'
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    source = (tmp_path / "main.py").read_text()
+    # Must parse cleanly - this is the main.py the user will run.
+    tree = ast.parse(source)
+    # Locate the ShellModelRunner(...) call and pull out train_command / predict_command literals.
+    runner_kwargs: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "ShellModelRunner":
+            for kw in node.keywords:
+                if kw.arg in ("train_command", "predict_command") and isinstance(kw.value, ast.Constant):
+                    value = kw.value.value
+                    assert isinstance(value, str)
+                    runner_kwargs[kw.arg] = value
+    assert 'python train.py --flag "a b"' in runner_kwargs["train_command"]
+    assert 'python predict.py --mode "x"' in runner_kwargs["predict_command"]
+
+
+def test_generated_pyproject_escapes_quotes_in_description(tmp_path: Path) -> None:
+    """Descriptions containing double-quotes produce valid TOML."""
+    mlproject_yaml = r"""
+name: quoted_description
+meta_data:
+  description: 'A model with "quoted" metadata and a \ backslash'
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    # Parse the generated pyproject.toml with tomllib - this is what uv / pip do.
+    toml_bytes = (tmp_path / "pyproject.toml").read_bytes()
+    parsed = tomllib.loads(toml_bytes.decode("utf-8"))
+    assert 'with "quoted" metadata' in parsed["project"]["description"]
+
+
+def test_conda_env_only_extracts_pip_sublist(tmp_path: Path) -> None:
+    """conda.yaml's dependencies mix conda scalars and a nested pip list - only pip entries are used."""
+    mlproject_yaml = """
+name: conda_model
+conda_env: conda.yaml
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+"""
+    conda_yaml = """
+name: myenv
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - conda-forge::numpy=1.26
+  - pip:
+      - pandas>=2.0,<2.1
+      - statsmodels==0.14.1
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "...", "conda.yaml": conda_yaml})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    generated = (tmp_path / "pyproject.toml").read_text()
+    # pip sub-list carried through verbatim.
+    assert '"pandas>=2.0,<2.1"' in generated
+    assert '"statsmodels==0.14.1"' in generated
+    # Conda-native scalars filtered out - they'd break uv pip install.
+    assert "python=3.11" not in generated
+    assert "conda-forge::numpy" not in generated
+    # Bare `pip` isn't a pip-installable requirement either; must be excluded.
+    lines = [ln.strip() for ln in generated.splitlines()]
+    assert '"pip",' not in lines
 
 
 def test_dry_run_changes_nothing(tmp_path: Path) -> None:

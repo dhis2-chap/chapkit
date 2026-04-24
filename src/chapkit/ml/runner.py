@@ -101,8 +101,16 @@ _CHAP_CORE_RESERVED_FIELDS: frozenset[str] = frozenset({"prediction_periods", "a
 
 
 def dump_config_yaml(config: BaseConfig, format: Literal["flat", "chap_core"] = "flat") -> str:
-    """Serialize a config to YAML for workspace config.yml."""
-    payload = config.model_dump()
+    """Serialize a config to YAML for workspace config.yml.
+
+    Dumps with by_alias=True so fields declared with `Field(alias="...")` emit the
+    wire-format name instead of the Python attribute name. That keeps the YAML in
+    sync with the contract scripts expect - for instance, an MLproject user_option
+    `n-lags` is stored on the Python class as `n_lags` (Field(alias="n-lags")) but
+    scripts read `config["user_option_values"]["n-lags"]`, so the YAML must use
+    the hyphen form. Fields without aliases are unaffected.
+    """
+    payload = config.model_dump(by_alias=True)
     if format == "chap_core":
         top: dict[str, Any] = {k: payload[k] for k in _CHAP_CORE_RESERVED_FIELDS if k in payload}
         user_option_values = {k: v for k, v in payload.items() if k not in _CHAP_CORE_RESERVED_FIELDS}

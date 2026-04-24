@@ -13,15 +13,20 @@ from pydantic import Field
 class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
     """Configuration for {{ PROJECT_NAME }}."""
 
-{% for name, py_type, default_repr, description in CONFIG_FIELDS %}
-{% if description %}
+{% for name, py_type, default_repr, description, alias in CONFIG_FIELDS %}
+{% if description or alias %}
     {{ name }}: {{ py_type }} = Field(
 {% if default_repr == '...' %}
         ...,
 {% else %}
         default={{ default_repr }},
 {% endif %}
+{% if description %}
         description={{ description | tojson }},
+{% endif %}
+{% if alias %}
+        alias={{ alias | tojson }},
+{% endif %}
     )
 {% else %}
     {{ name }}: {{ py_type }} = {{ default_repr }}
@@ -53,8 +58,8 @@ class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
 # remaining fields nested under user_option_values) so scripts ported from
 # chap-models repos can read config["user_option_values"][...] unchanged.
 runner: ShellModelRunner[{{ PROJECT_CLASS_NAME }}Config] = ShellModelRunner(
-    train_command="{{ TRAIN_COMMAND }}",
-    predict_command="{{ PREDICT_COMMAND }}",
+    train_command={{ TRAIN_COMMAND | tojson }},
+    predict_command={{ PREDICT_COMMAND | tojson }},
     config_format="chap_core",
 )
 
