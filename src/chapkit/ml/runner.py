@@ -10,7 +10,7 @@ import tempfile
 import zipfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Generic, Literal, TypeVar
 
 import yaml
 from geojson_pydantic import FeatureCollection
@@ -18,8 +18,16 @@ from servicekit.logging import get_logger
 
 from chapkit.config.schemas import BaseConfig
 from chapkit.data import DataFrame
-from chapkit.ml.schemas import ValidationDiagnostic
 from chapkit.utils import run_shell
+
+if TYPE_CHECKING:
+    # Typing-only: every use of ValidationDiagnostic below is a type annotation
+    # (stringified via `from __future__ import annotations`) or a lazily-evaluated
+    # PEP 695 `type` alias. Keeping the import guarded means this module loads
+    # cleanly even when installed alongside an older chapkit where
+    # ValidationDiagnostic did not yet exist - which matters when a container
+    # ships a pinned chapkit version and we volume-mount this file on top.
+    from chapkit.ml.schemas import ValidationDiagnostic
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
 
