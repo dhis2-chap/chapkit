@@ -86,7 +86,13 @@ docker build -t my-model:dev .
 docker run --rm -p 8000:8000 my-model:dev
 ```
 
-**If your model has R or other system dependencies**, swap the base image. The ewars model uses `ghcr.io/mortenoh/r-docker-images/my-r-inla-mini:latest` and pins `--platform=linux/amd64` because R-INLA is amd64-only; on Apple Silicon it runs emulated. See the ewars [`Dockerfile`](https://github.com/chap-models/chapkit_ewars_model/blob/main/Dockerfile) for the pattern.
+**If your model has R or other system dependencies**, swap the base image for one of the pre-built [chapkit-images](https://github.com/dhis2-chap/chapkit-images):
+
+- `ghcr.io/dhis2-chap/chapkit-py:latest` — Python (multi-arch).
+- `ghcr.io/dhis2-chap/chapkit-r:latest` — R without INLA (multi-arch).
+- `ghcr.io/dhis2-chap/chapkit-r-inla:latest` — R + INLA (amd64 only; add `--platform=linux/amd64` and expect emulation on Apple Silicon).
+
+See [MLproject Runner → Running in a Container](mlproject-runner.md#running-in-a-container) for the full image table (sizes, architectures, contents) and [chapkit migrate → Base image auto-detection](mlproject-migrate.md#base-image-auto-detection) for how the right base is picked when adopting an existing MLproject.
 
 ## Step 5 — Publish to GHCR
 
@@ -228,11 +234,9 @@ To put the DB somewhere else, set an absolute `DATABASE_URL` (note the four slas
 
 ---
 
-## Appendix — ewars reference files
-
-All four files together make up the canonical end-to-end example:
+## Appendix — reference files
 
 - [`chapkit_ewars_model/main.py`](https://github.com/chap-models/chapkit_ewars_model/blob/main/main.py) — `MLServiceInfo`, `ShellModelRunner`, `.with_registration()`.
-- [`chapkit_ewars_model/Dockerfile`](https://github.com/chap-models/chapkit_ewars_model/blob/main/Dockerfile) — R-INLA base + uv for the Python layer.
-- [`chapkit_ewars_model/.github/workflows/publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) — GHCR publish on push to `main`.
+- [`chapkit_ewars_model/.github/workflows/publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) — a fuller GHCR publish workflow with cache, semver tags, and SLSA attestations.
 - [`chap-core/compose.ewars.yml`](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml) — the overlay that drops the image onto the chap-core network and triggers self-registration.
+- [`dhis2-chap/chapkit-images`](https://github.com/dhis2-chap/chapkit-images) — Dockerfiles and publish workflow for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` base images referenced throughout this guide.
