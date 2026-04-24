@@ -547,6 +547,56 @@ importlib-metadata; python_version < "3.10"
     assert "-r base.txt" not in lines
 
 
+def test_requirements_txt_constraint_file_is_passthrough_not_recursed(tmp_path: Path) -> None:
+    """`-c constraints.txt` is preserved verbatim; its entries are NOT installed as deps.
+
+    pip semantics: constraint files bound versions for packages pulled in elsewhere; they
+    don't cause installation. Recursing them into the dep list would silently install
+    packages the user never asked for.
+    """
+    constraints_txt = """\
+# lower bounds the project relies on when pulled in transitively
+django<5
+only-if-someone-else-needs-me==1.2.3
+"""
+    main_requirements = """\
+-c constraints.txt
+pandas>=2.0
+"""
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "requirements.txt": main_requirements,
+            "constraints.txt": constraints_txt,
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    # constraints.txt lives at the project root (not chaff) so `-c constraints.txt`
+    # in the generated requirements.txt resolves at build time.
+    assert (tmp_path / "constraints.txt").is_file()
+
+    # The -c directive itself is preserved verbatim in the generated requirements.txt,
+    # NOT inlined as deps.
+    generated_reqs = (tmp_path / "requirements.txt").read_text()
+    assert "-c constraints.txt" in generated_reqs
+    assert "pandas>=2.0" in generated_reqs
+    # Constraint entries must NOT leak into deps - that is the bug this test guards against.
+    assert "django" not in generated_reqs
+    assert "only-if-someone-else-needs-me" not in generated_reqs
+
+    # Same story in the generated pyproject.toml: pandas yes, constraint entries no.
+    generated_pyproject = (tmp_path / "pyproject.toml").read_text()
+    assert '"pandas>=2.0"' in generated_pyproject
+    assert "django" not in generated_pyproject
+    assert "only-if-someone-else-needs-me" not in generated_pyproject
+
+
 def test_requirements_txt_cycle_does_not_loop(tmp_path: Path) -> None:
     """Circular `-r` references are short-circuited via a visited-file set."""
     _seed_project(

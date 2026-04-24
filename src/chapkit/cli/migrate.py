@@ -251,10 +251,19 @@ def _parse_requirements_file(
         if not line:
             continue
 
-        # Directive handling. `-r`/`--requirement` and `-c`/`--constraint`
-        # recurse; index directives are preserved; `-e .` on the migrated
-        # project is a no-op (the generated project is a service, not an
-        # installable package) and is silently skipped.
+        # Directive handling.
+        # - `-r` / `--requirement` recurses: its entries are installable deps,
+        #   we inline them so the generated requirements.txt is self-contained.
+        # - `-c` / `--constraint` is preserved verbatim (emitted in the index
+        #   options block at the top of the generated requirements.txt) but NOT
+        #   recursed into. Constraint files bound versions for packages pulled
+        #   in elsewhere; treating their entries as deps would install packages
+        #   the user didn't ask for. The original constraint file stays at
+        #   root (not in chaff) so uv resolves the `-c` reference at build time.
+        # - Index directives (`--extra-index-url`, ...) are preserved verbatim.
+        # - `-e .` is silently skipped (migrated project is a service, not an
+        #   installable package).
+        # - Anything else prints a warning.
         if line.startswith("-"):
             tokens = line.split(None, 1)
             flag = tokens[0]
@@ -262,7 +271,7 @@ def _parse_requirements_file(
             # Handle `--flag=value` form too.
             if "=" in flag and flag.startswith("--"):
                 flag, _, rest = flag.partition("=")
-            if flag in ("-r", "--requirement", "-c", "--constraint"):
+            if flag in ("-r", "--requirement"):
                 if rest:
                     _parse_requirements_file(
                         (resolved.parent / rest).resolve(),
@@ -271,14 +280,15 @@ def _parse_requirements_file(
                         add_index_option,
                     )
                 continue
+            if flag in ("-c", "--constraint"):
+                if rest:
+                    add_index_option(f"-c {rest}")
+                continue
             if flag in _REQUIREMENTS_INDEX_DIRECTIVES:
                 add_index_option(line if rest else flag)
                 continue
             if flag in ("-e", "--editable") and rest.strip() in (".", "./"):
-                # `pip install -e .` on the migrated project is meaningless.
                 continue
-            # Unknown directive - surface to the user so they know something
-            # didn't translate automatically.
             typer.echo(
                 f"Warning: ignoring unrecognized directive in {resolved}: {line}",
                 err=True,
@@ -304,9 +314,13 @@ def _extract_user_dependencies(
 
     Sources, in order of precedence:
     1. pyproject.toml [project.dependencies] at the project root
-    2. requirements.txt at the project root. `-r other.txt` / `-c constraints.txt`
-       are followed recursively (cycle-safe); `--extra-index-url` and friends
-       are preserved; `-e .` is silently skipped; anything else prints a warning.
+    2. requirements.txt at the project root. `-r other.txt` is followed
+       recursively (cycle-safe) and its entries inlined as deps. `-c
+       constraints.txt` is preserved verbatim at the top of the generated
+       requirements.txt (constraint files bound versions for already-installed
+       packages; recursing them would install things the user didn't ask for).
+       `--extra-index-url` and friends are preserved; `-e .` is silently
+       skipped; anything else prints a warning.
     3. MLproject's python_env / conda_env file (MLflow-style YAML with a
        `dependencies:` list). Simple scalar deps are kept verbatim; nested
        pip-sub-dict entries inside a conda env are flattened.
