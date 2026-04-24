@@ -465,6 +465,87 @@ def _extract_user_dependencies(
     return kept, index_options
 
 
+def _split_index_options_for_pyproject(
+    options: list[str],
+    project_root: Path,
+) -> dict[str, Any]:
+    """Classify raw requirements.txt directive lines into pyproject [tool.uv] buckets.
+
+    The Dockerfile path installs via `-r requirements.txt` and honours the raw
+    directive block verbatim. The local `uv sync` path reads pyproject.toml,
+    which needs the same install context expressed as `[tool.uv]` keys so
+    private indexes resolve and constraint files actually bind versions.
+
+    Recognised flags:
+      --index-url URL         -> UV_INDEX_URL              (string)
+      --extra-index-url URL   -> UV_EXTRA_INDEX_URLS       (list of strings)
+      --find-links PATH_OR_URL-> UV_FIND_LINKS             (list of strings)
+      --no-index              -> UV_NO_INDEX               (bool)
+      --pre                   -> UV_PRE                    (bool; uv renders as prerelease = "allow")
+      -c PATH                 -> UV_CONSTRAINT_DEPENDENCIES (list of PEP 508 specs, inlined from the file)
+      --trusted-host HOST     -> deliberately dropped; uv has no pyproject key for this
+
+    For `-c <path>` the path is already relative to `project_root` (rewritten
+    by _parse_requirements_file), so we resolve it there, read the file, and
+    inline each non-directive requirement spec into constraint-dependencies.
+    URL-form `-c` values (rare) are ignored here - they only work at install
+    time through the Dockerfile's `-r requirements.txt` path.
+    """
+    extra_index_urls: list[str] = []
+    find_links: list[str] = []
+    index_url: str | None = None
+    constraint_deps: list[str] = []
+    seen_constraints: set[str] = set()
+    no_index = False
+    pre = False
+    for option in options:
+        tokens = option.split(None, 1)
+        if not tokens:
+            continue
+        flag = tokens[0]
+        rest = tokens[1].strip() if len(tokens) == 2 else ""
+        if flag == "--index-url" and rest:
+            index_url = rest
+        elif flag == "--extra-index-url" and rest:
+            if rest not in extra_index_urls:
+                extra_index_urls.append(rest)
+        elif flag == "--find-links" and rest:
+            if rest not in find_links:
+                find_links.append(rest)
+        elif flag == "--no-index":
+            no_index = True
+        elif flag == "--pre":
+            pre = True
+        elif flag == "-c" and rest and "://" not in rest:
+            target = (project_root / rest).resolve()
+            try:
+                constraint_text = target.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            for raw_line in constraint_text.splitlines():
+                stripped_leading = raw_line.lstrip()
+                if not stripped_leading or stripped_leading.startswith("#"):
+                    continue
+                head = _REQUIREMENTS_INLINE_COMMENT.sub("", raw_line).strip()
+                if not head or head.startswith("-"):
+                    # Nested directives in a constraint file are not expressible as
+                    # [tool.uv].constraint-dependencies entries; the docker path
+                    # still honours them via the raw -r/-c pass-through.
+                    continue
+                if _dep_name(head) in seen_constraints:
+                    continue
+                seen_constraints.add(_dep_name(head))
+                constraint_deps.append(head)
+    return {
+        "UV_INDEX_URL": index_url,
+        "UV_EXTRA_INDEX_URLS": extra_index_urls,
+        "UV_FIND_LINKS": find_links,
+        "UV_CONSTRAINT_DEPENDENCIES": constraint_deps,
+        "UV_NO_INDEX": no_index,
+        "UV_PRE": pre,
+    }
+
+
 def _any_r_script_uses(project_path: Path, packages: tuple[str, ...]) -> bool:
     for script in project_path.glob("*.[rR]"):
         try:
@@ -809,6 +890,7 @@ def _run(
     renders = list(_GENERATED_FILENAMES)
 
     user_deps, user_index_options = _extract_user_dependencies(project_path, mlproject)
+    uv_pyproject_options = _split_index_options_for_pyproject(user_index_options, project_path)
     # Prefer a meta_data description from the MLproject for the service description
     # (e.g. ewars_template has a nice paragraph). Fall back to our generic template.
     meta_description = mlproject.meta_data.get("description")
@@ -839,6 +921,7 @@ def _run(
         "HAS_USER_PYPROJECT": (project_path / "pyproject.toml").is_file(),
         "USER_DEPENDENCIES": user_deps,
         "USER_INDEX_OPTIONS": user_index_options,
+        **uv_pyproject_options,
         "CHAPKIT_VERSION": _get_chapkit_version(),
         **build_service_info_context(mlproject),
     }

@@ -590,11 +590,15 @@ pandas>=2.0
     assert "django" not in generated_reqs
     assert "only-if-someone-else-needs-me" not in generated_reqs
 
-    # Same story in the generated pyproject.toml: pandas yes, constraint entries no.
-    generated_pyproject = (tmp_path / "pyproject.toml").read_text()
-    assert '"pandas>=2.0"' in generated_pyproject
-    assert "django" not in generated_pyproject
-    assert "only-if-someone-else-needs-me" not in generated_pyproject
+    # In the generated pyproject.toml: pandas is a real dep, constraint entries land under
+    # [tool.uv].constraint-dependencies (constraint-only; they never turn into installable deps)
+    # so `uv sync` enforces the same version bounds as `uv pip install -r requirements.txt`.
+    parsed_pyproject = tomllib.loads((tmp_path / "pyproject.toml").read_text())
+    assert "pandas>=2.0" in parsed_pyproject["project"]["dependencies"]
+    assert "django" not in " ".join(parsed_pyproject["project"]["dependencies"])
+    tool_uv = parsed_pyproject.get("tool", {}).get("uv", {})
+    assert "django<5" in tool_uv.get("constraint-dependencies", [])
+    assert "only-if-someone-else-needs-me==1.2.3" in tool_uv.get("constraint-dependencies", [])
 
 
 def test_requirements_txt_nested_constraint_path_rewritten_to_project_root(tmp_path: Path) -> None:
@@ -648,6 +652,54 @@ def test_requirements_txt_nested_find_links_path_rewritten_to_project_root(tmp_p
     # Original unrewritten form (which would resolve to <root>/wheels) must NOT leak.
     assert "--find-links wheels\n" not in generated_reqs
     assert "pandas>=2.0" in generated_reqs
+
+
+def test_pyproject_gets_tool_uv_section_with_index_context(tmp_path: Path) -> None:
+    """Index directives from requirements.txt are lifted into `[tool.uv]` so `uv sync` works too.
+
+    Without this, the Docker build path (uv pip install -r requirements.txt) would honour
+    --extra-index-url / --find-links / -c but the local `uv sync` path (reads pyproject.toml)
+    would not - private packages would fail to resolve, constraints wouldn't bind versions.
+    """
+    (tmp_path / "wheels").mkdir()
+    (tmp_path / "constraints.txt").write_text("django<5\nfoo>=1.0\n")
+    (tmp_path / "requirements.txt").write_text(
+        "--extra-index-url https://internal.example.org/simple\n--find-links wheels\n-c constraints.txt\npandas>=2.0\n"
+    )
+    _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    parsed = tomllib.loads((tmp_path / "pyproject.toml").read_text())
+    tool_uv = parsed.get("tool", {}).get("uv", {})
+
+    # Extra indexes lifted from requirements.txt to pyproject.
+    assert "https://internal.example.org/simple" in tool_uv.get("extra-index-url", [])
+
+    # find-links rewritten relative to project root and lifted.
+    assert "wheels" in tool_uv.get("find-links", [])
+
+    # Constraint file contents inlined into constraint-dependencies.
+    constraints = tool_uv.get("constraint-dependencies", [])
+    assert "django<5" in constraints
+    assert "foo>=1.0" in constraints
+
+    # Real dep still in [project.dependencies].
+    assert "pandas>=2.0" in parsed["project"]["dependencies"]
+
+
+def test_pyproject_no_tool_uv_section_when_no_index_context(tmp_path: Path) -> None:
+    """Projects without index directives don't get an empty `[tool.uv]` block."""
+    (tmp_path / "requirements.txt").write_text("pandas>=2.0\n")
+    _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    parsed = tomllib.loads((tmp_path / "pyproject.toml").read_text())
+    # No [tool.uv] section at all - the block is only emitted when it has content.
+    assert "uv" not in parsed.get("tool", {})
 
 
 def test_requirements_txt_url_forms_pass_through_unchanged(tmp_path: Path) -> None:
