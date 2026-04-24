@@ -10,10 +10,12 @@ This project is now a [**chapkit**](https://github.com/dhis2-chap/chapkit) servi
 
 | Do this | You get |
 | --- | --- |
-| [`uv sync && uv run python main.py`](#run-it-locally) | Service on http://127.0.0.1:8000 |
-| [`docker build -t {{ PROJECT_SLUG }} .`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images) |
-| [`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) | End-to-end train + predict smoke test |
+| [`make install && make run`](#run-it-locally) | Service on http://127.0.0.1:8000 |
+| [`make test`](#smoke-test-with-chapkit-test) | One-shot smoke test (auto-starts an in-memory service) |
+| [`make docker-build && make docker-run`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images), container on `:8000` |
 | [`/docs`](http://127.0.0.1:8000/docs) | Live OpenAPI UI for the service |
+
+All four have longer-form equivalents with explanations below. `make help` in the repo root lists every target.
 
 ## Run it locally
 
@@ -36,19 +38,94 @@ The image builds on [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://githu
 > **Note:** `chapkit-r-inla` is `amd64`-only (INLA ships only x86_64 binaries). On Apple Silicon add `--platform=linux/amd64` to both `docker build` and `docker run`.
 {% endif %}
 
-## Smoke-test the service
+## Smoke-test with `chapkit test`
 
-[`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) POSTs a synthetic config, drives a full train → predict cycle, and reports back. Useful right after migrating to confirm the wiring is sound.
+[`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) is the first thing to run after migrating. It POSTs a synthetic config, generates synthetic [panel data](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/#generated-data-structure), drives a full train → predict cycle, and reports back. A clean run means your MLproject translated cleanly and your scripts read the config shape they expected.
+
+### The fastest path
+
+```bash
+make test
+```
+
+Equivalent to `uv run chapkit test --start-service` — auto-boots the service with an in-memory DB, runs the smoke test, tears it down. No second terminal needed.
+
+### Two-terminal flow (more control)
 
 ```bash
 # terminal 1:
-uv run python main.py
+make run        # uv run python main.py
 
-# terminal 2:
-uv run chapkit test
+# terminal 2 (from the same project dir):
+make test-remote   # uv run chapkit test --url http://localhost:8000
 ```
 
-The generator produces [chap-core-shaped panel data](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/#generated-data-structure) (`time_period`, `location`, `disease_cases`, `population`, `rainfall`, `mean_temperature`, plus any [`required_covariates`](#covariates) your model declares).
+Use this when you want to poke at the live service (http://127.0.0.1:8000/docs) between test runs, or tail the server logs while the test drives it.
+
+### What a clean run looks like
+
+```
+==================================================
+TEST SUMMARY
+==================================================
+Service URL:           http://localhost:8000
+Elapsed time:          6.48s
+Configs created:       1
+Trainings completed:   1
+Trainings failed:      0
+Predictions completed: 1
+Predictions failed:    0
+
+Result: ALL TESTS PASSED
+```
+
+### Useful flags
+
+| Flag | Default | When to use |
+| --- | --- | --- |
+| `--start-service` | off | One-shot runs without managing the server yourself |
+| `-c / --configs N` | `1` | Stress-test multiple config variations |
+| `-t / --trainings N` | `1` | Train multiple times per config |
+| `-p / --predictions N` | `1` | Predict multiple times per trained model |
+| `--rows N` | `250` | Size of training panel (locations × periods); bump for long-context models |
+| `--predict-rows N` | `150` | Size of historic+future frames; bump if you see "X must have same columns as X in fit" |
+| `--period-type weekly` | `monthly` | Emit `YYYY-Wxx` periods instead of `YYYY-mm` |
+| `--geo-type point` | `polygon` | Point geometries in the generated `geo.json` |
+| `--save-data` | off | Dumps the generated CSVs/JSON to `target/` so you can inspect what the scripts saw |
+| `-v / --verbose` | off | Per-step output |
+| `--debug` | off | Full tracebacks on errors |
+
+Full reference: [Testing ML Services guide](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/).
+
+### When it fails
+
+The test reports `N FAILURE(S)` in the summary, and the real error is in the **server logs** (terminal 1, or `docker logs <container>` if running in Docker). Look for log lines with `train_script_failed` or `predict_script_failed` — the `stderr=...` field has the actual traceback from your script.
+
+Three common failure shapes and their fixes:
+
+| Symptom | What it means | Fix |
+| --- | --- | --- |
+| `KeyError: "['<col>'] not in index"` at train time | Your script hardcodes a column the synthetic data didn't include. | Add the column to `MLServiceInfo.required_covariates=[...]` in `main.py` (preferred: declare `required_covariates:` in the original MLproject and re-migrate). |
+| `KeyError: '<name>'` reading from `config.yml` | Your script reads a key the generated Config class doesn't define. | Add the typed field to the `{{ PROJECT_CLASS_NAME }}Config` class (preferred: declare it under `user_options:` in the original MLproject and re-migrate). |
+| `TypeError: <func>() got an unexpected keyword argument '<kw>'` | An unpinned dep resolved to a newer major version than your script was written against (e.g. pandas 2.1 removed `fillna(method=)`). | Pin the dep in `pyproject.toml` (e.g. `"pandas>=2.0,<2.1"`) and rebuild. |
+
+Full iteration checklist — including "re-run migrate vs. edit `main.py` directly", bumping `author_assessed_status`, and the rest of the post-migration workflow — lives in the [Migration Checklist](https://dhis2-chap.github.io/chapkit/guides/mlproject-migration-checklist/#after-migration).
+
+### Inspecting what the test generated
+
+Pass `--save-data` and the CSVs and JSON configs the harness sent are dumped under `target/`:
+
+```bash
+uv run chapkit test --start-service --save-data
+ls target/
+#   config_*.json              the config(s) POSTed
+#   training_*.json / .csv     training panel data (time_period, location, disease_cases, ...)
+#   prediction_*_historic.*    historic frame for prediction
+#   prediction_*_future.*      future frame (disease_cases nulled)
+#   geo.json                   GeoJSON when requires_geo is set
+```
+
+Useful for reproducing a failure outside chapkit: feed the same CSVs into your script manually.
 
 ## What's in the box
 

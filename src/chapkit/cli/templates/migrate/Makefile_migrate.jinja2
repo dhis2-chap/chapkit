@@ -1,4 +1,4 @@
-.PHONY: help install run test docker-build docker-run clean
+.PHONY: help install run test test-remote docker-build docker-run clean
 
 IMAGE ?= {{ PROJECT_SLUG }}
 PORT ?= 8000
@@ -12,7 +12,9 @@ help:
 	@echo "Targets:"
 	@echo "  install       Install deps into .venv (uv sync)"
 	@echo "  run           Serve the chapkit app locally (python main.py)"
-	@echo "  test          Drive an end-to-end train+predict against a running service (chapkit test)"
+	@echo "  test          One-shot smoke test: auto-starts an in-memory service,"
+	@echo "                drives a full train+predict, tears it down (chapkit test --start-service)"
+	@echo "  test-remote   Drive chapkit test against an already-running service on \$$PORT"
 	@echo "  docker-build  Build the container image (\$$IMAGE=$(IMAGE))"
 	@echo "  docker-run    Run the container, publishing \$$PORT=$(PORT)"
 	@echo "  clean         Remove .venv and common caches"
@@ -24,7 +26,10 @@ run:
 	uv run python main.py
 
 test:
-	uv run chapkit test
+	uv run chapkit test --start-service
+
+test-remote:
+	uv run chapkit test --url http://localhost:$(PORT)
 
 docker-build:
 	docker build $(PLATFORM_FLAG) -t $(IMAGE) .
