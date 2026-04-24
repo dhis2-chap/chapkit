@@ -10,7 +10,7 @@ import tomllib
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Callable
 
 import typer
 import yaml
@@ -197,25 +197,124 @@ def _rewrite_alias(requirement: str) -> str:
     return f"{leading_ws}{alias}{stripped[tail_start:]}"
 
 
-def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None = None) -> list[str]:
-    """Collect user's Python dependencies from pyproject.toml, requirements.txt, and/or env YAML files.
+# Inline-comment stripper for requirements.txt lines. pip's rule: a whitespace-
+# prefixed `#` starts a comment; bare `#` is part of the value (direct-URL /
+# VCS fragments like `#sha256=...` or `#subdirectory=src` must survive).
+_REQUIREMENTS_INLINE_COMMENT = re.compile(r"\s+#.*$")
 
-    Returns the deps as raw requirement strings (e.g. "pandas>=2.0", "numpy"),
-    deduplicated by canonical package name (first occurrence wins). Entries
-    that reference chapkit itself are dropped; the generated pyproject.toml
-    adds chapkit with its own pinned version.
+# Directive flags that carry index configuration and should flow through into
+# the generated requirements.txt so uv / pip can honour the user's private
+# indexes. Each accepts a value (either space-separated or `=` attached).
+_REQUIREMENTS_INDEX_DIRECTIVES = (
+    "--index-url",
+    "--extra-index-url",
+    "--find-links",
+    "--trusted-host",
+    "--no-index",
+    "--pre",
+)
+
+
+def _parse_requirements_file(
+    path: Path,
+    seen_files: set[Path],
+    add_dep: Callable[[str], None],
+    add_index_option: Callable[[str], None],
+) -> None:
+    """Parse a requirements.txt file, recursing into `-r`/`-c` includes.
+
+    Follows pip's semantics: `-r other.txt` / `--requirement other.txt` and
+    `-c constraints.txt` / `--constraint constraints.txt` are resolved relative
+    to the including file and pulled in transitively. Cycles are short-circuited
+    via `seen_files` (resolved Path identity).
+
+    Installable requirements are handed to `add_dep`; index-configuration
+    directives (`--extra-index-url`, etc.) are handed to `add_index_option`
+    for verbatim emission into the generated requirements.txt. Unrecognized
+    directives are printed as a warning rather than silently dropped, so the
+    user notices anything we couldn't translate.
+    """
+    resolved = path.resolve()
+    if resolved in seen_files or not resolved.is_file():
+        return
+    seen_files.add(resolved)
+    try:
+        raw_text = resolved.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for raw_line in raw_text.splitlines():
+        stripped_leading = raw_line.lstrip()
+        if not stripped_leading or stripped_leading.startswith("#"):
+            continue
+        # Strip inline whitespace-prefixed comment (preserves URL fragments).
+        line = _REQUIREMENTS_INLINE_COMMENT.sub("", raw_line).strip()
+        if not line:
+            continue
+
+        # Directive handling. `-r`/`--requirement` and `-c`/`--constraint`
+        # recurse; index directives are preserved; `-e .` on the migrated
+        # project is a no-op (the generated project is a service, not an
+        # installable package) and is silently skipped.
+        if line.startswith("-"):
+            tokens = line.split(None, 1)
+            flag = tokens[0]
+            rest = tokens[1] if len(tokens) == 2 else ""
+            # Handle `--flag=value` form too.
+            if "=" in flag and flag.startswith("--"):
+                flag, _, rest = flag.partition("=")
+            if flag in ("-r", "--requirement", "-c", "--constraint"):
+                if rest:
+                    _parse_requirements_file(
+                        (resolved.parent / rest).resolve(),
+                        seen_files,
+                        add_dep,
+                        add_index_option,
+                    )
+                continue
+            if flag in _REQUIREMENTS_INDEX_DIRECTIVES:
+                add_index_option(line if rest else flag)
+                continue
+            if flag in ("-e", "--editable") and rest.strip() in (".", "./"):
+                # `pip install -e .` on the migrated project is meaningless.
+                continue
+            # Unknown directive - surface to the user so they know something
+            # didn't translate automatically.
+            typer.echo(
+                f"Warning: ignoring unrecognized directive in {resolved}: {line}",
+                err=True,
+            )
+            continue
+
+        add_dep(line)
+
+
+def _extract_user_dependencies(
+    project_path: Path,
+    mlproject: MLProject | None = None,
+) -> tuple[list[str], list[str]]:
+    """Collect user's Python deps and index options from pyproject / requirements.txt / env YAMLs.
+
+    Returns `(deps, index_options)`:
+    - `deps` are raw requirement strings ("pandas>=2.0", "numpy", ...)
+      deduplicated by canonical package name (first occurrence wins). Any
+      chapkit entry is stripped (the generated pyproject.toml pins its own).
+    - `index_options` are verbatim pip / uv directive lines (e.g.
+      `--extra-index-url https://internal.example.org/simple`) lifted from
+      requirements.txt so private indexes still resolve at image build time.
 
     Sources, in order of precedence:
     1. pyproject.toml [project.dependencies] at the project root
-    2. requirements.txt at the project root (common Python project layout)
+    2. requirements.txt at the project root. `-r other.txt` / `-c constraints.txt`
+       are followed recursively (cycle-safe); `--extra-index-url` and friends
+       are preserved; `-e .` is silently skipped; anything else prints a warning.
     3. MLproject's python_env / conda_env file (MLflow-style YAML with a
        `dependencies:` list). Simple scalar deps are kept verbatim; nested
        pip-sub-dict entries inside a conda env are flattened.
-
-    Returns an empty list when nothing parseable is found.
     """
     seen: set[str] = set()
     kept: list[str] = []
+    index_options: list[str] = []
+    seen_index_options: set[str] = set()
 
     def _add(requirement: object) -> None:
         if not isinstance(requirement, str):
@@ -226,6 +325,13 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
             return
         seen.add(name)
         kept.append(rewritten.strip())
+
+    def _add_index_option(option: str) -> None:
+        option = option.strip()
+        if not option or option in seen_index_options:
+            return
+        seen_index_options.add(option)
+        index_options.append(option)
 
     pyproject = project_path / "pyproject.toml"
     if pyproject.is_file():
@@ -239,33 +345,9 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
             for entry in raw:
                 _add(entry)
 
-    # requirements.txt is a second common source of runtime deps - some Python
-    # repos ship only this file, and migrate would lose their deps if we only
-    # consulted pyproject.toml and env YAMLs. Parse with pip's comment rules
-    # (see https://pip.pypa.io/en/stable/reference/requirements-file-format/):
-    # a line starting with `#` is a whole-line comment; `#` is only an inline
-    # comment marker when preceded by whitespace. Bare `#` mid-requirement is
-    # part of the value, which matters for direct-URL deps like
-    #   pkg @ https://example.org/pkg.whl#sha256=abc...
-    #   pkg @ git+https://github.com/x/y@rev#subdirectory=src
-    # where the fragment carries integrity / subdirectory info that must NOT
-    # be stripped. Also skip pip directive lines (`-r other.txt`, `-e .`,
-    # `--extra-index-url ...`) which aren't installable requirements.
-    _REQUIREMENTS_INLINE_COMMENT = re.compile(r"\s+#.*$")
     requirements_path = project_path / "requirements.txt"
     if requirements_path.is_file():
-        try:
-            raw_text = requirements_path.read_text(encoding="utf-8")
-        except OSError:
-            raw_text = ""
-        for line in raw_text.splitlines():
-            stripped_leading = line.lstrip()
-            if not stripped_leading or stripped_leading.startswith("#"):
-                continue
-            head = _REQUIREMENTS_INLINE_COMMENT.sub("", line).strip()
-            if not head or head.startswith("-"):
-                continue
-            _add(head)
+        _parse_requirements_file(requirements_path, set(), _add, _add_index_option)
 
     # Candidate env files: first the ones the MLproject explicitly points at,
     # then a fallback scan for conventional filenames at the project root when
@@ -331,7 +413,7 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
                 continue
             else:
                 _add(entry)
-    return kept
+    return kept, index_options
 
 
 def _any_r_script_uses(project_path: Path, packages: tuple[str, ...]) -> bool:
@@ -677,7 +759,7 @@ def _run(
     # pyproject.toml, .gitignore, .dockerignore, etc. - they land in _old/.
     renders = list(_GENERATED_FILENAMES)
 
-    user_deps = _extract_user_dependencies(project_path, mlproject)
+    user_deps, user_index_options = _extract_user_dependencies(project_path, mlproject)
     # Prefer a meta_data description from the MLproject for the service description
     # (e.g. ewars_template has a nice paragraph). Fall back to our generic template.
     meta_description = mlproject.meta_data.get("description")
@@ -707,6 +789,7 @@ def _run(
         "HAS_INSTALL_PACKAGES_R": (project_path / "install_packages.R").is_file(),
         "HAS_USER_PYPROJECT": (project_path / "pyproject.toml").is_file(),
         "USER_DEPENDENCIES": user_deps,
+        "USER_INDEX_OPTIONS": user_index_options,
         "CHAPKIT_VERSION": _get_chapkit_version(),
         **build_service_info_context(mlproject),
     }

@@ -487,19 +487,19 @@ entry_points:
 def test_requirements_txt_only_project_keeps_its_deps(tmp_path: Path) -> None:
     """A Python project that ships only requirements.txt has its deps pulled into migrate's output.
 
-    requirements.txt is moved to _old/ as regenerated metadata, but migrate still reads it
-    beforehand - otherwise a common Python project layout would silently drop all deps.
+    requirements.txt is moved to _old/ as regenerated metadata, but migrate reads it first -
+    including following `-r other.txt` recursively and preserving index directives - so a common
+    Python project layout doesn't silently drop anything.
     """
-    requirements = """\
+    base_requirements = "numpy>=1.26\njoblib>=1.3\n"
+    main_requirements = """\
 # runtime deps from upstream
+-r base.txt
 pandas>=2.0
 statsmodels==0.14.1
 importlib-metadata; python_version < "3.10"
-
-# pip directives should be skipped:
--r base.txt
+--extra-index-url https://internal.example.org/simple
 -e .
---extra-index-url https://example.org/pypi
 """
     _seed_project(
         tmp_path,
@@ -507,30 +507,84 @@ importlib-metadata; python_version < "3.10"
         {
             "train.py": "...",
             "predict.py": "...",
-            "requirements.txt": requirements,
+            "requirements.txt": main_requirements,
+            "base.txt": base_requirements,
         },
     )
     runner = CliRunner()
     result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
-    # Original requirements.txt preserved under _old/ as with other regenerated metadata.
+    # Originals preserved under _old/ as with other regenerated metadata.
     assert (tmp_path / "_old" / "requirements.txt").is_file()
+    # base.txt is not a filename migrate classifies as chaff; it stays at root so the
+    # generated requirements.txt still resolves `-r`-references if the user keeps them.
+    # Content below verifies the transitive deps were inlined, which is what actually matters.
 
-    # Deps flowed into the generated pyproject.toml AND the generated requirements.txt.
+    # Deps from BOTH files flowed into the generated pyproject.toml.
     generated_pyproject = (tmp_path / "pyproject.toml").read_text()
+    assert '"numpy>=1.26"' in generated_pyproject
+    assert '"joblib>=1.3"' in generated_pyproject
     assert '"pandas>=2.0"' in generated_pyproject
     assert '"statsmodels==0.14.1"' in generated_pyproject
     assert 'importlib-metadata; python_version < \\"3.10\\"' in generated_pyproject
 
+    # Same for the generated requirements.txt (what the Dockerfile installs).
     generated_reqs = (tmp_path / "requirements.txt").read_text()
+    assert "numpy>=1.26" in generated_reqs
+    assert "joblib>=1.3" in generated_reqs
     assert "pandas>=2.0" in generated_reqs
     assert "statsmodels==0.14.1" in generated_reqs
     assert 'importlib-metadata; python_version < "3.10"' in generated_reqs
 
-    # Pip directives and comments were filtered out.
-    assert "base.txt" not in generated_reqs
-    assert "--extra-index-url" not in generated_reqs
+    # --extra-index-url preserved for the private index - uv needs this to resolve.
+    assert "--extra-index-url https://internal.example.org/simple" in generated_reqs
+
+    # `-e .` doesn't leak (the migrated project is a service, not installable).
+    assert "\n-e .\n" not in generated_reqs
+    # `-r base.txt` was inlined, not echoed verbatim.
+    lines = [ln.strip() for ln in generated_reqs.splitlines()]
+    assert "-r base.txt" not in lines
+
+
+def test_requirements_txt_cycle_does_not_loop(tmp_path: Path) -> None:
+    """Circular `-r` references are short-circuited via a visited-file set."""
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "requirements.txt": "-r a.txt\npandas\n",
+            "a.txt": "-r b.txt\nnumpy\n",
+            "b.txt": "-r a.txt\njoblib\n",
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    generated = (tmp_path / "requirements.txt").read_text()
+    for dep in ("pandas", "numpy", "joblib"):
+        assert dep in generated
+
+
+def test_requirements_txt_unknown_directive_warns(tmp_path: Path) -> None:
+    """Unrecognized requirements.txt directives surface as warnings, not silent drops."""
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "requirements.txt": "pandas\n--totally-made-up-flag foo\n",
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    output = (result.output or "") + (result.stderr or "")
+    assert "--totally-made-up-flag" in output
+    assert "unrecognized" in output.lower() or "Warning" in output
 
 
 def test_requirements_txt_preserves_url_fragments_in_direct_deps(tmp_path: Path) -> None:
