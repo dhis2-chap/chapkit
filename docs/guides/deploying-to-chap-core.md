@@ -232,18 +232,25 @@ Keepalive pings are failing. Check the model container is still running (`docker
 Expected for amd64-only base images (R-INLA, some Python wheels). The container runs under emulation; slower but correct.
 
 **SQLite file disappears between runs.**
-Bind-mount `/app/data`, or use a named volume:
+The scaffolded image runs from `WORKDIR /workspace` and the default `DATABASE_URL` is the relative path `data/chapkit.db`, which resolves to `/workspace/data/chapkit.db`. The scaffolded `Dockerfile` pre-creates that directory with the right ownership, and the scaffolded `compose.yml` already mounts a named volume there — so persistence works out of the box when you run via `docker compose up`.
+
+If you run the image directly with `docker run` and want the DB to survive container restarts, mount a volume at `/workspace/data`:
 
 ```yaml
 services:
   my-model:
     volumes:
-      - my-model-data:/app/data
+      - my-model-data:/workspace/data
 volumes:
   my-model-data:
 ```
 
-The scaffolded `main.py` auto-creates the parent directory, so any writable mount at `/app/data` is enough.
+To put the DB somewhere else, set an absolute `DATABASE_URL` (note the four slashes):
+
+```yaml
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////workspace/data/chapkit.db
+```
 
 ---
 
