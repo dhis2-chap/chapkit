@@ -489,6 +489,55 @@ entry_points:
     assert 'with "quoted" metadata' in parsed["project"]["description"]
 
 
+def test_requirements_txt_only_project_keeps_its_deps(tmp_path: Path) -> None:
+    """A Python project that ships only requirements.txt has its deps pulled into migrate's output.
+
+    requirements.txt is moved to _old/ as regenerated metadata, but migrate still reads it
+    beforehand - otherwise a common Python project layout would silently drop all deps.
+    """
+    requirements = """\
+# runtime deps from upstream
+pandas>=2.0
+statsmodels==0.14.1
+importlib-metadata; python_version < "3.10"
+
+# pip directives should be skipped:
+-r base.txt
+-e .
+--extra-index-url https://example.org/pypi
+"""
+    _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT,
+        {
+            "train.py": "...",
+            "predict.py": "...",
+            "requirements.txt": requirements,
+        },
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    # Original requirements.txt preserved under _old/ as with other regenerated metadata.
+    assert (tmp_path / "_old" / "requirements.txt").is_file()
+
+    # Deps flowed into the generated pyproject.toml AND the generated requirements.txt.
+    generated_pyproject = (tmp_path / "pyproject.toml").read_text()
+    assert '"pandas>=2.0"' in generated_pyproject
+    assert '"statsmodels==0.14.1"' in generated_pyproject
+    assert 'importlib-metadata; python_version < \\"3.10\\"' in generated_pyproject
+
+    generated_reqs = (tmp_path / "requirements.txt").read_text()
+    assert "pandas>=2.0" in generated_reqs
+    assert "statsmodels==0.14.1" in generated_reqs
+    assert 'importlib-metadata; python_version < "3.10"' in generated_reqs
+
+    # Pip directives and comments were filtered out.
+    assert "base.txt" not in generated_reqs
+    assert "--extra-index-url" not in generated_reqs
+
+
 def test_generated_requirements_txt_preserves_pep508_markers_with_quotes(tmp_path: Path) -> None:
     """Deps with PEP 508 markers containing nested quotes survive into requirements.txt verbatim.
 

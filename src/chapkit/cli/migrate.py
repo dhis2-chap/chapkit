@@ -198,7 +198,7 @@ def _rewrite_alias(requirement: str) -> str:
 
 
 def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None = None) -> list[str]:
-    """Collect user's Python dependencies from pyproject.toml and/or pyenv.yaml.
+    """Collect user's Python dependencies from pyproject.toml, requirements.txt, and/or env YAML files.
 
     Returns the deps as raw requirement strings (e.g. "pandas>=2.0", "numpy"),
     deduplicated by canonical package name (first occurrence wins). Entries
@@ -207,7 +207,8 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
 
     Sources, in order of precedence:
     1. pyproject.toml [project.dependencies] at the project root
-    2. MLproject's python_env / conda_env file (MLflow-style YAML with a
+    2. requirements.txt at the project root (common Python project layout)
+    3. MLproject's python_env / conda_env file (MLflow-style YAML with a
        `dependencies:` list). Simple scalar deps are kept verbatim; nested
        pip-sub-dict entries inside a conda env are flattened.
 
@@ -237,6 +238,24 @@ def _extract_user_dependencies(project_path: Path, mlproject: MLProject | None =
         if isinstance(raw, list):
             for entry in raw:
                 _add(entry)
+
+    # requirements.txt is a second common source of runtime deps - some Python
+    # repos ship only this file, and migrate would lose their deps if we only
+    # consulted pyproject.toml and env YAMLs. Parse strictly: one PEP 508
+    # requirement per line, strip inline `#` comments, skip blank lines and
+    # pip directive lines (`-r other.txt`, `-e .`, `--extra-index-url ...`)
+    # which aren't installable requirements on their own.
+    requirements_path = project_path / "requirements.txt"
+    if requirements_path.is_file():
+        try:
+            raw_text = requirements_path.read_text(encoding="utf-8")
+        except OSError:
+            raw_text = ""
+        for line in raw_text.splitlines():
+            head = line.split("#", 1)[0].strip()
+            if not head or head.startswith("-"):
+                continue
+            _add(head)
 
     # Candidate env files: first the ones the MLproject explicitly points at,
     # then a fallback scan for conventional filenames at the project root when
