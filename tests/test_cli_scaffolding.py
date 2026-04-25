@@ -678,9 +678,22 @@ def test_scaffold_config_artifact_linkage(
             assert artifact_id in artifact_ids
 
 
+#: Latest chapkit release on PyPI. The Docker-build tests pin against this so
+#: the lockfile + container build can resolve from PyPI - the dev-version
+#: scaffolded into pyproject.toml (e.g. 0.22.0.dev0) isn't published yet.
+_LATEST_PUBLISHED_CHAPKIT = "0.21.0"
+
+
 @pytest.fixture
 def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[str, str], Path]:
-    """Scaffold a project without installing dependencies (for Docker build tests)."""
+    """Scaffold a project for Docker build tests: patches chapkit + runs `uv lock` only.
+
+    Skips `uv sync` (no local .venv) but still generates `uv.lock`, which the
+    scaffolded Dockerfile pins against via `uv sync --frozen`. Patches the
+    chapkit dep to the latest published PyPI version so the Docker container's
+    `uv sync --frozen` step can resolve - the dev version chapkit init writes
+    by default (e.g. 0.22.0.dev0) isn't on PyPI.
+    """
 
     def _scaffold(name: str, template: str = "fn-py") -> Path:
         result = subprocess.run(
@@ -700,7 +713,28 @@ def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[st
             text=True,
         )
         assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
-        return tmp_path / name
+
+        project_dir = tmp_path / name
+
+        pyproject = project_dir / "pyproject.toml"
+        content = pyproject.read_text()
+        content = re.sub(
+            r'"chapkit>=[^"]+"',
+            f'"chapkit>={_LATEST_PUBLISHED_CHAPKIT}"',
+            content,
+        )
+        pyproject.write_text(content)
+
+        # Generate uv.lock (the Dockerfile's `uv sync --frozen` requires it).
+        lock_result = subprocess.run(
+            ["uv", "lock"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+        )
+        assert lock_result.returncode == 0, f"uv lock failed: {lock_result.stderr}"
+
+        return project_dir
 
     return _scaffold
 
