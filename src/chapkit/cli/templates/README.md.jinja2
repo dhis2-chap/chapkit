@@ -33,6 +33,30 @@ The API will be available at:
 - Grafana: http://localhost:3000 (admin/admin)
 {% endif %}
 
+### Verify the service
+
+Once the service is running (locally or in Docker), exercise the full
+config -> train -> predict flow with `chapkit test`:
+
+```bash
+# Against the running service (default http://localhost:8000)
+uv run chapkit test
+
+# More aggressive: 3 configs, 2 trainings each, 2 predictions per model
+uv run chapkit test -c 3 -t 2 -p 2 --verbose
+
+# Auto-start an in-memory service for the duration of the test
+uv run chapkit test --start-service
+```
+
+Note: this is an end-to-end **smoke test** of the API surface, not a model
+quality test. `chapkit test` synthesises random training and prediction
+data, drives the service through the full config -> train -> predict
+lifecycle, and confirms each step returns a valid response. It does not
+validate that your model produces meaningful predictions - only that the
+service plumbing (config CRUD, the train job, artifact persistence, and
+predict) all work. Handy after editing `main.py` or rebuilding the image.
+
 ## API Endpoints
 
 ### Health Check

@@ -1,24 +1,39 @@
 services:
   api:
+    # Default: build the image locally from this directory.
     build:
       context: .
       dockerfile: Dockerfile
+    # Alternative: pull a prebuilt image from GHCR (comment out `build:` above).
+    # image: ghcr.io/<your-org>/{{ PROJECT_SLUG }}:latest
+    # pull_policy: always
+    # platform: linux/amd64
     ports:
       - "8000:8000"
     volumes:
-      - ck_{{ PROJECT_SLUG }}_data:/workspace/data
+      - ck_{{ PROJECT_SLUG }}_data:/app/data
     environment:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
       WORKERS: 1
       # CHAPKIT_TEMP_DIR: /tmp  # Override temp directory for ML workspaces
+      # When integrating with chap-core, register this service on startup:
+      # SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
+      # SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}
     restart: unless-stopped
     networks:
       - ck_{{ PROJECT_SLUG }}
+    # When integrating with chap-core, wait for it to be healthy first:
+    # depends_on:
+    #   chap:
+    #     condition: service_healthy
 
 networks:
   ck_{{ PROJECT_SLUG }}:
     driver: bridge
+  # When integrating with chap-core, attach to its shared network instead:
+  # chap-network:
+  #   external: true
 
 volumes:
   ck_{{ PROJECT_SLUG }}_data:
