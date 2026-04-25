@@ -1,6 +1,6 @@
 # MLproject Migrate
 
-`chapkit migrate` turns an existing MLflow-style `MLproject` directory into a first-class chapkit project in place. It's the code-generating sibling of [`chapkit run`](mlproject-runner.md): where `run` adapts an MLproject at runtime without writing anything, `migrate` gives you a `main.py`, a `Dockerfile` pointing at the right [chapkit-images](https://github.com/dhis2-chap/chapkit-images) base, a `pyproject.toml`, a `compose.yml`, and a `CHAPKIT.md` that you can commit, extend, and ship.
+`chapkit mlproject migrate` turns an existing MLflow-style `MLproject` directory into a first-class chapkit project in place. It's the code-generating sibling of [`chapkit mlproject run`](mlproject-runner.md): where `run` adapts an MLproject at runtime without writing anything, `migrate` gives you a `main.py`, a `Dockerfile` pointing at the right [chapkit-images](https://github.com/dhis2-chap/chapkit-images) base, a `pyproject.toml`, a `compose.yml`, and a `CHAPKIT.md` that you can commit, extend, and ship.
 
 Your existing train/predict scripts, helpers, and arbitrary config / data files are **not moved or modified**. Project metadata that chapkit regenerates (`README.md`, `.gitignore`, `pyproject.toml`, `Dockerfile`, `compose.yml`, `.python-version`, `Makefile`, the `MLproject` itself), plus obvious chaff (`input/`, `output/`, `example_data*/`, `isolated_run.*`, stale data CSVs, serialised model files, `renv/`), are swept into `_old/` so nothing is lost — your original repo state is fully recoverable from there.
 
@@ -11,17 +11,17 @@ Your existing train/predict scripts, helpers, and arbitrary config / data files 
 
 | Command | Writes files | Good for |
 | --- | --- | --- |
-| [`chapkit run`](mlproject-runner.md) | No | Evaluating an MLproject against chapkit's API without changes to the repo. |
-| `chapkit migrate` | Yes (at project root) | Turning an MLproject into a chapkit project you own, commit, and containerise. |
+| [`chapkit mlproject run`](mlproject-runner.md) | No | Evaluating an MLproject against chapkit's API without changes to the repo. |
+| `chapkit mlproject migrate` | Yes (at project root) | Turning an MLproject into a chapkit project you own, commit, and containerise. |
 | [`chapkit init`](cli-scaffolding.md) | Yes (creates a new dir) | Greenfield chapkit project from scratch. |
 
 ## Quick start
 
 ```bash
 cd /path/to/your/mlproject
-chapkit migrate --dry-run      # preview the plan without touching anything
-chapkit migrate                # execute with interactive prompts
-chapkit migrate --yes          # execute non-interactively (scripts / CI)
+chapkit mlproject migrate --dry-run      # preview the plan without touching anything
+chapkit mlproject migrate                # execute with interactive prompts
+chapkit mlproject migrate --yes          # execute non-interactively (scripts / CI)
 ```
 
 After a successful run, the project root holds your unchanged source files alongside the generated chapkit wrapper, with the original structure preserved under `_old/`.
@@ -42,7 +42,7 @@ Arbitrary files at the project root that aren't in the chaff list stay put — s
 
 ## Base image auto-detection
 
-`chapkit migrate` picks the right base image from [chapkit-images](https://github.com/dhis2-chap/chapkit-images) by scanning your repo:
+`chapkit mlproject migrate` picks the right base image from [chapkit-images](https://github.com/dhis2-chap/chapkit-images) by scanning your repo:
 
 - **Python only** (`.py` at root) → `ghcr.io/dhis2-chap/chapkit-py:latest` (multi-arch, lean).
 - **R without INLA** (`.r`/`.R` at root, no `library(INLA)` / `library(fmesher)`, no `docker_r_inla` in MLproject `docker_env`) → `ghcr.io/dhis2-chap/chapkit-r:latest` (multi-arch).
@@ -110,5 +110,5 @@ git add -A && git commit -m "chore: migrate MLproject to chapkit"
 
 - **`--restructure`** flag for the `scripts/` + top-level Python package layout manually applied by some existing chap-models repos. v1 leaves source files where they are.
 - **`--with-monitoring`** / **`--with-validation`** mirroring the `chapkit init` flags.
-- **`chapkit migrate --reverse`** to restore from `_old/` in one shot.
+- **`chapkit mlproject migrate --reverse`** to restore from `_old/` in one shot.
 - **`git mv`** mode to preserve history for moved files.

@@ -1,9 +1,9 @@
 # MLproject Migration Checklist
 
-This guide is the full lifecycle checklist for migrating an existing [MLflow-style `MLproject`](https://mlflow.org/docs/latest/projects.html) directory into a chapkit service. Use it to prepare your repo **before** you run [`chapkit migrate`](mlproject-migrate.md), and to iterate **after** when the first `chapkit test` run surfaces something.
+This guide is the full lifecycle checklist for migrating an existing [MLflow-style `MLproject`](https://mlflow.org/docs/latest/projects.html) directory into a chapkit service. Use it to prepare your repo **before** you run [`chapkit mlproject migrate`](mlproject-migrate.md), and to iterate **after** when the first `chapkit test` run surfaces something.
 
 !!! info "Scope: shell-based runners"
-    `chapkit migrate` always emits a [`ShellModelRunner`](ml-workflows.md#shellmodelrunner) in the generated `main.py`. Your train/predict scripts run as shell commands in a copied workspace, with input/output bound to well-known filenames. That's the model this guide addresses. If you need a Python-native runner ([`FunctionalModelRunner`](ml-workflows.md#functionalmodelrunner) or a custom [`BaseModelRunner`](ml-workflows.md#basemodelrunner)), start from [`chapkit init`](cli-scaffolding.md) instead and wire your functions directly — migrate doesn't produce those runners.
+    `chapkit mlproject migrate` always emits a [`ShellModelRunner`](ml-workflows.md#shellmodelrunner) in the generated `main.py`. Your train/predict scripts run as shell commands in a copied workspace, with input/output bound to well-known filenames. That's the model this guide addresses. If you need a Python-native runner ([`FunctionalModelRunner`](ml-workflows.md#functionalmodelrunner) or a custom [`BaseModelRunner`](ml-workflows.md#basemodelrunner)), start from [`chapkit init`](cli-scaffolding.md) instead and wire your functions directly — migrate doesn't produce those runners.
 
 ## Before migration
 
@@ -60,7 +60,7 @@ dependencies:
   - joblib>=1.3
 ```
 
-`conda.yaml`, `environment.yaml`, or the `[project.dependencies]` section of `pyproject.toml` work the same way. `chapkit migrate` carries entries verbatim and warns in its summary about any unpinned name it finds, but pinning upstream keeps the MLproject self-contained.
+`conda.yaml`, `environment.yaml`, or the `[project.dependencies]` section of `pyproject.toml` work the same way. `chapkit mlproject migrate` carries entries verbatim and warns in its summary about any unpinned name it finds, but pinning upstream keeps the MLproject self-contained.
 
 ### 4. Tell migrate about your Python environment
 
@@ -175,9 +175,9 @@ If that works, your scripts are ready for migrate.
 
 ```bash
 cd /path/to/your/mlproject
-chapkit migrate --dry-run      # preview the plan without touching anything
-chapkit migrate                # execute with interactive prompts
-chapkit migrate --yes          # execute non-interactively (CI / scripts)
+chapkit mlproject migrate --dry-run      # preview the plan without touching anything
+chapkit mlproject migrate                # execute with interactive prompts
+chapkit mlproject migrate --yes          # execute non-interactively (CI / scripts)
 ```
 
 Full flag reference and behavioural details in the [MLproject Migrate guide](mlproject-migrate.md).
@@ -337,7 +337,7 @@ If a future teammate asks what used to live there, the commit history has the an
 
 ## See also
 
-- [MLproject Migrate](mlproject-migrate.md) — full `chapkit migrate` reference: flags, classification rules, what's generated.
+- [MLproject Migrate](mlproject-migrate.md) — full `chapkit mlproject migrate` reference: flags, classification rules, what's generated.
 - [`chapkit test`](testing-ml-services.md) — smoke-test harness used in step 12.
 - [ML Workflows](ml-workflows.md) — runner types, `MLServiceInfo`, `ModelMetadata` fields.
 - [Configuration Management](configuration-management.md) — `BaseConfig`, typed schemas, HTTP lifecycle.

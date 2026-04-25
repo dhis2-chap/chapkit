@@ -9,6 +9,7 @@ from chapkit import __version__
 from chapkit.cli.artifact import artifact_app
 from chapkit.cli.init import init_command
 from chapkit.cli.migrate import migrate_command
+from chapkit.cli.mlproject import MLPROJECT_FILENAMES
 from chapkit.cli.run import run_command
 from chapkit.cli.test import test_command
 
@@ -36,6 +37,12 @@ def _find_chapkit_project() -> Path | None:
             except Exception:
                 pass
     return None
+
+
+def _has_mlproject() -> bool:
+    """Return True if the current directory contains an MLproject file."""
+    cwd = Path.cwd()
+    return any((cwd / name).is_file() for name in MLPROJECT_FILENAMES)
 
 
 app = typer.Typer(
@@ -66,8 +73,26 @@ if _find_chapkit_project() is None:
 # Only show 'test' command when INSIDE a chapkit project
 if _find_chapkit_project() is not None:
     app.command(name="test", help="Run end-to-end test of the ML service workflow")(test_command)
-app.command(name="run", help="Run an MLproject directory as a chapkit service")(run_command)
-app.command(name="migrate", help="Migrate an MLproject directory into a chapkit project")(migrate_command)
+
+# 'run' and 'migrate' operate on MLflow-style MLproject directories - the canonical
+# surface lives under `chapkit mlproject`, hidden from --help when no MLproject file
+# is in the current directory.
+mlproject_app = typer.Typer(
+    name="mlproject",
+    help="Run or migrate an MLflow-style MLproject directory",
+    no_args_is_help=True,
+)
+mlproject_app.command(name="run", help="Run an MLproject directory as a chapkit service")(run_command)
+mlproject_app.command(name="migrate", help="Migrate an MLproject directory into a chapkit project")(migrate_command)
+app.add_typer(mlproject_app, name="mlproject", hidden=not _has_mlproject())
+
+# Top-level `chapkit run` / `chapkit migrate` stay registered (hidden) as backwards-
+# compatible aliases so the chapkit-py base image's existing CMD (`chapkit run .`)
+# keeps working until chapkit-images is updated to use the canonical
+# `chapkit mlproject run .` form.
+app.command(name="run", hidden=True)(run_command)
+app.command(name="migrate", hidden=True)(migrate_command)
+
 app.add_typer(artifact_app, name="artifact")
 
 

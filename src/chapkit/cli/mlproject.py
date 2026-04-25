@@ -203,7 +203,7 @@ def translate_to_runner_template(command: str, overrides: dict[str, str] | None 
     (`{data_file}`, `{historic_file}`, etc.) where ShellModelRunner does its
     own substitution at train/predict time. Literal paths (`model`,
     `config.yml`) are inlined because ShellModelRunner has no templating
-    hook for them. This is what `chapkit migrate` embeds in main.py.
+    hook for them. This is what `chapkit mlproject migrate` embeds in main.py.
     """
     return _apply_param_mapping(command, {**RUNNER_PLACEHOLDERS, **(overrides or {})})
 

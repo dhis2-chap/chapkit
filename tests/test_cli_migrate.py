@@ -421,7 +421,7 @@ entry_points:
 """
     _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     source = (tmp_path / "main.py").read_text()
     # Python field name is the normalized identifier.
@@ -444,7 +444,7 @@ entry_points:
 """
     _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     source = (tmp_path / "main.py").read_text()
     # Must parse cleanly - this is the main.py the user will run.
@@ -476,7 +476,7 @@ entry_points:
 """
     _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     # Parse the generated pyproject.toml with tomllib - this is what uv / pip do.
     toml_bytes = (tmp_path / "pyproject.toml").read_bytes()
@@ -512,7 +512,7 @@ importlib-metadata; python_version < "3.10"
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     # Originals preserved under _old/ as with other regenerated metadata.
@@ -574,7 +574,7 @@ pandas>=2.0
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     # constraints.txt lives at the project root (not chaff) so `-c constraints.txt`
@@ -615,7 +615,7 @@ def test_requirements_txt_nested_constraint_path_rewritten_to_project_root(tmp_p
     _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
 
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     generated_reqs = (tmp_path / "requirements.txt").read_text()
@@ -643,7 +643,7 @@ def test_requirements_txt_nested_find_links_path_rewritten_to_project_root(tmp_p
     _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
 
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     generated_reqs = (tmp_path / "requirements.txt").read_text()
@@ -669,7 +669,7 @@ def test_pyproject_gets_tool_uv_section_with_index_context(tmp_path: Path) -> No
     _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
 
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     parsed = tomllib.loads((tmp_path / "pyproject.toml").read_text())
@@ -695,7 +695,7 @@ def test_pyproject_no_tool_uv_section_when_no_index_context(tmp_path: Path) -> N
     (tmp_path / "requirements.txt").write_text("pandas>=2.0\n")
     _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     parsed = tomllib.loads((tmp_path / "pyproject.toml").read_text())
     # No [tool.uv] section at all - the block is only emitted when it has content.
@@ -716,7 +716,7 @@ def test_requirements_txt_url_forms_pass_through_unchanged(tmp_path: Path) -> No
     _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
 
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     generated_reqs = (tmp_path / "requirements.txt").read_text()
     assert "--find-links https://example.org/wheels/" in generated_reqs
@@ -741,7 +741,7 @@ entry_points:
 """
     _seed_project(tmp_path, mlproject_yaml, {"main.py": "# user's CLI runner\n"})
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 1
     output = (result.output or "") + (result.stderr or "")
     assert "reference main.py" in output
@@ -768,7 +768,7 @@ def test_existing_main_py_moves_to_old_during_remigrate(tmp_path: Path) -> None:
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     # Fresh chapkit main.py exists at root.
     new_main = (tmp_path / "main.py").read_text()
@@ -792,7 +792,7 @@ def test_requirements_txt_cycle_does_not_loop(tmp_path: Path) -> None:
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     generated = (tmp_path / "requirements.txt").read_text()
     for dep in ("pandas", "numpy", "joblib"):
@@ -811,7 +811,7 @@ def test_requirements_txt_unknown_directive_warns(tmp_path: Path) -> None:
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     output = (result.output or "") + (result.stderr or "")
     assert "--totally-made-up-flag" in output
@@ -843,7 +843,7 @@ statsmodels  # trailing-comment keeper
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     generated_reqs = (tmp_path / "requirements.txt").read_text()
@@ -888,7 +888,7 @@ dependencies = [
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     # requirements.txt is generated; each dep on its own line, verbatim.
@@ -907,7 +907,7 @@ def test_no_requirements_txt_when_no_user_deps(tmp_path: Path) -> None:
     """Python projects with no user deps don't get a requirements.txt, and the Dockerfile skips the install step."""
     _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     assert not (tmp_path / "requirements.txt").exists()
     dockerfile = (tmp_path / "Dockerfile").read_text()
@@ -932,7 +932,7 @@ def test_dockerfile_runs_install_packages_r_when_present(tmp_path: Path) -> None
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     dockerfile = (tmp_path / "Dockerfile").read_text()
@@ -954,7 +954,7 @@ def test_dockerfile_prefers_renv_over_install_packages_r(tmp_path: Path) -> None
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     dockerfile = (tmp_path / "Dockerfile").read_text()
@@ -970,7 +970,7 @@ def test_no_requirements_txt_for_r_projects(tmp_path: Path) -> None:
         {"train.r": "df <- read.csv('x')\n", "predict.r": "df <- read.csv('x')\n", "renv.lock": "{}\n"},
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     assert not (tmp_path / "requirements.txt").exists()
 
@@ -1000,7 +1000,7 @@ dependencies:
 """
     _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "...", "conda.yaml": conda_yaml})
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     generated = (tmp_path / "pyproject.toml").read_text()
     # pip sub-list carried through verbatim.
@@ -1023,7 +1023,7 @@ def test_dry_run_changes_nothing(tmp_path: Path) -> None:
     snapshot_before = {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*")}
 
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--dry-run"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--dry-run"])
     assert result.exit_code == 0, result.output
     assert "Dry run: no files changed." in result.output
 
@@ -1045,7 +1045,7 @@ def test_full_run_moves_chaff_and_writes_outputs(tmp_path: Path) -> None:
     )
 
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     assert (tmp_path / "_old" / "MLproject").is_file()
@@ -1094,7 +1094,7 @@ def test_old_dir_already_exists_errors(tmp_path: Path) -> None:
     (tmp_path / "_old").mkdir()
 
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 1
     assert "_old" in result.output
 
@@ -1106,7 +1106,7 @@ def test_existing_readme_moves_to_old(tmp_path: Path) -> None:
         {"train.py": "...", "predict.py": "...", "README.md": "# user readme\n"},
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     assert (tmp_path / "_old" / "README.md").read_text() == "# user readme\n"
     assert (tmp_path / "README.md").is_file()
@@ -1137,7 +1137,7 @@ dependencies = [
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     # Original user pyproject.toml is preserved under _old/ for reference.
@@ -1194,7 +1194,7 @@ dependencies:
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
     generated = (tmp_path / "pyproject.toml").read_text()
@@ -1214,7 +1214,7 @@ def test_pyproject_without_deps_still_works(tmp_path: Path) -> None:
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     generated = (tmp_path / "pyproject.toml").read_text()
     assert "chapkit>=" in generated
@@ -1233,7 +1233,7 @@ def test_invalid_pyproject_does_not_crash(tmp_path: Path) -> None:
         },
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
     generated = (tmp_path / "pyproject.toml").read_text()
     assert "chapkit>=" in generated
@@ -1249,7 +1249,7 @@ def test_unknown_param_hard_errors_with_yes(tmp_path: Path) -> None:
         {"train.py": "...", "predict.py": "..."},
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 1
     assert "dataset" in result.output
 
@@ -1261,7 +1261,7 @@ def test_unknown_param_override_via_flag(tmp_path: Path) -> None:
         {"train.py": "...", "predict.py": "..."},
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["migrate", str(tmp_path), "--yes", "--param", "dataset=data.csv"])
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes", "--param", "dataset=data.csv"])
     assert result.exit_code == 0, result.output
     source = (tmp_path / "main.py").read_text()
     assert "python train.py data.csv" in source
@@ -1275,7 +1275,7 @@ def test_unknown_param_interactive_prompt(tmp_path: Path) -> None:
     )
     runner = CliRunner()
     # Answer the prompt with "data.csv\n" then confirm the plan with "y\n".
-    result = runner.invoke(app, ["migrate", str(tmp_path)], input="data.csv\ny\n")
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path)], input="data.csv\ny\n")
     assert result.exit_code == 0, result.output
     source = (tmp_path / "main.py").read_text()
     assert "python train.py data.csv" in source

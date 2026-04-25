@@ -35,7 +35,7 @@ class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
 
     # chap-core ecosystem convention: most disease-surveillance models
     # (EWARS and friends) take rainfall + mean_temperature as lagged
-    # climate predictors, so `chapkit migrate` pins them here by default.
+    # climate predictors, so `chapkit mlproject migrate` pins them here by default.
     # If this model doesn't use climate covariates, DELETE the whole
     # block below - BaseConfig's inherited default is an empty list.
     # To keep the field but change it, override per-config via

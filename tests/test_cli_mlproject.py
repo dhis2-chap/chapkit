@@ -382,7 +382,7 @@ entry_points:
 
 def test_run_command_errors_cleanly_when_no_mlproject(tmp_path: Path) -> None:
     runner = CliRunner()
-    result = runner.invoke(app, ["run", str(tmp_path)])
+    result = runner.invoke(app, ["mlproject", "run", str(tmp_path)])
     assert result.exit_code == 1
     assert "No MLproject file found" in result.stdout or "No MLproject file found" in result.output
 
@@ -398,7 +398,7 @@ entry_points:
 """
     _write_mlproject(tmp_path, contents)
     runner = CliRunner()
-    result = runner.invoke(app, ["run", str(tmp_path)])
+    result = runner.invoke(app, ["mlproject", "run", str(tmp_path)])
     assert result.exit_code == 1
     combined = result.output + result.stdout
     assert "dataset" in combined

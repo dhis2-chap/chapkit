@@ -4,7 +4,7 @@
 
 This project is now a [**chapkit**](https://github.com/dhis2-chap/chapkit) service — a small FastAPI app that wraps your existing train/predict scripts and exposes them to the [chap-core](https://github.com/dhis2-chap/chap-core) orchestrator as a standard HTTP service.
 
-[`chapkit migrate`](https://dhis2-chap.github.io/chapkit/guides/mlproject-migrate/) generated the wrapper; your scripts are untouched. The original `MLproject` and anything chapkit regenerated (README, pyproject, etc.) are preserved under `_old/`.
+[`chapkit mlproject migrate`](https://dhis2-chap.github.io/chapkit/guides/mlproject-migrate/) generated the wrapper; your scripts are untouched. The original `MLproject` and anything chapkit regenerated (README, pyproject, etc.) are preserved under `_old/`.
 
 ## TL;DR
 
@@ -272,5 +272,5 @@ services:
 ## Links
 
 - **chapkit docs** → [user guides](https://dhis2-chap.github.io/chapkit/) · [ML workflows](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/) · [configuration](https://dhis2-chap.github.io/chapkit/guides/configuration-management/) · [artifacts](https://dhis2-chap.github.io/chapkit/guides/artifact-storage/) · [testing](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/) · [API reference](https://dhis2-chap.github.io/chapkit/api-reference/)
-- **CLI** → [`chapkit migrate`](https://dhis2-chap.github.io/chapkit/guides/mlproject-migrate/) · [`chapkit run`](https://dhis2-chap.github.io/chapkit/guides/mlproject-runner/) · [`chapkit init`](https://dhis2-chap.github.io/chapkit/guides/cli-scaffolding/) · [`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/)
+- **CLI** → [`chapkit mlproject migrate`](https://dhis2-chap.github.io/chapkit/guides/mlproject-migrate/) · [`chapkit mlproject run`](https://dhis2-chap.github.io/chapkit/guides/mlproject-runner/) · [`chapkit init`](https://dhis2-chap.github.io/chapkit/guides/cli-scaffolding/) · [`chapkit test`](https://dhis2-chap.github.io/chapkit/guides/testing-ml-services/)
 - **Ecosystem** → [chapkit on GitHub](https://github.com/dhis2-chap/chapkit) · [chap-core](https://github.com/dhis2-chap/chap-core) · [chapkit base images](https://github.com/dhis2-chap/chapkit-images) · [chap-models catalogue](https://github.com/chap-models)

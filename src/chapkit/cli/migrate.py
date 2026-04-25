@@ -578,13 +578,13 @@ def _check_entry_points_reference_main_py(mlproject: MLProject) -> None:
         return
     joined = "\n  ".join(offenders)
     raise MigrateError(
-        "MLproject entry_point command(s) reference main.py, but chapkit migrate also "
-        "generates a main.py (the FastAPI service) - the two cannot coexist at the "
+        "MLproject entry_point command(s) reference main.py, but chapkit mlproject migrate "
+        "also generates a main.py (the FastAPI service) - the two cannot coexist at the "
         "project root.\n\n"
         f"Offending entry_point(s):\n  {joined}\n\n"
         "Rename your script (e.g. main.py -> cli.py or runner.py), update the MLproject's "
-        "entry_points commands to match, then re-run `chapkit migrate`. Your renamed "
-        "file will stay at the project root and the generated commands in the new "
+        "entry_points commands to match, then re-run `chapkit mlproject migrate`. Your "
+        "renamed file will stay at the project root and the generated commands in the new "
         "main.py will invoke it correctly."
     )
 
@@ -1047,11 +1047,11 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
 
 
 #: Floor for the `chapkit>=...` dep that migrate emits into the generated
-#: pyproject.toml. This is the minimum chapkit release that has `chapkit run`
-#: (the command the generated main.py and Dockerfile CMD depend on). It's
-#: explicitly NOT the running chapkit's own version, because that could be a
-#: `.devN` not-yet-published release and would leave the migrated project
-#: with an uninstallable dep.
+#: pyproject.toml. This is the minimum chapkit release that has the runtime
+#: bits the generated main.py and Dockerfile CMD depend on. It's explicitly
+#: NOT the running chapkit's own version, because that could be a `.devN`
+#: not-yet-published release and would leave the migrated project with an
+#: uninstallable dep.
 _MIN_CHAPKIT_VERSION = "0.20.0"
 
 

@@ -41,12 +41,12 @@ def _warn_about_env(mlproject: MLProject) -> None:
     if not mlproject.env_hints:
         return
     typer.echo("", err=True)
-    typer.echo("WARNING: chapkit run does not auto-activate environments.", err=True)
+    typer.echo("WARNING: chapkit mlproject run does not auto-activate environments.", err=True)
     for field_name, value in mlproject.env_hints.items():
         typer.echo(f"  - {field_name}: {value}", err=True)
     typer.echo(
         "Activate the right runtime (R/renv, conda, Docker image, etc.) "
-        "before launching chapkit run, or invoke chapkit run from inside it.",
+        "before launching chapkit mlproject run, or invoke it from inside the runtime.",
         err=True,
     )
     typer.echo("", err=True)
@@ -100,8 +100,8 @@ def _print_docker_hint(project_dir: Path, mlproject: MLProject, port: int) -> No
     typer.echo(
         f"  docker run --rm -p {port}:8000{platform_flag} -v {project_dir}:/work ghcr.io/dhis2-chap/{image}:latest"
     )
-    typer.echo("  # chapkit-images ship WORKDIR=/work + CMD=chapkit run . built-in; model-specific R / Python")
-    typer.echo("  # packages need to be installed separately (e.g. `chapkit migrate` + `docker build`).")
+    typer.echo("  # chapkit-images ship WORKDIR=/work + a preinstalled chapkit; model-specific R / Python")
+    typer.echo("  # packages need to be installed separately (e.g. `chapkit mlproject migrate` + `docker build`).")
     typer.echo("")
 
 
@@ -167,7 +167,7 @@ def run_command(
     from chapkit.ml import ShellModelRunner
 
     config_schema = build_config_schema(mlproject)
-    # Match `chapkit migrate`'s default: emit config.yml in chap-core's
+    # Match `chapkit mlproject migrate`'s default: emit config.yml in chap-core's
     # ModelConfiguration shape (reserved keys at top level, everything else
     # nested under user_option_values). Keeps runtime and code-generated
     # services consistent so scripts written for the chap-models ecosystem

@@ -21,6 +21,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl --fail http://localhost:8000/health || exit 1
 
-# chapkit-py's default CMD is `chapkit run .`, which only works on MLproject directories.
-# Init-generated projects ship main.py, so we override here.
+# chapkit-py's default CMD targets MLproject directories; init-generated projects ship
+# main.py, so we override here.
 CMD ["python", "main.py"]

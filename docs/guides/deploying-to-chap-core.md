@@ -92,7 +92,7 @@ docker run --rm -p 8000:8000 my-model:dev
 - `ghcr.io/dhis2-chap/chapkit-r:latest` — R without INLA (multi-arch).
 - `ghcr.io/dhis2-chap/chapkit-r-inla:latest` — R + INLA (amd64 only; add `--platform=linux/amd64` and expect emulation on Apple Silicon).
 
-See [MLproject Runner → Running in a Container](mlproject-runner.md#running-in-a-container) for the full image table (sizes, architectures, contents) and [chapkit migrate → Base image auto-detection](mlproject-migrate.md#base-image-auto-detection) for how the right base is picked when adopting an existing MLproject.
+See [MLproject Runner → Running in a Container](mlproject-runner.md#running-in-a-container) for the full image table (sizes, architectures, contents) and [chapkit mlproject migrate → Base image auto-detection](mlproject-migrate.md#base-image-auto-detection) for how the right base is picked when adopting an existing MLproject.
 
 ## Step 5 — Publish to GHCR
 

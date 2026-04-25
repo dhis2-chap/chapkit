@@ -73,25 +73,25 @@ This creates a ready-to-run service with configuration, artifacts, and API endpo
 - **ml-shell**: Use external scripts for training/prediction (language-agnostic, supports Python/R/Julia/etc.)
 - **task**: General-purpose task execution with Python functions and shell commands (not ML-specific)
 
-### `chapkit run` - Serve an existing MLproject
+### `chapkit mlproject run` - Serve an existing MLproject
 
-If you already have an MLflow-style `MLproject` directory (R, Python, or mixed), `chapkit run` stands it up as a chapkit service with no code generation:
+If you already have an MLflow-style `MLproject` directory (R, Python, or mixed), `chapkit mlproject run` stands it up as a chapkit service with no code generation:
 
 ```bash
-chapkit run              # serve the MLproject in the current directory
-chapkit run .            # same
-chapkit run /path/to/mlproject
+chapkit mlproject run              # serve the MLproject in the current directory
+chapkit mlproject run .            # same
+chapkit mlproject run /path/to/mlproject
 ```
 
-### `chapkit migrate` - Adopt an existing MLproject as a chapkit project
+### `chapkit mlproject migrate` - Adopt an existing MLproject as a chapkit project
 
-When you're ready to own the service code (commit it, containerise it, extend it with validation hooks), `chapkit migrate` generates `main.py`, a `Dockerfile` pointing at the right [chapkit-images](https://github.com/dhis2-chap/chapkit-images) base, a `pyproject.toml`, a `compose.yml`, and a `CHAPKIT.md`. Chaff (input data, ad-hoc runners, the `MLproject` file itself) is swept to `_old/`; your train/predict scripts stay where they are:
+When you're ready to own the service code (commit it, containerise it, extend it with validation hooks), `chapkit mlproject migrate` generates `main.py`, a `Dockerfile` pointing at the right [chapkit-images](https://github.com/dhis2-chap/chapkit-images) base, a `pyproject.toml`, a `compose.yml`, and a `CHAPKIT.md`. Chaff (input data, ad-hoc runners, the `MLproject` file itself) is swept to `_old/`; your train/predict scripts stay where they are:
 
 ```bash
 cd /path/to/your/mlproject
-chapkit migrate --dry-run   # preview
-chapkit migrate             # execute interactively
-chapkit migrate --yes       # non-interactive (scripts / CI)
+chapkit mlproject migrate --dry-run   # preview
+chapkit mlproject migrate             # execute interactively
+chapkit mlproject migrate --yes       # non-interactive (scripts / CI)
 ```
 
 See the [MLproject Migrate guide](docs/guides/mlproject-migrate.md) for the classification table, base-image detection, and deferred features.
@@ -231,8 +231,8 @@ See `docs/guides/` for comprehensive guides:
 - [Artifact Storage](docs/guides/artifact-storage.md) - Hierarchical data storage for ML artifacts
 - [Task Execution](docs/guides/task-execution.md) - Python functions and shell command templates
 - [CLI Scaffolding](docs/guides/cli-scaffolding.md) - Project scaffolding with `chapkit init`
-- [MLproject Runner](docs/guides/mlproject-runner.md) - Serve existing MLproject directories with `chapkit run`
-- [MLproject Migrate](docs/guides/mlproject-migrate.md) - Adopt an MLproject as a chapkit project with `chapkit migrate`
+- [MLproject Runner](docs/guides/mlproject-runner.md) - Serve existing MLproject directories with `chapkit mlproject run`
+- [MLproject Migrate](docs/guides/mlproject-migrate.md) - Adopt an MLproject as a chapkit project with `chapkit mlproject migrate`
 - [Database Migrations](docs/guides/database-migrations.md) - Custom models and Alembic migrations
 
 Full documentation: https://dhis2-chap.github.io/chapkit/
@@ -252,4 +252,4 @@ AGPL-3.0-or-later
 ## Related Projects
 
 - **[servicekit](https://github.com/winterop-com/servicekit)** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.) ([docs](https://winterop-com.github.io/servicekit))
-- **[chapkit-images](https://github.com/dhis2-chap/chapkit-images)** - Dockerfiles and CI for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` runtime images used by `chapkit run`.
+- **[chapkit-images](https://github.com/dhis2-chap/chapkit-images)** - Dockerfiles and CI for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` runtime images used by `chapkit mlproject run`.
