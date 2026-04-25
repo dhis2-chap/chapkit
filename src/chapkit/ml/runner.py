@@ -543,8 +543,8 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 BaseConfig field at the top level. "chap_core" keeps prediction_periods and
                 additional_continuous_covariates at the top level and nests remaining fields
                 under user_option_values, matching chap-core's ModelConfiguration schema so
-                scripts ported from chap-models repos can read config["user_option_values"][...]
-                unchanged.
+                scripts ported from chap-models repos can read
+                ``config["user_option_values"]["<key>"]`` unchanged.
         """
         self.train_command = train_command
         self.predict_command = predict_command
