@@ -443,11 +443,11 @@ def upgrade() -> None:
 ```
 
 **Benefits**:
-- ✅ No need to regenerate migrations
-- ✅ Reuse tested helper functions
-- ✅ Explicit control over table creation order
-- ✅ Mix and match as needed
-- ✅ Clear and maintainable
+- No need to regenerate migrations
+- Reuse tested helper functions
+- Explicit control over table creation order
+- Mix and match as needed
+- Clear and maintainable
 
 **Alternative: Single Alembic with All Models**
 

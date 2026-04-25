@@ -1019,7 +1019,7 @@ def _run(
     typer.echo("Next steps:")
     typer.echo("  uv sync && uv run python main.py")
     typer.echo(
-        f"  # or: docker build -t {context['PROJECT_SLUG']} . && docker run --rm -p 8000:8000 {context['PROJECT_SLUG']}"
+        f"  # or: docker build -t {context['PROJECT_SLUG']} . && docker run --rm -p 9090:8000 {context['PROJECT_SLUG']}"
     )
     typer.echo("See CHAPKIT.md for more.")
 

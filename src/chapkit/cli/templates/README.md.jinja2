@@ -29,7 +29,7 @@ docker compose up --build
 The API will be available at:
 - API: http://localhost:9090
 - API Docs: http://localhost:9090/docs
-{% if monitoring %}
+{% if WITH_MONITORING %}
 - Prometheus: http://localhost:9091
 - Grafana: http://localhost:3000 (admin/admin)
 {% endif %}

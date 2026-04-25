@@ -119,7 +119,7 @@ def run_command(
     port: Annotated[
         int,
         typer.Option(help="Port to listen on."),
-    ] = 8000,
+    ] = 9090,
     param: Annotated[
         list[str] | None,
         typer.Option(

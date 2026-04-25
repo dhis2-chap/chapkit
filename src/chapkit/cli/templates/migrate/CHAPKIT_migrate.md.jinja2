@@ -11,16 +11,16 @@ This project is now a [**chapkit**](https://github.com/dhis2-chap/chapkit) servi
 {% if LANGUAGE == "python" %}
 | Do this | You get |
 | --- | --- |
-| [`make install && make run`](#run-it-locally) | Service on http://127.0.0.1:8000 |
+| [`make install && make run`](#run-it-locally) | Service on http://127.0.0.1:9090 |
 | [`make test`](#smoke-test-with-chapkit-test) | One-shot smoke test (auto-starts an in-memory service) |
-| [`make docker-build && make docker-run`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images), container on `:8000` |
-| [`/docs`](http://127.0.0.1:8000/docs) | Live OpenAPI UI for the service |
+| [`make docker-build && make docker-run`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images), published on host `:9090` (container `:8000`) |
+| [`/docs`](http://127.0.0.1:9090/docs) | Live OpenAPI UI for the service |
 {% else %}
 | Do this | You get |
 | --- | --- |
-| [`make docker-build && make docker-run`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images), container on `:8000` |
+| [`make docker-build && make docker-run`](#run-it-in-docker) | Image built on [`{{ BASE_IMAGE }}`](https://github.com/dhis2-chap/chapkit-images), published on host `:9090` (container `:8000`) |
 | [`make test-remote`](#smoke-test-with-chapkit-test) | Smoke test driving the running container |
-| [`/docs`](http://127.0.0.1:8000/docs) | Live OpenAPI UI for the service |
+| [`/docs`](http://127.0.0.1:9090/docs) | Live OpenAPI UI for the service |
 
 This is an R model — Docker is the supported path because `main.py` spawns R scripts that need R + `renv.lock` packages installed. The Docker image ships both; your host probably doesn't. `make test` (via `--start-service`) is Python-only and won't work here.
 {% endif %}
@@ -31,10 +31,10 @@ This is an R model — Docker is the supported path because `main.py` spawns R s
 {% if LANGUAGE == "python" %}
 ```bash
 uv sync                # installs chapkit + your deps into .venv
-uv run python main.py   # serves on http://127.0.0.1:8000
+uv run python main.py   # serves on http://127.0.0.1:9090
 ```
 
-Poke at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for the OpenAPI UI, or `/health` for a heartbeat.
+Poke at [http://127.0.0.1:9090/docs](http://127.0.0.1:9090/docs) for the OpenAPI UI, or `/health` for a heartbeat.
 {% else %}
 !!! warning "R model — prefer Docker"
     `main.py` invokes your `train.R` / `predict.R` scripts via `subprocess`, so the host needs R plus every package in `renv.lock` restored. Unless you actively develop R on this machine, **use [Docker](#run-it-in-docker) instead** — the base image has R and the packages pre-installed.
@@ -43,17 +43,17 @@ If you *do* have R set up locally (with `Rscript` on `$PATH` and `renv.lock` alr
 
 ```bash
 uv sync                # installs chapkit + Python deps into .venv
-uv run python main.py   # serves on http://127.0.0.1:8000 — calls into your R scripts
+uv run python main.py   # serves on http://127.0.0.1:9090 — calls into your R scripts
 ```
 
-Poke at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) for the OpenAPI UI, or `/health` for a heartbeat.
+Poke at [http://127.0.0.1:9090/docs](http://127.0.0.1:9090/docs) for the OpenAPI UI, or `/health` for a heartbeat.
 {% endif %}
 
 ## Run it in Docker
 
 ```bash
 docker build -t {{ PROJECT_SLUG }} .
-docker run --rm -p 8000:8000 {{ PROJECT_SLUG }}
+docker run --rm -p 9090:8000 {{ PROJECT_SLUG }}
 ```
 
 The image builds on [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://github.com/dhis2-chap/chapkit-images), one of the pre-baked [chapkit base images](https://github.com/dhis2-chap/chapkit-images) with Python/R and the common ML stack ready to go.
@@ -80,10 +80,10 @@ Equivalent to `uv run chapkit test --start-service` — auto-boots the service w
 make run           # uv run python main.py
 
 # terminal 2 (from the same project dir):
-make test-remote   # uv run chapkit test --url http://localhost:8000
+make test-remote   # uv run chapkit test --url http://localhost:9090
 ```
 
-Use this when you want to poke at the live service (http://127.0.0.1:8000/docs) between test runs, or tail the server logs while the test drives it.
+Use this when you want to poke at the live service (http://127.0.0.1:9090/docs) between test runs, or tail the server logs while the test drives it.
 {% else %}
 ### Docker-first (required for this R-based model)
 
@@ -92,12 +92,12 @@ Use this when you want to poke at the live service (http://127.0.0.1:8000/docs) 
 **This is an R model.** Your `train.R` / `predict.R` need R itself plus every package in `renv.lock` installed on the host. That's almost never what a developer has sitting around, but the Docker image has it all baked in. So the one-shot `make test` path does not apply here; go through Docker instead:
 
 ```bash
-# terminal 1 (builds the image + runs the container on :8000):
+# terminal 1 (builds the image + runs the container on host port 9090):
 make docker-build
 make docker-run
 
 # terminal 2 (once the container is healthy):
-make test-remote   # uv run chapkit test --url http://localhost:8000
+make test-remote   # uv run chapkit test --url http://localhost:9090
 ```
 
 `make docker-run` uses the same base image [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://github.com/dhis2-chap/chapkit-images) described above, which ships with R and pre-restores `renv.lock`, so the scripts execute in the environment they were written for.
@@ -111,7 +111,7 @@ If you really want to run `main.py` on the host (rare), you need R, a working `R
 ==================================================
 TEST SUMMARY
 ==================================================
-Service URL:           http://localhost:8000
+Service URL:           http://localhost:9090
 Elapsed time:          6.48s
 Configs created:       1
 Trainings completed:   1
@@ -247,7 +247,7 @@ When in doubt, **prefer `required_covariates`** — it's the stricter contract a
 
 ## Artifacts
 
-Each train/predict call leaves a zipped workspace behind, browsable at [`/api/v1/artifacts`](http://127.0.0.1:8000/docs#/artifacts). Jobs are scheduled via [`/api/v1/jobs`](http://127.0.0.1:8000/docs#/jobs) so you can POST training and poll for completion. Full API reference: [`/docs`](http://127.0.0.1:8000/docs) once the service is running, or the [ML workflows guide](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#api-reference).
+Each train/predict call leaves a zipped workspace behind, browsable at [`/api/v1/artifacts`](http://127.0.0.1:9090/docs#/artifacts). Jobs are scheduled via [`/api/v1/jobs`](http://127.0.0.1:9090/docs#/jobs) so you can POST training and poll for completion. Full API reference: [`/docs`](http://127.0.0.1:9090/docs) once the service is running, or the [ML workflows guide](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#api-reference).
 
 ## Registering with chap-core
 
