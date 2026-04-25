@@ -131,12 +131,7 @@ app = (
         runner=runner,
         database_url=DATABASE_URL,
     )
-    # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
-    # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
-    # local `python main.py` runs without any extra config. Optional env vars:
-    #   SERVICEKIT_ORCHESTRATOR_URL   e.g. http://chap:8000/v2/services/$register
-    #   SERVICEKIT_REGISTRATION_KEY   shared secret if chap has one set
-    #   SERVICEKIT_HOST, SERVICEKIT_PORT   override the advertised endpoint
+    # See compose.yml for chap-core self-registration env vars.
     .with_registration()
     .build()
 )

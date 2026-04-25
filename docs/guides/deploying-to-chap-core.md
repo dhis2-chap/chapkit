@@ -135,7 +135,7 @@ Want more — SHA tags for traceability, semver releases, build cache, SLSA atte
 
 ## Step 6 — Wire it into chap-core with a compose overlay
 
-chap-core ships with a base `compose.yml` (`chap`, `worker`, `redis`, `postgres`) and expects model services to be added via overlay files. Add one for your model, next to chap-core's `compose.yml`:
+chap-core ships with a base `compose.yml` (`chap`, `worker`, `redis`, `postgres`) and expects model services to be added via overlay files. Your scaffolded project also ships a `compose.yml` for standalone local dev — when you copy it over (or write a new one) next to chap-core's, **rename it `compose.<your-model>.yml`** so the two files don't clash and so `docker compose -f compose.yml -f compose.<your-model>.yml up` reads as "the chap-core base, plus my model".
 
 ```yaml
 # compose.my-model.yml
@@ -212,15 +212,15 @@ Keepalive pings are failing. Check the model container is still running (`docker
 Expected for amd64-only base images (R-INLA, some Python wheels). The container runs under emulation; slower but correct.
 
 **SQLite file disappears between runs.**
-The scaffolded image runs from `WORKDIR /workspace` and the default `DATABASE_URL` is the relative path `data/chapkit.db`, which resolves to `/workspace/data/chapkit.db`. The scaffolded `Dockerfile` pre-creates that directory with the right ownership, and the scaffolded `compose.yml` already mounts a named volume there — so persistence works out of the box when you run via `docker compose up`.
+The scaffolded image runs from `WORKDIR /work` and the default `DATABASE_URL` is the relative path `data/chapkit.db`, which resolves to `/work/data/chapkit.db`. The scaffolded `compose.yml` mounts a named volume there — persistence works out of the box when you run via `docker compose up`.
 
-If you run the image directly with `docker run` and want the DB to survive container restarts, mount a volume at `/workspace/data`:
+If you run the image directly with `docker run` and want the DB to survive container restarts, mount a volume at `/work/data`:
 
 ```yaml
 services:
   my-model:
     volumes:
-      - my-model-data:/workspace/data
+      - my-model-data:/work/data
 volumes:
   my-model-data:
 ```
@@ -229,13 +229,14 @@ To put the DB somewhere else, set an absolute `DATABASE_URL` (note the four slas
 
 ```yaml
     environment:
-      DATABASE_URL: sqlite+aiosqlite:////workspace/data/chapkit.db
+      DATABASE_URL: sqlite+aiosqlite:////work/data/chapkit.db
 ```
 
 ---
 
 ## Appendix — reference files
 
+- [chapkit documentation](https://dhis2-chap.github.io/chapkit/) — full guides, CLI reference, and API docs.
 - [`chapkit_ewars_model/main.py`](https://github.com/chap-models/chapkit_ewars_model/blob/main/main.py) — `MLServiceInfo`, `ShellModelRunner`, `.with_registration()`.
 - [`chapkit_ewars_model/Dockerfile`](https://github.com/chap-models/chapkit_ewars_model/blob/main/Dockerfile) — short `FROM ghcr.io/dhis2-chap/chapkit-r-inla:latest` + `uv sync` layer; a concrete example of extending a chapkit-images base with model-specific Python deps.
 - [`chapkit_ewars_model/.github/workflows/publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) — a fuller GHCR publish workflow with cache, semver tags, and SLSA attestations.

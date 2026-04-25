@@ -11,7 +11,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ck_{{ PROJECT_SLUG }}_data:/app/data
+      - ck_{{ PROJECT_SLUG }}_data:/work/data
     environment:
       LOG_FORMAT: json
       LOG_LEVEL: INFO

@@ -16,6 +16,10 @@ COPY scripts/ ./scripts/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --python /app/.venv/bin/python -r pyproject.toml
 
+# Bind to all interfaces inside the container so docker-compose port forwarding works.
+# Local `python main.py` runs (without HOST set) keep their loopback default.
+ENV HOST=0.0.0.0
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
