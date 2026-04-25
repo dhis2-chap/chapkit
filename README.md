@@ -229,6 +229,7 @@ See `docs/guides/` for comprehensive guides:
 - [Configuration Management](docs/guides/configuration-management.md) - Config schemas and validation
 - [Artifact Storage](docs/guides/artifact-storage.md) - Hierarchical data storage for ML artifacts
 - [CLI Scaffolding](docs/guides/cli-scaffolding.md) - Project scaffolding with `chapkit init`
+- [Monitoring](docs/guides/monitoring.md) - Adding Prometheus + Grafana around the scaffolded `/metrics` endpoint
 - [MLproject Runner](docs/guides/mlproject-runner.md) - Serve existing MLproject directories with `chapkit mlproject run`
 - [MLproject Migrate](docs/guides/mlproject-migrate.md) - Adopt an MLproject as a chapkit project with `chapkit mlproject migrate`
 - [Database Migrations](docs/guides/database-migrations.md) - Custom models and Alembic migrations

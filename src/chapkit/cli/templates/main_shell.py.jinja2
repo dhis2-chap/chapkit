@@ -224,9 +224,7 @@ app = (
         runner=runner,
         database_url=DATABASE_URL,
     )
-{% if WITH_MONITORING %}
     .with_monitoring()
-{% endif %}
     # See compose.yml for chap-core self-registration env vars.
     .with_registration()
     .build()

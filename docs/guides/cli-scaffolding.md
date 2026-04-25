@@ -118,10 +118,14 @@ chapkit init PROJECT_NAME [OPTIONS]
 **Options:**
 
 - `--path PATH` - Target directory (default: current directory)
-- `--with-monitoring` - Include Prometheus and Grafana monitoring stack
 - `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Off by default.
 - `--template TYPE` - Template type: `fn-py` (default), `shell-py`, or `shell-r`
 - `--help` - Show help message
+
+> Looking for Prometheus + Grafana? The scaffolded service exposes `/metrics`
+> out of the box (chapkit calls `.with_monitoring()` on the builder). To wire
+> up a Prometheus scraper and a Grafana dashboard alongside it, see the
+> [Monitoring guide](monitoring.md).
 
 **Examples:**
 
@@ -135,9 +139,6 @@ chapkit init my-service
 # Create project in specific location
 chapkit init my-service --path ~/projects
 
-# Create project with monitoring stack
-chapkit init my-service --with-monitoring
-
 # Create project with shell-py template (Python scripts under scripts/)
 chapkit init my-service --template shell-py
 
@@ -148,7 +149,7 @@ chapkit init my-service --template shell-r
 chapkit init my-service --with-validation
 
 # Combine options
-chapkit init my-service --template shell-py --with-monitoring --with-validation
+chapkit init my-service --template shell-py --with-validation
 
 # From GitHub (development version)
 uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
@@ -371,24 +372,6 @@ my-service/
 │   └── chapkit.db       # SQLite database (created at runtime)
 ├── .gitignore           # Python gitignore
 └── README.md            # Project documentation
-```
-
-### With Monitoring
-
-When using `--with-monitoring`, additional files are generated:
-
-```
-my-service/
-...
-└── monitoring/
-    ├── prometheus/
-    │   └── prometheus.yml
-    └── grafana/
-        ├── provisioning/
-        │   ├── datasources/prometheus.yml
-        │   └── dashboards/dashboard.yml
-        └── dashboards/
-            └── chapkit-service-metrics.json
 ```
 
 ### With Validation Hooks

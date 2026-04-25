@@ -79,10 +79,6 @@ docker compose up --build
 The API will be available at:
 - API: http://localhost:9090
 - API Docs: http://localhost:9090/docs
-{% if WITH_MONITORING %}
-- Prometheus: http://localhost:9091
-- Grafana: http://localhost:3000 (admin/admin)
-{% endif %}
 
 The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
 if you want a different host port.
@@ -120,10 +116,6 @@ docker compose up --build
 The API will be available at:
 - API: http://localhost:9090
 - API Docs: http://localhost:9090/docs
-{% if WITH_MONITORING %}
-- Prometheus: http://localhost:9091
-- Grafana: http://localhost:3000 (admin/admin)
-{% endif %}
 
 The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
 to change the host port. Local dev (`python main.py`) also defaults to 9090.
@@ -154,6 +146,14 @@ service plumbing (config CRUD, the train job, artifact persistence, and
 predict) all work. Handy after editing `main.py` or rebuilding the image.
 
 ## API Endpoints
+
+The interactive Swagger UI at <http://localhost:9090/docs> is the easiest way to
+poke at the service - it lets you fill in payloads and hit endpoints from the
+browser without any extra tools.
+
+If you prefer Postman or Insomnia, point them at the OpenAPI spec at
+<http://localhost:9090/openapi.json> (Postman: *Import → Link* and paste the URL;
+it generates a fresh collection). Re-import after API changes.
 
 ### Health Check
 
@@ -282,13 +282,8 @@ Edit the `on_predict` function in `main.py` to implement your prediction logic.
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # Docker build configuration
 ├── compose.yml          # Docker Compose configuration
-├── data/                # Database directory
-│   └── chapkit.db       # SQLite database (persisted)
-{% if WITH_MONITORING %}
-└── monitoring/          # Monitoring stack configuration
-    ├── prometheus/      # Prometheus configuration
-    └── grafana/         # Grafana dashboards and data sources
-{% endif %}
+└── data/                # Database directory
+    └── chapkit.db       # SQLite database (persisted)
 ```
 
 ## Documentation

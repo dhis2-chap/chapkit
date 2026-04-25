@@ -35,7 +35,7 @@ uvx chapkit init my-model
 cd my-model
 ```
 
-See [CLI Scaffolding](cli-scaffolding.md) for template options (`ml`, `ml-shell`, `task`) and flags (`--with-monitoring`, `--with-validation`).
+See [CLI Scaffolding](cli-scaffolding.md) for template options (`fn-py`, `shell-py`, `shell-r`) and the `--with-validation` flag.
 
 The scaffolded `main.py` already ends with `.with_registration()`. No manual edit is needed to enable registration — the builder silently no-ops when the orchestrator env var is unset, so `python main.py` still runs standalone.
 

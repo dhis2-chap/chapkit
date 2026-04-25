@@ -173,7 +173,7 @@ Useful for reproducing a failure outside chapkit: feed the same CSVs into your s
 ## What's in the box
 
 - **`main.py`** — the generated chapkit service. Defines your [`{{ PROJECT_CLASS_NAME }}Config`](https://dhis2-chap.github.io/chapkit/guides/configuration-management/), wires a [`ShellModelRunner`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#shellmodelrunner) to your scripts, and hands everything to [`MLServiceBuilder`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlservicebuilder-recommended).
-- **`Dockerfile`**, **`compose.yml`**, **`pyproject.toml`**, **`postman_collection.json`**, **`README.md`**, **`.gitignore`**, **`.dockerignore`** — all generated, all yours to edit.
+- **`Dockerfile`**, **`compose.yml`**, **`pyproject.toml`**, **`README.md`**, **`.gitignore`**, **`.dockerignore`** — all generated, all yours to edit.
 - **Your train/predict scripts**, helpers, Python packages, lockfiles, `LICENSE`, and any arbitrary `*.yaml`/`*.json` config files your scripts read — **untouched**, at the project root.
 - **`_old/`** — safety net: original `MLproject`, pre-existing metadata files chapkit regenerated, example input/output, ad-hoc runners (`isolated_run.*`). Nothing here is loaded at runtime; browse freely, copy anything worth porting back.
 {% if HAS_USER_PYPROJECT %}

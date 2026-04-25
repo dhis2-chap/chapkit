@@ -31,7 +31,7 @@ After a successful run, the project root holds your unchanged source files along
 | Kind | Destination | Examples |
 | --- | --- | --- |
 | Original MLproject definition | `_old/` | `MLproject`, `MLproject.yaml` |
-| User's project metadata (chapkit regenerates these) | `_old/` | `README.md`, `.gitignore`, `.dockerignore`, `.python-version`, `pyproject.toml`, `Makefile`, `Dockerfile`, `compose.yml`, `postman_collection.json`, `CHAPKIT.md` |
+| User's project metadata (chapkit regenerates these) | `_old/` | `README.md`, `.gitignore`, `.dockerignore`, `.python-version`, `pyproject.toml`, `Makefile`, `Dockerfile`, `compose.yml`, `CHAPKIT.md` |
 | Built-for-dev runners | `_old/` | `isolated_run.r`, `isolated_run.R`, `evaluate_one_step.py`, `slides.md` |
 | Example / demo data | `_old/` | `input/`, `output/`, `example_data/`, `example_data_monthly/`, root-level `training_data*.csv`, `predictions*.csv`, `future_data*.csv`, `historic_data*.csv`, `*.pickle`, `*.rds`, `*.model` |
 | R environment-local state | `_old/` | `renv/`, `.Rprofile` |
@@ -109,6 +109,6 @@ git add -A && git commit -m "chore: migrate MLproject to chapkit"
 ## What's deferred
 
 - **`--restructure`** flag for the `scripts/` + top-level Python package layout manually applied by some existing chap-models repos. v1 leaves source files where they are.
-- **`--with-monitoring`** / **`--with-validation`** mirroring the `chapkit init` flags.
+- **`--with-validation`** mirroring the `chapkit init` flag.
 - **`chapkit mlproject migrate --reverse`** to restore from `_old/` in one shot.
 - **`git mv`** mode to preserve history for moved files.

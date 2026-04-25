@@ -86,7 +86,6 @@ _INIT_EPILOG = (
     "[bold cyan]chapkit init my-model[/bold cyan] - Python model in main.py (default)\n\n"
     "[bold cyan]chapkit init my-model --template shell-py[/bold cyan] - Python train/predict scripts\n\n"
     "[bold cyan]chapkit init my-model --template shell-r[/bold cyan] - R scripts on chapkit-r-inla\n\n"
-    "[bold cyan]chapkit init my-model --with-monitoring[/bold cyan] - add Prometheus + Grafana\n\n"
     "[bold]After scaffolding:[/bold] [cyan]cd my-model && uv lock && docker compose up --build[/cyan]"
 )
 

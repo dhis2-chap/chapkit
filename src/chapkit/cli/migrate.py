@@ -70,7 +70,6 @@ _CHAFF_FILENAMES = {
     "Dockerfile",
     "compose.yml",
     "compose.yaml",
-    "postman_collection.json",
     "CHAPKIT.md",
     # R profile
     ".Rprofile",
@@ -98,7 +97,6 @@ _GENERATED_FILENAMES: tuple[str, ...] = (
     "compose.yml",
     "Makefile",
     "CHAPKIT.md",
-    "postman_collection.json",
     "README.md",
     "requirements.txt",
     ".gitignore",
@@ -1033,7 +1031,6 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
         "compose.yml": _render(_SHARED_TEMPLATE_DIR, "compose.yml.jinja2", context),
         "Makefile": _render(t, "Makefile_migrate.jinja2", context),
         "CHAPKIT.md": _render(t, "CHAPKIT_migrate.md.jinja2", context),
-        "postman_collection.json": _render(_SHARED_TEMPLATE_DIR, "postman_collection_ml_shell.json.jinja2", context),
         "README.md": _render(t, "README_migrate.md.jinja2", context),
         ".gitignore": _render(t, "gitignore_migrate.jinja2", context),
         ".dockerignore": _render(t, "dockerignore_migrate.jinja2", context),

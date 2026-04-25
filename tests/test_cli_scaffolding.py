@@ -431,7 +431,6 @@ def test_scaffold_functional_project_structure(
     assert (project_dir / "Dockerfile").exists()
     assert (project_dir / "README.md").exists()
     assert (project_dir / "compose.yml").exists()
-    assert (project_dir / "postman_collection.json").exists()
     assert (project_dir / ".gitignore").exists()
     assert (project_dir / ".python-version").exists()
 
@@ -461,44 +460,6 @@ def test_scaffold_shell_project_structure(
     assert "ShellModelRunner" in main_content
     assert "train_command" in main_content
     assert "predict_command" in main_content
-
-
-@pytest.mark.slow
-def test_scaffold_with_monitoring_structure(tmp_path: Path, chapkit_root: Path) -> None:
-    """Test scaffolding with monitoring stack generates all files."""
-    result = subprocess.run(
-        [
-            "uv",
-            "run",
-            "chapkit",
-            "init",
-            "test-monitor",
-            "--with-monitoring",
-            "--path",
-            str(tmp_path),
-        ],
-        cwd=chapkit_root,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, f"chapkit init failed: {result.stderr}"
-
-    project_dir = tmp_path / "test-monitor"
-
-    # Verify monitoring files exist
-    assert (project_dir / "compose.yml").exists()
-    assert (project_dir / "monitoring").is_dir()
-    assert (project_dir / "monitoring" / "prometheus").is_dir()
-    assert (project_dir / "monitoring" / "prometheus" / "prometheus.yml").exists()
-    assert (project_dir / "monitoring" / "grafana").is_dir()
-    assert (project_dir / "monitoring" / "grafana" / "provisioning").is_dir()
-    assert (project_dir / "monitoring" / "grafana" / "provisioning" / "datasources").is_dir()
-    assert (project_dir / "monitoring" / "grafana" / "provisioning" / "dashboards").is_dir()
-
-    # Verify compose.yml has monitoring services
-    compose_content = (project_dir / "compose.yml").read_text()
-    assert "prometheus" in compose_content
-    assert "grafana" in compose_content
 
 
 @pytest.mark.slow
@@ -588,37 +549,6 @@ def test_scaffold_without_validation_omits_hook_stubs(tmp_path: Path, chapkit_ro
     assert "async def on_validate_train" not in main_content
     assert "async def on_validate_predict" not in main_content
     assert "ValidationDiagnostic" not in main_content
-
-
-@pytest.mark.slow
-def test_scaffold_ml_postman_collection_includes_validate(tmp_path: Path, chapkit_root: Path) -> None:
-    """Postman collection always includes $validate regardless of --with-validation."""
-    import json
-
-    result = subprocess.run(
-        [
-            "uv",
-            "run",
-            "chapkit",
-            "init",
-            "test-pm-val",
-            "--path",
-            str(tmp_path),
-        ],
-        cwd=chapkit_root,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0
-
-    collection = json.loads((tmp_path / "test-pm-val" / "postman_collection.json").read_text())
-    folder_names = [folder["name"] for folder in collection["item"]]
-    assert any("Model Validation" in name for name in folder_names)
-
-    validation_folder = next(f for f in collection["item"] if "Model Validation" in f["name"])
-    request_names = [item["name"] for item in validation_folder["item"]]
-    assert "Validate Train Payload" in request_names
-    assert "Validate Predict Payload" in request_names
 
 
 @pytest.mark.slow
