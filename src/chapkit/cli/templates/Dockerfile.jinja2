@@ -5,16 +5,20 @@ FROM ghcr.io/dhis2-chap/chapkit-py:latest
 USER root
 
 WORKDIR /work
-COPY pyproject.toml ./
+# Copy lockfile + manifest first so the dep-install layer caches independently of code changes.
+# Run `uv sync` once locally before the first `docker build` to generate uv.lock.
+COPY pyproject.toml uv.lock ./
+
+# Sync user deps into the chapkit-py base's existing venv at /app/.venv. --frozen pins to
+# uv.lock for reproducible builds, --no-dev skips dev-only deps (uvicorn etc. ship with
+# chapkit-py), --no-install-project because this project isn't a package, just a service.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    UV_PROJECT_ENVIRONMENT=/app/.venv uv sync --frozen --no-dev --no-install-project
+
 COPY main.py ./
 {% if TEMPLATE == "ml-shell" %}
 COPY scripts/ ./scripts/
 {% endif %}
-
-# Install user dependencies into the chapkit venv that ships with the base image.
-# Reads dependencies from pyproject.toml directly - no build-system or lock file required.
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --python /app/.venv/bin/python -r pyproject.toml
 
 EXPOSE 8000
 
