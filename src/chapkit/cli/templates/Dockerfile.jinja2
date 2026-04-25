@@ -1,5 +1,16 @@
 # {{ PROJECT_NAME }} Dockerfile
+{% if TEMPLATE == "shell-r" %}
+# chapkit-r-inla ships R 4.5 + INLA + the spatial / time-series stack (sf, spdep, dlnm,
+# tsModel, sn, xgboost, fmesher, ...) preinstalled. The image is amd64-only (INLA ships
+# x86_64 binaries only), so the FROM line pins linux/amd64 - this works on Apple Silicon
+# too via Rosetta. Use chapkit-r instead if you don't need INLA - it's smaller and
+# multi-arch (drop the --platform pin if you want a native arm64 build, and remove
+# `platform: linux/amd64` from compose.yml).
+FROM --platform=linux/amd64 ghcr.io/dhis2-chap/chapkit-r-inla:latest
+# FROM --platform=linux/amd64 ghcr.io/dhis2-chap/chapkit-r:latest
+{% else %}
 FROM ghcr.io/dhis2-chap/chapkit-py:latest
+{% endif %}
 
 # chapkit-py runs as root; matches chapkit-r / chapkit-r-inla.
 USER root
@@ -9,14 +20,14 @@ WORKDIR /work
 # Run `uv sync` once locally before the first `docker build` to generate uv.lock.
 COPY pyproject.toml uv.lock ./
 
-# Sync user deps into the chapkit-py base's existing venv at /app/.venv. --frozen pins to
+# Sync user deps into the base image's existing venv at /app/.venv. --frozen pins to
 # uv.lock for reproducible builds, --no-dev skips dev-only deps (uvicorn etc. ship with
-# chapkit-py), --no-install-project because this project isn't a package, just a service.
+# the base), --no-install-project because this project isn't a package, just a service.
 RUN --mount=type=cache,target=/root/.cache/uv \
     UV_PROJECT_ENVIRONMENT=/app/.venv uv sync --frozen --no-dev --no-install-project
 
 COPY main.py ./
-{% if TEMPLATE == "ml-shell" %}
+{% if TEMPLATE in ("shell-py", "shell-r") %}
 COPY scripts/ ./scripts/
 {% endif %}
 

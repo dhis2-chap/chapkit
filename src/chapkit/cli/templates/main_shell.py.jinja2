@@ -44,6 +44,18 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
 #   config.yml - YAML config (always available)
 #   model.pickle - Model file (create/use as needed)
 
+{% if TEMPLATE == "shell-r" %}
+# Training command template (using relative path to script)
+train_command = "Rscript scripts/train.R --data {data_file}"
+
+# Prediction command template (using relative path to script)
+predict_command = (
+    "Rscript scripts/predict.R "
+    "--historic {historic_file} "
+    "--future {future_file} "
+    "--output {output_file}"
+)
+{% else %}
 # Training command template (using relative path to script)
 train_command = "python scripts/train_model.py --data {data_file}"
 
@@ -54,6 +66,7 @@ predict_command = (
     "--future {future_file} "
     "--output {output_file}"
 )
+{% endif %}
 
 {% if WITH_VALIDATION %}
 # ====================================================================================

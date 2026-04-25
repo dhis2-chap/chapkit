@@ -64,13 +64,14 @@ uvx chapkit init my-ml-service
 Options:
 - `--path <directory>` - Target directory (default: current directory)
 - `--with-monitoring` - Include Prometheus and Grafana monitoring stack
-- `--template <type>` - Template type: `ml` (default), `ml-shell`, or `task`
+- `--template <type>` - Template type: `fn-py` (default), `shell-py`, `shell-r`, or `task`
 
 This creates a ready-to-run service with configuration, artifacts, and API endpoints pre-configured.
 
 **Template Types:**
-- **ml**: Define training/prediction as Python functions in `main.py` (simpler, best for Python-only ML workflows)
-- **ml-shell**: Use external scripts for training/prediction (language-agnostic, supports Python/R/Julia/etc.)
+- **fn-py**: Define training/prediction as Python functions in `main.py` (simplest path, Python-only ML workflows)
+- **shell-py**: Train/predict via external Python scripts in `scripts/` (driven by `ShellModelRunner`)
+- **shell-r**: Train/predict via external R scripts in `scripts/`, defaults to the `chapkit-r-inla` base image
 - **task**: General-purpose task execution with Python functions and shell commands (not ML-specific)
 
 ### `chapkit mlproject run` - Serve an existing MLproject

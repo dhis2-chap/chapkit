@@ -49,7 +49,7 @@ def chapkit_root() -> Path:
 def scaffold_project(tmp_path: Path, chapkit_root: Path) -> Callable[..., Path]:
     """Scaffold a project and patch to use local chapkit."""
 
-    def _scaffold(name: str, template: str = "ml", *, with_validation: bool = False) -> Path:
+    def _scaffold(name: str, template: str = "fn-py", *, with_validation: bool = False) -> Path:
         cmd = [
             "uv",
             "run",
@@ -423,7 +423,7 @@ def test_scaffold_functional_project_structure(
     scaffold_project: Callable[[str, str], Path],
 ) -> None:
     """Test that scaffolded functional ML project has correct structure."""
-    project_dir = scaffold_project("test-functional", "ml")
+    project_dir = scaffold_project("test-functional", "fn-py")
 
     # Verify project structure
     assert (project_dir / "main.py").exists()
@@ -447,7 +447,7 @@ def test_scaffold_shell_project_structure(
     scaffold_project: Callable[[str, str], Path],
 ) -> None:
     """Test that scaffolded shell ML project has correct structure."""
-    project_dir = scaffold_project("test-shell", "ml-shell")
+    project_dir = scaffold_project("test-shell", "shell-py")
 
     # Verify project structure
     assert (project_dir / "main.py").exists()
@@ -543,7 +543,7 @@ def test_scaffold_with_validation_ml_shell_template(tmp_path: Path, chapkit_root
             "init",
             "test-val-ml-shell",
             "--template",
-            "ml-shell",
+            "shell-py",
             "--with-validation",
             "--path",
             str(tmp_path),
@@ -652,7 +652,7 @@ def test_scaffold_functional_train_predict(
     scaffold_project: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded functional ML project with train and predict workflow."""
-    project_dir = scaffold_project("test-ml-workflow", "ml")
+    project_dir = scaffold_project("test-ml-workflow", "fn-py")
     port = find_free_port()
 
     with run_service(project_dir, port) as base_url:
@@ -665,7 +665,7 @@ def test_scaffold_shell_train_predict(
     scaffold_project: Callable[[str, str], Path],
 ) -> None:
     """Test scaffolded shell ML project with train and predict workflow."""
-    project_dir = scaffold_project("test-shell-workflow", "ml-shell")
+    project_dir = scaffold_project("test-shell-workflow", "shell-py")
     port = find_free_port()
 
     with run_service(project_dir, port) as base_url:
@@ -678,7 +678,7 @@ def test_scaffold_multiple_predictions_from_same_model(
     scaffold_project: Callable[[str, str], Path],
 ) -> None:
     """Test making multiple predictions from the same trained model."""
-    project_dir = scaffold_project("test-multi-predict", "ml")
+    project_dir = scaffold_project("test-multi-predict", "fn-py")
     port = find_free_port()
 
     with run_service(project_dir, port) as base_url:
@@ -736,7 +736,7 @@ def test_scaffold_config_artifact_linkage(
     scaffold_project: Callable[[str, str], Path],
 ) -> None:
     """Test that config is linked to artifacts via artifact operations."""
-    project_dir = scaffold_project("test-config-link", "ml")
+    project_dir = scaffold_project("test-config-link", "fn-py")
     port = find_free_port()
 
     with run_service(project_dir, port) as base_url:
@@ -778,7 +778,7 @@ def test_scaffold_config_artifact_linkage(
 def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[str, str], Path]:
     """Scaffold a project without installing dependencies (for Docker build tests)."""
 
-    def _scaffold(name: str, template: str = "ml") -> Path:
+    def _scaffold(name: str, template: str = "fn-py") -> Path:
         result = subprocess.run(
             [
                 "uv",
@@ -802,7 +802,7 @@ def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[st
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("template", ["ml", "ml-shell"])
+@pytest.mark.parametrize("template", ["fn-py", "shell-py"])
 def test_scaffold_docker_build(
     scaffold_project_no_sync: Callable[[str, str], Path],
     template: str,
@@ -850,7 +850,7 @@ def test_scaffold_functional_train_predict_docker(
     if docker_check.returncode != 0:
         pytest.skip("Docker is not available")
 
-    project_dir = scaffold_project_no_sync("test-docker-ml-workflow", "ml")
+    project_dir = scaffold_project_no_sync("test-docker-ml-workflow", "fn-py")
     port = find_free_port()
 
     with run_service_docker(project_dir, port) as base_url:
@@ -868,7 +868,7 @@ def test_scaffold_shell_train_predict_docker(
     if docker_check.returncode != 0:
         pytest.skip("Docker is not available")
 
-    project_dir = scaffold_project_no_sync("test-docker-shell-workflow", "ml-shell")
+    project_dir = scaffold_project_no_sync("test-docker-shell-workflow", "shell-py")
     port = find_free_port()
 
     with run_service_docker(project_dir, port) as base_url:

@@ -127,41 +127,41 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
     learning_rate: float = 0.01
 ```
 
-{% if TEMPLATE == "ml-shell" %}
-### Customize Training (Shell Runner)
+{% if TEMPLATE == "shell-py" %}
+### Customize Training (Shell Runner, Python)
 
-Edit the training script in `scripts/train_model.py` to implement your model training logic.
+Edit `scripts/train_model.py` to implement your model training logic. The script
+receives `--data <path-to-training-csv>` (and optionally `--geo <path-to-geojson>`),
+reads `config.yml` from the workspace, and writes its model artefact to disk
+(`model.pickle` in the example).
 
-The script receives the following arguments:
-- `--config`: Path to config YAML file
-- `--data`: Path to training data CSV
-- `--model`: Path to save trained model (pickle format)
-- `--geo`: Optional GeoJSON file path
+### Customize Prediction (Shell Runner, Python)
 
-### Customize Prediction (Shell Runner)
+Edit `scripts/predict_model.py`. It receives `--historic`, `--future`, `--output`
+(and optional `--geo`), loads the model written by training, and writes
+predictions to the `--output` CSV.
+{% elif TEMPLATE == "shell-r" %}
+### Customize Training (Shell Runner, R)
 
-Edit the prediction script in `scripts/predict_model.py` to implement your prediction logic.
+Edit `scripts/train.R` to implement your model training logic. The script
+receives `--data <path-to-training-csv>` (and optionally `--geo <path-to-geojson>`),
+reads `config.yml` from the workspace, and writes its model artefact to disk
+(`model.rds` in the example).
 
-The script receives the following arguments:
-- `--config`: Path to config YAML file
-- `--model`: Path to trained model pickle file
-- `--historic`: Path to historic data CSV
-- `--future`: Path to future data CSV
-- `--output`: Path to save predictions CSV
-- `--geo`: Optional GeoJSON file path
+### Customize Prediction (Shell Runner, R)
 
-### Using Other Languages
+Edit `scripts/predict.R`. It receives `--historic`, `--future`, `--output`
+(and optional `--geo`), loads the model written by training, and writes
+predictions to the `--output` CSV.
 
-The shell runner is language-agnostic! You can replace the Python scripts with:
-- R scripts: `Rscript scripts/train_model.R ...`
-- Julia scripts: `julia scripts/train_model.jl ...`
-- Any executable that accepts the same arguments
+### R packages
 
-Just update the command templates in `main.py`:
-
-```python
-train_command = f"Rscript {SCRIPTS_DIR}/train_model.R --config {{config_file}} ..."
-```
+The default Docker image (`chapkit-r-inla`) ships a curated R stack: `INLA`,
+`fmesher`, `dlnm`, `tsModel`, `sn`, `xgboost`, `sf`, `spdep`, `dplyr`, `readr`,
+`yaml`, `jsonlite`, `pak`, `renv`. To add packages, either install them at
+build time in the `Dockerfile` (`RUN R -e "install.packages('foo')"`) or
+commit an `renv.lock` and bake it in. See
+[chapkit-r-inla](https://github.com/dhis2-chap/chapkit-images) for the full list.
 {% else %}
 ### Customize Training
 
@@ -177,10 +177,14 @@ Edit the `on_predict` function in `main.py` to implement your prediction logic.
 ```
 {{ PROJECT_SLUG }}/
 ├── main.py              # Main application file
-{% if TEMPLATE == "ml-shell" %}
-├── scripts/             # External training/prediction scripts
+{% if TEMPLATE == "shell-py" %}
+├── scripts/             # External training/prediction scripts (Python)
 │   ├── train_model.py   # Training script
 │   └── predict_model.py # Prediction script
+{% elif TEMPLATE == "shell-r" %}
+├── scripts/             # External training/prediction scripts (R)
+│   ├── train.R          # Training script
+│   └── predict.R        # Prediction script
 {% endif %}
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # Docker build configuration

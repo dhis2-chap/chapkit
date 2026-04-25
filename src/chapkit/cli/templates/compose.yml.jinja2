@@ -8,6 +8,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+{% if TEMPLATE == "shell-r" %}
+    # chapkit-r-inla is amd64-only; runs under Rosetta on Apple Silicon. Drop this if
+    # you switch to the chapkit-r base in the Dockerfile.
+    platform: linux/amd64
+{% endif %}
     # Alternative: pull a prebuilt image from GHCR (comment out `build:` above).
     # image: ghcr.io/<your-org>/{{ PROJECT_SLUG }}:latest
     # pull_policy: always

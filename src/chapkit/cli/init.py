@@ -83,8 +83,8 @@ def init_command(
     ] = False,
     template: Annotated[
         str,
-        typer.Option(help="Template type: 'ml', 'ml-shell', or 'task'"),
-    ] = "ml",
+        typer.Option(help="Template type: 'fn-py' (default), 'shell-py', 'shell-r', or 'task'"),
+    ] = "fn-py",
 ) -> None:
     """Initialize a new chapkit ML service project."""
     target_dir = (path or Path.cwd()) / project_name
@@ -93,15 +93,19 @@ def init_command(
         typer.echo(f"Error: Directory '{target_dir}' already exists", err=True)
         raise typer.Exit(code=1)
 
-    if template not in ["ml", "ml-shell", "task"]:
-        typer.echo(f"Error: Invalid template '{template}'. Must be 'ml', 'ml-shell', or 'task'", err=True)
+    valid_templates = ["fn-py", "shell-py", "shell-r", "task"]
+    if template not in valid_templates:
+        typer.echo(
+            f"Error: Invalid template '{template}'. Must be one of: {', '.join(valid_templates)}",
+            err=True,
+        )
         raise typer.Exit(code=1)
 
     if with_validation and template == "task":
         typer.echo(
             "Error: --with-validation is only supported for ML templates "
-            "('ml' or 'ml-shell'). The task template has no ML runner and "
-            "therefore no $validate endpoint.",
+            "('fn-py', 'shell-py', or 'shell-r'). The task template has no ML runner "
+            "and therefore no $validate endpoint.",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -141,8 +145,10 @@ def init_command(
 
     typer.echo("Generating project files...")
 
+    is_shell = template in ("shell-py", "shell-r")
+
     # Render main.py based on template type
-    if template == "ml-shell":
+    if is_shell:
         _render_template(template_dir, target_dir, "main_shell.py.jinja2", context, "main.py")
     elif template == "task":
         _render_template(template_dir, target_dir, "main_task.py.jinja2", context, "main.py")
@@ -154,7 +160,7 @@ def init_command(
     _render_template(template_dir, target_dir, "README.md.jinja2", context, "README.md")
 
     # Render Postman collection based on template type
-    if template == "ml-shell":
+    if is_shell:
         _render_template(
             template_dir, target_dir, "postman_collection_ml_shell.json.jinja2", context, "postman_collection.json"
         )
@@ -167,8 +173,8 @@ def init_command(
             template_dir, target_dir, "postman_collection_ml.json.jinja2", context, "postman_collection.json"
         )
 
-    # For ml-shell template, create scripts directory
-    if template == "ml-shell":
+    # For shell templates, create scripts directory with language-specific stubs
+    if template == "shell-py":
         scripts_dir = target_dir / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
         _render_template(
@@ -184,6 +190,23 @@ def init_command(
             "predict_model.py.jinja2",
             context,
             "predict_model.py",
+        )
+    elif template == "shell-r":
+        scripts_dir = target_dir / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
+        _render_template(
+            template_dir / "scripts",
+            scripts_dir,
+            "train.R.jinja2",
+            context,
+            "train.R",
+        )
+        _render_template(
+            template_dir / "scripts",
+            scripts_dir,
+            "predict.R.jinja2",
+            context,
+            "predict.R",
         )
 
     if with_monitoring:
