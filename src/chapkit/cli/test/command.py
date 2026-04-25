@@ -148,8 +148,40 @@ def test_command(
         "trainings_failed": 0,
         "predictions_completed": 0,
         "predictions_failed": 0,
+        "validations_run": 0,
+        "validations_failed": 0,
+        "validations_skipped": 0,
         "start_time": time.time(),
     }
+
+    def run_validation(kind: Literal["train", "predict"], payload: dict[str, Any], context: str) -> bool:
+        """Call $validate and surface diagnostics. Returns False on error-severity findings."""
+        ok, message, diagnostics = runner.validate_payload(kind, payload)
+
+        if diagnostics is None:
+            stats["validations_skipped"] += 1
+            if verbose:
+                typer.echo(f"  [SKIP] {context} validate: {message}")
+            return True
+
+        stats["validations_run"] += 1
+        if not ok:
+            stats["validations_failed"] += 1
+            typer.echo(f"  [FAILED] {context} validate: {message}", err=True)
+            for d in diagnostics:
+                if d.get("severity") == "error":
+                    typer.echo(f"    - [{d.get('code')}] {d.get('message')}", err=True)
+            return False
+
+        if verbose:
+            non_errors = [d for d in diagnostics if d.get("severity") != "error"]
+            if non_errors:
+                typer.echo(f"  [OK] {context} validate ({len(non_errors)} warning/info)")
+                for d in non_errors:
+                    typer.echo(f"    - [{d.get('severity')}] [{d.get('code')}] {d.get('message')}")
+            else:
+                typer.echo(f"  [OK] {context} validate")
+        return True
 
     try:
         # 1. Health check
@@ -265,6 +297,13 @@ def test_command(
                     save_test_data(save_data_path, f"training_{config_idx}_{training_index}.json", training_data)
                     training_index += 1
 
+                train_payload: dict[str, Any] = {"config_id": config_id, "data": training_data}
+                if geo_data:
+                    train_payload["geo"] = geo_data
+                if not run_validation("train", train_payload, "train"):
+                    stats["trainings_failed"] += 1
+                    continue
+
                 success, msg, job_id, artifact_id = runner.submit_training(config_id, training_data, geo_data)
                 if not success:
                     typer.echo(f"  [FAILED] Submit: {msg}", err=True)
@@ -338,6 +377,17 @@ def test_command(
                         )
                         prediction_index += 1
 
+                    predict_payload: dict[str, Any] = {
+                        "artifact_id": model_artifact_id,
+                        "historic": historic,
+                        "future": future,
+                    }
+                    if geo_data:
+                        predict_payload["geo"] = geo_data
+                    if not run_validation("predict", predict_payload, "predict"):
+                        stats["predictions_failed"] += 1
+                        continue
+
                     success, msg, job_id, pred_artifact_id = runner.submit_prediction(
                         model_artifact_id, historic, future, geo_data
                     )
@@ -377,6 +427,11 @@ def test_command(
         typer.echo(f"Trainings failed:      {stats['trainings_failed']}")
         typer.echo(f"Predictions completed: {stats['predictions_completed']}")
         typer.echo(f"Predictions failed:    {stats['predictions_failed']}")
+        if stats["validations_run"] or stats["validations_skipped"]:
+            typer.echo(f"Validations run:       {stats['validations_run']}")
+            typer.echo(f"Validations failed:    {stats['validations_failed']}")
+            if stats["validations_skipped"]:
+                typer.echo(f"Validations skipped:   {stats['validations_skipped']}")
         typer.echo()
 
         # Determine overall status

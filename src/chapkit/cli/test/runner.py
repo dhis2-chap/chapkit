@@ -2,7 +2,7 @@
 
 import time
 import traceback
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
@@ -85,6 +85,39 @@ class TestRunner:
             return False, f"Failed to create config: {response.text}", None
         except Exception as e:
             return False, self._format_error("Error creating config", e), None
+
+    def validate_payload(
+        self,
+        kind: Literal["train", "predict"],
+        payload: dict[str, Any],
+    ) -> tuple[bool, str, list[dict[str, Any]] | None]:
+        """POST to /api/v1/ml/$validate and return (ok, message, diagnostics).
+
+        ok=False with diagnostics=None signals "skip" (endpoint missing or unreachable);
+        ok=False with diagnostics signals error-severity findings; ok=True returns any
+        warning/info diagnostics for verbose surfacing.
+        """
+        try:
+            request_body = {"type": kind, **payload}
+            response = self.client.post(f"{self.base_url}/api/v1/ml/$validate", json=request_body)
+
+            if response.status_code == 404:
+                return False, "validate endpoint not available (older service)", None
+
+            if response.status_code != 200:
+                return False, f"Validate returned {response.status_code}: {response.text}", None
+
+            result = response.json()
+            diagnostics: list[dict[str, Any]] = result.get("diagnostics", [])
+            valid = result.get("valid", True)
+
+            if not valid:
+                error_codes = [d.get("code", "?") for d in diagnostics if d.get("severity") == "error"]
+                return False, f"validation failed: {', '.join(error_codes)}", diagnostics
+
+            return True, "validation passed", diagnostics
+        except Exception as e:
+            return False, self._format_error("Error calling $validate", e), None
 
     def submit_training(
         self, config_id: str, data: dict[str, Any], geo: dict[str, Any] | None = None
