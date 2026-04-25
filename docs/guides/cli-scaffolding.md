@@ -729,25 +729,24 @@ After scaffolding your project:
 
 ## Examples
 
-The `examples/` directory contains working examples for each template type:
+The `examples/` directory contains pattern-focused examples (use `chapkit init` for a fresh starter project):
 
-**ML Template Examples:**
-- `ml_functional/` - ML template with Python functions (FunctionalModelRunner)
-- `ml_class/` - Class-based ML runner approach
-- `quickstart/` - Complete ML service with config, artifacts, and ML endpoints
+**ML Workflow Patterns:**
+- `ml_functional/` - `FunctionalModelRunner` (matches `--template fn-py`)
+- `ml_class/` - Class-based `BaseModelRunner` subclass
+- `ml_shell/` - `ShellModelRunner` with external Python scripts (matches `--template shell-py`)
 
-**ML-Shell Template Example:**
-- `ml_shell/` - Language-agnostic ML with external scripts (ShellModelRunner)
-
-**Task Template Example:**
+**Task Execution:**
 - `task_execution/` - General-purpose task execution with Python functions
 
-**Other Examples:**
+**Other Patterns:**
 - `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
-- `full_featured/` - Comprehensive example with monitoring and custom routers
 - `config_artifact/` - Configuration with artifact linking
+- `config/` - Config CRUD walkthrough
 - `artifact/` - Read-only artifact API
-- `custom_migrations/` - Database migrations with custom models
+- `library_usage/` - Using chapkit as a library with custom models
+- `dataframe_usage/` - Working with `chapkit.data.DataFrame`
+- `vega_visualization/` - Vega chart specs from chapkit output
 
 ## Related Documentation
 

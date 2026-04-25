@@ -213,15 +213,17 @@ Chapkit extends servicekit's `BaseServiceBuilder` with ML-specific features and 
 
 See the `examples/` directory for complete working examples:
 
-- `quickstart/` - Complete ML service with config, artifacts, and ML endpoints
+- `config/` - Config CRUD walkthrough
 - `config_artifact/` - Config with artifact linking
-- `ml_functional/`, `ml_class/`, `ml_shell/` - ML workflow patterns (ML template, class-based, ML-shell template)
-- `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
 - `artifact/` - Read-only artifact API with hierarchical storage
+- `ml_functional/`, `ml_class/`, `ml_shell/` - ML workflow patterns (`FunctionalModelRunner`, class-based `BaseModelRunner`, `ShellModelRunner`)
+- `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
 - `task_execution/` - Task execution with Python functions and shell commands
-- `full_featured/` - Comprehensive example with monitoring, custom routers, and hooks
 - `library_usage/` - Using chapkit as a library with custom models
-- `custom_migrations/` - Database migrations with custom models
+- `dataframe_usage/` - Working with `chapkit.data.DataFrame`
+- `vega_visualization/` - Vega chart specs from chapkit output
+
+For a fresh project, prefer `chapkit init` (see [`docs/guides/cli-scaffolding.md`](docs/guides/cli-scaffolding.md)) — the `examples/` directory targets specific patterns rather than a full starting point.
 
 ## Documentation
 
