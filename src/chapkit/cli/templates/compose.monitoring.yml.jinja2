@@ -13,10 +13,11 @@ services:
     # pull_policy: always
     # platform: linux/amd64
     ports:
-      # Format is "host:container". Pick a host port that doesn't collide with chap-core
-      # (which uses 8000) or other model overlays. e.g. ewars uses 5002, pick 5003+ for new
-      # models. The container port stays 8000 - that's what the service listens on inside.
-      - "8000:8000"
+      # Format is "host:container". Default host port is 9090 - avoids the usual busy
+      # ports (8000, 8080, 3000). When overlaying onto chap-core alongside other
+      # models, pick a unique host port per overlay (chap-core's ewars overlay uses
+      # 5002, for example). The container (right) port stays 8000.
+      - "9090:8000"
     volumes:
       - ck_{{ PROJECT_SLUG }}_data:/work/data
     environment:
@@ -33,8 +34,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    networks:
-      - ck_{{ PROJECT_SLUG }}
+    # No `networks:` directive on purpose - see compose.yml comment.
     # When integrating with chap-core, wait for it to be healthy first:
     # depends_on:
     #   chap:
@@ -43,7 +43,9 @@ services:
   prometheus:
     image: prom/prometheus:latest
     ports:
-      - "9090:9090"
+      # Host port 9091 because the model service is on 9090. Prometheus still listens
+      # on 9090 inside the container - the prometheus.yml scrape target uses that.
+      - "9091:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -59,8 +61,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
-    networks:
-      - ck_{{ PROJECT_SLUG }}
     depends_on:
       {{ PROJECT_SLUG }}:
         condition: service_healthy
@@ -88,18 +88,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    networks:
-      - ck_{{ PROJECT_SLUG }}
     depends_on:
       prometheus:
         condition: service_healthy
-
-networks:
-  ck_{{ PROJECT_SLUG }}:
-    driver: bridge
-  # When integrating with chap-core, attach to its shared network instead:
-  # chap-network:
-  #   external: true
 
 volumes:
   ck_{{ PROJECT_SLUG }}_data:

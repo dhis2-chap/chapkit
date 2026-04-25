@@ -156,7 +156,7 @@ def run_service_docker(project_dir: Path, port: int) -> Generator[str, None, Non
     # Update compose.yml to use the specified port
     compose_file = project_dir / "compose.yml"
     content = compose_file.read_text()
-    content = content.replace("8000:8000", f"{port}:8000")
+    content = content.replace("9090:8000", f"{port}:8000")
     compose_file.write_text(content)
 
     try:

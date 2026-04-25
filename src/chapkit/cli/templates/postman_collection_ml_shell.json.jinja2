@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "{{ PROJECT_SLUG }}-ml-shell-service",
         "name": "{{ PROJECT_NAME }} - ML Shell Service",
-        "description": "Language-agnostic ML service for {{ PROJECT_NAME }} using external scripts.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Shell-based ML workflows (Python, R, Julia, etc.)\n- External train/predict scripts in scripts/ directory\n- File-based data interchange (CSV, YAML, pickle)\n- Language-agnostic execution model",
+        "description": "Language-agnostic ML service for {{ PROJECT_NAME }} using external scripts.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:9090\n3. API docs: http://localhost:9090/docs\n\n**Features:**\n- Shell-based ML workflows (Python, R, Julia, etc.)\n- External train/predict scripts in scripts/ directory\n- File-based data interchange (CSV, YAML, pickle)\n- Language-agnostic execution model",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -103,8 +103,8 @@
                                     "raw": "{\n  \"name\": \"shell_model_config\",\n  \"data\": {}\n}"
                                 },
                                 "url": {
-                                    "raw": "http://localhost:8000/api/v1/configs",
-                                    "host": ["http://localhost:8000"],
+                                    "raw": "http://localhost:9090/api/v1/configs",
+                                    "host": ["http://localhost:9090"],
                                     "path": ["api", "v1", "configs"]
                                 }
                             },
@@ -422,7 +422,7 @@
     "variable": [
         {
             "key": "baseUrl",
-            "value": "http://localhost:8000",
+            "value": "http://localhost:9090",
             "type": "string"
         },
         {

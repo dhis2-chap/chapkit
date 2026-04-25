@@ -13,10 +13,11 @@ services:
     # pull_policy: always
     # platform: linux/amd64
     ports:
-      # Format is "host:container". Pick a host port that doesn't collide with chap-core
-      # (which uses 8000) or other model overlays. e.g. ewars uses 5002, pick 5003+ for new
-      # models. The container port stays 8000 - that's what the service listens on inside.
-      - "8000:8000"
+      # Format is "host:container". Default host port is 9090 - avoids the usual busy
+      # ports (8000, 8080, 3000). When overlaying onto chap-core alongside other
+      # models, pick a unique host port per overlay (chap-core's ewars overlay uses
+      # 5002, for example). The container (right) port stays 8000.
+      - "9090:8000"
     volumes:
       - ck_{{ PROJECT_SLUG }}_data:/work/data
     environment:
@@ -28,19 +29,16 @@ services:
       # SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
       # SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}
     restart: unless-stopped
-    networks:
-      - ck_{{ PROJECT_SLUG }}
+    # No `networks:` directive on purpose. Compose puts every service on the project's
+    # default network, so standalone (`docker compose up`) just works, and overlay use
+    # (`docker compose -f compose.yml -f compose.<model>.yml up`) automatically joins
+    # the same default network as chap, redis, postgres - which is how ewars and
+    # chap-core reach each other by hostname. Pinning a custom network here would
+    # isolate the service from the parent stack.
     # When integrating with chap-core, wait for it to be healthy first:
     # depends_on:
     #   chap:
     #     condition: service_healthy
-
-networks:
-  ck_{{ PROJECT_SLUG }}:
-    driver: bridge
-  # When integrating with chap-core, attach to its shared network instead:
-  # chap-network:
-  #   external: true
 
 volumes:
   ck_{{ PROJECT_SLUG }}_data:

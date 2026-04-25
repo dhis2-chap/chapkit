@@ -241,7 +241,7 @@ def list_command(
         typer.Option(
             "--url",
             "-u",
-            help="Base URL of running chapkit service (e.g., http://localhost:8000)",
+            help="Base URL of running chapkit service (e.g., http://localhost:9090)",
         ),
     ] = None,
     artifact_type: Annotated[
@@ -347,7 +347,7 @@ def download_command(
         typer.Option(
             "--url",
             "-u",
-            help="Base URL of running chapkit service (e.g., http://localhost:8000)",
+            help="Base URL of running chapkit service (e.g., http://localhost:9090)",
         ),
     ] = None,
     extract: Annotated[

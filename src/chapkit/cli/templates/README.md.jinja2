@@ -15,7 +15,7 @@ uv sync
 uv run python main.py
 ```
 
-The API will be available at http://localhost:8000
+The API will be available at http://localhost:9090
 
 ### Docker
 
@@ -26,12 +26,14 @@ docker compose up --build
 ```
 
 The API will be available at:
-- API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+- API: http://localhost:9090
+- API Docs: http://localhost:9090/docs
 {% if monitoring %}
-- Prometheus: http://localhost:9090
+- Prometheus: http://localhost:9091
 - Grafana: http://localhost:3000 (admin/admin)
 {% endif %}
+
+(The compose stack maps host port 9090 to container port 8000. Edit `compose.yml` to change the host port. Local dev (`python main.py`) also defaults to 9090 so the `curl` and `chapkit test` examples below work for either path.)
 
 ### Verify the service
 
@@ -39,7 +41,7 @@ Once the service is running (locally or in Docker), exercise the full
 config -> train -> predict flow with `chapkit test`:
 
 ```bash
-# Against the running service (default http://localhost:8000)
+# Against the running service (default http://localhost:9090)
 uv run chapkit test
 
 # More aggressive: 3 configs, 2 trainings each, 2 predictions per model
@@ -62,7 +64,7 @@ predict) all work. Handy after editing `main.py` or rebuilding the image.
 ### Health Check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:9090/health
 ```
 
 ### Configuration Management
@@ -70,7 +72,7 @@ curl http://localhost:8000/health
 Create a configuration:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/configs \
+curl -X POST http://localhost:9090/api/v1/configs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-config",
@@ -83,7 +85,7 @@ curl -X POST http://localhost:8000/api/v1/configs \
 Train a model:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/ml/\$train \
+curl -X POST http://localhost:9090/api/v1/ml/\$train \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "YOUR_CONFIG_ID",
@@ -98,7 +100,7 @@ curl -X POST http://localhost:8000/api/v1/ml/\$train \
 Make predictions:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/ml/\$predict \
+curl -X POST http://localhost:9090/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "YOUR_MODEL_ID",

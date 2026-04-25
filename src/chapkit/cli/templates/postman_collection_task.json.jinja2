@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "temp-task-service",
         "name": "TEMP - Task Execution",
-        "description": "Registry-based task execution service for TEMP.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Execute Python functions as tasks\n- Dependency injection (Database, ArtifactManager, ChapkitJobScheduler, AsyncSession)\n- Tag-based task organization\n- Job scheduling integration\n- Artifact result storage\n\n**Registered Tasks:**\n- greet_user (tags: demo, simple)\n- process_data (tags: demo, injection)\n- count_files (tags: demo, filesystem)\n- multiply_numbers (tags: demo, math)\n- run_command (tags: demo, subprocess)",
+        "description": "Registry-based task execution service for TEMP.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:9090\n3. API docs: http://localhost:9090/docs\n\n**Features:**\n- Execute Python functions as tasks\n- Dependency injection (Database, ArtifactManager, ChapkitJobScheduler, AsyncSession)\n- Tag-based task organization\n- Job scheduling integration\n- Artifact result storage\n\n**Registered Tasks:**\n- greet_user (tags: demo, simple)\n- process_data (tags: demo, injection)\n- count_files (tags: demo, filesystem)\n- multiply_numbers (tags: demo, math)\n- run_command (tags: demo, subprocess)",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -73,9 +73,9 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "http://localhost:8000/api/v1/tasks",
+                                    "raw": "http://localhost:9090/api/v1/tasks",
                                     "host": [
-                                        "http://localhost:8000"
+                                        "http://localhost:9090"
                                     ],
                                     "path": [
                                         "api",
@@ -124,9 +124,9 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "http://localhost:8000/api/v1/tasks/greet_user",
+                                    "raw": "http://localhost:9090/api/v1/tasks/greet_user",
                                     "host": [
-                                        "http://localhost:8000"
+                                        "http://localhost:9090"
                                     ],
                                     "path": [
                                         "api",
@@ -440,9 +440,9 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "http://localhost:8000/api/v1/jobs/01JC0002JJJJJJJJJJJ0000002",
+                                    "raw": "http://localhost:9090/api/v1/jobs/01JC0002JJJJJJJJJJJ0000002",
                                     "host": [
-                                        "http://localhost:8000"
+                                        "http://localhost:9090"
                                     ],
                                     "path": [
                                         "api",
@@ -540,9 +540,9 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "http://localhost:8000/api/v1/artifacts/01JC0003AAAAAAAAAAA0000003",
+                                    "raw": "http://localhost:9090/api/v1/artifacts/01JC0003AAAAAAAAAAA0000003",
                                     "host": [
-                                        "http://localhost:8000"
+                                        "http://localhost:9090"
                                     ],
                                     "path": [
                                         "api",
@@ -590,7 +590,7 @@
     "variable": [
         {
             "key": "baseUrl",
-            "value": "http://localhost:8000",
+            "value": "http://localhost:9090",
             "type": "string"
         },
         {

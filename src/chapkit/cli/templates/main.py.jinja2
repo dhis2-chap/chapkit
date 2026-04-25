@@ -246,5 +246,7 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    # Set reload=True to enable hot reloading during development
-    run_app("main:app", reload=False)
+    # Default to port 9090 to match the Docker compose host port and avoid the usual
+    # busy ports (8000, 8080). Override with the PORT env var. Set reload=True to
+    # enable hot reloading during development.
+    run_app("main:app", reload=False, port=9090)

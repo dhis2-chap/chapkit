@@ -2,7 +2,7 @@
     "info": {
         "_postman_id": "{{ PROJECT_SLUG }}-ml-service",
         "name": "{{ PROJECT_NAME }} - ML Service",
-        "description": "ML service for {{ PROJECT_NAME }} with train/predict workflows.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:8000\n3. API docs: http://localhost:8000/docs\n\n**Features:**\n- Config management with Pydantic validation\n- ML training and prediction\n- Artifact storage with hierarchy\n- Job scheduling for async operations",
+        "description": "ML service for {{ PROJECT_NAME }} with train/predict workflows.\n\n**Quick Start:**\n1. Start service: `uv run python main.py`\n2. Service available at: http://localhost:9090\n3. API docs: http://localhost:9090/docs\n\n**Features:**\n- Config management with Pydantic validation\n- ML training and prediction\n- Artifact storage with hierarchy\n- Job scheduling for async operations",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "item": [
@@ -102,8 +102,8 @@
                                     "raw": "{\n  \"name\": \"default_config\",\n  \"data\": {}\n}"
                                 },
                                 "url": {
-                                    "raw": "http://localhost:8000/api/v1/configs",
-                                    "host": ["http://localhost:8000"],
+                                    "raw": "http://localhost:9090/api/v1/configs",
+                                    "host": ["http://localhost:9090"],
                                     "path": ["api", "v1", "configs"]
                                 }
                             },
@@ -399,7 +399,7 @@
     "variable": [
         {
             "key": "baseUrl",
-            "value": "http://localhost:8000",
+            "value": "http://localhost:9090",
             "type": "string"
         },
         {
