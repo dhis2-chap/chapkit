@@ -77,7 +77,7 @@ app = (
 - `GET /health` - Health checks
 - `GET /metrics` - Prometheus metrics (with `.with_monitoring()`)
 
-Run with: `fastapi dev your_file.py` → Service ready at `http://localhost:8000`
+Run with: `fastapi dev your_file.py` → Service ready at `http://localhost:9090`
 
 ## Installation
 

@@ -62,8 +62,10 @@ uvx chapkit init my-ml-service
 
 Options:
 - `--path <directory>` - Target directory (default: current directory)
-- `--with-monitoring` - Include Prometheus and Grafana monitoring stack
 - `--template <type>` - Template type: `fn-py` (default), `shell-py`, or `shell-r`
+- `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Off by default.
+
+The scaffolded service exposes `/metrics` (Prometheus format) out of the box. To layer Prometheus + Grafana around it, see the [Monitoring guide](docs/guides/monitoring.md).
 
 This creates a ready-to-run service with configuration, artifacts, and API endpoints pre-configured.
 
@@ -229,6 +231,7 @@ See `docs/guides/` for comprehensive guides:
 - [Configuration Management](docs/guides/configuration-management.md) - Config schemas and validation
 - [Artifact Storage](docs/guides/artifact-storage.md) - Hierarchical data storage for ML artifacts
 - [CLI Scaffolding](docs/guides/cli-scaffolding.md) - Project scaffolding with `chapkit init`
+- [Shell-runner Contract](docs/guides/shell-runner-contract.md) - Exact file-by-file lifecycle of train and predict workspaces
 - [Monitoring](docs/guides/monitoring.md) - Adding Prometheus + Grafana around the scaffolded `/metrics` endpoint
 - [MLproject Runner](docs/guides/mlproject-runner.md) - Serve existing MLproject directories with `chapkit mlproject run`
 - [MLproject Migrate](docs/guides/mlproject-migrate.md) - Adopt an MLproject as a chapkit project with `chapkit mlproject migrate`

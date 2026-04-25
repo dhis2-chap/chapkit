@@ -250,9 +250,9 @@ If something failed, the **service logs** hold the actual stderr — the termina
 
 ```bash
 docker build -t my-model .
-docker run --rm -p 8000:8000 my-model
+docker run --rm -p 9090:8000 my-model
 # elsewhere:
-chapkit test --url http://localhost:8000
+chapkit test --url http://localhost:9090
 ```
 
 If the image starts but `chapkit test` hangs or returns errors, look at `docker logs` for the service — it'll have the structured log output with `train_script_failed` / `predict_script_failed` events and their `stderr`.

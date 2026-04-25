@@ -98,7 +98,7 @@ The migrate output summary tells you how many deps were merged, and points at th
 
 ```bash
 uv sync && uv run python main.py                            # local dev server
-docker build -t my-model . && docker run --rm -p 8000:8000 my-model   # containerised
+docker build -t my-model . && docker run --rm -p 9090:8000 my-model   # containerised
 uv run python main.py   &                                   # in background
 uv run chapkit test                                         # drive an end-to-end train+predict
 git add -A && git commit -m "chore: migrate MLproject to chapkit"

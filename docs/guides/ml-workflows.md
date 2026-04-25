@@ -476,12 +476,12 @@ Train a model asynchronously.
 **cURL Example:**
 ```bash
 # Create config first
-CONFIG_ID=$(curl -s -X POST http://localhost:8000/api/v1/configs \
+CONFIG_ID=$(curl -s -X POST http://localhost:9090/api/v1/configs \
   -H "Content-Type: application/json" \
   -d '{"name": "my_config", "data": {}}' | jq -r '.id')
 
 # Submit training job
-curl -X POST http://localhost:8000/api/v1/ml/\$train \
+curl -X POST http://localhost:9090/api/v1/ml/\$train \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "'$CONFIG_ID'",
@@ -527,7 +527,7 @@ Make predictions using a trained model.
 **cURL Example:**
 ```bash
 # Use model from training
-curl -X POST http://localhost:8000/api/v1/ml/\$predict \
+curl -X POST http://localhost:9090/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
     "artifact_id": "'$MODEL_ARTIFACT_ID'",
@@ -546,14 +546,14 @@ curl -X POST http://localhost:8000/api/v1/ml/\$predict \
 
 ```bash
 # Poll job status
-curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq
+curl http://localhost:9090/api/v1/jobs/$JOB_ID | jq
 
 # Stream status updates (SSE)
-curl -N http://localhost:8000/api/v1/jobs/$JOB_ID/\$stream
+curl -N http://localhost:9090/api/v1/jobs/$JOB_ID/\$stream
 
 # Get results from artifact
-ARTIFACT_ID=$(curl -s http://localhost:8000/api/v1/jobs/$JOB_ID | jq -r '.artifact_id')
-curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq
+ARTIFACT_ID=$(curl -s http://localhost:9090/api/v1/jobs/$JOB_ID | jq -r '.artifact_id')
+curl http://localhost:9090/api/v1/artifacts/$ARTIFACT_ID | jq
 ```
 
 ### POST /api/v1/ml/$validate
@@ -640,7 +640,7 @@ ValidationDiagnostic.info(code="using_defaults", message="No custom config; usin
 
 **cURL example:**
 ```bash
-curl -X POST http://localhost:8000/api/v1/ml/\$validate \
+curl -X POST http://localhost:9090/api/v1/ml/\$validate \
   -H "Content-Type: application/json" \
   -d '{
     "type": "train",
@@ -941,7 +941,7 @@ Using curl:
 ```bash
 # Download workspace artifact content
 curl -o workspace.zip \
-  http://localhost:8000/api/v1/artifacts/$WORKSPACE_ID/\$download
+  http://localhost:9090/api/v1/artifacts/$WORKSPACE_ID/\$download
 
 # Extract and inspect
 unzip workspace.zip -d workspace_debug/
@@ -990,10 +990,10 @@ Download artifact content as files:
 
 ```bash
 # Download predictions as JSON
-curl -O -J http://localhost:8000/api/v1/artifacts/$PRED_ARTIFACT_ID/\$download
+curl -O -J http://localhost:9090/api/v1/artifacts/$PRED_ARTIFACT_ID/\$download
 
 # Get metadata only (no binary content)
-curl http://localhost:8000/api/v1/artifacts/$MODEL_ARTIFACT_ID/\$metadata | jq
+curl http://localhost:9090/api/v1/artifacts/$MODEL_ARTIFACT_ID/\$metadata | jq
 ```
 
 See [Artifact Storage Guide](./artifact-storage.md#get-apiv1artifactsiddownload) for more details.
@@ -1009,12 +1009,12 @@ See [Artifact Storage Guide](./artifact-storage.md#get-apiv1artifactsiddownload)
 fastapi dev examples/ml_basic.py
 
 # 2. Create config
-CONFIG_ID=$(curl -s -X POST http://localhost:8000/api/v1/configs \
+CONFIG_ID=$(curl -s -X POST http://localhost:9090/api/v1/configs \
   -H "Content-Type: application/json" \
   -d '{"name": "weather_model", "data": {}}' | jq -r '.id')
 
 # 3. Train model
-TRAIN_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train \
+TRAIN_RESPONSE=$(curl -s -X POST http://localhost:9090/api/v1/ml/\$train \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "'$CONFIG_ID'",
@@ -1037,13 +1037,13 @@ echo "Training Job ID: $JOB_ID"
 echo "Model Artifact ID: $MODEL_ARTIFACT_ID"
 
 # 4. Wait for training completion
-curl -N http://localhost:8000/api/v1/jobs/$JOB_ID/\$stream
+curl -N http://localhost:9090/api/v1/jobs/$JOB_ID/\$stream
 
 # 5. View trained model
-curl http://localhost:8000/api/v1/artifacts/$MODEL_ARTIFACT_ID | jq
+curl http://localhost:9090/api/v1/artifacts/$MODEL_ARTIFACT_ID | jq
 
 # 6. Make predictions
-PREDICT_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict \
+PREDICT_RESPONSE=$(curl -s -X POST http://localhost:9090/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
     "artifact_id": "'$MODEL_ARTIFACT_ID'",
@@ -1065,10 +1065,10 @@ PRED_JOB_ID=$(echo $PREDICT_RESPONSE | jq -r '.job_id')
 PRED_ARTIFACT_ID=$(echo $PREDICT_RESPONSE | jq -r '.artifact_id')
 
 # 7. Wait for predictions
-curl -N http://localhost:8000/api/v1/jobs/$PRED_JOB_ID/\$stream
+curl -N http://localhost:9090/api/v1/jobs/$PRED_JOB_ID/\$stream
 
 # 8. View predictions
-curl http://localhost:8000/api/v1/artifacts/$PRED_ARTIFACT_ID | jq '.data.content'
+curl http://localhost:9090/api/v1/artifacts/$PRED_ARTIFACT_ID | jq '.data.content'
 ```
 
 ### Class-Based with Preprocessing
@@ -1187,10 +1187,10 @@ fastapi dev examples/ml_basic.py
 **Terminal 2:**
 ```bash
 # Complete workflow test
-CONFIG_ID=$(curl -s -X POST http://localhost:8000/api/v1/configs \
+CONFIG_ID=$(curl -s -X POST http://localhost:9090/api/v1/configs \
   -d '{"name":"test","data":{}}' | jq -r '.id')
 
-TRAIN=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train -d '{
+TRAIN=$(curl -s -X POST http://localhost:9090/api/v1/ml/\$train -d '{
   "config_id":"'$CONFIG_ID'",
   "data":{"columns":["a","b","y"],"data":[[1,2,10],[2,3,15],[3,4,20]]}
 }')
@@ -1200,10 +1200,10 @@ JOB_ID=$(echo $TRAIN | jq -r '.job_id')
 
 # Wait for completion
 sleep 2
-curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq '.status'
+curl http://localhost:9090/api/v1/jobs/$JOB_ID | jq '.status'
 
 # Predict
-PRED=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$predict -d '{
+PRED=$(curl -s -X POST http://localhost:9090/api/v1/ml/\$predict -d '{
   "artifact_id":"'$MODEL_ID'",
   "historic":{"columns":["a","b"],"data":[]},
   "future":{"columns":["a","b"],"data":[[1.5,2.5],[2.5,3.5]]}
@@ -1213,7 +1213,7 @@ PRED_ID=$(echo $PRED | jq -r '.artifact_id')
 sleep 2
 
 # View results
-curl http://localhost:8000/api/v1/artifacts/$PRED_ID | jq '.data.content'
+curl http://localhost:9090/api/v1/artifacts/$PRED_ID | jq '.data.content'
 ```
 
 ### Automated Testing
@@ -1297,7 +1297,7 @@ def test_train_predict_workflow(client: TestClient):
 
 ### Browser Testing (Swagger UI)
 
-1. Open http://localhost:8000/docs
+1. Open http://localhost:9090/docs
 2. Create config via POST `/api/v1/configs`
 3. Train via POST `/api/v1/ml/$train`
 4. Monitor job via GET `/api/v1/jobs/{job_id}`
@@ -1553,7 +1553,7 @@ services:
   ml-service:
     build: .
     ports:
-      - "8000:8000"
+      - "9090:8000"   # host:container - matches the scaffolded compose.yml convention
     volumes:
       - ml-data:/data
     environment:
@@ -1608,10 +1608,10 @@ services:
 **Solution:**
 ```bash
 # List configs
-curl http://localhost:8000/api/v1/configs | jq
+curl http://localhost:9090/api/v1/configs | jq
 
 # Verify config exists
-curl http://localhost:8000/api/v1/configs/$CONFIG_ID
+curl http://localhost:9090/api/v1/configs/$CONFIG_ID
 ```
 
 ### "Model artifact not found" Error
@@ -1623,13 +1623,13 @@ curl http://localhost:8000/api/v1/configs/$CONFIG_ID
 **Solution:**
 ```bash
 # Check training job status
-curl http://localhost:8000/api/v1/jobs/$TRAIN_JOB_ID | jq
+curl http://localhost:9090/api/v1/jobs/$TRAIN_JOB_ID | jq
 
 # If training failed, check error
-curl http://localhost:8000/api/v1/jobs/$TRAIN_JOB_ID | jq '.error'
+curl http://localhost:9090/api/v1/jobs/$TRAIN_JOB_ID | jq '.error'
 
 # List artifacts
-curl http://localhost:8000/api/v1/artifacts | jq
+curl http://localhost:9090/api/v1/artifacts | jq
 ```
 
 ### Training Job Fails Immediately
@@ -1645,7 +1645,7 @@ curl http://localhost:8000/api/v1/artifacts | jq
 **Solution:**
 ```bash
 # Check job error message
-curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq '.error, .error_traceback'
+curl http://localhost:9090/api/v1/jobs/$JOB_ID | jq '.error, .error_traceback'
 
 # Common fixes:
 # - Ensure model is pickleable (no lambda functions, local classes)
@@ -1693,7 +1693,7 @@ python scripts/train_model.py \
   --model /tmp/test_model.pkl
 
 # Check script stderr output
-curl http://localhost:8000/api/v1/jobs/$JOB_ID | jq '.error'
+curl http://localhost:9090/api/v1/jobs/$JOB_ID | jq '.error'
 ```
 
 ### High Memory Usage
@@ -1775,14 +1775,14 @@ MLServiceBuilder(..., database_url="postgresql://...")
 **Solution:**
 ```bash
 # Check training artifact status
-curl http://localhost:8000/api/v1/artifacts/$TRAINING_ARTIFACT_ID | jq '.data.metadata'
+curl http://localhost:9090/api/v1/artifacts/$TRAINING_ARTIFACT_ID | jq '.data.metadata'
 
 # If status is "failed", check stdout/stderr
-curl http://localhost:8000/api/v1/artifacts/$TRAINING_ARTIFACT_ID | \
+curl http://localhost:9090/api/v1/artifacts/$TRAINING_ARTIFACT_ID | \
   jq '.data.metadata | {status, exit_code, stdout, stderr}'
 
 # Re-train with fixed script
-curl -X POST http://localhost:8000/api/v1/ml/\$train \
+curl -X POST http://localhost:9090/api/v1/ml/\$train \
   -H "Content-Type: application/json" \
   -d '{"config_id": "...", "data": {...}}'
 ```
@@ -1807,7 +1807,7 @@ curl -X POST http://localhost:8000/api/v1/ml/\$train \
 # - Same class definitions
 
 # If model class changed, re-train:
-curl -X POST http://localhost:8000/api/v1/ml/\$train ...
+curl -X POST http://localhost:9090/api/v1/ml/\$train ...
 ```
 
 ### Workspace Extraction Fails
@@ -1821,7 +1821,7 @@ curl -X POST http://localhost:8000/api/v1/ml/\$train ...
 **Solution:**
 ```bash
 # Check artifact content_type
-curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq '.data.content_type'
+curl http://localhost:9090/api/v1/artifacts/$ARTIFACT_ID | jq '.data.content_type'
 
 # If "application/x-pickle" - not a workspace, use pickle.loads()
 # If "application/zip" - workspace, use zipfile

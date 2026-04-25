@@ -209,7 +209,7 @@ No chapkit-side configuration is needed — if `SERVICEKIT_ORCHESTRATOR_URL` is 
 
 When you're ready to **own** the service code (commit it, extend it, ship it as your own image), reach for [`chapkit mlproject migrate`](mlproject-migrate.md): it's the code-generating sibling of `run` that adopts your MLproject in place and produces a committable `main.py`, `Dockerfile`, `pyproject.toml` (with your deps merged in), `compose.yml`, and `CHAPKIT.md`. Your train/predict scripts stay put; only chapkit-owned metadata and chaff moves to `_old/`.
 
-Use [`chapkit init`](cli-scaffolding.md) instead when you want to start a **greenfield** chapkit project — no existing MLproject to adopt, full template choice (`ml`, `ml-shell`, `task`), optional monitoring stack, validation-hook stubs.
+Use [`chapkit init`](cli-scaffolding.md) instead when you want to start a **greenfield** chapkit project — no existing MLproject to adopt, full template choice (`fn-py`, `shell-py`, `shell-r`), validation-hook stubs.
 
 | You have… | Use |
 | --- | --- |
