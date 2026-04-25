@@ -82,6 +82,12 @@ Rebuild and re-test:
 
 ```bash
 docker compose up --build -d
+
+# Wait for the container to be healthy before running tests. Works in
+# bash, zsh, and sh (the `!` plus `while` form is POSIX). On Apple
+# Silicon under Rosetta the first request can take 20-30s.
+while ! curl -fsS http://localhost:9090/health >/dev/null 2>&1; do sleep 2; done
+
 uvx chapkit test --verbose
 ```
 
@@ -136,6 +142,7 @@ When your model works locally, see [Deploying to chap-core](deploying-to-chap-co
 
 ## Where to go next
 
+- [Shell-runner contract](shell-runner-contract.md) for the precise file-by-file lifecycle of train and predict workspaces - useful when scripts misbehave.
 - [MLproject Migrate](mlproject-migrate.md) if you have an existing MLproject directory you'd rather adopt than start from scratch.
 - [ML Workflows](ml-workflows.md) for the full lifecycle (validation hooks, multi-stage pipelines, custom runners).
 - [Deploying to chap-core](deploying-to-chap-core.md) for the production registration flow.

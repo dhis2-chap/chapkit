@@ -193,6 +193,10 @@ info = MLServiceInfo(
     description="Shell-based ML service using external scripts for train/predict. Scripts can be implemented in any language (Python, R, Julia, etc.)",
     model_metadata=ModelMetadata(
         author="Your Name",
+        # Maturity colour shown in chap-core's UI. Pick conservatively:
+        # green=validated for production, yellow=ready for rigorous testing,
+        # orange=promising on limited data, red=highly experimental,
+        # gray=deprecated. See README.md for full meanings.
         author_assessed_status=AssessedStatus.yellow,
         contact_email="your.email@example.com",
     ),

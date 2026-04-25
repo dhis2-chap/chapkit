@@ -104,6 +104,15 @@ def test_command(
     service_process: subprocess.Popen[bytes] | None = None
     save_data_path: Path | None = None
 
+    # Surface the target URL prominently up front - the most common confusion is
+    # someone running `chapkit test` and not realising it's hitting a different
+    # service than the container they think they're testing.
+    typer.echo()
+    typer.echo("=" * 60)
+    typer.echo(f"  chapkit test  ->  {url}")
+    typer.echo("=" * 60)
+    typer.echo()
+
     # Handle --save-data
     if save_data:
         save_data_path = Path(save_data_dir)

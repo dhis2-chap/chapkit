@@ -207,6 +207,27 @@ curl -X POST http://localhost:9090/api/v1/ml/\$predict \
 
 ## Customization
 
+### Service identity (`MLServiceInfo`)
+
+Open `main.py` and fill in the `MLServiceInfo` block - chap-core surfaces these
+fields in its UI when listing models:
+
+- `id`, `display_name`, `version`, `description` - human-readable identity.
+- `model_metadata.author`, `contact_email`, `organization` - who owns it.
+- `model_metadata.author_assessed_status` - your honest read of how validated
+  the model is. Pick conservatively; chap-core shows this colour next to your
+  model in the catalogue.
+
+| Status | Meaning |
+| --- | --- |
+| `green` | Validated and ready for production use |
+| `yellow` | Ready for more rigorous testing on diverse data |
+| `orange` | Shows promise on limited data, needs manual configuration and careful evaluation |
+| `red` | Highly experimental prototype, not validated, only for early experimentation |
+| `gray` | Not intended for use - deprecated or kept only for backwards compatibility |
+
+The scaffold ships `AssessedStatus.yellow`; bump it up or down to match reality.
+
 ### Update Model Configuration
 
 Edit the configuration class in `main.py`:
