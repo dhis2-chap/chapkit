@@ -43,7 +43,7 @@ Creating Your Own Helpers:
         op.drop_index(op.f('ix_users_email'), table_name='users')
         op.drop_table('users')
 
-See examples/custom_migrations/ for a complete working example.
+See docs/guides/database-migrations.md for the full walkthrough.
 """
 
 from typing import Any
