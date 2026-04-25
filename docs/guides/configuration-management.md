@@ -25,7 +25,7 @@ app = (
 
 **Run:** `fastapi dev your_file.py`
 
-Visit http://localhost:8000/docs to manage configurations via Swagger UI.
+Visit http://localhost:9090/docs to manage configurations via Swagger UI.
 
 ---
 
@@ -498,7 +498,7 @@ app = (
 ### 3. Create Configuration
 
 ```bash
-CONFIG_ID=$(curl -s -X POST http://localhost:8000/api/v1/configs \
+CONFIG_ID=$(curl -s -X POST http://localhost:9090/api/v1/configs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "weather_v1",
@@ -517,7 +517,7 @@ echo "Config ID: $CONFIG_ID"
 
 ```bash
 # Train model - creates artifact
-TRAIN_RESPONSE=$(curl -s -X POST http://localhost:8000/api/v1/ml/\$train \
+TRAIN_RESPONSE=$(curl -s -X POST http://localhost:9090/api/v1/ml/\$train \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "'$CONFIG_ID'",
@@ -530,7 +530,7 @@ MODEL_ARTIFACT_ID=$(echo $TRAIN_RESPONSE | jq -r '.artifact_id')
 ### 5. Link Model to Config
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/configs/$CONFIG_ID/\$link-artifact \
+curl -X POST http://localhost:9090/api/v1/configs/$CONFIG_ID/\$link-artifact \
   -H "Content-Type: application/json" \
   -d '{"artifact_id": "'$MODEL_ARTIFACT_ID'"}'
 ```
@@ -538,13 +538,13 @@ curl -X POST http://localhost:8000/api/v1/configs/$CONFIG_ID/\$link-artifact \
 ### 6. Query Linked Artifacts
 
 ```bash
-curl http://localhost:8000/api/v1/configs/$CONFIG_ID/\$artifacts | jq
+curl http://localhost:9090/api/v1/configs/$CONFIG_ID/\$artifacts | jq
 ```
 
 ### 7. Update Configuration
 
 ```bash
-curl -X PUT http://localhost:8000/api/v1/configs/$CONFIG_ID \
+curl -X PUT http://localhost:9090/api/v1/configs/$CONFIG_ID \
   -H "Content-Type: application/json" \
   -d '{
     "name": "weather_v1",
@@ -640,23 +640,23 @@ async def test_config_artifact_linking(session, artifact_manager, config_manager
 
 ```bash
 # Create config
-curl -X POST http://localhost:8000/api/v1/configs \
+curl -X POST http://localhost:9090/api/v1/configs \
   -H "Content-Type: application/json" \
   -d '{"name": "test", "data": {"debug": true, "port": 8000}}'
 
 # List configs
-curl http://localhost:8000/api/v1/configs | jq
+curl http://localhost:9090/api/v1/configs | jq
 
 # Get by ID
-curl http://localhost:8000/api/v1/configs/01CONFIG123... | jq
+curl http://localhost:9090/api/v1/configs/01CONFIG123... | jq
 
 # Update
-curl -X PUT http://localhost:8000/api/v1/configs/01CONFIG123... \
+curl -X PUT http://localhost:9090/api/v1/configs/01CONFIG123... \
   -H "Content-Type: application/json" \
   -d '{"name": "test", "data": {"debug": false, "port": 9000}}'
 
 # Delete
-curl -X DELETE http://localhost:8000/api/v1/configs/01CONFIG123...
+curl -X DELETE http://localhost:9090/api/v1/configs/01CONFIG123...
 ```
 
 ---
@@ -781,11 +781,11 @@ class ValidatedConfig(BaseConfig):
 
 ```bash
 # Export all configs
-curl http://localhost:8000/api/v1/configs?size=1000 | jq > configs_backup.json
+curl http://localhost:9090/api/v1/configs?size=1000 | jq > configs_backup.json
 
 # Restore
 cat configs_backup.json | jq -c '.items[]' | while read config; do
-  curl -X POST http://localhost:8000/api/v1/configs \
+  curl -X POST http://localhost:9090/api/v1/configs \
     -H "Content-Type: application/json" \
     -d "$config"
 done
@@ -836,7 +836,7 @@ class MyConfig(BaseConfig):  # Inherits extra="allow"
 **Solution:**
 ```bash
 # Check artifact
-curl http://localhost:8000/api/v1/artifacts/$ARTIFACT_ID | jq '.parent_id'
+curl http://localhost:9090/api/v1/artifacts/$ARTIFACT_ID | jq '.parent_id'
 
 # Should be null for root artifacts
 # Only link root artifacts to configs

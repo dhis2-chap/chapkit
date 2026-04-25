@@ -204,7 +204,7 @@ Users extending chapkit with custom tables should:
 - Inherit from `servicekit.models.Entity` or `Base`
 - Import models in `alembic/env.py` for auto-detection
 - Follow the alembic_helpers pattern for reusable migrations
-- See `examples/custom_migrations/` for complete example
+- See `docs/guides/database-migrations.md` for the full walkthrough
 
 **Documentation:**
 See `docs/guides/database-migrations.md` for comprehensive guide including:

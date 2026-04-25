@@ -95,7 +95,7 @@ uv sync
 uv run python main.py
 ```
 
-Visit http://localhost:8000/docs to interact with the ML API.
+Visit http://localhost:9090/docs to interact with the ML API.
 
 ---
 
@@ -185,7 +185,7 @@ chapkit artifact list [OPTIONS]
 chapkit artifact list --database ./data/chapkit.db
 
 # List from running service
-chapkit artifact list --url http://localhost:8000
+chapkit artifact list --url http://localhost:9090
 
 # Filter by type
 chapkit artifact list --database ./data/chapkit.db --type ml_training_workspace
@@ -254,7 +254,7 @@ chapkit artifact download 01ABC123... --database ./data/chapkit.db --extract
 chapkit artifact download 01ABC123... --database ./data/chapkit.db --extract -o ./workspace
 
 # Download from running service
-chapkit artifact download 01ABC123... --url http://localhost:8000
+chapkit artifact download 01ABC123... --url http://localhost:9090
 
 # Force overwrite existing
 chapkit artifact download 01ABC123... --database ./data/chapkit.db --force
@@ -592,29 +592,32 @@ Docker Compose uses named volumes (not bind mounts) for data persistence:
 
 ```yaml
 volumes:
-  - ck_my_service_data:/workspace/data
+  - ck_my_service_data:/work/data
 ```
 
 This approach:
 
 - Works consistently across macOS, Linux, and Windows
-- Avoids UID permission issues on Linux
+- Avoids permission issues on Linux
 - Data persists across container restarts
 
 **Accessing Data**
 
+The compose service name is your project slug (`my-service` below); replace it
+with whatever `chapkit init` named for you.
+
 ```bash
 # List files in data directory
-docker compose exec api ls /workspace/data
+docker compose exec my-service ls /work/data
 
 # Copy database out of container
-docker compose cp api:/workspace/data/chapkit.db ./backup.db
+docker compose cp my-service:/work/data/chapkit.db ./backup.db
 
 # Copy database into container
-docker compose cp ./mydata.db api:/workspace/data/chapkit.db
+docker compose cp ./mydata.db my-service:/work/data/chapkit.db
 
 # Direct SQLite access
-docker compose exec api sqlite3 /workspace/data/chapkit.db ".tables"
+docker compose exec my-service sqlite3 /work/data/chapkit.db ".tables"
 ```
 
 **Volume Management**
@@ -639,17 +642,17 @@ If you need direct host filesystem access, modify `compose.yml` to use a bind mo
 
 ```yaml
 volumes:
-  - ./data:/workspace/data  # Host path:container path
+  - ./data:/work/data  # Host path:container path
 ```
 
-Note: On Linux, ensure the host directory has correct permissions for the container user (UID 10001).
+The container runs as root, so no UID/GID gymnastics are needed on Linux - it can read and write any host path you bind-mount.
 
 ### Access Services
 
-- **API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-- **Prometheus** (if monitoring enabled): http://localhost:9090
-- **Grafana** (if monitoring enabled): http://localhost:3000
+- **API**: http://localhost:9090
+- **API Docs**: http://localhost:9090/docs
+
+For Prometheus + Grafana on top of `/metrics`, see the [Monitoring guide](monitoring.md).
 
 ---
 

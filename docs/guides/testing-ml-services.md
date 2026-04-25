@@ -36,7 +36,7 @@ This is the easiest way to test your service - it handles starting and stopping 
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--url` | `-u` | `http://localhost:8000` | Service URL |
+| `--url` | `-u` | `http://localhost:9090` | Service URL |
 | `--configs` | `-c` | `1` | Number of configs to create |
 | `--trainings` | `-t` | `1` | Training jobs per config |
 | `--predictions` | `-p` | `1` | Predictions per trained model |
@@ -167,13 +167,13 @@ DATABASE_URL="sqlite+aiosqlite:///test_data/test.db" uv run python main.py
 
 ```bash
 docker build -t my-ml-service .
-docker run -p 8000:8000 -e DATABASE_URL="sqlite+aiosqlite:///:memory:" my-ml-service
+docker run -p 9090:8000 -e DATABASE_URL="sqlite+aiosqlite:///:memory:" my-ml-service
 ```
 
 Then test from the host:
 
 ```bash
-chapkit test --url http://localhost:8000
+chapkit test --url http://localhost:9090
 ```
 
 ### Docker Compose
@@ -186,7 +186,7 @@ services:
     environment:
       - DATABASE_URL=sqlite+aiosqlite:///:memory:
     ports:
-      - "8000:8000"
+      - "9090:8000"
 ```
 
 ```bash

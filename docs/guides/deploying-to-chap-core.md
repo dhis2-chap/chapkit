@@ -79,11 +79,11 @@ The ewars model ([`main.py`](https://github.com/chap-models/chapkit_ewars_model/
 
 ## Step 4 — Build a Docker image
 
-The scaffolded `Dockerfile` works out of the box for Python models — it is a multi-stage `uv`-based build that runs `uvicorn main:app` on port 8000 and exposes a `/health` healthcheck.
+The scaffolded `Dockerfile` works out of the box for Python models — `FROM ghcr.io/dhis2-chap/chapkit-py:latest`, `uv sync --frozen`, then `uvicorn main:app` on container port 8000 with a `/health` healthcheck. The scaffolded `compose.yml` maps host port 9090 to container 8000.
 
 ```bash
 docker build -t my-model:dev .
-docker run --rm -p 8000:8000 my-model:dev
+docker run --rm -p 9090:8000 my-model:dev
 ```
 
 **If your model has R or other system dependencies**, swap the base image for one of the pre-built [chapkit-images](https://github.com/dhis2-chap/chapkit-images):

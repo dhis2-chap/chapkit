@@ -330,7 +330,7 @@ Download artifact content as a binary file.
 **Example:**
 ```bash
 # Download predictions as JSON
-curl -O -J http://localhost:8000/api/v1/artifacts/01PRED123.../$download
+curl -O -J http://localhost:9090/api/v1/artifacts/01PRED123.../$download
 
 # Returns: artifact_01PRED123....json with prediction data
 ```
@@ -602,12 +602,12 @@ async def test_artifact_hierarchy(session):
 
 ```bash
 # Create root artifact
-ROOT_ID=$(curl -s -X POST http://localhost:8000/api/v1/artifacts \
+ROOT_ID=$(curl -s -X POST http://localhost:9090/api/v1/artifacts \
   -H "Content-Type: application/json" \
   -d '{"data": {"experiment": "test"}}' | jq -r '.id')
 
 # Create child artifact
-CHILD_ID=$(curl -s -X POST http://localhost:8000/api/v1/artifacts \
+CHILD_ID=$(curl -s -X POST http://localhost:9090/api/v1/artifacts \
   -H "Content-Type: application/json" \
   -d '{
     "parent_id": "'$ROOT_ID'",
@@ -615,7 +615,7 @@ CHILD_ID=$(curl -s -X POST http://localhost:8000/api/v1/artifacts \
   }' | jq -r '.id')
 
 # Get tree
-curl -X POST http://localhost:8000/api/v1/artifacts/\$tree \
+curl -X POST http://localhost:9090/api/v1/artifacts/\$tree \
   -H "Content-Type: application/json" \
   -d '{"root_id": "'$ROOT_ID'"}' | jq
 ```
