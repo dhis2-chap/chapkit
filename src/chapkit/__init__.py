@@ -55,17 +55,6 @@ from .ml import (
 )
 from .scheduler import ChapkitJobRecord, ChapkitScheduler, InMemoryChapkitScheduler
 
-# Task feature
-from .task import (
-    ParameterInfo,
-    TaskExecuteRequest,
-    TaskExecuteResponse,
-    TaskExecutor,
-    TaskInfo,
-    TaskRegistry,
-    TaskRouter,
-)
-
 # Utils
 from .utils import run_shell
 
@@ -117,12 +106,4 @@ __all__ = [
     "PredictResponse",
     "TrainRequest",
     "TrainResponse",
-    # Task
-    "ParameterInfo",
-    "TaskExecuteRequest",
-    "TaskExecuteResponse",
-    "TaskExecutor",
-    "TaskInfo",
-    "TaskRegistry",
-    "TaskRouter",
 ]

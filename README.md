@@ -7,14 +7,13 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Documentation](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://dhis2-chap.github.io/chapkit/)
 
-> ML service modules built on servicekit - config, artifact, task, and ML workflows
+> ML service modules built on servicekit - config, artifact, and ML workflows
 
-Chapkit provides domain-specific modules for building machine learning services on top of servicekit's core framework. Includes artifact storage, task execution, configuration management, and ML train/predict workflows.
+Chapkit provides domain-specific modules for building machine learning services on top of servicekit's core framework. Includes artifact storage, configuration management, and ML train/predict workflows.
 
 ## Features
 
 - **Artifact Module**: Hierarchical storage for models, data, and experiment tracking with parent-child relationships
-- **Task Module**: Reusable command templates for shell and Python task execution with parameter injection
 - **Config Module**: Key-value configuration with JSON data and Pydantic validation
 - **ML Module**: Train/predict workflows with artifact-based model storage and timing metadata
 - **Config-Artifact Linking**: Connect configurations to artifact hierarchies for experiment tracking
@@ -64,7 +63,7 @@ uvx chapkit init my-ml-service
 Options:
 - `--path <directory>` - Target directory (default: current directory)
 - `--with-monitoring` - Include Prometheus and Grafana monitoring stack
-- `--template <type>` - Template type: `fn-py` (default), `shell-py`, `shell-r`, or `task`
+- `--template <type>` - Template type: `fn-py` (default), `shell-py`, or `shell-r`
 
 This creates a ready-to-run service with configuration, artifacts, and API endpoints pre-configured.
 
@@ -72,7 +71,6 @@ This creates a ready-to-run service with configuration, artifacts, and API endpo
 - **fn-py**: Define training/prediction as Python functions in `main.py` (simplest path, Python-only ML workflows)
 - **shell-py**: Train/predict via external Python scripts in `scripts/` (driven by `ShellModelRunner`)
 - **shell-r**: Train/predict via external R scripts in `scripts/`, defaults to the `chapkit-r-inla` base image
-- **task**: General-purpose task execution with Python functions and shell commands (not ML-specific)
 
 ### `chapkit mlproject run` - Serve an existing MLproject
 
@@ -199,7 +197,6 @@ app.with_ml(runner=runner)
 chapkit/
 ├── config/           # Configuration management with Pydantic validation
 ├── artifact/         # Hierarchical storage for models and data
-├── task/             # Reusable task templates (Python functions, shell commands)
 ├── ml/               # ML train/predict workflows
 ├── cli/              # CLI scaffolding tools
 ├── scheduler.py      # Job scheduling integration
@@ -207,7 +204,7 @@ chapkit/
     └── service_builder.py  # .with_config(), .with_artifacts(), .with_ml()
 ```
 
-Chapkit extends servicekit's `BaseServiceBuilder` with ML-specific features and domain modules for configuration, artifacts, tasks, and ML workflows.
+Chapkit extends servicekit's `BaseServiceBuilder` with ML-specific features and domain modules for configuration, artifacts, and ML workflows.
 
 ## Examples
 
@@ -218,10 +215,8 @@ See the `examples/` directory for complete working examples:
 - `artifact/` - Read-only artifact API with hierarchical storage
 - `ml_functional/`, `ml_class/`, `ml_shell/` - ML workflow patterns (`FunctionalModelRunner`, class-based `BaseModelRunner`, `ShellModelRunner`)
 - `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
-- `task_execution/` - Task execution with Python functions and shell commands
 - `library_usage/` - Using chapkit as a library with custom models
 - `dataframe_usage/` - Working with `chapkit.data.DataFrame`
-- `vega_visualization/` - Vega chart specs from chapkit output
 
 For a fresh project, prefer `chapkit init` (see [`docs/guides/cli-scaffolding.md`](docs/guides/cli-scaffolding.md)) — the `examples/` directory targets specific patterns rather than a full starting point.
 
@@ -232,7 +227,6 @@ See `docs/guides/` for comprehensive guides:
 - [ML Workflows](docs/guides/ml-workflows.md) - Train/predict patterns and model runners
 - [Configuration Management](docs/guides/configuration-management.md) - Config schemas and validation
 - [Artifact Storage](docs/guides/artifact-storage.md) - Hierarchical data storage for ML artifacts
-- [Task Execution](docs/guides/task-execution.md) - Python functions and shell command templates
 - [CLI Scaffolding](docs/guides/cli-scaffolding.md) - Project scaffolding with `chapkit init`
 - [MLproject Runner](docs/guides/mlproject-runner.md) - Serve existing MLproject directories with `chapkit mlproject run`
 - [MLproject Migrate](docs/guides/mlproject-migrate.md) - Adopt an MLproject as a chapkit project with `chapkit mlproject migrate`

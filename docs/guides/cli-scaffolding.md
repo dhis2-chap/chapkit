@@ -119,8 +119,8 @@ chapkit init PROJECT_NAME [OPTIONS]
 
 - `--path PATH` - Target directory (default: current directory)
 - `--with-monitoring` - Include Prometheus and Grafana monitoring stack
-- `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Only valid with the ML templates (`--template fn-py`, `--template shell-py`, or `--template shell-r`); combining it with `--template task` is rejected because task services have no ML runner and no `$validate` endpoint. Off by default.
-- `--template TYPE` - Template type: `fn-py` (default), `shell-py`, `shell-r`, or `task`
+- `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Off by default.
+- `--template TYPE` - Template type: `fn-py` (default), `shell-py`, or `shell-r`
 - `--help` - Show help message
 
 **Examples:**
@@ -143,9 +143,6 @@ chapkit init my-service --template shell-py
 
 # Create project with shell-r template (R scripts on chapkit-r-inla)
 chapkit init my-service --template shell-r
-
-# Create project with task template (task execution)
-chapkit init my-service --template task
 
 # Create project with $validate hook stubs
 chapkit init my-service --with-validation
@@ -320,24 +317,6 @@ Same `ShellModelRunner` shape as `shell-py`, but with R scripts in `scripts/` (`
 
 **Best for:** R-language epidemiology / time-series models, especially anything using INLA.
 
-### Task Template
-
-The task template provides a general-purpose task execution system for Python functions:
-
-**Pros:**
-- Execute Python functions as tasks
-- Dependency injection (Database, ArtifactManager, etc.)
-- Registry-based task management
-- Job-based async execution
-- Task results stored in artifacts
-
-**Cons:**
-- Not ML-specific (no train/predict operations)
-- Requires understanding of task registry
-- More complex than simple function calls
-
-**Best for:** General-purpose automation, data processing pipelines, scheduled tasks, non-ML workflows
-
 ---
 
 ## Generated Project Structure
@@ -394,22 +373,6 @@ my-service/
 └── README.md            # Project documentation
 ```
 
-### Task Template
-
-When using `--template task`, a task execution service is generated:
-
-```
-my-service/
-├── main.py              # Task execution service with Python functions
-├── pyproject.toml       # Python dependencies
-├── Dockerfile           # Multi-stage Docker build
-├── compose.yml          # Docker Compose configuration
-├── data/                # Database directory
-│   └── chapkit.db       # SQLite database (created at runtime)
-├── .gitignore           # Python gitignore
-└── README.md            # Project documentation
-```
-
 ### With Monitoring
 
 When using `--with-monitoring`, additional files are generated:
@@ -430,9 +393,7 @@ my-service/
 
 ### With Validation Hooks
 
-Applies to the `fn-py`, `shell-py`, and `shell-r` templates. Passing
-`--with-validation` together with `--template task` is rejected by the CLI
-because task services have no ML runner and no `$validate` endpoint.
+Applies to all three templates (`fn-py`, `shell-py`, `shell-r`).
 
 When using `--with-validation` with an ML template, the generated `main.py`
 gains two extra async functions and wires them into the runner:
@@ -481,12 +442,6 @@ The generated `main.py` varies by template:
 - Same `ShellModelRunner` shape as `shell-py` but the commands invoke `Rscript scripts/train.R …`
 - **Scripts Directory**: `scripts/train.R` and `scripts/predict.R`
 - **Dockerfile**: defaults to `chapkit-r-inla` (with a commented `chapkit-r` alternative for non-INLA models)
-
-**Task Template (`task`):**
-- **Task Functions**: Python functions registered with `@TaskRegistry.register()`
-- **Task Manager**: Handles task execution with dependency injection
-- **Task Router**: API endpoints for task CRUD and execution
-- **FastAPI App**: Built using `ServiceBuilder` (not ML-specific)
 
 **Example structure (`fn-py` template):**
 
@@ -736,9 +691,6 @@ The `examples/` directory contains pattern-focused examples (use `chapkit init` 
 - `ml_class/` - Class-based `BaseModelRunner` subclass
 - `ml_shell/` - `ShellModelRunner` with external Python scripts (matches `--template shell-py`)
 
-**Task Execution:**
-- `task_execution/` - General-purpose task execution with Python functions
-
 **Other Patterns:**
 - `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
 - `config_artifact/` - Configuration with artifact linking
@@ -746,7 +698,6 @@ The `examples/` directory contains pattern-focused examples (use `chapkit init` 
 - `artifact/` - Read-only artifact API
 - `library_usage/` - Using chapkit as a library with custom models
 - `dataframe_usage/` - Working with `chapkit.data.DataFrame`
-- `vega_visualization/` - Vega chart specs from chapkit output
 
 ## Related Documentation
 
@@ -754,4 +705,3 @@ The `examples/` directory contains pattern-focused examples (use `chapkit init` 
 - [ML Workflows](ml-workflows.md) - Learn about model training and prediction
 - [Configuration Management](configuration-management.md) - Working with configs
 - [Artifact Storage](artifact-storage.md) - Managing models and predictions
-- [Task Execution](task-execution.md) - Scheduling background jobs

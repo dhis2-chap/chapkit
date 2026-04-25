@@ -26,26 +26,6 @@ Hierarchical storage system for models, data, and experiment tracking.
 
 ::: chapkit.artifact.router
 
-## Task Module
-
-Registry-based task execution system for Python functions with dependency injection.
-
-### Registry
-
-::: chapkit.task.registry
-
-### Executor
-
-::: chapkit.task.executor
-
-### Router
-
-::: chapkit.task.router
-
-### Schemas
-
-::: chapkit.task.schemas
-
 ## Data Module
 
 Universal DataFrame interchange format for tabular data across pandas, polars, xarray, and other libraries.
@@ -116,7 +96,7 @@ Protocol and implementations for ML model training and prediction.
 
 ## Scheduler
 
-Chapkit job scheduler with artifact tracking for ML/task workflows.
+Chapkit job scheduler with artifact tracking for ML workflows.
 
 ::: chapkit.scheduler
 

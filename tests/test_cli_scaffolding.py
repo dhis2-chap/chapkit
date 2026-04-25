@@ -591,32 +591,6 @@ def test_scaffold_without_validation_omits_hook_stubs(tmp_path: Path, chapkit_ro
 
 
 @pytest.mark.slow
-def test_scaffold_with_validation_task_template_is_rejected(tmp_path: Path, chapkit_root: Path) -> None:
-    """--with-validation + --template task must error clearly — task has no ML endpoints."""
-    result = subprocess.run(
-        [
-            "uv",
-            "run",
-            "chapkit",
-            "init",
-            "test-task-val",
-            "--template",
-            "task",
-            "--with-validation",
-            "--path",
-            str(tmp_path),
-        ],
-        cwd=chapkit_root,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode != 0
-    assert "--with-validation is only supported for ML templates" in result.stderr
-    # Project directory should not have been created
-    assert not (tmp_path / "test-task-val").exists()
-
-
-@pytest.mark.slow
 def test_scaffold_ml_postman_collection_includes_validate(tmp_path: Path, chapkit_root: Path) -> None:
     """Postman collection always includes $validate regardless of --with-validation."""
     import json

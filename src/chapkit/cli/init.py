@@ -83,7 +83,7 @@ def init_command(
     ] = False,
     template: Annotated[
         str,
-        typer.Option(help="Template type: 'fn-py' (default), 'shell-py', 'shell-r', or 'task'"),
+        typer.Option(help="Template type: 'fn-py' (default), 'shell-py', or 'shell-r'"),
     ] = "fn-py",
 ) -> None:
     """Initialize a new chapkit ML service project."""
@@ -93,19 +93,10 @@ def init_command(
         typer.echo(f"Error: Directory '{target_dir}' already exists", err=True)
         raise typer.Exit(code=1)
 
-    valid_templates = ["fn-py", "shell-py", "shell-r", "task"]
+    valid_templates = ["fn-py", "shell-py", "shell-r"]
     if template not in valid_templates:
         typer.echo(
             f"Error: Invalid template '{template}'. Must be one of: {', '.join(valid_templates)}",
-            err=True,
-        )
-        raise typer.Exit(code=1)
-
-    if with_validation and template == "task":
-        typer.echo(
-            "Error: --with-validation is only supported for ML templates "
-            "('fn-py', 'shell-py', or 'shell-r'). The task template has no ML runner "
-            "and therefore no $validate endpoint.",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -150,8 +141,6 @@ def init_command(
     # Render main.py based on template type
     if is_shell:
         _render_template(template_dir, target_dir, "main_shell.py.jinja2", context, "main.py")
-    elif template == "task":
-        _render_template(template_dir, target_dir, "main_task.py.jinja2", context, "main.py")
     else:
         _render_template(template_dir, target_dir, "main.py.jinja2", context, "main.py")
 
@@ -163,10 +152,6 @@ def init_command(
     if is_shell:
         _render_template(
             template_dir, target_dir, "postman_collection_ml_shell.json.jinja2", context, "postman_collection.json"
-        )
-    elif template == "task":
-        _render_template(
-            template_dir, target_dir, "postman_collection_task.json.jinja2", context, "postman_collection.json"
         )
     else:
         _render_template(

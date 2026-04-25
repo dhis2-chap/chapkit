@@ -1,4 +1,4 @@
-"""Tests for task utility functions."""
+"""Tests for the chapkit.utils run_shell helper."""
 
 from __future__ import annotations
 
