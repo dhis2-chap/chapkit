@@ -1,5 +1,26 @@
 """{{ PROJECT_DESCRIPTION }}."""
 
+# =====================================================================
+# What is this file?
+# =====================================================================
+# main.py is the chapkit service wrapper around your model. You usually
+# only edit two things in here:
+#   1. The Config class below (add fields your scripts read from config.yml).
+#   2. The ServiceInfo block (your name, email, model description).
+#
+# Your actual training and prediction logic lives in:
+{% if TEMPLATE == "shell-r" %}
+#   - scripts/train.R
+#   - scripts/predict.R
+{% else %}
+#   - scripts/train_model.py
+#   - scripts/predict_model.py
+{% endif %}
+#
+# Edit those scripts to do real work; main.py wires them into the HTTP
+# service, manages databases, and handles request/response shapes for you.
+# =====================================================================
+
 import os
 from pathlib import Path
 
@@ -42,7 +63,11 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
 #
 # Files available in workspace (scripts can access directly):
 #   config.yml - YAML config (always available)
-#   model.pickle - Model file (create/use as needed)
+{% if TEMPLATE == "shell-r" %}
+#   model.rds - Model file (saveRDS / readRDS in your R scripts)
+{% else %}
+#   model.pickle - Model file (pickle.dump / pickle.load in your scripts)
+{% endif %}
 
 {% if TEMPLATE == "shell-r" %}
 # Training command template (using relative path to script)

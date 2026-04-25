@@ -224,6 +224,7 @@ For a fresh project, prefer `chapkit init` (see [`docs/guides/cli-scaffolding.md
 
 See `docs/guides/` for comprehensive guides:
 
+- [R Quickstart](docs/guides/r-quickstart.md) - 10-minute path from R model to running chapkit service
 - [ML Workflows](docs/guides/ml-workflows.md) - Train/predict patterns and model runners
 - [Configuration Management](docs/guides/configuration-management.md) - Config schemas and validation
 - [Artifact Storage](docs/guides/artifact-storage.md) - Hierarchical data storage for ML artifacts

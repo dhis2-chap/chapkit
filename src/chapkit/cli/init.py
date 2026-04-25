@@ -83,7 +83,13 @@ def init_command(
     ] = False,
     template: Annotated[
         str,
-        typer.Option(help="Template type: 'fn-py' (default), 'shell-py', or 'shell-r'"),
+        typer.Option(
+            help=(
+                "Template type. fn-py: Python ML in main.py. "
+                "shell-py: Python train/predict scripts in scripts/. "
+                "shell-r: R train/predict scripts in scripts/, on chapkit-r-inla."
+            ),
+        ),
     ] = "fn-py",
 ) -> None:
     """Initialize a new chapkit ML service project."""

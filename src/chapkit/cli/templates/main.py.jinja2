@@ -1,5 +1,17 @@
 """{{ PROJECT_DESCRIPTION }}."""
 
+# =====================================================================
+# What is this file?
+# =====================================================================
+# main.py defines your chapkit service. The bits you typically edit are:
+#   1. The Config class below (the parameters your model takes).
+#   2. The on_train and on_predict functions (your actual ML logic).
+#   3. The ServiceInfo block (your name, email, model description).
+#
+# Everything else (database wiring, HTTP routing, async plumbing) is
+# boilerplate that chapkit needs and you almost never have to touch.
+# =====================================================================
+
 import os
 from pathlib import Path
 from typing import Any

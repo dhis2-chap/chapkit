@@ -4,8 +4,99 @@
 
 This project was scaffolded using the [Chapkit](https://dhis2-chap.github.io/chapkit) CLI.
 
+{% if TEMPLATE == "shell-r" %}
+## What you'll edit
+
+You typically only edit three places:
+
+1. `scripts/train.R` - your R training logic
+2. `scripts/predict.R` - your R prediction logic
+3. The `Config` class and `MLServiceInfo` block in `main.py` - the parameters your
+   model accepts and the metadata that describes it
+
+Everything else (`Dockerfile`, `compose.yml`, the rest of `main.py`, the database
+plumbing) is wiring you can leave alone.
+
+## What you need installed
+
+- **Docker** with the compose plugin (the Docker image ships R + INLA + the spatial /
+  time-series stack, so you don't need a local R install).
+- **Python 3.13 + uv** *(optional, only for fast iteration without rebuilding the
+  Docker image)*. Install uv from [astral.sh/uv](https://docs.astral.sh/uv/).
+
+`chapkit` itself is bundled inside the Docker image; you don't have to install
+it on your host.
+{% elif TEMPLATE == "shell-py" %}
+## What you'll edit
+
+You typically only edit three places:
+
+1. `scripts/train_model.py` - your Python training logic
+2. `scripts/predict_model.py` - your Python prediction logic
+3. The `Config` class and `MLServiceInfo` block in `main.py` - the parameters your
+   model accepts and the metadata that describes it
+
+Everything else (`Dockerfile`, `compose.yml`, the rest of `main.py`, the database
+plumbing) is wiring you can leave alone.
+
+## What you need installed
+
+- **Python 3.13 + uv**. Install uv from [astral.sh/uv](https://docs.astral.sh/uv/).
+- **Docker** with the compose plugin (for the production-ish path).
+{% else %}
+## What you'll edit
+
+You typically only edit two places:
+
+1. The `on_train` and `on_predict` functions in `main.py` - your model logic
+2. The `Config` class and `MLServiceInfo` block in `main.py` - the parameters your
+   model accepts and the metadata that describes it
+
+Everything else (`Dockerfile`, `compose.yml`, the database plumbing) is wiring you
+can leave alone.
+
+## What you need installed
+
+- **Python 3.13 + uv**. Install uv from [astral.sh/uv](https://docs.astral.sh/uv/).
+- **Docker** with the compose plugin (for the production-ish path).
+{% endif %}
+
 ## Quick Start
 
+{% if TEMPLATE == "shell-r" %}
+### Run with Docker (recommended)
+
+The Docker image bundles everything (R, INLA, chapkit), so this works without a
+local Python or R install:
+
+```bash
+# One-time: generates uv.lock that the Dockerfile pins against. Needs uv installed.
+uv lock
+
+docker compose up --build
+```
+
+The API will be available at:
+- API: http://localhost:9090
+- API Docs: http://localhost:9090/docs
+{% if WITH_MONITORING %}
+- Prometheus: http://localhost:9091
+- Grafana: http://localhost:3000 (admin/admin)
+{% endif %}
+
+The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
+if you want a different host port.
+
+### Local dev (optional, faster iteration)
+
+If you have Python 3.13 + uv + R installed locally, you can skip Docker for
+faster restart cycles:
+
+```bash
+uv sync
+uv run python main.py
+```
+{% else %}
 ### Development Mode
 
 Install dependencies and run the service locally:
@@ -34,7 +125,9 @@ The API will be available at:
 - Grafana: http://localhost:3000 (admin/admin)
 {% endif %}
 
-(The compose stack maps host port 9090 to container port 8000. Edit `compose.yml` to change the host port. Local dev (`python main.py`) also defaults to 9090 so the `curl` and `chapkit test` examples below work for either path.)
+The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
+to change the host port. Local dev (`python main.py`) also defaults to 9090.
+{% endif %}
 
 ### Verify the service
 

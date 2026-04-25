@@ -45,10 +45,25 @@ def _has_mlproject() -> bool:
     return any((cwd / name).is_file() for name in MLPROJECT_FILENAMES)
 
 
+_TOP_HELP = """\
+Chapkit CLI - scaffold and manage ML services for the chap-core ecosystem.
+
+Quick start:
+  chapkit init my-model --template shell-r   # R model on chapkit-r-inla
+  chapkit init my-model --template shell-py  # Python model with external scripts
+  chapkit init my-model                      # Python model in main.py (default)
+
+Once you've cd'd into a scaffolded project, `chapkit test` exercises the full
+config -> train -> predict flow against the running service. See
+https://dhis2-chap.github.io/chapkit/ for the full guide.
+"""
+
+
 app = typer.Typer(
     name="chapkit",
-    help="Chapkit CLI for ML service management and scaffolding",
+    help=_TOP_HELP,
     no_args_is_help=True,
+    rich_markup_mode="rich",
 )
 
 
@@ -66,10 +81,24 @@ def callback(
         typer.echo(ctx.get_help())
 
 
+_INIT_EPILOG = (
+    "[bold]Examples:[/bold]\n\n"
+    "[bold cyan]chapkit init my-model[/bold cyan] - Python model in main.py (default)\n\n"
+    "[bold cyan]chapkit init my-model --template shell-py[/bold cyan] - Python train/predict scripts\n\n"
+    "[bold cyan]chapkit init my-model --template shell-r[/bold cyan] - R scripts on chapkit-r-inla\n\n"
+    "[bold cyan]chapkit init my-model --with-monitoring[/bold cyan] - add Prometheus + Grafana\n\n"
+    "[bold]After scaffolding:[/bold] [cyan]cd my-model && uv lock && docker compose up --build[/cyan]"
+)
+
+
 # Register subcommands
 # Only show 'init' command when NOT inside a chapkit project
 if _find_chapkit_project() is None:
-    app.command(name="init", help="Initialize a new chapkit ML service project")(init_command)
+    app.command(
+        name="init",
+        help="Initialize a new chapkit ML service project",
+        epilog=_INIT_EPILOG,
+    )(init_command)
 # Only show 'test' command when INSIDE a chapkit project
 if _find_chapkit_project() is not None:
     app.command(name="test", help="Run end-to-end test of the ML service workflow")(test_command)
