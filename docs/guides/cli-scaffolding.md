@@ -686,5 +686,6 @@ The `examples/` directory contains pattern-focused examples (use `chapkit init` 
 
 - [Deploying to chap-core](deploying-to-chap-core.md) - End-to-end deploy from scaffold to DHIS2
 - [ML Workflows](ml-workflows.md) - Learn about model training and prediction
+- [Shell-runner contract](shell-runner-contract.md) - Exact file-by-file lifecycle of train and predict workspaces
 - [Configuration Management](configuration-management.md) - Working with configs
 - [Artifact Storage](artifact-storage.md) - Managing models and predictions

@@ -191,15 +191,15 @@ The service's public identity and contract: `id`, `display_name`, `description`,
 
 ### [`ModelMetadata.author_assessed_status`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#modelmetadata-fields) — traffic-light maturity
 
-One of `green` / `yellow` / `orange` / `red` / `gray`. Self-assessed by you, the model author; visible to anyone browsing chap-core. Rough semantics:
+One of `green` / `yellow` / `orange` / `red` / `gray`. Self-assessed by you, the model author; visible to anyone browsing chap-core. Pick conservatively - chap-core surfaces this in the UI so deployers can make informed choices.
 
 | Status | Meaning |
 | --- | --- |
-| `green` | Validated, recommended for production use |
-| `yellow` | Works, but results should be reviewed |
-| `orange` | Experimental; correctness not guaranteed |
-| `red` | Known issues; don't use in production |
-| `gray` | Not yet assessed |
+| `green` | Validated and ready for production use |
+| `yellow` | Ready for more rigorous testing on diverse data |
+| `orange` | Shows promise on limited data, needs manual configuration and careful evaluation |
+| `red` | Highly experimental prototype, not validated, only for early experimentation |
+| `gray` | Not intended for use - deprecated or kept only for backwards compatibility |
 
 Migrate defaults to `yellow` when the MLproject doesn't set one — bump it up (or down) to match reality.
 

@@ -41,6 +41,7 @@ nav:
       - Configuration Management: guides/configuration-management.md
       - Artifact Storage: guides/artifact-storage.md
       - ML Workflows: guides/ml-workflows.md
+      - Shell-runner Contract: guides/shell-runner-contract.md
       - Monitoring: guides/monitoring.md
       - DataFrame: guides/dataframe.md
       - Database Migrations: guides/database-migrations.md

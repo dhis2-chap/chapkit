@@ -38,13 +38,24 @@ type DependencyFactory = Callable[..., Coroutine[Any, Any, Any]]
 
 
 class AssessedStatus(StrEnum):
-    """Status indicating the maturity and validation level of an ML service."""
+    """Maturity / validation level of an ML service, surfaced in the model catalogue.
 
-    gray = "gray"  # Not intended for use, deprecated, or meant for legacy use only
-    red = "red"  # Highly experimental prototype - not validated, only for early experimentation
-    orange = "orange"  # Shows promise on limited data, needs manual configuration and careful evaluation
-    yellow = "yellow"  # Ready for more rigorous testing
-    green = "green"  # Validated and ready for production use
+    Use the colour that most honestly describes how rigorously your model has been
+    validated against real data. Pick conservatively - chap-core surfaces this in
+    the UI so deployers can make informed choices.
+
+    - ``gray``: not intended for use - deprecated, or kept only for backwards compatibility.
+    - ``red``: highly experimental prototype, not validated, only for early experimentation.
+    - ``orange``: shows promise on limited data, needs manual configuration and careful evaluation.
+    - ``yellow``: ready for more rigorous testing on diverse data.
+    - ``green``: validated and ready for production use.
+    """
+
+    gray = "gray"
+    red = "red"
+    orange = "orange"
+    yellow = "yellow"
+    green = "green"
 
 
 class PeriodType(StrEnum):
