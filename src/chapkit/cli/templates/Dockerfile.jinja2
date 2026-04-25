@@ -16,15 +16,12 @@ COPY scripts/ ./scripts/
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --python /app/.venv/bin/python -r pyproject.toml
 
-# Bind to all interfaces inside the container so docker-compose port forwarding works.
-# Local `python main.py` runs (without HOST set) keep their loopback default.
-ENV HOST=0.0.0.0
-
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl --fail http://localhost:8000/health || exit 1
 
-# chapkit-py's default CMD targets MLproject directories; init-generated projects ship
-# main.py, so we override here.
-CMD ["python", "main.py"]
+# Run uvicorn directly so server flags (--workers, --log-level, --timeout-keep-alive,
+# etc.) are visible here in the Dockerfile. main.py's `if __name__ == "__main__":`
+# block stays as the local-dev shortcut for `python main.py`.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,5 +1,9 @@
 services:
-  api:
+  # Service name doubles as the inter-container DNS hostname used by chap-core to
+  # reach this service after registration, so it should be unique within the
+  # compose stack. Using the project slug avoids collisions when this file is
+  # used as a chap-core overlay alongside other model services.
+  {{ PROJECT_SLUG }}:
     # Default: build the image locally from this directory.
     build:
       context: .
@@ -9,6 +13,9 @@ services:
     # pull_policy: always
     # platform: linux/amd64
     ports:
+      # Format is "host:container". Pick a host port that doesn't collide with chap-core
+      # (which uses 8000) or other model overlays. e.g. ewars uses 5002, pick 5003+ for new
+      # models. The container port stays 8000 - that's what the service listens on inside.
       - "8000:8000"
     volumes:
       - ck_{{ PROJECT_SLUG }}_data:/work/data
@@ -55,7 +62,7 @@ services:
     networks:
       - ck_{{ PROJECT_SLUG }}
     depends_on:
-      api:
+      {{ PROJECT_SLUG }}:
         condition: service_healthy
 
   grafana:

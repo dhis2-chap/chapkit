@@ -135,7 +135,15 @@ Want more — SHA tags for traceability, semver releases, build cache, SLSA atte
 
 ## Step 6 — Wire it into chap-core with a compose overlay
 
-chap-core ships with a base `compose.yml` (`chap`, `worker`, `redis`, `postgres`) and expects model services to be added via overlay files. Your scaffolded project also ships a `compose.yml` for standalone local dev — when you copy it over (or write a new one) next to chap-core's, **rename it `compose.<your-model>.yml`** so the two files don't clash and so `docker compose -f compose.yml -f compose.<your-model>.yml up` reads as "the chap-core base, plus my model".
+chap-core ships with a base `compose.yml` (`chap`, `worker`, `redis`, `postgres`) and expects model services to be added via overlay files. Your scaffolded project also ships a `compose.yml` for standalone local dev — when you drop it next to chap-core's, **rename it `compose.<your-model>.yml`** so the two files don't clash and so `docker compose -f compose.yml -f compose.<your-model>.yml up` reads as "the chap-core base, plus my model".
+
+The scaffolded `compose.yml` is already most of the way there:
+
+- The service name is your project slug, not a generic `api` — that's the inter-container DNS hostname chap-core uses to reach you, so it has to be unique across all model overlays.
+- Build vs. GHCR image, chap-core registration env vars, and the `depends_on: chap` block are all present as commented alternatives. Uncomment the GHCR `image:` line, comment out `build:`, uncomment the registration env, and uncomment `depends_on`.
+- The host port is `8000`, which collides with chap-core itself. Pick a unique host port in the `5000–5999` range — ewars uses `5002`, so `5003+` for new models. The container port stays `8000`.
+
+After those uncomments the overlay looks roughly like the canonical [ewars overlay](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml):
 
 ```yaml
 # compose.my-model.yml
@@ -145,7 +153,7 @@ services:
     platform: linux/amd64  # only if your base image needs it
     pull_policy: always
     ports:
-      - "5010:8000"
+      - "5010:8000"   # host:container - host port must not collide with chap (8000) or other models
     environment:
       SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
       # Uncomment if chap has SERVICEKIT_REGISTRATION_KEY set:
@@ -165,8 +173,6 @@ Two things worth calling out:
 
 - **`$$register`** — the double dollar escapes `$` for compose's own variable substitution. If you write `$register`, compose will try to expand a variable named `register` and silently leave you with `http://chap:8000/v2/services/`, which 404s.
 - **`depends_on: chap: condition: service_healthy`** — prevents the model from trying to register against a half-started chap-core. Chap-core's healthcheck must be green first.
-
-The ewars model's [`compose.ewars.yml`](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml) is the canonical example.
 
 ## Step 7 — Verify registration
 
