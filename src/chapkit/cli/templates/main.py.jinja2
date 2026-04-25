@@ -1,5 +1,17 @@
 """{{ PROJECT_DESCRIPTION }}."""
 
+# =====================================================================
+# What is this file?
+# =====================================================================
+# main.py defines your chapkit service. The bits you typically edit are:
+#   1. The Config class below (the parameters your model takes).
+#   2. The on_train and on_predict functions (your actual ML logic).
+#   3. The ServiceInfo block (your name, email, model description).
+#
+# Everything else (database wiring, HTTP routing, async plumbing) is
+# boilerplate that chapkit needs and you almost never have to touch.
+# =====================================================================
+
 import os
 from pathlib import Path
 from typing import Any
@@ -234,16 +246,8 @@ app = (
         runner=runner,
         database_url=DATABASE_URL,
     )
-{% if WITH_MONITORING %}
     .with_monitoring()
-{% endif %}
-    # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
-    # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
-    # local `python main.py` runs without any extra config. Optional env vars:
-    #   SERVICEKIT_ORCHESTRATOR_URL   e.g. http://chap:8000/v2/services/$register
-    #   SERVICEKIT_REGISTRATION_KEY   shared secret if chap has one set
-    #   SERVICEKIT_HOST, SERVICEKIT_PORT   override the advertised endpoint
-    # See docs/guides/deploying-to-chap-core.md for the full walkthrough.
+    # See compose.yml for chap-core self-registration env vars.
     .with_registration()
     .build()
 )
@@ -252,5 +256,7 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    # Set reload=True to enable hot reloading during development
-    run_app("main:app", reload=False)
+    # Default to port 9090 to match the Docker compose host port and avoid the usual
+    # busy ports (8000, 8080). Override with the PORT env var. Set reload=True to
+    # enable hot reloading during development.
+    run_app("main:app", reload=False, port=9090)

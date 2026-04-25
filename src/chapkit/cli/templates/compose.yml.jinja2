@@ -1,24 +1,49 @@
 services:
-  api:
+  # Service name doubles as the inter-container DNS hostname used by chap-core to
+  # reach this service after registration, so it should be unique within the
+  # compose stack. Using the project slug avoids collisions when this file is
+  # used as a chap-core overlay alongside other model services.
+  {{ PROJECT_SLUG }}:
+    # Default: build the image locally from this directory.
     build:
       context: .
       dockerfile: Dockerfile
+{% if TEMPLATE == "shell-r" %}
+    # chapkit-r-inla is amd64-only; runs under Rosetta on Apple Silicon. Drop this if
+    # you switch to the chapkit-r base in the Dockerfile.
+    platform: linux/amd64
+{% endif %}
+    # Alternative: pull a prebuilt image from GHCR (comment out `build:` above).
+    # image: ghcr.io/<your-org>/{{ PROJECT_SLUG }}:latest
+    # pull_policy: always
+    # platform: linux/amd64
     ports:
-      - "8000:8000"
+      # Format is "host:container". Default host port is 9090 - avoids the usual busy
+      # ports (8000, 8080, 3000). When overlaying onto chap-core alongside other
+      # models, pick a unique host port per overlay (chap-core's ewars overlay uses
+      # 5002, for example). The container (right) port stays 8000.
+      - "9090:8000"
     volumes:
-      - ck_{{ PROJECT_SLUG }}_data:/workspace/data
+      - ck_{{ PROJECT_SLUG }}_data:/work/data
     environment:
       LOG_FORMAT: json
       LOG_LEVEL: INFO
       WORKERS: 1
       # CHAPKIT_TEMP_DIR: /tmp  # Override temp directory for ML workspaces
+      # When integrating with chap-core, register this service on startup:
+      # SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
+      # SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}
     restart: unless-stopped
-    networks:
-      - ck_{{ PROJECT_SLUG }}
-
-networks:
-  ck_{{ PROJECT_SLUG }}:
-    driver: bridge
+    # No `networks:` directive on purpose. Compose puts every service on the project's
+    # default network, so standalone (`docker compose up`) just works, and overlay use
+    # (`docker compose -f compose.yml -f compose.<model>.yml up`) automatically joins
+    # the same default network as chap, redis, postgres - which is how ewars and
+    # chap-core reach each other by hostname. Pinning a custom network here would
+    # isolate the service from the parent stack.
+    # When integrating with chap-core, wait for it to be healthy first:
+    # depends_on:
+    #   chap:
+    #     condition: service_healthy
 
 volumes:
   ck_{{ PROJECT_SLUG }}_data:

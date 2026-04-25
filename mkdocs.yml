@@ -31,6 +31,7 @@ theme:
 nav:
   - Home: index.md
   - Guides:
+      - R Quickstart: guides/r-quickstart.md
       - CLI Scaffolding: guides/cli-scaffolding.md
       - MLproject Runner: guides/mlproject-runner.md
       - MLproject Migration Checklist: guides/mlproject-migration-checklist.md
@@ -39,8 +40,8 @@ nav:
       - Testing ML Services: guides/testing-ml-services.md
       - Configuration Management: guides/configuration-management.md
       - Artifact Storage: guides/artifact-storage.md
-      - Task Execution: guides/task-execution.md
       - ML Workflows: guides/ml-workflows.md
+      - Monitoring: guides/monitoring.md
       - DataFrame: guides/dataframe.md
       - Database Migrations: guides/database-migrations.md
   - API Reference: api-reference.md

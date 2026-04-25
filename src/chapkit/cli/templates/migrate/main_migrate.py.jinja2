@@ -35,7 +35,7 @@ class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
 
     # chap-core ecosystem convention: most disease-surveillance models
     # (EWARS and friends) take rainfall + mean_temperature as lagged
-    # climate predictors, so `chapkit migrate` pins them here by default.
+    # climate predictors, so `chapkit mlproject migrate` pins them here by default.
     # If this model doesn't use climate covariates, DELETE the whole
     # block below - BaseConfig's inherited default is an empty list.
     # To keep the field but change it, override per-config via
@@ -131,12 +131,7 @@ app = (
         runner=runner,
         database_url=DATABASE_URL,
     )
-    # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
-    # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
-    # local `python main.py` runs without any extra config. Optional env vars:
-    #   SERVICEKIT_ORCHESTRATOR_URL   e.g. http://chap:8000/v2/services/$register
-    #   SERVICEKIT_REGISTRATION_KEY   shared secret if chap has one set
-    #   SERVICEKIT_HOST, SERVICEKIT_PORT   override the advertised endpoint
+    # See compose.yml for chap-core self-registration env vars.
     .with_registration()
     .build()
 )
@@ -145,4 +140,4 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    run_app("main:app", host="0.0.0.0", port=8000)
+    run_app("main:app", host="0.0.0.0", port=9090)

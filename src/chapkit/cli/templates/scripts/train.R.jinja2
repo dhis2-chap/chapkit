@@ -1,0 +1,52 @@
+#!/usr/bin/env Rscript
+# External training script for ML model training via ShellModelRunner.
+#
+# Mirrors the shell-py train_model.py: reads config.yml, loads training data,
+# computes column means as a toy model, saves the model to disk. Replace with
+# your own ML logic.
+#
+# Usage:
+#   Rscript train.R --data data.csv [--geo geo.json]
+
+suppressPackageStartupMessages({
+  library(yaml)
+})
+
+args <- commandArgs(trailingOnly = TRUE)
+parse_arg <- function(name, required = FALSE, default = "") {
+  idx <- which(args == paste0("--", name))
+  if (length(idx) == 0) {
+    if (required) stop(sprintf("Missing required argument --%s", name))
+    return(default)
+  }
+  args[idx + 1]
+}
+
+data_path <- parse_arg("data", required = TRUE)
+geo_path <- parse_arg("geo")
+
+result <- tryCatch({
+  config <- yaml.load_file("config.yml")
+  message(sprintf("Training with config: %s", paste(names(config), collapse = ", ")))
+
+  data <- read.csv(data_path)
+  message(sprintf("Loaded %d training samples", nrow(data)))
+
+  numeric_cols <- sapply(data, is.numeric)
+  numeric_data <- data[, numeric_cols, drop = FALSE]
+  model <- list(
+    means = as.list(colMeans(numeric_data, na.rm = TRUE)),
+    columns = names(numeric_data)
+  )
+  message(sprintf("Model trained with means for: %s", paste(model$columns, collapse = ", ")))
+
+  saveRDS(model, "model.rds")
+  message("Model saved to model.rds")
+  cat("SUCCESS: Training completed\n")
+  0
+}, error = function(e) {
+  message(sprintf("ERROR: Training failed: %s", conditionMessage(e)))
+  1
+})
+
+quit(status = result)

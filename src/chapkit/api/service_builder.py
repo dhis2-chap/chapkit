@@ -224,7 +224,7 @@ class ServiceBuilder(BaseServiceBuilder):
                 )
 
     def _register_module_routers(self, app: FastAPI) -> None:
-        """Register module-specific routers (config, artifact, task)."""
+        """Register module-specific routers (config, artifact, ml)."""
         if self._config_options:
             config_options = self._config_options
             config_schema = config_options.schema

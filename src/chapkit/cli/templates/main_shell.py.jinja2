@@ -1,5 +1,26 @@
 """{{ PROJECT_DESCRIPTION }}."""
 
+# =====================================================================
+# What is this file?
+# =====================================================================
+# main.py is the chapkit service wrapper around your model. You usually
+# only edit two things in here:
+#   1. The Config class below (add fields your scripts read from config.yml).
+#   2. The ServiceInfo block (your name, email, model description).
+#
+# Your actual training and prediction logic lives in:
+{% if TEMPLATE == "shell-r" %}
+#   - scripts/train.R
+#   - scripts/predict.R
+{% else %}
+#   - scripts/train_model.py
+#   - scripts/predict_model.py
+{% endif %}
+#
+# Edit those scripts to do real work; main.py wires them into the HTTP
+# service, manages databases, and handles request/response shapes for you.
+# =====================================================================
+
 import os
 from pathlib import Path
 
@@ -42,8 +63,24 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
 #
 # Files available in workspace (scripts can access directly):
 #   config.yml - YAML config (always available)
-#   model.pickle - Model file (create/use as needed)
+{% if TEMPLATE == "shell-r" %}
+#   model.rds - Model file (saveRDS / readRDS in your R scripts)
+{% else %}
+#   model.pickle - Model file (pickle.dump / pickle.load in your scripts)
+{% endif %}
 
+{% if TEMPLATE == "shell-r" %}
+# Training command template (using relative path to script)
+train_command = "Rscript scripts/train.R --data {data_file}"
+
+# Prediction command template (using relative path to script)
+predict_command = (
+    "Rscript scripts/predict.R "
+    "--historic {historic_file} "
+    "--future {future_file} "
+    "--output {output_file}"
+)
+{% else %}
 # Training command template (using relative path to script)
 train_command = "python scripts/train_model.py --data {data_file}"
 
@@ -54,6 +91,7 @@ predict_command = (
     "--future {future_file} "
     "--output {output_file}"
 )
+{% endif %}
 
 {% if WITH_VALIDATION %}
 # ====================================================================================
@@ -186,16 +224,8 @@ app = (
         runner=runner,
         database_url=DATABASE_URL,
     )
-{% if WITH_MONITORING %}
     .with_monitoring()
-{% endif %}
-    # Self-register with chap-core when SERVICEKIT_ORCHESTRATOR_URL is set in
-    # the environment (e.g. via docker-compose). Silently no-ops otherwise, so
-    # local `python main.py` runs without any extra config. Optional env vars:
-    #   SERVICEKIT_ORCHESTRATOR_URL   e.g. http://chap:8000/v2/services/$register
-    #   SERVICEKIT_REGISTRATION_KEY   shared secret if chap has one set
-    #   SERVICEKIT_HOST, SERVICEKIT_PORT   override the advertised endpoint
-    # See docs/guides/deploying-to-chap-core.md for the full walkthrough.
+    # See compose.yml for chap-core self-registration env vars.
     .with_registration()
     .build()
 )
@@ -204,5 +234,7 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    # Set reload=True to enable hot reloading during development
-    run_app("main:app", reload=False)
+    # Default to port 9090 to match the Docker compose host port and avoid the usual
+    # busy ports (8000, 8080). Override with the PORT env var. Set reload=True to
+    # enable hot reloading during development.
+    run_app("main:app", reload=False, port=9090)

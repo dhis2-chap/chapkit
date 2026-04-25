@@ -22,7 +22,7 @@ def test_command(
     url: Annotated[
         str,
         typer.Option("--url", "-u", help="Base URL of running chapkit service"),
-    ] = "http://localhost:8000",
+    ] = "http://localhost:9090",
     num_configs: Annotated[
         int,
         typer.Option("--configs", "-c", help="Number of configs to create"),

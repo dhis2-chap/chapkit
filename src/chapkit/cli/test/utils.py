@@ -26,10 +26,11 @@ def save_test_data(directory: Path, filename: str, data: dict[str, Any]) -> None
         df.to_csv(filepath.with_suffix(".csv"))
 
 
-def start_service_subprocess(project_root: Path, port: int = 8000) -> subprocess.Popen[bytes]:
-    """Start the service as a subprocess with in-memory database."""
+def start_service_subprocess(project_root: Path, port: int = 9090) -> subprocess.Popen[bytes]:
+    """Start the service as a subprocess with in-memory database on the given port."""
     env = os.environ.copy()
     env["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+    env["PORT"] = str(port)
 
     process = subprocess.Popen(
         [sys.executable, "main.py"],

@@ -35,7 +35,7 @@ uvx chapkit init my-model
 cd my-model
 ```
 
-See [CLI Scaffolding](cli-scaffolding.md) for template options (`ml`, `ml-shell`, `task`) and flags (`--with-monitoring`, `--with-validation`).
+See [CLI Scaffolding](cli-scaffolding.md) for template options (`fn-py`, `shell-py`, `shell-r`) and the `--with-validation` flag.
 
 The scaffolded `main.py` already ends with `.with_registration()`. No manual edit is needed to enable registration — the builder silently no-ops when the orchestrator env var is unset, so `python main.py` still runs standalone.
 
@@ -92,7 +92,7 @@ docker run --rm -p 8000:8000 my-model:dev
 - `ghcr.io/dhis2-chap/chapkit-r:latest` — R without INLA (multi-arch).
 - `ghcr.io/dhis2-chap/chapkit-r-inla:latest` — R + INLA (amd64 only; add `--platform=linux/amd64` and expect emulation on Apple Silicon).
 
-See [MLproject Runner → Running in a Container](mlproject-runner.md#running-in-a-container) for the full image table (sizes, architectures, contents) and [chapkit migrate → Base image auto-detection](mlproject-migrate.md#base-image-auto-detection) for how the right base is picked when adopting an existing MLproject.
+See [MLproject Runner → Running in a Container](mlproject-runner.md#running-in-a-container) for the full image table (sizes, architectures, contents) and [chapkit mlproject migrate → Base image auto-detection](mlproject-migrate.md#base-image-auto-detection) for how the right base is picked when adopting an existing MLproject.
 
 ## Step 5 — Publish to GHCR
 
@@ -135,7 +135,15 @@ Want more — SHA tags for traceability, semver releases, build cache, SLSA atte
 
 ## Step 6 — Wire it into chap-core with a compose overlay
 
-chap-core ships with a base `compose.yml` (`chap`, `worker`, `redis`, `postgres`) and expects model services to be added via overlay files. Add one for your model, next to chap-core's `compose.yml`:
+chap-core ships with a base `compose.yml` (`chap`, `worker`, `redis`, `postgres`) and expects model services to be added via overlay files. Your scaffolded project also ships a `compose.yml` for standalone local dev — when you drop it next to chap-core's, **rename it `compose.<your-model>.yml`** so the two files don't clash and so `docker compose -f compose.yml -f compose.<your-model>.yml up` reads as "the chap-core base, plus my model".
+
+The scaffolded `compose.yml` is already most of the way there:
+
+- The service name is your project slug, not a generic `api` — that's the inter-container DNS hostname chap-core uses to reach you, so it has to be unique across all model overlays.
+- Build vs. GHCR image, chap-core registration env vars, and the `depends_on: chap` block are all present as commented alternatives. Uncomment the GHCR `image:` line, comment out `build:`, uncomment the registration env, and uncomment `depends_on`.
+- The host port is `8000`, which collides with chap-core itself. Pick a unique host port in the `5000–5999` range — ewars uses `5002`, so `5003+` for new models. The container port stays `8000`.
+
+After those uncomments the overlay looks roughly like the canonical [ewars overlay](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml):
 
 ```yaml
 # compose.my-model.yml
@@ -145,7 +153,7 @@ services:
     platform: linux/amd64  # only if your base image needs it
     pull_policy: always
     ports:
-      - "5010:8000"
+      - "5010:8000"   # host:container - host port must not collide with chap (8000) or other models
     environment:
       SERVICEKIT_ORCHESTRATOR_URL: http://chap:8000/v2/services/$$register
       # Uncomment if chap has SERVICEKIT_REGISTRATION_KEY set:
@@ -165,8 +173,6 @@ Two things worth calling out:
 
 - **`$$register`** — the double dollar escapes `$` for compose's own variable substitution. If you write `$register`, compose will try to expand a variable named `register` and silently leave you with `http://chap:8000/v2/services/`, which 404s.
 - **`depends_on: chap: condition: service_healthy`** — prevents the model from trying to register against a half-started chap-core. Chap-core's healthcheck must be green first.
-
-The ewars model's [`compose.ewars.yml`](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml) is the canonical example.
 
 ## Step 7 — Verify registration
 
@@ -212,15 +218,15 @@ Keepalive pings are failing. Check the model container is still running (`docker
 Expected for amd64-only base images (R-INLA, some Python wheels). The container runs under emulation; slower but correct.
 
 **SQLite file disappears between runs.**
-The scaffolded image runs from `WORKDIR /workspace` and the default `DATABASE_URL` is the relative path `data/chapkit.db`, which resolves to `/workspace/data/chapkit.db`. The scaffolded `Dockerfile` pre-creates that directory with the right ownership, and the scaffolded `compose.yml` already mounts a named volume there — so persistence works out of the box when you run via `docker compose up`.
+The scaffolded image runs from `WORKDIR /work` and the default `DATABASE_URL` is the relative path `data/chapkit.db`, which resolves to `/work/data/chapkit.db`. The scaffolded `compose.yml` mounts a named volume there — persistence works out of the box when you run via `docker compose up`.
 
-If you run the image directly with `docker run` and want the DB to survive container restarts, mount a volume at `/workspace/data`:
+If you run the image directly with `docker run` and want the DB to survive container restarts, mount a volume at `/work/data`:
 
 ```yaml
 services:
   my-model:
     volumes:
-      - my-model-data:/workspace/data
+      - my-model-data:/work/data
 volumes:
   my-model-data:
 ```
@@ -229,13 +235,14 @@ To put the DB somewhere else, set an absolute `DATABASE_URL` (note the four slas
 
 ```yaml
     environment:
-      DATABASE_URL: sqlite+aiosqlite:////workspace/data/chapkit.db
+      DATABASE_URL: sqlite+aiosqlite:////work/data/chapkit.db
 ```
 
 ---
 
 ## Appendix — reference files
 
+- [chapkit documentation](https://dhis2-chap.github.io/chapkit/) — full guides, CLI reference, and API docs.
 - [`chapkit_ewars_model/main.py`](https://github.com/chap-models/chapkit_ewars_model/blob/main/main.py) — `MLServiceInfo`, `ShellModelRunner`, `.with_registration()`.
 - [`chapkit_ewars_model/Dockerfile`](https://github.com/chap-models/chapkit_ewars_model/blob/main/Dockerfile) — short `FROM ghcr.io/dhis2-chap/chapkit-r-inla:latest` + `uv sync` layer; a concrete example of extending a chapkit-images base with model-specific Python deps.
 - [`chapkit_ewars_model/.github/workflows/publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) — a fuller GHCR publish workflow with cache, semver tags, and SLSA attestations.

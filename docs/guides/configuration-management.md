@@ -863,12 +863,7 @@ await manager.delete_by_id(config_id)
 
 ## Complete Example
 
-See `examples/config_basic/` for a complete working example with:
-- Custom configuration schema
-- Database seeding
-- Environment configurations
-- Custom service metadata
-- Docker deployment
+See `examples/config/` and `examples/config_artifact/` for working examples — `config` walks through the CRUD surface; `config_artifact` shows how a config can link to an artifact for experiment tracking.
 
 ---
 

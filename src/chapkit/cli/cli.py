@@ -9,6 +9,7 @@ from chapkit import __version__
 from chapkit.cli.artifact import artifact_app
 from chapkit.cli.init import init_command
 from chapkit.cli.migrate import migrate_command
+from chapkit.cli.mlproject import MLPROJECT_FILENAMES
 from chapkit.cli.run import run_command
 from chapkit.cli.test import test_command
 
@@ -38,10 +39,31 @@ def _find_chapkit_project() -> Path | None:
     return None
 
 
+def _has_mlproject() -> bool:
+    """Return True if the current directory contains an MLproject file."""
+    cwd = Path.cwd()
+    return any((cwd / name).is_file() for name in MLPROJECT_FILENAMES)
+
+
+_TOP_HELP = """\
+Chapkit CLI - scaffold and manage ML services for the chap-core ecosystem.
+
+Quick start:
+  chapkit init my-model --template shell-r   # R model on chapkit-r-inla
+  chapkit init my-model --template shell-py  # Python model with external scripts
+  chapkit init my-model                      # Python model in main.py (default)
+
+Once you've cd'd into a scaffolded project, `chapkit test` exercises the full
+config -> train -> predict flow against the running service. See
+https://dhis2-chap.github.io/chapkit/ for the full guide.
+"""
+
+
 app = typer.Typer(
     name="chapkit",
-    help="Chapkit CLI for ML service management and scaffolding",
+    help=_TOP_HELP,
     no_args_is_help=True,
+    rich_markup_mode="rich",
 )
 
 
@@ -59,15 +81,46 @@ def callback(
         typer.echo(ctx.get_help())
 
 
+_INIT_EPILOG = (
+    "[bold]Examples:[/bold]\n\n"
+    "[bold cyan]chapkit init my-model[/bold cyan] - Python model in main.py (default)\n\n"
+    "[bold cyan]chapkit init my-model --template shell-py[/bold cyan] - Python train/predict scripts\n\n"
+    "[bold cyan]chapkit init my-model --template shell-r[/bold cyan] - R scripts on chapkit-r-inla\n\n"
+    "[bold]After scaffolding:[/bold] [cyan]cd my-model && uv lock && docker compose up --build[/cyan]"
+)
+
+
 # Register subcommands
 # Only show 'init' command when NOT inside a chapkit project
 if _find_chapkit_project() is None:
-    app.command(name="init", help="Initialize a new chapkit ML service project")(init_command)
+    app.command(
+        name="init",
+        help="Initialize a new chapkit ML service project",
+        epilog=_INIT_EPILOG,
+    )(init_command)
 # Only show 'test' command when INSIDE a chapkit project
 if _find_chapkit_project() is not None:
     app.command(name="test", help="Run end-to-end test of the ML service workflow")(test_command)
-app.command(name="run", help="Run an MLproject directory as a chapkit service")(run_command)
-app.command(name="migrate", help="Migrate an MLproject directory into a chapkit project")(migrate_command)
+
+# 'run' and 'migrate' operate on MLflow-style MLproject directories - the canonical
+# surface lives under `chapkit mlproject`, hidden from --help when no MLproject file
+# is in the current directory.
+mlproject_app = typer.Typer(
+    name="mlproject",
+    help="Run or migrate an MLflow-style MLproject directory",
+    no_args_is_help=True,
+)
+mlproject_app.command(name="run", help="Run an MLproject directory as a chapkit service")(run_command)
+mlproject_app.command(name="migrate", help="Migrate an MLproject directory into a chapkit project")(migrate_command)
+app.add_typer(mlproject_app, name="mlproject", hidden=not _has_mlproject())
+
+# Top-level `chapkit run` / `chapkit migrate` stay registered (hidden) as backwards-
+# compatible aliases so the chapkit-py base image's existing CMD (`chapkit run .`)
+# keeps working until chapkit-images is updated to use the canonical
+# `chapkit mlproject run .` form.
+app.command(name="run", hidden=True)(run_command)
+app.command(name="migrate", hidden=True)(migrate_command)
+
 app.add_typer(artifact_app, name="artifact")
 
 

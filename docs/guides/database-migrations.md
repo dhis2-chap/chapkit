@@ -249,7 +249,7 @@ else:
 - Optionally import chapkit's models if you want those tables too
 - Set `target_metadata = Base.metadata`
 
-**Note**: Only **imported** models are included in migrations. If you don't import chapkit's models (Config, Artifact, Task), those tables won't be created. The example in `examples/custom_migrations/` demonstrates a standalone setup with only custom tables.
+**Note**: Only **imported** models are included in migrations. If you don't import chapkit's models (Config, Artifact, Task), those tables won't be created.
 
 #### 4. Create Your Models
 
@@ -443,11 +443,11 @@ def upgrade() -> None:
 ```
 
 **Benefits**:
-- ✅ No need to regenerate migrations
-- ✅ Reuse tested helper functions
-- ✅ Explicit control over table creation order
-- ✅ Mix and match as needed
-- ✅ Clear and maintainable
+- No need to regenerate migrations
+- Reuse tested helper functions
+- Explicit control over table creation order
+- Mix and match as needed
+- Clear and maintainable
 
 **Alternative: Single Alembic with All Models**
 
@@ -613,16 +613,6 @@ config.set_main_option(
     os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./app.db")
 )
 ```
-
----
-
-## Complete Example
-
-See `examples/custom_migrations/` for a working example with:
-- Custom User and Order models
-- Separate alembic setup
-- Reusable migration helpers
-- Integration with chapkit's infrastructure
 
 ---
 

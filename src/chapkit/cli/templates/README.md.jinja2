@@ -4,8 +4,95 @@
 
 This project was scaffolded using the [Chapkit](https://dhis2-chap.github.io/chapkit) CLI.
 
+{% if TEMPLATE == "shell-r" %}
+## What you'll edit
+
+You typically only edit three places:
+
+1. `scripts/train.R` - your R training logic
+2. `scripts/predict.R` - your R prediction logic
+3. The `Config` class and `MLServiceInfo` block in `main.py` - the parameters your
+   model accepts and the metadata that describes it
+
+Everything else (`Dockerfile`, `compose.yml`, the rest of `main.py`, the database
+plumbing) is wiring you can leave alone.
+
+## What you need installed
+
+- **Docker** with the compose plugin (the Docker image ships R + INLA + the spatial /
+  time-series stack, so you don't need a local R install).
+- **Python 3.13 + uv** *(optional, only for fast iteration without rebuilding the
+  Docker image)*. Install uv from [astral.sh/uv](https://docs.astral.sh/uv/).
+
+`chapkit` itself is bundled inside the Docker image; you don't have to install
+it on your host.
+{% elif TEMPLATE == "shell-py" %}
+## What you'll edit
+
+You typically only edit three places:
+
+1. `scripts/train_model.py` - your Python training logic
+2. `scripts/predict_model.py` - your Python prediction logic
+3. The `Config` class and `MLServiceInfo` block in `main.py` - the parameters your
+   model accepts and the metadata that describes it
+
+Everything else (`Dockerfile`, `compose.yml`, the rest of `main.py`, the database
+plumbing) is wiring you can leave alone.
+
+## What you need installed
+
+- **Python 3.13 + uv**. Install uv from [astral.sh/uv](https://docs.astral.sh/uv/).
+- **Docker** with the compose plugin (for the production-ish path).
+{% else %}
+## What you'll edit
+
+You typically only edit two places:
+
+1. The `on_train` and `on_predict` functions in `main.py` - your model logic
+2. The `Config` class and `MLServiceInfo` block in `main.py` - the parameters your
+   model accepts and the metadata that describes it
+
+Everything else (`Dockerfile`, `compose.yml`, the database plumbing) is wiring you
+can leave alone.
+
+## What you need installed
+
+- **Python 3.13 + uv**. Install uv from [astral.sh/uv](https://docs.astral.sh/uv/).
+- **Docker** with the compose plugin (for the production-ish path).
+{% endif %}
+
 ## Quick Start
 
+{% if TEMPLATE == "shell-r" %}
+### Run with Docker (recommended)
+
+The Docker image bundles everything (R, INLA, chapkit), so this works without a
+local Python or R install:
+
+```bash
+# One-time: generates uv.lock that the Dockerfile pins against. Needs uv installed.
+uv lock
+
+docker compose up --build
+```
+
+The API will be available at:
+- API: http://localhost:9090
+- API Docs: http://localhost:9090/docs
+
+The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
+if you want a different host port.
+
+### Local dev (optional, faster iteration)
+
+If you have Python 3.13 + uv + R installed locally, you can skip Docker for
+faster restart cycles:
+
+```bash
+uv sync
+uv run python main.py
+```
+{% else %}
 ### Development Mode
 
 Install dependencies and run the service locally:
@@ -15,30 +102,63 @@ uv sync
 uv run python main.py
 ```
 
-The API will be available at http://localhost:8000
+The API will be available at http://localhost:9090
 
 ### Docker
 
 Build and run with Docker Compose:
 
 ```bash
+uv sync                  # one-time, generates uv.lock that the Dockerfile pins against
 docker compose up --build
 ```
 
 The API will be available at:
-- API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
-{% if monitoring %}
-- Prometheus: http://localhost:9090
-- Grafana: http://localhost:3000 (admin/admin)
+- API: http://localhost:9090
+- API Docs: http://localhost:9090/docs
+
+The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
+to change the host port. Local dev (`python main.py`) also defaults to 9090.
 {% endif %}
 
+### Verify the service
+
+Once the service is running (locally or in Docker), exercise the full
+config -> train -> predict flow with `chapkit test`:
+
+```bash
+# Against the running service (default http://localhost:9090)
+uv run chapkit test
+
+# More aggressive: 3 configs, 2 trainings each, 2 predictions per model
+uv run chapkit test -c 3 -t 2 -p 2 --verbose
+
+# Auto-start an in-memory service for the duration of the test
+uv run chapkit test --start-service
+```
+
+Note: this is an end-to-end **smoke test** of the API surface, not a model
+quality test. `chapkit test` synthesises random training and prediction
+data, drives the service through the full config -> train -> predict
+lifecycle, and confirms each step returns a valid response. It does not
+validate that your model produces meaningful predictions - only that the
+service plumbing (config CRUD, the train job, artifact persistence, and
+predict) all work. Handy after editing `main.py` or rebuilding the image.
+
 ## API Endpoints
+
+The interactive Swagger UI at <http://localhost:9090/docs> is the easiest way to
+poke at the service - it lets you fill in payloads and hit endpoints from the
+browser without any extra tools.
+
+If you prefer Postman or Insomnia, point them at the OpenAPI spec at
+<http://localhost:9090/openapi.json> (Postman: *Import → Link* and paste the URL;
+it generates a fresh collection). Re-import after API changes.
 
 ### Health Check
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:9090/health
 ```
 
 ### Configuration Management
@@ -46,7 +166,7 @@ curl http://localhost:8000/health
 Create a configuration:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/configs \
+curl -X POST http://localhost:9090/api/v1/configs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-config",
@@ -59,7 +179,7 @@ curl -X POST http://localhost:8000/api/v1/configs \
 Train a model:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/ml/\$train \
+curl -X POST http://localhost:9090/api/v1/ml/\$train \
   -H "Content-Type: application/json" \
   -d '{
     "config_id": "YOUR_CONFIG_ID",
@@ -74,7 +194,7 @@ curl -X POST http://localhost:8000/api/v1/ml/\$train \
 Make predictions:
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/ml/\$predict \
+curl -X POST http://localhost:9090/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
     "model_id": "YOUR_MODEL_ID",
@@ -100,41 +220,41 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
     learning_rate: float = 0.01
 ```
 
-{% if TEMPLATE == "ml-shell" %}
-### Customize Training (Shell Runner)
+{% if TEMPLATE == "shell-py" %}
+### Customize Training (Shell Runner, Python)
 
-Edit the training script in `scripts/train_model.py` to implement your model training logic.
+Edit `scripts/train_model.py` to implement your model training logic. The script
+receives `--data <path-to-training-csv>` (and optionally `--geo <path-to-geojson>`),
+reads `config.yml` from the workspace, and writes its model artefact to disk
+(`model.pickle` in the example).
 
-The script receives the following arguments:
-- `--config`: Path to config YAML file
-- `--data`: Path to training data CSV
-- `--model`: Path to save trained model (pickle format)
-- `--geo`: Optional GeoJSON file path
+### Customize Prediction (Shell Runner, Python)
 
-### Customize Prediction (Shell Runner)
+Edit `scripts/predict_model.py`. It receives `--historic`, `--future`, `--output`
+(and optional `--geo`), loads the model written by training, and writes
+predictions to the `--output` CSV.
+{% elif TEMPLATE == "shell-r" %}
+### Customize Training (Shell Runner, R)
 
-Edit the prediction script in `scripts/predict_model.py` to implement your prediction logic.
+Edit `scripts/train.R` to implement your model training logic. The script
+receives `--data <path-to-training-csv>` (and optionally `--geo <path-to-geojson>`),
+reads `config.yml` from the workspace, and writes its model artefact to disk
+(`model.rds` in the example).
 
-The script receives the following arguments:
-- `--config`: Path to config YAML file
-- `--model`: Path to trained model pickle file
-- `--historic`: Path to historic data CSV
-- `--future`: Path to future data CSV
-- `--output`: Path to save predictions CSV
-- `--geo`: Optional GeoJSON file path
+### Customize Prediction (Shell Runner, R)
 
-### Using Other Languages
+Edit `scripts/predict.R`. It receives `--historic`, `--future`, `--output`
+(and optional `--geo`), loads the model written by training, and writes
+predictions to the `--output` CSV.
 
-The shell runner is language-agnostic! You can replace the Python scripts with:
-- R scripts: `Rscript scripts/train_model.R ...`
-- Julia scripts: `julia scripts/train_model.jl ...`
-- Any executable that accepts the same arguments
+### R packages
 
-Just update the command templates in `main.py`:
-
-```python
-train_command = f"Rscript {SCRIPTS_DIR}/train_model.R --config {{config_file}} ..."
-```
+The default Docker image (`chapkit-r-inla`) ships a curated R stack: `INLA`,
+`fmesher`, `dlnm`, `tsModel`, `sn`, `xgboost`, `sf`, `spdep`, `dplyr`, `readr`,
+`yaml`, `jsonlite`, `pak`, `renv`. To add packages, either install them at
+build time in the `Dockerfile` (`RUN R -e "install.packages('foo')"`) or
+commit an `renv.lock` and bake it in. See
+[chapkit-r-inla](https://github.com/dhis2-chap/chapkit-images) for the full list.
 {% else %}
 ### Customize Training
 
@@ -150,21 +270,20 @@ Edit the `on_predict` function in `main.py` to implement your prediction logic.
 ```
 {{ PROJECT_SLUG }}/
 ├── main.py              # Main application file
-{% if TEMPLATE == "ml-shell" %}
-├── scripts/             # External training/prediction scripts
+{% if TEMPLATE == "shell-py" %}
+├── scripts/             # External training/prediction scripts (Python)
 │   ├── train_model.py   # Training script
 │   └── predict_model.py # Prediction script
+{% elif TEMPLATE == "shell-r" %}
+├── scripts/             # External training/prediction scripts (R)
+│   ├── train.R          # Training script
+│   └── predict.R        # Prediction script
 {% endif %}
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # Docker build configuration
 ├── compose.yml          # Docker Compose configuration
-├── data/                # Database directory
-│   └── chapkit.db       # SQLite database (persisted)
-{% if WITH_MONITORING %}
-└── monitoring/          # Monitoring stack configuration
-    ├── prometheus/      # Prometheus configuration
-    └── grafana/         # Grafana dashboards and data sources
-{% endif %}
+└── data/                # Database directory
+    └── chapkit.db       # SQLite database (persisted)
 ```
 
 ## Documentation

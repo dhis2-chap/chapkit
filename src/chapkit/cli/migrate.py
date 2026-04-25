@@ -70,7 +70,6 @@ _CHAFF_FILENAMES = {
     "Dockerfile",
     "compose.yml",
     "compose.yaml",
-    "postman_collection.json",
     "CHAPKIT.md",
     # R profile
     ".Rprofile",
@@ -98,7 +97,6 @@ _GENERATED_FILENAMES: tuple[str, ...] = (
     "compose.yml",
     "Makefile",
     "CHAPKIT.md",
-    "postman_collection.json",
     "README.md",
     "requirements.txt",
     ".gitignore",
@@ -578,13 +576,13 @@ def _check_entry_points_reference_main_py(mlproject: MLProject) -> None:
         return
     joined = "\n  ".join(offenders)
     raise MigrateError(
-        "MLproject entry_point command(s) reference main.py, but chapkit migrate also "
-        "generates a main.py (the FastAPI service) - the two cannot coexist at the "
+        "MLproject entry_point command(s) reference main.py, but chapkit mlproject migrate "
+        "also generates a main.py (the FastAPI service) - the two cannot coexist at the "
         "project root.\n\n"
         f"Offending entry_point(s):\n  {joined}\n\n"
         "Rename your script (e.g. main.py -> cli.py or runner.py), update the MLproject's "
-        "entry_points commands to match, then re-run `chapkit migrate`. Your renamed "
-        "file will stay at the project root and the generated commands in the new "
+        "entry_points commands to match, then re-run `chapkit mlproject migrate`. Your "
+        "renamed file will stay at the project root and the generated commands in the new "
         "main.py will invoke it correctly."
     )
 
@@ -1019,7 +1017,7 @@ def _run(
     typer.echo("Next steps:")
     typer.echo("  uv sync && uv run python main.py")
     typer.echo(
-        f"  # or: docker build -t {context['PROJECT_SLUG']} . && docker run --rm -p 8000:8000 {context['PROJECT_SLUG']}"
+        f"  # or: docker build -t {context['PROJECT_SLUG']} . && docker run --rm -p 9090:8000 {context['PROJECT_SLUG']}"
     )
     typer.echo("See CHAPKIT.md for more.")
 
@@ -1033,7 +1031,6 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
         "compose.yml": _render(_SHARED_TEMPLATE_DIR, "compose.yml.jinja2", context),
         "Makefile": _render(t, "Makefile_migrate.jinja2", context),
         "CHAPKIT.md": _render(t, "CHAPKIT_migrate.md.jinja2", context),
-        "postman_collection.json": _render(_SHARED_TEMPLATE_DIR, "postman_collection_ml_shell.json.jinja2", context),
         "README.md": _render(t, "README_migrate.md.jinja2", context),
         ".gitignore": _render(t, "gitignore_migrate.jinja2", context),
         ".dockerignore": _render(t, "dockerignore_migrate.jinja2", context),
@@ -1047,11 +1044,11 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
 
 
 #: Floor for the `chapkit>=...` dep that migrate emits into the generated
-#: pyproject.toml. This is the minimum chapkit release that has `chapkit run`
-#: (the command the generated main.py and Dockerfile CMD depend on). It's
-#: explicitly NOT the running chapkit's own version, because that could be a
-#: `.devN` not-yet-published release and would leave the migrated project
-#: with an uninstallable dep.
+#: pyproject.toml. This is the minimum chapkit release that has the runtime
+#: bits the generated main.py and Dockerfile CMD depend on. It's explicitly
+#: NOT the running chapkit's own version, because that could be a `.devN`
+#: not-yet-published release and would leave the migrated project with an
+#: uninstallable dep.
 _MIN_CHAPKIT_VERSION = "0.20.0"
 
 

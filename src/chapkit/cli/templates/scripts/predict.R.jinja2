@@ -1,0 +1,54 @@
+#!/usr/bin/env Rscript
+# External prediction script for ML model inference via ShellModelRunner.
+#
+# Mirrors the shell-py predict_model.py: reads config.yml + the trained model
+# from disk, loads future data, predicts the average of the training-time
+# column means for every row. Replace with your own prediction logic.
+#
+# Usage:
+#   Rscript predict.R --historic historic.csv --future future.csv --output predictions.csv [--geo geo.json]
+
+suppressPackageStartupMessages({
+  library(yaml)
+})
+
+args <- commandArgs(trailingOnly = TRUE)
+parse_arg <- function(name, required = FALSE, default = "") {
+  idx <- which(args == paste0("--", name))
+  if (length(idx) == 0) {
+    if (required) stop(sprintf("Missing required argument --%s", name))
+    return(default)
+  }
+  args[idx + 1]
+}
+
+historic_path <- parse_arg("historic", required = TRUE)
+future_path <- parse_arg("future", required = TRUE)
+output_path <- parse_arg("output", required = TRUE)
+geo_path <- parse_arg("geo")
+
+result <- tryCatch({
+  config <- yaml.load_file("config.yml")
+  message(sprintf("Predicting with config: %s", paste(names(config), collapse = ", ")))
+
+  model <- readRDS("model.rds")
+  message("Model loaded from model.rds")
+
+  future <- read.csv(future_path)
+  message(sprintf("Loaded %d prediction samples", nrow(future)))
+
+  means <- unlist(model$means)
+  prediction_value <- if (length(means) > 0) mean(means, na.rm = TRUE) else 0.0
+  future$sample_0 <- prediction_value
+  message(sprintf("Made %d predictions (value: %f)", nrow(future), prediction_value))
+
+  write.csv(future, output_path, row.names = FALSE)
+  message(sprintf("Predictions saved to %s", output_path))
+  cat("SUCCESS: Prediction completed\n")
+  0
+}, error = function(e) {
+  message(sprintf("ERROR: Prediction failed: %s", conditionMessage(e)))
+  1
+})
+
+quit(status = result)

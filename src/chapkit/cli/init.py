@@ -68,10 +68,6 @@ def init_command(
         Path | None,
         typer.Option(help="Target directory (default: current directory)"),
     ] = None,
-    with_monitoring: Annotated[
-        bool,
-        typer.Option(help="Include Prometheus and Grafana monitoring stack"),
-    ] = False,
     with_validation: Annotated[
         bool,
         typer.Option(
@@ -83,8 +79,14 @@ def init_command(
     ] = False,
     template: Annotated[
         str,
-        typer.Option(help="Template type: 'ml', 'ml-shell', or 'task'"),
-    ] = "ml",
+        typer.Option(
+            help=(
+                "Template type. fn-py: Python ML in main.py. "
+                "shell-py: Python train/predict scripts in scripts/. "
+                "shell-r: R train/predict scripts in scripts/, on chapkit-r-inla."
+            ),
+        ),
+    ] = "fn-py",
 ) -> None:
     """Initialize a new chapkit ML service project."""
     target_dir = (path or Path.cwd()) / project_name
@@ -93,15 +95,10 @@ def init_command(
         typer.echo(f"Error: Directory '{target_dir}' already exists", err=True)
         raise typer.Exit(code=1)
 
-    if template not in ["ml", "ml-shell", "task"]:
-        typer.echo(f"Error: Invalid template '{template}'. Must be 'ml', 'ml-shell', or 'task'", err=True)
-        raise typer.Exit(code=1)
-
-    if with_validation and template == "task":
+    valid_templates = ["fn-py", "shell-py", "shell-r"]
+    if template not in valid_templates:
         typer.echo(
-            "Error: --with-validation is only supported for ML templates "
-            "('ml' or 'ml-shell'). The task template has no ML runner and "
-            "therefore no $validate endpoint.",
+            f"Error: Invalid template '{template}'. Must be one of: {', '.join(valid_templates)}",
             err=True,
         )
         raise typer.Exit(code=1)
@@ -112,8 +109,6 @@ def init_command(
     typer.echo(f"Project directory: {target_dir}")
     typer.echo(f"Package name: {project_slug}")
     typer.echo(f"Template: {template}")
-    if with_monitoring:
-        typer.echo("Including monitoring stack (Prometheus + Grafana)")
     if with_validation:
         typer.echo("Including $validate hook stubs (on_validate_train / on_validate_predict)")
     typer.echo()
@@ -133,7 +128,6 @@ def init_command(
         "PROJECT_SLUG": project_slug,
         "PROJECT_SERVICE_ID": service_id,
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
-        "WITH_MONITORING": with_monitoring,
         "WITH_VALIDATION": with_validation,
         "TEMPLATE": template,
         "CHAPKIT_VERSION": _get_chapkit_version(),
@@ -141,34 +135,21 @@ def init_command(
 
     typer.echo("Generating project files...")
 
+    is_shell = template in ("shell-py", "shell-r")
+
     # Render main.py based on template type
-    if template == "ml-shell":
+    if is_shell:
         _render_template(template_dir, target_dir, "main_shell.py.jinja2", context, "main.py")
-    elif template == "task":
-        _render_template(template_dir, target_dir, "main_task.py.jinja2", context, "main.py")
     else:
         _render_template(template_dir, target_dir, "main.py.jinja2", context, "main.py")
 
     _render_template(template_dir, target_dir, "pyproject.toml.jinja2", context, "pyproject.toml")
     _render_template(template_dir, target_dir, "Dockerfile.jinja2", context, "Dockerfile")
     _render_template(template_dir, target_dir, "README.md.jinja2", context, "README.md")
+    _render_template(template_dir, target_dir, "compose.yml.jinja2", context, "compose.yml")
 
-    # Render Postman collection based on template type
-    if template == "ml-shell":
-        _render_template(
-            template_dir, target_dir, "postman_collection_ml_shell.json.jinja2", context, "postman_collection.json"
-        )
-    elif template == "task":
-        _render_template(
-            template_dir, target_dir, "postman_collection_task.json.jinja2", context, "postman_collection.json"
-        )
-    else:
-        _render_template(
-            template_dir, target_dir, "postman_collection_ml.json.jinja2", context, "postman_collection.json"
-        )
-
-    # For ml-shell template, create scripts directory
-    if template == "ml-shell":
+    # For shell templates, create scripts directory with language-specific stubs
+    if template == "shell-py":
         scripts_dir = target_dir / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
         _render_template(
@@ -185,45 +166,23 @@ def init_command(
             context,
             "predict_model.py",
         )
-
-    if with_monitoring:
-        _render_template(template_dir, target_dir, "compose.monitoring.yml.jinja2", context, "compose.yml")
-
-        monitoring_dir = target_dir / "monitoring"
-        monitoring_dir.mkdir(parents=True, exist_ok=True)
-
-        prom_dir = monitoring_dir / "prometheus"
-        prom_dir.mkdir(parents=True, exist_ok=True)
+    elif template == "shell-r":
+        scripts_dir = target_dir / "scripts"
+        scripts_dir.mkdir(parents=True, exist_ok=True)
         _render_template(
-            template_dir / "monitoring" / "prometheus",
-            prom_dir,
-            "prometheus.yml.jinja2",
+            template_dir / "scripts",
+            scripts_dir,
+            "train.R.jinja2",
             context,
-            "prometheus.yml",
+            "train.R",
         )
-
-        grafana_dir = monitoring_dir / "grafana"
-        (grafana_dir / "provisioning" / "datasources").mkdir(parents=True, exist_ok=True)
-        (grafana_dir / "provisioning" / "dashboards").mkdir(parents=True, exist_ok=True)
-        (grafana_dir / "dashboards").mkdir(parents=True, exist_ok=True)
-
-        _copy_static_file(
-            template_dir / "monitoring" / "grafana" / "provisioning" / "datasources",
-            grafana_dir / "provisioning" / "datasources",
-            "prometheus.yml",
+        _render_template(
+            template_dir / "scripts",
+            scripts_dir,
+            "predict.R.jinja2",
+            context,
+            "predict.R",
         )
-        _copy_static_file(
-            template_dir / "monitoring" / "grafana" / "provisioning" / "dashboards",
-            grafana_dir / "provisioning" / "dashboards",
-            "dashboard.yml",
-        )
-        _copy_static_file(
-            template_dir / "monitoring" / "grafana" / "dashboards",
-            grafana_dir / "dashboards",
-            "chapkit-service-metrics.json",
-        )
-    else:
-        _render_template(template_dir, target_dir, "compose.yml.jinja2", context, "compose.yml")
 
     _copy_static_file(template_dir, target_dir, ".gitignore")
     _copy_static_file(template_dir, target_dir, ".python-version")
@@ -236,9 +195,6 @@ def init_command(
     typer.echo("  uv sync")
     typer.echo("  uv run python main.py")
     typer.echo()
-    if with_monitoring:
-        typer.echo("To start with Docker (including monitoring):")
-    else:
-        typer.echo("To start with Docker:")
+    typer.echo("To start with Docker:")
     typer.echo("  docker compose up --build")
     typer.echo()

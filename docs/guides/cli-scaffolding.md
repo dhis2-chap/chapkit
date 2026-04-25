@@ -118,10 +118,14 @@ chapkit init PROJECT_NAME [OPTIONS]
 **Options:**
 
 - `--path PATH` - Target directory (default: current directory)
-- `--with-monitoring` - Include Prometheus and Grafana monitoring stack
-- `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Only valid with `--template ml` or `--template ml-shell`; combining it with `--template task` is rejected because task services have no ML runner and no `$validate` endpoint. Off by default.
-- `--template TYPE` - Template type: `ml` (default), `ml-shell`, or `task`
+- `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Off by default.
+- `--template TYPE` - Template type: `fn-py` (default), `shell-py`, or `shell-r`
 - `--help` - Show help message
+
+> Looking for Prometheus + Grafana? The scaffolded service exposes `/metrics`
+> out of the box (chapkit calls `.with_monitoring()` on the builder). To wire
+> up a Prometheus scraper and a Grafana dashboard alongside it, see the
+> [Monitoring guide](monitoring.md).
 
 **Examples:**
 
@@ -135,20 +139,17 @@ chapkit init my-service
 # Create project in specific location
 chapkit init my-service --path ~/projects
 
-# Create project with monitoring stack
-chapkit init my-service --with-monitoring
+# Create project with shell-py template (Python scripts under scripts/)
+chapkit init my-service --template shell-py
 
-# Create project with ml-shell template (language-agnostic)
-chapkit init my-service --template ml-shell
-
-# Create project with task template (task execution)
-chapkit init my-service --template task
+# Create project with shell-r template (R scripts on chapkit-r-inla)
+chapkit init my-service --template shell-r
 
 # Create project with $validate hook stubs
 chapkit init my-service --with-validation
 
 # Combine options
-chapkit init my-service --template ml-shell --with-monitoring --with-validation
+chapkit init my-service --template shell-py --with-validation
 
 # From GitHub (development version)
 uvx --from git+https://github.com/dhis2-chap/chapkit chapkit init my-service
@@ -271,68 +272,63 @@ See [Testing ML Services](testing-ml-services.md) for full documentation.
 
 ## Template Types
 
-### ML Template (Default)
+### `fn-py` (Default)
 
-The ML template is the simpler approach where you define training and prediction logic as Python functions directly in `main.py`:
+The default template defines training and prediction as Python functions directly in `main.py` (driven by `FunctionalModelRunner`):
 
 **Pros:**
 - Simpler to understand and get started
 - All code in one file
-- Direct access to Python ecosystem
-- No external processes
+- Direct access to the Python ecosystem
+- No external subprocess overhead
 
 **Cons:**
 - Python-only workflows
-- Less isolation between training and prediction
+- Couples train and predict in the same process
 
-**Best for:** Python-centric ML workflows, prototyping, simpler models
+**Best for:** Python-centric ML workflows, prototyping, simpler models.
 
-### ML-Shell Template
+### `shell-py`
 
-The ML-shell template executes external scripts for training and prediction, enabling language-agnostic ML workflows:
+Train and predict via external Python scripts in `scripts/`, driven by `ShellModelRunner`. Scripts run as subprocesses with file-based interchange (CSV, YAML, pickle) over an isolated workspace.
 
 **Pros:**
-- Language-agnostic (Python, R, Julia, etc.)
-- Better isolation and testing
-- Can integrate existing scripts without modification
-- File-based data interchange (CSV, YAML, pickle)
+- Workspace isolation between train and predict
+- Easy to bring an existing CLI script into chapkit unchanged
+- Same image as `fn-py` (chapkit-py base)
 
 **Cons:**
 - More files to manage
-- Requires understanding of file I/O formats
-- Slightly more complex
+- File I/O conventions to learn (`config.yml`, `model.pickle`, etc.)
 
-**Best for:** Multi-language environments, integrating existing scripts, team collaboration with different language preferences
+**Best for:** Adopting an existing Python CLI workflow into chapkit, or wanting workspace isolation per train run.
 
-### Task Template
+### `shell-r`
 
-The task template provides a general-purpose task execution system for Python functions:
+Same `ShellModelRunner` shape as `shell-py`, but with R scripts in `scripts/` (`train.R`, `predict.R`). Defaults to the [`chapkit-r-inla`](https://github.com/dhis2-chap/chapkit-images) base image (R 4.5 + INLA + spatial / time-series stack preinstalled). The Dockerfile ships a commented `chapkit-r` alternative for projects that don't need INLA (smaller image, multi-arch).
 
 **Pros:**
-- Execute Python functions as tasks
-- Dependency injection (Database, ArtifactManager, etc.)
-- Registry-based task management
-- Job-based async execution
-- Task results stored in artifacts
+- R 4.5 + INLA / spatial / time-series stack ready out of the box
+- File-based interchange (CSV, YAML, RDS) — same conventions as `shell-py`
+- Closest match to `chapkit_ewars_model` and other published R models
 
 **Cons:**
-- Not ML-specific (no train/predict operations)
-- Requires understanding of task registry
-- More complex than simple function calls
+- `chapkit-r-inla` is amd64-only (Apple Silicon needs Rosetta)
+- ~570 MB image footprint
 
-**Best for:** General-purpose automation, data processing pipelines, scheduled tasks, non-ML workflows
+**Best for:** R-language epidemiology / time-series models, especially anything using INLA.
 
 ---
 
 ## Generated Project Structure
 
-### ML Template (Default)
+### `fn-py` (Default)
 
 ```
 my-service/
 ├── main.py              # ML service with train/predict functions
 ├── pyproject.toml       # Python dependencies
-├── Dockerfile           # Multi-stage Docker build
+├── Dockerfile           # FROM chapkit-py + uv sync
 ├── compose.yml          # Docker Compose configuration
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (created at runtime)
@@ -340,18 +336,18 @@ my-service/
 └── README.md            # Project documentation
 ```
 
-### ML-Shell Template
+### `shell-py`
 
-When using `--template ml-shell`, external scripts are generated:
+When using `--template shell-py`, external Python scripts are generated under `scripts/`:
 
 ```
 my-service/
 ├── main.py              # ML service with command templates
-├── scripts/             # External training/prediction scripts
+├── scripts/             # External training/prediction scripts (Python)
 │   ├── train_model.py   # Training script
 │   └── predict_model.py # Prediction script
 ├── pyproject.toml       # Python dependencies
-├── Dockerfile           # Multi-stage Docker build
+├── Dockerfile           # FROM chapkit-py + uv sync
 ├── compose.yml          # Docker Compose configuration
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (created at runtime)
@@ -359,45 +355,28 @@ my-service/
 └── README.md            # Project documentation
 ```
 
-### Task Template
+### `shell-r`
 
-When using `--template task`, a task execution service is generated:
+When using `--template shell-r`, external R scripts are generated under `scripts/`. The Dockerfile defaults to `chapkit-r-inla` (with a commented `chapkit-r` alternative for non-INLA projects):
 
 ```
 my-service/
-├── main.py              # Task execution service with Python functions
-├── pyproject.toml       # Python dependencies
-├── Dockerfile           # Multi-stage Docker build
+├── main.py              # ML service with Rscript-based command templates
+├── scripts/             # External training/prediction scripts (R)
+│   ├── train.R          # Training script
+│   └── predict.R        # Prediction script
+├── pyproject.toml       # Python deps for the service layer (chapkit only by default)
+├── Dockerfile           # FROM chapkit-r-inla + uv sync
 ├── compose.yml          # Docker Compose configuration
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (created at runtime)
 ├── .gitignore           # Python gitignore
 └── README.md            # Project documentation
-```
-
-### With Monitoring
-
-When using `--with-monitoring`, additional files are generated:
-
-```
-my-service/
-...
-└── monitoring/
-    ├── prometheus/
-    │   └── prometheus.yml
-    └── grafana/
-        ├── provisioning/
-        │   ├── datasources/prometheus.yml
-        │   └── dashboards/dashboard.yml
-        └── dashboards/
-            └── chapkit-service-metrics.json
 ```
 
 ### With Validation Hooks
 
-Applies to the `ml` and `ml-shell` templates only. Passing `--with-validation`
-together with `--template task` is rejected by the CLI because task services
-have no ML runner and no `$validate` endpoint.
+Applies to all three templates (`fn-py`, `shell-py`, `shell-r`).
 
 When using `--with-validation` with an ML template, the generated `main.py`
 gains two extra async functions and wires them into the runner:
@@ -429,26 +408,25 @@ full endpoint reference and the `ValidationDiagnostic` schema.
 
 The generated `main.py` varies by template:
 
-**ML Template (`ml`):**
+**`fn-py` (default):**
 - **Config Schema**: Pydantic model for ML parameters
 - **Training Function**: `on_train` with simple model example
 - **Prediction Function**: `on_predict` for inference
 - **Service Info**: Metadata (name, version, author, status)
 - **Artifact Hierarchy**: Storage structure for models and predictions
-- **FastAPI App**: Built using `MLServiceBuilder`
+- **FastAPI App**: Built using `MLServiceBuilder` with a `FunctionalModelRunner`
 
-**ML-Shell Template (`ml-shell`):**
-- Similar to ML template but references external training/prediction scripts
-- **Shell Commands**: Command templates for executing scripts
-- **Scripts Directory**: Contains `train_model.py` and `predict_model.py`
+**`shell-py`:**
+- Same `MLServiceBuilder` shape as `fn-py` but uses `ShellModelRunner`
+- **Shell Commands**: `train_command` / `predict_command` strings invoking `python scripts/train_model.py …`
+- **Scripts Directory**: `scripts/train_model.py` and `scripts/predict_model.py`
 
-**Task Template (`task`):**
-- **Task Functions**: Python functions registered with `@TaskRegistry.register()`
-- **Task Manager**: Handles task execution with dependency injection
-- **Task Router**: API endpoints for task CRUD and execution
-- **FastAPI App**: Built using `ServiceBuilder` (not ML-specific)
+**`shell-r`:**
+- Same `ShellModelRunner` shape as `shell-py` but the commands invoke `Rscript scripts/train.R …`
+- **Scripts Directory**: `scripts/train.R` and `scripts/predict.R`
+- **Dockerfile**: defaults to `chapkit-r-inla` (with a commented `chapkit-r` alternative for non-INLA models)
 
-**Example structure (ML template):**
+**Example structure (`fn-py` template):**
 
 ```python
 class MyServiceConfig(BaseConfig):
@@ -689,25 +667,20 @@ After scaffolding your project:
 
 ## Examples
 
-The `examples/` directory contains working examples for each template type:
+The `examples/` directory contains pattern-focused examples (use `chapkit init` for a fresh starter project):
 
-**ML Template Examples:**
-- `ml_functional/` - ML template with Python functions (FunctionalModelRunner)
-- `ml_class/` - Class-based ML runner approach
-- `quickstart/` - Complete ML service with config, artifacts, and ML endpoints
+**ML Workflow Patterns:**
+- `ml_functional/` - `FunctionalModelRunner` (matches `--template fn-py`)
+- `ml_class/` - Class-based `BaseModelRunner` subclass
+- `ml_shell/` - `ShellModelRunner` with external Python scripts (matches `--template shell-py`)
 
-**ML-Shell Template Example:**
-- `ml_shell/` - Language-agnostic ML with external scripts (ShellModelRunner)
-
-**Task Template Example:**
-- `task_execution/` - General-purpose task execution with Python functions
-
-**Other Examples:**
+**Other Patterns:**
 - `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
-- `full_featured/` - Comprehensive example with monitoring and custom routers
 - `config_artifact/` - Configuration with artifact linking
+- `config/` - Config CRUD walkthrough
 - `artifact/` - Read-only artifact API
-- `custom_migrations/` - Database migrations with custom models
+- `library_usage/` - Using chapkit as a library with custom models
+- `dataframe_usage/` - Working with `chapkit.data.DataFrame`
 
 ## Related Documentation
 
@@ -715,4 +688,3 @@ The `examples/` directory contains working examples for each template type:
 - [ML Workflows](ml-workflows.md) - Learn about model training and prediction
 - [Configuration Management](configuration-management.md) - Working with configs
 - [Artifact Storage](artifact-storage.md) - Managing models and predictions
-- [Task Execution](task-execution.md) - Scheduling background jobs
