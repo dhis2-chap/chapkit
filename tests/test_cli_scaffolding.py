@@ -681,7 +681,7 @@ def test_scaffold_config_artifact_linkage(
 #: Latest chapkit release on PyPI. The Docker-build tests pin against this so
 #: the lockfile + container build can resolve from PyPI - the dev-version
 #: scaffolded into pyproject.toml (e.g. 0.22.0.dev0) isn't published yet.
-_LATEST_PUBLISHED_CHAPKIT = "0.21.0"
+_LATEST_PUBLISHED_CHAPKIT = "0.22.0"
 
 
 @pytest.fixture
