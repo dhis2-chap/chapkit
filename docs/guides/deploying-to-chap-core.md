@@ -143,7 +143,7 @@ The scaffolded `compose.yml` is already most of the way there:
 - Build vs. GHCR image, chap-core registration env vars, and the `depends_on: chap` block are all present as commented alternatives. Uncomment the GHCR `image:` line, comment out `build:`, uncomment the registration env, and uncomment `depends_on`.
 - The host port is `8000`, which collides with chap-core itself. Pick a unique host port in the `5000–5999` range — ewars uses `5002`, so `5003+` for new models. The container port stays `8000`.
 
-After those uncomments the overlay looks roughly like the canonical [ewars overlay](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml):
+After those uncomments the overlay looks roughly like the canonical [ewars overlay](https://github.com/dhis2-chap/chap-core/blob/master/compose.ewars.yml):
 
 ```yaml
 # compose.my-model.yml
@@ -174,6 +174,16 @@ Two things worth calling out:
 - **`$$register`** — the double dollar escapes `$` for compose's own variable substitution. If you write `$register`, compose will try to expand a variable named `register` and silently leave you with `http://chap:8000/v2/services/`, which 404s.
 - **`depends_on: chap: condition: service_healthy`** — prevents the model from trying to register against a half-started chap-core. Chap-core's healthcheck must be green first.
 
+### Once your model is upstream: the chapkit umbrella overlay
+
+Once your overlay is merged into chap-core alongside `compose.ewars.yml`, it should also be added to chap-core's [`compose.chapkit.yml`](https://github.com/dhis2-chap/chap-core/blob/master/compose.chapkit.yml) — an umbrella overlay that pulls in every chapkit-converted model via Docker Compose's `include` directive. Operators then get all chapkit models in one shot:
+
+```bash
+docker compose -f compose.yml -f compose.chapkit.yml up -d
+```
+
+The single-model overlays (`compose.ewars.yml`, `compose.<your-model>.yml`) are kept for users who only want one service. Requires Docker Compose v2.20+ for `include`.
+
 ## Step 7 — Verify registration
 
 Watch the model's logs for the registration line:
@@ -198,8 +208,8 @@ Once your model is registered with chap-core, it shows up in the DHIS2 Modeling 
 
 For the UI side of the flow — creating model templates, running predictions, pushing results back to DHIS2 — see chap-core's own docs:
 
-- [`docs/modeling-app/managing-model-templates.md`](https://github.com/dhis2-chap/chap-core/blob/main/docs/modeling-app/managing-model-templates.md)
-- [`docs/modeling-app/enabling-optional-model-services.md`](https://github.com/dhis2-chap/chap-core/blob/main/docs/modeling-app/enabling-optional-model-services.md)
+- [`docs/modeling-app/managing-model-templates.md`](https://github.com/dhis2-chap/chap-core/blob/master/docs/modeling-app/managing-model-templates.md)
+- [`docs/modeling-app/enabling-optional-model-services.md`](https://github.com/dhis2-chap/chap-core/blob/master/docs/modeling-app/enabling-optional-model-services.md)
 
 ---
 
@@ -246,5 +256,6 @@ To put the DB somewhere else, set an absolute `DATABASE_URL` (note the four slas
 - [`chapkit_ewars_model/main.py`](https://github.com/chap-models/chapkit_ewars_model/blob/main/main.py) — `MLServiceInfo`, `ShellModelRunner`, `.with_registration()`.
 - [`chapkit_ewars_model/Dockerfile`](https://github.com/chap-models/chapkit_ewars_model/blob/main/Dockerfile) — short `FROM ghcr.io/dhis2-chap/chapkit-r-inla:latest` + `uv sync` layer; a concrete example of extending a chapkit-images base with model-specific Python deps.
 - [`chapkit_ewars_model/.github/workflows/publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) — a fuller GHCR publish workflow with cache, semver tags, and SLSA attestations.
-- [`chap-core/compose.ewars.yml`](https://github.com/dhis2-chap/chap-core/blob/main/compose.ewars.yml) — the overlay that drops the image onto the chap-core network and triggers self-registration.
+- [`chap-core/compose.ewars.yml`](https://github.com/dhis2-chap/chap-core/blob/master/compose.ewars.yml) — the per-model overlay that drops the image onto the chap-core network and triggers self-registration.
+- [`chap-core/compose.chapkit.yml`](https://github.com/dhis2-chap/chap-core/blob/master/compose.chapkit.yml) — umbrella overlay that `include`s every chapkit-converted model overlay so operators can launch all of them with a single `-f` flag.
 - [`dhis2-chap/chapkit-images`](https://github.com/dhis2-chap/chapkit-images) — Dockerfiles and publish workflow for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` base images referenced throughout this guide.
