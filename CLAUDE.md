@@ -96,6 +96,16 @@ class AuthManager:
 - **ABSOLUTELY NO EMOJIS in PR titles or descriptions** (when using `gh pr create`, `gh pr edit`, or any other gh command)
 - **NO AI ATTRIBUTION** in PR descriptions (no "Generated with Claude Code" or similar)
 
+**Jira linking:**
+- If the work has a Jira ticket, append the issue key to the PR title in parentheses, e.g. `chore: add memory benchmark script (CLIM-635)`.
+- Put the Jira link at the **bottom** of the PR description, separated by a `---` rule:
+  ```
+  ---
+
+  Jira: [CLIM-635](https://dhis2.atlassian.net/browse/CLIM-635)
+  ```
+- Do not put the Jira link at the top — keep the Summary / Test plan in the lead.
+
 ## Project Overview
 
 `chapkit` is a collection of ML-specific modules built on top of the [servicekit](https://github.com/winterop-com/servicekit) framework. It provides config management and ML workflows, using servicekit's artifact and task infrastructure.
