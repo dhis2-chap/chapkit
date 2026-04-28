@@ -37,6 +37,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import BaseModel, Field
+from rich.console import Console
+from rich.table import Table
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TEMPLATES = ["fn-py", "shell-py", "shell-r"]
@@ -605,6 +607,39 @@ def check_deps() -> None:
         sys.exit(1)
 
 
+def print_pretty_table(results: list[BenchResult]) -> None:
+    """Render results as a rich Table to stdout. Units live in column headers."""
+    table = Table(title="chapkit memory benchmark", show_lines=False)
+    table.add_column("Template", style="cyan", no_wrap=True)
+    table.add_column("chapkit", style="magenta", no_wrap=True)
+    table.add_column("Image\nMB", justify="right", no_wrap=True)
+    table.add_column("Idle stats\nMiB", justify="right", no_wrap=True)
+    table.add_column("Idle cgroup\nMiB", justify="right", no_wrap=True)
+    table.add_column("Peak poll\nMiB", justify="right", no_wrap=True)
+    table.add_column("Peak cgroup\nMiB", justify="right", style="bold", no_wrap=True)
+    table.add_column("Test\nsec", justify="right", no_wrap=True)
+    table.add_column("Result", no_wrap=True)
+
+    def cell(value: float | int | None) -> str:
+        return "n/a" if value is None else f"{value}"
+
+    for r in results:
+        result_style = "green" if r.status == "PASS" else "red"
+        table.add_row(
+            r.template,
+            r.chapkit_version,
+            cell(r.image_size_mb),
+            cell(r.idle_stats_mib),
+            cell(r.idle_cgroup_mib),
+            cell(r.peak_stats_mib),
+            cell(r.peak_cgroup_mib),
+            str(r.test_duration_sec),
+            f"[{result_style}]{r.status}[/{result_style}]",
+        )
+    # Use a wide console so columns don't wrap when stdout isn't a tty.
+    Console(width=120).print(table)
+
+
 def main() -> int:
     """Run the full benchmark and emit the markdown table."""
     cfg = parse_args()
@@ -631,8 +666,8 @@ def main() -> int:
     text = render_table(results, cfg)
     cfg.output_file.parent.mkdir(parents=True, exist_ok=True)
     cfg.output_file.write_text(text)
-    sys.stdout.write(text)
-    log(f"wrote {cfg.output_file}")
+    print_pretty_table(results)
+    log(f"wrote full report (with How / What / Caveats sections) to {cfg.output_file}")
     return 130 if interrupted else 0
 
 
