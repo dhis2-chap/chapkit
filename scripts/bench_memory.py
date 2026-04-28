@@ -136,7 +136,12 @@ def is_prerelease(version: str) -> bool:
 
 
 def vendor_local_chapkit_wheel(proj_dir: Path, pinned: str) -> str:
-    """Build a wheel of REPO_ROOT chapkit and wire it into the scaffolded project."""
+    """Build a wheel of REPO_ROOT chapkit and wire it into the scaffolded project.
+
+    Uses `[tool.uv.sources]` to point chapkit at the vendored wheel — uv resolves
+    the path relative to pyproject.toml, which works both for `uv lock` here and
+    for `uv sync --frozen` inside the docker build (vendor/ is COPYed in too).
+    """
     vendor = proj_dir / "vendor"
     vendor.mkdir(exist_ok=True)
     subprocess.run(
@@ -152,12 +157,14 @@ def vendor_local_chapkit_wheel(proj_dir: Path, pinned: str) -> str:
     wheel_name = wheels[0].name
 
     pp = proj_dir / "pyproject.toml"
-    pp.write_text(
-        pp.read_text().replace(
-            f'"chapkit>={pinned}"',
-            f'"chapkit @ file:./vendor/{wheel_name}"',
-        )
+    text = pp.read_text()
+    # Drop the version constraint - we'll satisfy chapkit via [tool.uv.sources].
+    text = text.replace(f'"chapkit>={pinned}"', '"chapkit"')
+    text += (
+        f"\n[tool.uv.sources]\n"
+        f'chapkit = {{ path = "./vendor/{wheel_name}" }}\n'
     )
+    pp.write_text(text)
 
     df = proj_dir / "Dockerfile"
     df.write_text(
@@ -309,11 +316,11 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
             check=True,
         )
     except subprocess.CalledProcessError:
-        return BenchResult(template, f"{version_kind}?", status="INIT_FAIL")
+        return BenchResult(template=template, chapkit_version=f"{version_kind}?", status="INIT_FAIL")
 
     pinned = parse_scaffolded_chapkit_version(proj_dir)
     if not pinned:
-        return BenchResult(template, f"{version_kind}?", status="INIT_PARSE_FAIL")
+        return BenchResult(template=template, chapkit_version=f"{version_kind}?", status="INIT_PARSE_FAIL")
 
     if version_kind == "local" and is_prerelease(pinned):
         try:
@@ -321,25 +328,25 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
             print(f"  vendored local chapkit wheel: {wheel}", file=sys.stderr)
         except (subprocess.CalledProcessError, RuntimeError) as e:
             print(f"  ERROR: failed to vendor wheel: {e}", file=sys.stderr)
-            return BenchResult(template, pinned, status="WHEEL_BUILD_FAIL")
+            return BenchResult(template=template, chapkit_version=pinned, status="WHEEL_BUILD_FAIL")
 
     try:
         try:
             subprocess.run(["uv", "lock"], cwd=proj_dir, check=True)
             compose(["up", "-d", "--build"], cwd=proj_dir)
         except subprocess.CalledProcessError:
-            return BenchResult(template, pinned, status="BUILD_FAIL")
+            return BenchResult(template=template, chapkit_version=pinned, status="BUILD_FAIL")
 
         if not wait_for_health(
             f"http://localhost:{cfg.host_port}/health", cfg.health_timeout_sec
         ):
             print("FAIL: never became healthy", file=sys.stderr)
             compose(["logs", "--tail", "100"], cwd=proj_dir, check=False)
-            return BenchResult(template, pinned, status="UNHEALTHY")
+            return BenchResult(template=template, chapkit_version=pinned, status="UNHEALTHY")
 
         container_id = get_compose_container_id(proj_dir)
         if container_id is None:
-            return BenchResult(template, pinned, status="NO_CONTAINER")
+            return BenchResult(template=template, chapkit_version=pinned, status="NO_CONTAINER")
 
         time.sleep(cfg.idle_settle_sec)
 
@@ -445,8 +452,9 @@ def render_table(results: list[BenchResult], cfg: BenchConfig) -> str:
         "   - **local** uses the `chapkit` already on PATH (typically an active venv installed "
         "from source). If that install is a pre-release that PyPI cannot resolve, the script "
         "builds a wheel of the local chapkit source and vendors it into the scaffolded project "
-        "- rewriting the chapkit dep to `chapkit @ file:./vendor/<wheel>` and adding a "
-        "`COPY vendor/ ./vendor/` line to the Dockerfile so the docker build can find it.",
+        "- dropping the version constraint and adding a `[tool.uv.sources]` entry that points "
+        "chapkit at `./vendor/<wheel>`, plus a `COPY vendor/ ./vendor/` line in the Dockerfile "
+        "so `uv sync --frozen` inside the docker build resolves the same path.",
         "2. `uv lock`, then `docker compose up -d --build`.",
         f"3. Polled `GET /health` until 200, then slept {cfg.idle_settle_sec}s for the service "
         "to reach steady state.",
