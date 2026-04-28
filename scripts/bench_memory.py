@@ -43,6 +43,11 @@ DEFAULT_TEMPLATES = ["fn-py", "shell-py", "shell-r"]
 DEFAULT_VERSIONS = ["published", "local"]
 
 
+def log(msg: str) -> None:
+    """Emit a timestamped progress line to stderr (line-flushed for live tail)."""
+    print(f"[{time.strftime('%H:%M:%S')}] {msg}", file=sys.stderr, flush=True)
+
+
 class BenchResult(BaseModel):
     """One row of the benchmark table."""
 
@@ -230,13 +235,14 @@ def reset_cgroup_peak(container_id: str) -> None:
 
 
 class PollMaxWorker(threading.Thread):
-    """Background thread that samples `docker stats` and tracks the max MiB seen."""
+    """Background thread that samples `docker stats`, tracks the max, and emits periodic status."""
 
-    def __init__(self, container_id: str, interval_sec: float) -> None:
-        """Capture polling target and cadence; thread is daemonic."""
+    def __init__(self, container_id: str, interval_sec: float, status_every_sec: float = 10.0) -> None:
+        """Capture polling target, cadence, and status emit interval; thread is daemonic."""
         super().__init__(daemon=True)
         self.container_id = container_id
         self.interval_sec = interval_sec
+        self.status_every_sec = status_every_sec
         self.max_mib = 0.0
         self._stop = threading.Event()
 
@@ -245,11 +251,22 @@ class PollMaxWorker(threading.Thread):
         self._stop.set()
 
     def run(self) -> None:
-        """Sample loop until stop is set."""
+        """Sample loop until stop is set; emits a status line every status_every_sec."""
+        started = time.monotonic()
+        last_status = started
+        last_mib: float | None = None
         while not self._stop.is_set():
             mib = docker_stats_mib(self.container_id)
-            if mib is not None and mib > self.max_mib:
-                self.max_mib = mib
+            if mib is not None:
+                last_mib = mib
+                if mib > self.max_mib:
+                    self.max_mib = mib
+            now = time.monotonic()
+            if now - last_status >= self.status_every_sec:
+                last_status = now
+                elapsed = int(now - started)
+                cur = f"{last_mib:.0f} MiB" if last_mib is not None else "?"
+                log(f"  ... chapkit test running, {elapsed}s elapsed, current={cur}, peak={self.max_mib:.0f} MiB")
             self._stop.wait(self.interval_sec)
 
 
@@ -302,14 +319,15 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
     proj_name = f"bench_{template.replace('-', '_')}_{version_kind}"
     proj_dir = cfg.root_dir / proj_name
 
-    print(f"\n{'=' * 64}", file=sys.stderr)
-    print(f"Template: {template}  | chapkit: {version_kind}  | dir: {proj_dir}", file=sys.stderr)
-    print("=" * 64, file=sys.stderr)
+    print(f"\n{'=' * 64}", file=sys.stderr, flush=True)
+    log(f"Template: {template}  | chapkit: {version_kind}  | dir: {proj_dir}")
+    print("=" * 64, file=sys.stderr, flush=True)
 
     if proj_dir.exists():
         shutil.rmtree(proj_dir)
 
     init_argv = chapkit_cmd(version_kind, cfg.published_pin)
+    log(f"step 1/6: chapkit init via {' '.join(init_argv)}")
     try:
         subprocess.run(
             [*init_argv, "init", proj_name, "--path", str(cfg.root_dir), "--template", template],
@@ -321,26 +339,31 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
     pinned = parse_scaffolded_chapkit_version(proj_dir)
     if not pinned:
         return BenchResult(template=template, chapkit_version=f"{version_kind}?", status="INIT_PARSE_FAIL")
+    log(f"  scaffolded pyproject pins chapkit>={pinned}")
 
     if version_kind == "local" and is_prerelease(pinned):
+        log("  pre-release pin detected; building local chapkit wheel and vendoring it (slower the first time)")
         try:
             wheel = vendor_local_chapkit_wheel(proj_dir, pinned)
-            print(f"  vendored local chapkit wheel: {wheel}", file=sys.stderr)
+            log(f"  vendored local chapkit wheel: {wheel}")
         except (subprocess.CalledProcessError, RuntimeError) as e:
-            print(f"  ERROR: failed to vendor wheel: {e}", file=sys.stderr)
+            log(f"  ERROR: failed to vendor wheel: {e}")
             return BenchResult(template=template, chapkit_version=pinned, status="WHEEL_BUILD_FAIL")
 
     try:
         try:
+            log("step 2/6: uv lock")
             subprocess.run(["uv", "lock"], cwd=proj_dir, check=True)
+            log("step 3/6: docker compose up -d --build (first build can be minutes; subsequent are cached)")
             compose(["up", "-d", "--build"], cwd=proj_dir)
         except subprocess.CalledProcessError:
             return BenchResult(template=template, chapkit_version=pinned, status="BUILD_FAIL")
 
+        log(f"step 4/6: waiting for /health on port {cfg.host_port} (timeout {cfg.health_timeout_sec}s)")
         if not wait_for_health(
             f"http://localhost:{cfg.host_port}/health", cfg.health_timeout_sec
         ):
-            print("FAIL: never became healthy", file=sys.stderr)
+            log("FAIL: never became healthy")
             compose(["logs", "--tail", "100"], cwd=proj_dir, check=False)
             return BenchResult(template=template, chapkit_version=pinned, status="UNHEALTHY")
 
@@ -348,13 +371,16 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
         if container_id is None:
             return BenchResult(template=template, chapkit_version=pinned, status="NO_CONTAINER")
 
+        log(f"  /health green; settling {cfg.idle_settle_sec}s before idle sample")
         time.sleep(cfg.idle_settle_sec)
 
         idle_stats = docker_stats_mib(container_id)
         idle_cur = docker_exec_read_int(container_id, "/sys/fs/cgroup/memory.current")
         idle_cgroup = bytes_to_mib(idle_cur) if idle_cur is not None else None
+        log(f"  idle: stats={idle_stats} MiB / cgroup.current={idle_cgroup} MiB")
 
         reset_cgroup_peak(container_id)
+        log(f"step 5/6: chapkit test (2 configs x 5 trainings x 5 predictions x 2000 rows; expect ~1-2 min)")
 
         poller = PollMaxWorker(container_id, cfg.poll_interval_sec)
         poller.start()
@@ -404,10 +430,15 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
 
         image_size = get_compose_image_size_mb(proj_dir)
 
+        log(
+            f"  test {test_status} in {test_duration}s; "
+            f"peak stats={peak_stats} MiB / cgroup={peak_cgroup} MiB; image={image_size} MB"
+        )
+
         if test_status == "FAIL":
-            print("--- chapkit test log (tail) ---", file=sys.stderr)
+            log("--- chapkit test log (tail) ---")
             sys.stderr.write(test_log.read_text()[-4000:])
-            print("\n------------------------------", file=sys.stderr)
+            log("------------------------------")
         test_log.unlink(missing_ok=True)
 
         return BenchResult(
@@ -422,6 +453,7 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
             status=test_status,
         )
     finally:
+        log("step 6/6: docker compose down -v")
         compose(["down", "-v"], cwd=proj_dir, check=False, quiet=True)
 
 
@@ -569,16 +601,29 @@ def main() -> int:
     check_deps()
     cfg.root_dir.mkdir(parents=True, exist_ok=True)
 
+    cells = [(t, v) for t in cfg.templates for v in cfg.versions]
+    log(
+        f"benchmarking {len(cells)} cell(s) "
+        f"({len(cfg.templates)} template(s) x {len(cfg.versions)} version(s)); "
+        f"each takes ~2-4 min depending on docker cache"
+    )
+
     results: list[BenchResult] = []
-    for template in cfg.templates:
-        for version_kind in cfg.versions:
+    interrupted = False
+    try:
+        for i, (template, version_kind) in enumerate(cells, start=1):
+            log(f"=== cell {i}/{len(cells)}: {template} @ {version_kind} ===")
             results.append(bench_one(template, version_kind, cfg))
+    except KeyboardInterrupt:
+        interrupted = True
+        log("interrupted - writing partial results table")
 
     text = render_table(results, cfg)
     cfg.output_file.parent.mkdir(parents=True, exist_ok=True)
     cfg.output_file.write_text(text)
     sys.stdout.write(text)
-    return 0
+    log(f"wrote {cfg.output_file}")
+    return 130 if interrupted else 0
 
 
 if __name__ == "__main__":
