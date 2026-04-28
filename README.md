@@ -97,16 +97,23 @@ chapkit mlproject migrate --yes       # non-interactive (scripts / CI)
 
 See the [MLproject Migrate guide](docs/guides/mlproject-migrate.md) for the classification table, base-image detection, and deferred features.
 
-Or use the published container images (no local chapkit install needed):
+Or use the published `-cli` container images (no local chapkit install needed):
 
 ```bash
-docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-py:latest    # Python model
-docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r:latest     # R model (no INLA)
+docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-py-cli:latest    # Python model
+docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r-cli:latest     # R model (no INLA)
 docker run --rm -p 8000:8000 --platform=linux/amd64 \
-    -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r-inla:latest                          # R + INLA
+    -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r-inla-cli:latest                          # R + INLA
 ```
 
-See the [MLproject Runner guide](docs/guides/mlproject-runner.md) for canonical parameter mapping, `user_options` -> dynamic config, env hints, and compose integration with chap-core.
+The same `-cli` images can run `chapkit mlproject migrate` or any other chapkit CLI subcommand without a local install:
+
+```bash
+docker run --rm -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-py-cli:latest \
+    chapkit mlproject migrate . --yes
+```
+
+The unsuffixed images (`chapkit-py`, `chapkit-r`, `chapkit-r-inla`) are runtime-only bases without chapkit pre-installed — that's what `chapkit init` and `chapkit mlproject migrate` use as the `FROM` line in the Dockerfiles they generate, where `uv sync` then installs chapkit from the project's `pyproject.toml`. See the [MLproject Runner guide](docs/guides/mlproject-runner.md) for canonical parameter mapping, `user_options` -> dynamic config, env hints, and compose integration with chap-core.
 
 ## Quick Start
 

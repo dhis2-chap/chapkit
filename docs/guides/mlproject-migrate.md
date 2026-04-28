@@ -24,6 +24,14 @@ chapkit mlproject migrate                # execute with interactive prompts
 chapkit mlproject migrate --yes          # execute non-interactively (scripts / CI)
 ```
 
+No local chapkit install? Run it via the `-cli` container (chapkit pre-installed):
+
+```bash
+docker run --rm -v "$(pwd):/work" \
+  ghcr.io/dhis2-chap/chapkit-py-cli:latest \
+  chapkit mlproject migrate . --yes
+```
+
 After a successful run, the project root holds your unchanged source files alongside the generated chapkit wrapper, with the original structure preserved under `_old/`.
 
 ## What moves where
