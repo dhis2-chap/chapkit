@@ -113,19 +113,28 @@ The published container images (below) set `PATH` correctly so this is a non-iss
 
 ## Running in a Container
 
-Chapkit publishes three base images for `chapkit mlproject run`, all built on `debian:trixie-slim`. The Dockerfiles and publish workflow live in the companion [dhis2-chap/chapkit-images](https://github.com/dhis2-chap/chapkit-images) repo so image builds don't block chapkit's own CI:
+The Dockerfiles and publish workflow live in the companion [dhis2-chap/chapkit-images](https://github.com/dhis2-chap/chapkit-images) repo so image builds don't block chapkit's own CI. Two variants are published per language flavour:
 
-| Image                                          | Contents                                                                                        | Architectures                  | Typical size (amd64) |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ | -------------------- |
-| `ghcr.io/dhis2-chap/chapkit-py:latest`         | Python 3.13, chapkit, uv                                                                         | `linux/amd64`, `linux/arm64`   | ~220 MB              |
-| `ghcr.io/dhis2-chap/chapkit-r:latest`          | R 4.5 + `renv` + `pak`, Python 3.13, chapkit, uv                                                 | `linux/amd64`, `linux/arm64`   | ~400 MB              |
-| `ghcr.io/dhis2-chap/chapkit-r-inla:latest`     | R 4.5 + INLA + spatial/time-series R stack (sf, spdep, dlnm, tsModel, sn, xgboost, ...), Python 3.13, chapkit | `linux/amd64` (INLA x86_64 only) | ~570 MB              |
+- **`chapkit-py` / `chapkit-r` / `chapkit-r-inla`** — runtime base only (Python+uv, plus R / R+INLA where relevant). **Chapkit is not installed.** Use these as the `FROM` for your own Dockerfile when your project's `pyproject.toml` already pins chapkit and a `uv sync` step installs it. This is what `chapkit init` and `chapkit mlproject migrate` produce. See the [deployment guide](deploying-to-chap-core.md) for that flow.
+- **`chapkit-py-cli` / `chapkit-r-cli` / `chapkit-r-inla-cli`** — same runtime base, **with chapkit pre-installed**. Use these for the "no local chapkit needed" workflow: `docker run` an MLproject directly via the bundled `chapkit run .` CMD, or invoke any other `chapkit` subcommand (e.g. `chapkit mlproject migrate`) without installing chapkit on the host.
+
+The two-variant split exists because pre-installing chapkit in the runtime base caused a measurable runtime memory overhead for projects that pinned a different chapkit version than the base image — `uv sync` had to take an uninstall + reinstall path with a heavier profile. Splitting keeps the install path uniform for `FROM`-style use, while preserving the convenience of `docker run` for CLI-style use.
+
+The `-cli` images, all built on `debian:trixie-slim`:
+
+| Image                                              | Contents                                                                                        | Architectures                    | Typical size (amd64) |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------- | -------------------- |
+| `ghcr.io/dhis2-chap/chapkit-py-cli:latest`         | Python 3.13, chapkit, uv                                                                        | `linux/amd64`, `linux/arm64`     | ~220 MB              |
+| `ghcr.io/dhis2-chap/chapkit-r-cli:latest`          | R 4.5 + `renv` + `pak`, Python 3.13, chapkit, uv                                                | `linux/amd64`, `linux/arm64`     | ~400 MB              |
+| `ghcr.io/dhis2-chap/chapkit-r-inla-cli:latest`     | R 4.5 + INLA + spatial/time-series R stack (sf, spdep, dlnm, tsModel, sn, xgboost, ...), Python 3.13, chapkit | `linux/amd64` (INLA x86_64 only) | ~570 MB              |
+
+Each `-cli` image also publishes a `:dev` tag, rebuilt nightly with chapkit installed from the `main` branch instead of PyPI — use it to test against unreleased chapkit changes.
 
 Which one to pick:
 
-- **Python MLproject?** Use `chapkit-py` — lean and multi-arch.
-- **R MLproject that does not need INLA?** (e.g. `minimalist_example_r`) Use `chapkit-r`. Multi-arch, includes the R toolchain and `renv`/`pak` so you can install additional CRAN packages or restore a lockfile at runtime.
-- **R MLproject that uses INLA?** (e.g. EWARS-style) Use `chapkit-r-inla`. INLA + fmesher + the chap-core R-model parity set (sf, spdep, sn, dlnm, tsModel, xgboost, ...) are pre-installed. amd64 only; you will need Rosetta emulation on Apple Silicon.
+- **Python MLproject?** Use `chapkit-py-cli` — lean and multi-arch.
+- **R MLproject that does not need INLA?** (e.g. `minimalist_example_r`) Use `chapkit-r-cli`. Multi-arch, includes the R toolchain and `renv`/`pak` so you can install additional CRAN packages or restore a lockfile at runtime.
+- **R MLproject that uses INLA?** (e.g. EWARS-style) Use `chapkit-r-inla-cli`. INLA + fmesher + the chap-core R-model parity set (sf, spdep, sn, dlnm, tsModel, xgboost, ...) are pre-installed. amd64 only; you will need Rosetta emulation on Apple Silicon.
 
 All three set `WORKDIR /work` and default to `CMD ["chapkit", "run", ".", "--host", "0.0.0.0", "--port", "8000"]`, so mounting your MLproject into `/work` is enough:
 
@@ -133,27 +142,35 @@ All three set `WORKDIR /work` and default to `CMD ["chapkit", "run", ".", "--hos
 # Python model
 docker run --rm -p 8000:8000 \
   -v "$(pwd):/work" \
-  ghcr.io/dhis2-chap/chapkit-py:latest
+  ghcr.io/dhis2-chap/chapkit-py-cli:latest
 
 # R model without INLA (multi-arch)
 docker run --rm -p 8000:8000 \
   -v "$(pwd):/work" \
-  ghcr.io/dhis2-chap/chapkit-r:latest
+  ghcr.io/dhis2-chap/chapkit-r-cli:latest
 
 # R model with INLA (amd64-only; Rosetta on Apple Silicon)
 docker run --rm -p 8000:8000 --platform=linux/amd64 \
   -v "$(pwd):/work" \
-  ghcr.io/dhis2-chap/chapkit-r-inla:latest
+  ghcr.io/dhis2-chap/chapkit-r-inla-cli:latest
+```
+
+The same images run any other `chapkit` subcommand without local install — for example, migrating an existing MLproject directory:
+
+```bash
+docker run --rm -v "$(pwd):/work" \
+  ghcr.io/dhis2-chap/chapkit-py-cli:latest \
+  chapkit mlproject migrate . --yes
 ```
 
 ### Model-Level Dependencies
 
-The images contain chapkit, Python, and (for `chapkit-r`) R+INLA, but **not** your model's extra dependencies (pandas, scikit-learn, INLA extensions beyond the bundled set, etc.). Add them in one of two ways:
+The `-cli` images contain chapkit, Python, and (for `chapkit-r-cli`) R+INLA, but **not** your model's extra dependencies (pandas, scikit-learn, INLA extensions beyond the bundled set, etc.). Add them in one of two ways:
 
 1. **Bake your own image** (production-recommended):
 
     ```dockerfile
-    FROM ghcr.io/dhis2-chap/chapkit-py:latest
+    FROM ghcr.io/dhis2-chap/chapkit-py-cli:latest
     WORKDIR /work
     COPY . .
     RUN uv pip install --python /app/.venv/bin/python -e .
@@ -163,7 +180,7 @@ The images contain chapkit, Python, and (for `chapkit-r`) R+INLA, but **not** yo
 
     ```bash
     docker run --rm -p 8000:8000 -v "$(pwd):/work" \
-      ghcr.io/dhis2-chap/chapkit-py:latest \
+      ghcr.io/dhis2-chap/chapkit-py-cli:latest \
       bash -c "uv pip install --python /app/.venv/bin/python -e . && exec chapkit mlproject run . --host 0.0.0.0"
     ```
 
@@ -180,7 +197,7 @@ Both images currently run as `root`. Non-root hardening needs the usual volume-m
 ```yaml
 services:
   my-model:
-    image: ghcr.io/dhis2-chap/chapkit-r:latest
+    image: ghcr.io/dhis2-chap/chapkit-r-cli:latest
     platform: linux/amd64
     volumes:
       - ./my_mlproject:/work
