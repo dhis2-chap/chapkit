@@ -17,6 +17,16 @@ and uv). For each (template, chapkit version):
 
 Outputs a markdown table to stdout and writes it to --output-file.
 
+KNOWN CAVEAT - "local" rows over-report fn-py peak by ~25%.
+The "local" path installs chapkit from a vendored file:// wheel via
+[tool.uv.sources]; the "published" path installs the same chapkit version from
+the PyPI registry. We have verified the resulting on-disk container state is
+functionally identical (same .py, same .so, same data files; only .pyc header
+timestamps and a couple of small uv tracking files differ). Yet for fn-py,
+runtime peak under chapkit test is reproducibly ~25% higher for the file://
+install. shell-py and shell-r are insulated by subprocess isolation and show
+no gap. Treat fn-py "local" peak numbers as an upper bound, not a regression.
+
 Requires: docker (compose v2), uv, chapkit + pydantic in the active venv.
 """
 
@@ -548,6 +558,19 @@ def render_table(results: list[BenchResult], cfg: BenchConfig) -> str:
         "load, not cold idle.",
         "- The **local** version is whatever `chapkit` is on PATH when the script runs. If you "
         "switch venvs mid-session, re-run from a clean shell.",
+        "- **fn-py local rows over-report peak by ~25%**. The `local` path installs chapkit from "
+        "a vendored `file://` wheel via `[tool.uv.sources]`; the `published` path installs the "
+        "same chapkit version from the PyPI registry. Verified on-disk container state is "
+        "functionally identical (same `.py`, same `.so`, same data files; only `.pyc` header "
+        "mtimes and ~200 bytes of uv tracking metadata differ). Yet fn-py peak under "
+        "`chapkit test` is reproducibly ~25% higher for the `file://` install (e.g. 1199 MiB "
+        "vs 911 MiB for the same chapkit==0.23.0). Mechanism is unconfirmed - candidates: "
+        "page-cache layout differences in overlayfs, uv install order influencing `sys.modules` "
+        "insertion order, or libc malloc arena heuristics being filesystem-layout sensitive. "
+        "Pinning the actual cause needs `tracemalloc` snapshots, `/proc/<pid>/maps` diffs at "
+        "peak, and probably kernel slab inspection. shell-py and shell-r are insulated by "
+        "subprocess isolation and show no gap. Treat fn-py `local` peaks as an upper bound, "
+        "not a regression vs the published version.",
         "",
     ]
     return "\n".join(parts)
