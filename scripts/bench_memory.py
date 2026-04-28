@@ -87,7 +87,7 @@ class BenchConfig(BaseModel):
     published_pin: str = ""
     root_dir: Path = Path("/tmp/chapkit-bench")
     host_port: int = 9090
-    poll_interval_sec: float = 0.2
+    poll_interval_sec: float = 1.0
     idle_settle_sec: int = 10
     health_timeout_sec: int = 600
     test_timeout_sec: int = 300
@@ -165,10 +165,7 @@ def vendor_local_chapkit_wheel(proj_dir: Path, pinned: str) -> str:
     text = pp.read_text()
     # Drop the version constraint - we'll satisfy chapkit via [tool.uv.sources].
     text = text.replace(f'"chapkit>={pinned}"', '"chapkit"')
-    text += (
-        f"\n[tool.uv.sources]\n"
-        f'chapkit = {{ path = "./vendor/{wheel_name}" }}\n'
-    )
+    text += f'\n[tool.uv.sources]\nchapkit = {{ path = "./vendor/{wheel_name}" }}\n'
     pp.write_text(text)
 
     df = proj_dir / "Dockerfile"
@@ -197,12 +194,17 @@ def wait_for_health(url: str, timeout_sec: float) -> bool:
 
 def docker_stats_mib(container_id: str) -> float | None:
     """Return current container memory in MiB via `docker stats --no-stream`."""
-    result = subprocess.run(
-        ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", container_id],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", container_id],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        # BlockingIOError / EAGAIN under fork pressure (macOS limits concurrent
+        # forks). Skipping a sample is fine - the next tick catches up.
+        return None
     if result.returncode != 0 or not result.stdout.strip():
         return None
     return parse_mem_to_mib(result.stdout.strip().split("/", 1)[0])
@@ -210,12 +212,15 @@ def docker_stats_mib(container_id: str) -> float | None:
 
 def docker_exec_read_int(container_id: str, path: str) -> int | None:
     """Cat a file inside the container and parse it as an int."""
-    result = subprocess.run(
-        ["docker", "exec", container_id, "sh", "-c", f"cat {path}"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["docker", "exec", container_id, "sh", "-c", f"cat {path}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
     if result.returncode != 0:
         return None
     try:
@@ -287,27 +292,35 @@ def compose(
 
 def get_compose_container_id(cwd: Path) -> str | None:
     """Return the first container ID for the compose project rooted at cwd."""
-    result = subprocess.run(
-        ["docker", "compose", "ps", "-q"], cwd=cwd, capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(["docker", "compose", "ps", "-q"], cwd=cwd, capture_output=True, text=True, check=True)
     ids = [line for line in result.stdout.splitlines() if line.strip()]
     return ids[0] if ids else None
 
 
 def get_compose_image_size_mb(cwd: Path) -> int | None:
-    """Return the on-disk size of the first compose-built image, in MB."""
-    listing = subprocess.run(
-        ["docker", "compose", "images", "-q"], cwd=cwd, capture_output=True, text=True, check=True
-    )
+    """Return the on-disk size of the first compose-built image, in MB; None on any failure."""
+    try:
+        listing = subprocess.run(
+            ["docker", "compose", "images", "-q"], cwd=cwd, capture_output=True, text=True, check=False
+        )
+    except OSError:
+        return None
+    if listing.returncode != 0:
+        return None
     ids = [line for line in listing.stdout.splitlines() if line.strip()]
     if not ids:
         return None
-    inspect = subprocess.run(
-        ["docker", "image", "inspect", "--format", "{{.Size}}", ids[0]],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    try:
+        inspect = subprocess.run(
+            ["docker", "image", "inspect", "--format", "{{.Size}}", ids[0]],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if inspect.returncode != 0:
+        return None
     try:
         return round(int(inspect.stdout.strip()) / (1024 * 1024))
     except ValueError:
@@ -354,15 +367,15 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
         try:
             log("step 2/6: uv lock")
             subprocess.run(["uv", "lock"], cwd=proj_dir, check=True)
-            log("step 3/6: docker compose up -d --build (first build can be minutes; subsequent are cached)")
-            compose(["up", "-d", "--build"], cwd=proj_dir)
+            log("step 3/6: docker compose build --pull (pulls latest base image, then builds)")
+            compose(["build", "--pull"], cwd=proj_dir)
+            log("           docker compose up -d (start container)")
+            compose(["up", "-d"], cwd=proj_dir)
         except subprocess.CalledProcessError:
             return BenchResult(template=template, chapkit_version=pinned, status="BUILD_FAIL")
 
         log(f"step 4/6: waiting for /health on port {cfg.host_port} (timeout {cfg.health_timeout_sec}s)")
-        if not wait_for_health(
-            f"http://localhost:{cfg.host_port}/health", cfg.health_timeout_sec
-        ):
+        if not wait_for_health(f"http://localhost:{cfg.host_port}/health", cfg.health_timeout_sec):
             log("FAIL: never became healthy")
             compose(["logs", "--tail", "100"], cwd=proj_dir, check=False)
             return BenchResult(template=template, chapkit_version=pinned, status="UNHEALTHY")
@@ -380,7 +393,7 @@ def bench_one(template: str, version_kind: str, cfg: BenchConfig) -> BenchResult
         log(f"  idle: stats={idle_stats} MiB / cgroup.current={idle_cgroup} MiB")
 
         reset_cgroup_peak(container_id)
-        log(f"step 5/6: chapkit test (2 configs x 5 trainings x 5 predictions x 2000 rows; expect ~1-2 min)")
+        log("step 5/6: chapkit test (2 configs x 5 trainings x 5 predictions x 2000 rows; expect ~1-2 min)")
 
         poller = PollMaxWorker(container_id, cfg.poll_interval_sec)
         poller.start()
@@ -479,8 +492,7 @@ def render_table(results: list[BenchResult], cfg: BenchConfig) -> str:
         "For each (template, chapkit version) pair the script ran, in sequence:",
         "",
         "1. `chapkit init <name> --template <t>` into a temp project directory.",
-        "   - **published** uses `uvx chapkit init` (latest PyPI by default; pin via "
-        "`--published-pin`).",
+        "   - **published** uses `uvx chapkit init` (latest PyPI by default; pin via `--published-pin`).",
         "   - **local** uses the `chapkit` already on PATH (typically an active venv installed "
         "from source). If that install is a pre-release that PyPI cannot resolve, the script "
         "builds a wheel of the local chapkit source and vendors it into the scaffolded project "
@@ -488,8 +500,7 @@ def render_table(results: list[BenchResult], cfg: BenchConfig) -> str:
         "chapkit at `./vendor/<wheel>`, plus a `COPY vendor/ ./vendor/` line in the Dockerfile "
         "so `uv sync --frozen` inside the docker build resolves the same path.",
         "2. `uv lock`, then `docker compose up -d --build`.",
-        f"3. Polled `GET /health` until 200, then slept {cfg.idle_settle_sec}s for the service "
-        "to reach steady state.",
+        f"3. Polled `GET /health` until 200, then slept {cfg.idle_settle_sec}s for the service to reach steady state.",
         "4. Sampled idle memory two ways: a single `docker stats --no-stream` reading and "
         "`cat /sys/fs/cgroup/memory.current` via `docker exec`.",
         "5. Reset the cgroup high-water mark "
@@ -501,8 +512,7 @@ def render_table(results: list[BenchResult], cfg: BenchConfig) -> str:
         "",
         "## What the numbers mean",
         "",
-        "- **Template** - the `chapkit init` template under test (`fn-py`, `shell-py`, "
-        "`shell-r`).",
+        "- **Template** - the `chapkit init` template under test (`fn-py`, `shell-py`, `shell-r`).",
         "- **chapkit** - the chapkit version actually pinned in the scaffolded "
         "`pyproject.toml`. Compare rows pairwise to see how the published vs local-dev release "
         "differ for the same template.",
@@ -564,7 +574,7 @@ def parse_args() -> BenchConfig:
     )
     parser.add_argument("--root-dir", default="/tmp/chapkit-bench")
     parser.add_argument("--host-port", type=int, default=9090)
-    parser.add_argument("--poll-interval-sec", type=float, default=0.2)
+    parser.add_argument("--poll-interval-sec", type=float, default=1.0)
     parser.add_argument("--idle-settle-sec", type=int, default=10)
     parser.add_argument("--health-timeout-sec", type=int, default=600)
     parser.add_argument("--test-timeout-sec", type=int, default=300)
