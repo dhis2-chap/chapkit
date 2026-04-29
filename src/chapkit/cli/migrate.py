@@ -1035,9 +1035,11 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
         ".gitignore": _render(t, "gitignore_migrate.jinja2", context),
         ".dockerignore": _render(t, "dockerignore_migrate.jinja2", context),
     }
-    # Only emit requirements.txt for Python projects with deps - R projects
-    # use renv, and a deps-less Python project has nothing to install anyway.
-    # The Dockerfile gates the `uv pip install -r` step on the same condition.
+    # Emit requirements.txt for Python projects with deps so any pip-style tooling
+    # downstream still has the canonical install list. The Dockerfile path now uses
+    # `uv sync` from pyproject.toml + uv.lock, so this file isn't wired into the
+    # image build - it's kept for reference and to preserve directives (notably
+    # --trusted-host) that don't translate cleanly into pyproject's [tool.uv].
     if context.get("LANGUAGE") == "python" and context.get("USER_DEPENDENCIES"):
         rendered["requirements.txt"] = _render(t, "requirements_migrate.txt.jinja2", context)
     return rendered
@@ -1049,7 +1051,7 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
 #: NOT the running chapkit's own version, because that could be a `.devN`
 #: not-yet-published release and would leave the migrated project with an
 #: uninstallable dep.
-_MIN_CHAPKIT_VERSION = "0.22.0"
+_MIN_CHAPKIT_VERSION = "0.23.0"
 
 
 def _get_chapkit_version() -> str:
