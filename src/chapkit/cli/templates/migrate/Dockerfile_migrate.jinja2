@@ -1,12 +1,36 @@
+{% if BASE_IMAGE == "chapkit-r-inla" %}
+# chapkit-r-inla ships R 4.5 + INLA + the spatial / time-series stack (sf, spdep, dlnm,
+# tsModel, sn, xgboost, fmesher, ...) preinstalled. The image is amd64-only (INLA ships
+# x86_64 binaries only), so the FROM line pins linux/amd64 via a build ARG - this works
+# on Apple Silicon too via Rosetta. Use chapkit-r instead if you don't need INLA - it's
+# smaller and multi-arch.
+ARG BASE_PLATFORM=linux/amd64
+FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest
+{% else %}
 FROM ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest
+{% endif %}
 
-# Switch to root so we can write to /app/.venv and install user deps
-# declared in pyproject.toml. chapkit-py currently runs as a non-root user
-# with a root-owned venv (chapkit-images issue tracked separately); staying
-# at root matches chapkit-r / chapkit-r-inla's runtime posture.
+# chapkit-py runs as root; matches chapkit-r / chapkit-r-inla.
 USER root
 
 WORKDIR /work
+# Copy lockfile + manifest first so the dep-install layer caches independently of code changes.
+# Run `uv sync` once locally before the first `docker build` to generate uv.lock.
+COPY pyproject.toml uv.lock ./
+
+# Sync runtime deps (chapkit + the user's pyproject deps) into the base image's
+# venv at /app/.venv. The chapkit-{py,r,r-inla}:latest images no longer ship
+# chapkit pre-installed (see chapkit-images), so this step is required for the
+# generated main.py to import chapkit at runtime. --frozen pins to uv.lock for
+# reproducible builds, --no-dev skips dev-only deps (uvicorn etc. arrive
+# transitively through chapkit), --no-install-project because this isn't a
+# package, just a service.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    UV_PROJECT_ENVIRONMENT=/app/.venv uv sync --frozen --no-dev --no-install-project
+
+# Migrated projects ship arbitrary user files (R scripts, helper modules, config
+# YAMLs, ...) at the root, so we copy the whole tree rather than enumerating
+# (`COPY main.py ./` + `COPY scripts/` like the scaffold does for its known layout).
 COPY . /work
 
 {% if HAS_RENV %}
@@ -20,23 +44,13 @@ RUN R -q -e "if (!requireNamespace('renv', quietly = TRUE)) install.packages('re
 # declares are baked into the image and the container starts instantly.
 RUN Rscript install_packages.R
 {% endif %}
-{% if LANGUAGE == "python" and USER_DEPENDENCIES %}
-# Install the project's Python dependencies (merged from the user's
-# original pyproject.toml / pyenv.yaml / conda env) into the chapkit
-# venv. Reads from the generated requirements.txt instead of passing
-# each dep inline so PEP 508 markers with nested quotes (e.g.
-# `importlib-metadata; python_version < "3.10"`) install cleanly - the
-# inline form would see the quotes as shell-command terminators.
-# `uv pip install .` is avoided because the generated project is a
-# service, not an installable package, and the user's scripts often use
-# a flat layout that setuptools can't auto-package.
-RUN uv pip install --python /app/.venv/bin/python -r requirements.txt
-
-{% endif %}
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl --fail http://localhost:8000/health || exit 1
 
-CMD ["python", "main.py"]
+# Run uvicorn directly so server flags (--workers, --log-level, --timeout-keep-alive,
+# etc.) are visible here in the Dockerfile. main.py's `if __name__ == "__main__":`
+# block stays as the local-dev shortcut for `python main.py`.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

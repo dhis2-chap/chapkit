@@ -12,8 +12,8 @@ help:
 	@echo "Targets:"
 	@echo "  install       Install deps into .venv (uv sync)"
 	@echo "  run           Serve the chapkit app locally (python main.py)"
-	@echo "  test          One-shot smoke test: auto-starts an in-memory service,"
-	@echo "                drives a full train+predict, tears it down (chapkit test --start-service)"
+	@echo "  test          Build the image, start the container, drive a full chapkit"
+	@echo "                test against it, then tear down"
 	@echo "  test-remote   Drive chapkit test against an already-running service on \$$PORT"
 	@echo "  docker-build  Build the container image (\$$IMAGE=$(IMAGE))"
 	@echo "  docker-run    Run the container, publishing \$$PORT=$(PORT)"
@@ -25,8 +25,17 @@ install:
 run:
 	uv run python main.py
 
-test:
-	uv run chapkit test --start-service
+# Build + run the image, then drive `chapkit test` against the running container.
+# Required for R-based models (the host doesn't have R + the renv packages),
+# useful for Python ones too because it exercises the same image that ships
+# downstream. `chapkit test` polls /health internally, so no extra wait step.
+test: docker-build
+	@docker rm -f $(IMAGE)-test 2>/dev/null || true
+	docker run -d --name $(IMAGE)-test -p $(PORT):8000 $(PLATFORM_FLAG) $(IMAGE)
+	@uv run chapkit test --url http://localhost:$(PORT); status=$$?; \
+		docker stop $(IMAGE)-test >/dev/null; \
+		docker rm $(IMAGE)-test >/dev/null; \
+		exit $$status
 
 test-remote:
 	uv run chapkit test --url http://localhost:$(PORT)

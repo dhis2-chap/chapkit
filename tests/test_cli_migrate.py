@@ -862,11 +862,11 @@ statsmodels  # trailing-comment keeper
 
 
 def test_generated_requirements_txt_preserves_pep508_markers_with_quotes(tmp_path: Path) -> None:
-    """Deps with PEP 508 markers containing nested quotes survive into requirements.txt verbatim.
+    """Deps with PEP 508 markers containing nested quotes survive verbatim into pyproject + requirements.txt.
 
-    The generated Dockerfile does `uv pip install -r requirements.txt`, not an inline shell
-    command, so markers like `importlib-metadata; python_version < "3.10"` don't need any
-    shell escaping - they just land in the file as written.
+    The generated Dockerfile installs deps via `uv sync` against pyproject.toml + uv.lock, not via
+    an inline shell command, so markers like `importlib-metadata; python_version < "3.10"` don't
+    need any shell escaping - they just land in the file as written.
     """
     tricky_dep = 'importlib-metadata; python_version < "3.10"'
     user_pyproject = f"""\
@@ -891,15 +891,21 @@ dependencies = [
     result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
     assert result.exit_code == 0, result.output
 
-    # requirements.txt is generated; each dep on its own line, verbatim.
+    # requirements.txt still gets generated for reference; each dep on its own line, verbatim.
     requirements = (tmp_path / "requirements.txt").read_text()
     assert "pandas>=2.0" in requirements
     assert tricky_dep in requirements
 
-    # Dockerfile installs via -r requirements.txt, not inline quoted args.
+    # pyproject.toml carries the dep with its marker preserved (this is what `uv sync` reads).
+    pyproject_text = (tmp_path / "pyproject.toml").read_text()
+    parsed = tomllib.loads(pyproject_text)
+    assert "pandas>=2.0" in parsed["project"]["dependencies"]
+    assert tricky_dep in parsed["project"]["dependencies"]
+
+    # Dockerfile installs via `uv sync`, not inline quoted args.
     dockerfile = (tmp_path / "Dockerfile").read_text()
-    assert "uv pip install --python /app/.venv/bin/python -r requirements.txt" in dockerfile
-    # Sanity: no leaked raw shell-quoted dep.
+    assert "uv sync --frozen --no-dev --no-install-project" in dockerfile
+    # Sanity: no leaked raw shell-quoted dep on the build command line.
     assert f'"{tricky_dep}"' not in dockerfile
 
 
@@ -1082,7 +1088,9 @@ def test_full_run_moves_chaff_and_writes_outputs(tmp_path: Path) -> None:
     ast.parse(source)
 
     dockerfile = (tmp_path / "Dockerfile").read_text()
-    assert "FROM ghcr.io/dhis2-chap/chapkit-r-inla:latest" in dockerfile
+    # chapkit-r-inla is amd64-only, so the FROM line pins the build platform via ARG.
+    assert "ARG BASE_PLATFORM=linux/amd64" in dockerfile
+    assert "FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest" in dockerfile
 
     assert (tmp_path / "CHAPKIT.md").is_file()
     assert (tmp_path / "pyproject.toml").is_file()
