@@ -2,9 +2,11 @@
 
 A 10-minute path from "I have an R model" to "it's running as a chapkit service that chap-core can talk to." This guide assumes you know R and shell basics; you don't need to know Python.
 
+This walkthrough uses the `shell-r-inla` template (R + INLA spatial / time-series stack). For a tidyverse / forecasting model, swap `--template shell-r-inla` for `--template shell-r-tidyverse` throughout. For a minimal R image with no preinstalled packages, use `--template shell-r`. See [CLI Scaffolding](cli-scaffolding.md#shell-r--shell-r-tidyverse--shell-r-inla) for the differences.
+
 ## What you're building
 
-`chapkit init --template shell-r` scaffolds a small project with this shape:
+`chapkit init --template shell-r-inla` scaffolds a small project with this shape:
 
 ```
 my-model/
@@ -30,7 +32,7 @@ You do *not* need a local R install. The Docker image has everything.
 ## Step 1 - Scaffold the project
 
 ```bash
-uvx chapkit init my-model --template shell-r
+uvx chapkit init my-model --template shell-r-inla
 cd my-model
 ```
 

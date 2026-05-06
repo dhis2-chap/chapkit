@@ -9,7 +9,7 @@
 #   2. The ServiceInfo block (your name, email, model description).
 #
 # Your actual training and prediction logic lives in:
-{% if TEMPLATE == "shell-r" %}
+{% if TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 #   - scripts/train.R
 #   - scripts/predict.R
 {% else %}
@@ -63,13 +63,13 @@ class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseCo
 #
 # Files available in workspace (scripts can access directly):
 #   config.yml - YAML config (always available)
-{% if TEMPLATE == "shell-r" %}
+{% if TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 #   model.rds - Model file (saveRDS / readRDS in your R scripts)
 {% else %}
 #   model.pickle - Model file (pickle.dump / pickle.load in your scripts)
 {% endif %}
 
-{% if TEMPLATE == "shell-r" %}
+{% if TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 # Training command template (using relative path to script)
 train_command = "Rscript scripts/train.R --data {data_file}"
 

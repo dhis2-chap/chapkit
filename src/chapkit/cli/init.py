@@ -81,9 +81,12 @@ def init_command(
         str,
         typer.Option(
             help=(
-                "Template type. fn-py: Python ML in main.py. "
-                "shell-py: Python train/predict scripts in scripts/. "
-                "shell-r: R train/predict scripts in scripts/, on chapkit-r-inla."
+                "Template type. "
+                "fn-py: Python ML in main.py (chapkit-py). "
+                "shell-py: Python train/predict scripts in scripts/ (chapkit-py). "
+                "shell-r: R train/predict scripts in scripts/ on plain chapkit-r. "
+                "shell-r-tidyverse: R scripts on chapkit-r-tidyverse (tidyverse + fable + forecasting/ML stack). "
+                "shell-r-inla: R scripts on chapkit-r-inla (INLA + spatial stack, amd64-only)."
             ),
         ),
     ] = "fn-py",
@@ -95,7 +98,7 @@ def init_command(
         typer.echo(f"Error: Directory '{target_dir}' already exists", err=True)
         raise typer.Exit(code=1)
 
-    valid_templates = ["fn-py", "shell-py", "shell-r"]
+    valid_templates = ["fn-py", "shell-py", "shell-r", "shell-r-tidyverse", "shell-r-inla"]
     if template not in valid_templates:
         typer.echo(
             f"Error: Invalid template '{template}'. Must be one of: {', '.join(valid_templates)}",
@@ -135,7 +138,7 @@ def init_command(
 
     typer.echo("Generating project files...")
 
-    is_shell = template in ("shell-py", "shell-r")
+    is_shell = template in ("shell-py", "shell-r", "shell-r-tidyverse", "shell-r-inla")
 
     # Render main.py based on template type
     if is_shell:
@@ -166,7 +169,7 @@ def init_command(
             context,
             "predict_model.py",
         )
-    elif template == "shell-r":
+    elif template in ("shell-r", "shell-r-tidyverse", "shell-r-inla"):
         scripts_dir = target_dir / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
         _render_template(

@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 
+from chapkit.cli.migrate import _TIDYVERSE_HINTS, _any_r_script_uses
 from chapkit.cli.mlproject import (
     MLProject,
     MLProjectError,
@@ -56,26 +57,30 @@ def _suggest_chapkit_image(project_dir: Path, mlproject: MLProject) -> str:
     """Pick the chapkit-images base image best suited to this MLproject.
 
     Light-touch variant of migrate's detect_base_image - just returns the
-    `chapkit-py` / `chapkit-r` / `chapkit-r-inla` suffix so we can print a
-    ready-made `docker run` one-liner. R + INLA detection mirrors migrate:
-    `library(INLA)` / `library(fmesher)` in any root-level R script, or a
-    `docker_r_inla` image in the MLproject's docker_env.
+    `chapkit-py` / `chapkit-r` / `chapkit-r-tidyverse` / `chapkit-r-inla`
+    suffix so we can print a ready-made `docker run` one-liner. R + INLA
+    detection mirrors migrate: `library(INLA)` / `library(fmesher)` in any
+    root-level R script, or a `docker_r_inla` image in the MLproject's
+    docker_env. Tidyverse detection reuses migrate's _TIDYVERSE_HINTS list.
     """
     has_r = any(project_dir.glob("*.r")) or any(project_dir.glob("*.R"))
     has_py = any(project_dir.glob("*.py"))
+    # Mixed R + Python at the project root: only chapkit-r-inla bundles both
+    # runtimes. Mirrors migrate.detect_base_image's mixed-language branch so the
+    # `docker run` hint matches what `chapkit mlproject migrate` would build.
+    if has_r and has_py:
+        return "chapkit-r-inla"
     docker_env_image = mlproject.env_hints.get("docker_env", "")
-    uses_inla = docker_env_image.startswith("ghcr.io/dhis2-chap/docker_r_inla")
+    # Match migrate.detect_base_image's substring check so the hint and the
+    # actual migrated image agree on inputs like `docker_r_inla:master` or any
+    # other registry path that still mentions docker_r_inla.
+    uses_inla = "docker_r_inla" in docker_env_image
     if not uses_inla and has_r:
-        for script in project_dir.glob("*.[rR]"):
-            try:
-                text = script.read_text(encoding="utf-8", errors="ignore")
-            except OSError:
-                continue
-            if "library(INLA)" in text or "library(fmesher)" in text or 'library("INLA")' in text:
-                uses_inla = True
-                break
+        uses_inla = _any_r_script_uses(project_dir, ("INLA", "fmesher", "inla"))
     if has_r and uses_inla:
         return "chapkit-r-inla"
+    if has_r and _any_r_script_uses(project_dir, _TIDYVERSE_HINTS):
+        return "chapkit-r-tidyverse"
     if has_r:
         return "chapkit-r"
     if has_py:

@@ -242,6 +242,106 @@ def test_detect_base_image_requires_scripts(tmp_path: Path) -> None:
         detect_base_image(tmp_path, mlproject, override=None)
 
 
+def test_detect_base_image_r_with_tidyverse(tmp_path: Path) -> None:
+    mlproject = _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.R": "library(fable)\n", "predict.R": "library(tsibble)\n"},
+    )
+    image, language, rationale = detect_base_image(tmp_path, mlproject, override=None)
+    assert image == "chapkit-r-tidyverse"
+    assert language == "r"
+    assert "tidyverse" in rationale
+
+
+def test_detect_base_image_inla_beats_tidyverse(tmp_path: Path) -> None:
+    mlproject = _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.R": "library(INLA)\nlibrary(dplyr)\n", "predict.R": "library(INLA)\n"},
+    )
+    image, _language, rationale = detect_base_image(tmp_path, mlproject, override=None)
+    assert image == "chapkit-r-inla"
+    assert "INLA" in rationale
+
+
+def test_detect_base_image_tidyverse_override(tmp_path: Path) -> None:
+    mlproject = _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.R": "df <- read.csv('x')\n", "predict.R": "df <- read.csv('x')\n"},
+    )
+    image, language, _ = detect_base_image(tmp_path, mlproject, override="chapkit-r-tidyverse")
+    assert image == "chapkit-r-tidyverse"
+    assert language == "r"
+
+
+@pytest.mark.parametrize(
+    "import_line",
+    [
+        "library(fable)",
+        'library("fable")',
+        "library('fable')",
+        "library (fable)",
+        "library(fable, quietly = TRUE)",
+        "require(fable)",
+        'requireNamespace("fable", quietly = TRUE)',
+    ],
+)
+def test_detect_base_image_tidyverse_import_forms(tmp_path: Path, import_line: str) -> None:
+    """Tidyverse detection covers library/require/requireNamespace, quoted/unquoted, with extra args."""
+    mlproject = _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.R": f"{import_line}\n", "predict.R": "df <- read.csv('x')\n"},
+    )
+    image, _language, _ = detect_base_image(tmp_path, mlproject, override=None)
+    assert image == "chapkit-r-tidyverse"
+
+
+def test_detect_base_image_tidyverse_substring_does_not_false_match(tmp_path: Path) -> None:
+    """A package name embedded in another identifier (e.g. `mydplyr`) must not trigger detection."""
+    mlproject = _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.R": "library(mydplyr)\n", "predict.R": "df <- read.csv('x')\n"},
+    )
+    image, _language, _ = detect_base_image(tmp_path, mlproject, override=None)
+    assert image == "chapkit-r"
+
+
+def test_detect_base_image_mixed_with_tidyverse_flags_rationale(tmp_path: Path) -> None:
+    """Mixed R+Python with tidyverse imports still picks chapkit-r-inla but flags missing packages."""
+    mlproject = _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.R": "library(fable)\n", "predict.R": "library(tsibble)\n", "helper.py": "..."},
+    )
+    image, language, rationale = detect_base_image(tmp_path, mlproject, override=None)
+    assert image == "chapkit-r-inla"
+    assert language == "mixed"
+    assert "tidyverse" in rationale
+    assert "install_packages.R" in rationale or "renv.lock" in rationale
+
+
+def test_migrate_dockerfile_uses_chapkit_r_tidyverse(tmp_path: Path) -> None:
+    """A migrated project with tidyverse imports gets a chapkit-r-tidyverse Dockerfile, no platform pin."""
+    _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT,
+        {"train.R": "library(fable)\n", "predict.R": "library(forecast)\n"},
+    )
+    runner = CliRunner()
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    dockerfile = (tmp_path / "Dockerfile").read_text()
+    assert "FROM ghcr.io/dhis2-chap/chapkit-r-tidyverse:latest" in dockerfile
+    # chapkit-r-tidyverse is multi-arch; no amd64 ARG should be emitted.
+    assert "ARG BASE_PLATFORM" not in dockerfile
+    assert "--platform=" not in dockerfile
+
+
 def test_build_service_info_context_ewars(tmp_path: Path) -> None:
     (tmp_path / "MLproject").write_text(EWARS_MLPROJECT)
     mlproject = parse_mlproject(tmp_path)

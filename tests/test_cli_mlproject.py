@@ -359,6 +359,57 @@ def test_suggest_chapkit_image_picks_r_inla_when_INLA_used(tmp_path: Path) -> No
     assert _suggest_chapkit_image(tmp_path, mlproject) == "chapkit-r-inla"
 
 
+def test_suggest_chapkit_image_inla_from_docker_env_hint(tmp_path: Path) -> None:
+    """A docker_env image mentioning docker_r_inla bumps the suggestion to chapkit-r-inla.
+
+    Mirrors migrate.detect_base_image's substring check, so a tag like
+    `docker_r_inla:master` (no `library(INLA)` in scripts) still resolves to
+    chapkit-r-inla rather than the plain chapkit-r fallback.
+    """
+    from chapkit.cli.run import _suggest_chapkit_image
+
+    _write_mlproject(
+        tmp_path,
+        """
+name: ewars_via_docker_env
+docker_env:
+  image: ghcr.io/dhis2-chap/docker_r_inla:master
+entry_points:
+  train:
+    command: "Rscript train.R {data_file}"
+  predict:
+    command: "Rscript predict.R {model} {historic_file} {future_file} {output_file}"
+""",
+    )
+    (tmp_path / "train.R").write_text("df <- read.csv('x')\n")
+    (tmp_path / "predict.R").write_text("df <- read.csv('x')\n")
+    mlproject = parse_mlproject(tmp_path)
+    assert _suggest_chapkit_image(tmp_path, mlproject) == "chapkit-r-inla"
+
+
+def test_suggest_chapkit_image_picks_r_tidyverse_for_tidyverse_imports(tmp_path: Path) -> None:
+    """library(fable) (no INLA, no Python) picks chapkit-r-tidyverse."""
+    from chapkit.cli.run import _suggest_chapkit_image
+
+    _write_mlproject(tmp_path, MINIMALIST_MLPROJECT)
+    (tmp_path / "train.R").write_text("library(fable)\n")
+    (tmp_path / "predict.R").write_text("library(tsibble)\n")
+    mlproject = parse_mlproject(tmp_path)
+    assert _suggest_chapkit_image(tmp_path, mlproject) == "chapkit-r-tidyverse"
+
+
+def test_suggest_chapkit_image_mixed_picks_inla(tmp_path: Path) -> None:
+    """Mixed R+Python at root picks chapkit-r-inla (only image with both runtimes), matching migrate."""
+    from chapkit.cli.run import _suggest_chapkit_image
+
+    _write_mlproject(tmp_path, MINIMALIST_MLPROJECT)
+    (tmp_path / "train.R").write_text("library(fable)\n")
+    (tmp_path / "predict.R").write_text("library(tsibble)\n")
+    (tmp_path / "helper.py").write_text("import pandas\n")
+    mlproject = parse_mlproject(tmp_path)
+    assert _suggest_chapkit_image(tmp_path, mlproject) == "chapkit-r-inla"
+
+
 def test_suggest_chapkit_image_picks_py_for_python(tmp_path: Path) -> None:
     """Python-only MLproject picks chapkit-py."""
     from chapkit.cli.run import _suggest_chapkit_image

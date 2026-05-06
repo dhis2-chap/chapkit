@@ -231,7 +231,7 @@ make test-remote
     make test-remote
     ```
 
-    The generated Docker image (built on [`chapkit-r`](https://github.com/dhis2-chap/chapkit-images) or [`chapkit-r-inla`](https://github.com/dhis2-chap/chapkit-images)) ships R and pre-restores `renv.lock` so your scripts run in the environment they were written for.
+    The generated Docker image (built on [`chapkit-r`](https://github.com/dhis2-chap/chapkit-images), [`chapkit-r-tidyverse`](https://github.com/dhis2-chap/chapkit-images), or [`chapkit-r-inla`](https://github.com/dhis2-chap/chapkit-images), depending on the imports detected by `chapkit mlproject migrate`) ships R and pre-restores `renv.lock` so your scripts run in the environment they were written for.
 
 A clean run looks like:
 

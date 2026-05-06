@@ -1,19 +1,26 @@
 # {{ PROJECT_NAME }} Dockerfile
-{% if TEMPLATE == "shell-r" %}
+{% if TEMPLATE == "shell-r-inla" %}
 # chapkit-r-inla ships R 4.5 + INLA + the spatial / time-series stack (sf, spdep, dlnm,
 # tsModel, sn, xgboost, fmesher, ...) preinstalled. The image is amd64-only (INLA ships
 # x86_64 binaries only), so the FROM line pins linux/amd64 via a build ARG - this works
-# on Apple Silicon too via Rosetta. Use chapkit-r instead if you don't need INLA - it's
-# smaller and multi-arch (override BASE_PLATFORM at build time for a native arm64 build,
-# and remove `platform: linux/amd64` from compose.yml).
+# on Apple Silicon too via Rosetta. Switch to shell-r-tidyverse or shell-r at scaffold
+# time if you don't need INLA - those base images are smaller and multi-arch.
 ARG BASE_PLATFORM=linux/amd64
 FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest
-# FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r:latest
+{% elif TEMPLATE == "shell-r-tidyverse" %}
+# chapkit-r-tidyverse ships R + tidyverse + the modern Posit forecasting stack
+# (fable, tsibble, feasts, forecast, ranger, xgboost, glmnet, lubridate, janitor, ...).
+# Multi-arch - no platform pin needed.
+FROM ghcr.io/dhis2-chap/chapkit-r-tidyverse:latest
+{% elif TEMPLATE == "shell-r" %}
+# chapkit-r is a minimal R image (R + renv + pak, no extra ML packages). Multi-arch.
+# Switch to chapkit-r-tidyverse or chapkit-r-inla if you need a richer stack.
+FROM ghcr.io/dhis2-chap/chapkit-r:latest
 {% else %}
 FROM ghcr.io/dhis2-chap/chapkit-py:latest
 {% endif %}
 
-# chapkit-py runs as root; matches chapkit-r / chapkit-r-inla.
+# chapkit-py runs as root; matches chapkit-r / chapkit-r-tidyverse / chapkit-r-inla.
 USER root
 
 WORKDIR /work
@@ -28,7 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     UV_PROJECT_ENVIRONMENT=/app/.venv uv sync --frozen --no-dev --no-install-project
 
 COPY main.py ./
-{% if TEMPLATE in ("shell-py", "shell-r") %}
+{% if TEMPLATE in ("shell-py", "shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 COPY scripts/ ./scripts/
 {% endif %}
 
