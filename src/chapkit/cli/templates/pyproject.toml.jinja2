@@ -5,13 +5,13 @@ description = "{{ PROJECT_DESCRIPTION }}"
 requires-python = ">=3.13"
 dependencies = [
     "chapkit>={{ CHAPKIT_VERSION }}",
-{% if TEMPLATE != "shell-r" %}
-    "pandas>=2.3.3",
-    # Add your ML library here (e.g., "scikit-learn>=1.6.1", "tensorflow>=2.17.0")
-{% else %}
+{% if TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
     # Data handling lives in the R scripts (scripts/train.R, scripts/predict.R) -
     # add Python deps here only if your service-side code (validation hooks,
     # custom routes, etc.) needs them.
+{% else %}
+    "pandas>=2.3.3",
+    # Add your ML library here (e.g., "scikit-learn>=1.6.1", "tensorflow>=2.17.0")
 {% endif %}
 ]
 

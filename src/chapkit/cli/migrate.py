@@ -34,7 +34,30 @@ from chapkit.cli.mlproject import (
 _TEMPLATE_DIR = Path(__file__).parent / "templates" / "migrate"
 _SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
 
-_VALID_BASE_IMAGES = ("chapkit-py", "chapkit-r", "chapkit-r-inla")
+_VALID_BASE_IMAGES = ("chapkit-py", "chapkit-r", "chapkit-r-tidyverse", "chapkit-r-inla")
+
+# Tidyverse-distinctive packages. A `library(<pkg>)` for any of these in a
+# root-level R script tips auto-detection from chapkit-r to chapkit-r-tidyverse.
+# Only listed packages that aren't usually present in plain-R workflows -
+# stuff like `library(yaml)` or `library(jsonlite)` doesn't imply tidyverse.
+_TIDYVERSE_HINTS = (
+    "tidyverse",
+    "dplyr",
+    "ggplot2",
+    "tidyr",
+    "readr",
+    "purrr",
+    "tibble",
+    "fable",
+    "tsibble",
+    "feasts",
+    "forecast",
+    "ranger",
+    "xgboost",
+    "glmnet",
+    "lubridate",
+    "janitor",
+)
 
 # Blocklist. Anything not explicitly chaff stays at root, because migrated
 # scripts may read arbitrary data / config files at runtime (e.g. a YAML
@@ -164,7 +187,7 @@ def _classify_dir(path: Path) -> ClassifiedPath:
 
 
 def _language_from_image(image: str) -> str:
-    return {"chapkit-py": "python", "chapkit-r": "r", "chapkit-r-inla": "r"}[image]
+    return {"chapkit-py": "python", "chapkit-r": "r", "chapkit-r-tidyverse": "r", "chapkit-r-inla": "r"}[image]
 
 
 def _dep_name(requirement: str) -> str:
@@ -623,7 +646,9 @@ def detect_base_image(
         if uses_inla:
             hint = "MLproject declares docker_r_inla" if env_suggests_inla else "R script imports INLA"
             return "chapkit-r-inla", "r", f"R + INLA ({hint})"
-        return "chapkit-r", "r", "R scripts, no INLA detected"
+        if _any_r_script_uses(project_path, _TIDYVERSE_HINTS):
+            return "chapkit-r-tidyverse", "r", "R + tidyverse stack (tidyverse/fable/forecast/etc. detected)"
+        return "chapkit-r", "r", "R scripts, no INLA or tidyverse hints detected"
     if py_scripts:
         return "chapkit-py", "python", "Python scripts only"
     raise MigrateError("No Python (.py) or R (.r/.R) scripts at the project root; cannot pick a base image.")
@@ -867,7 +892,10 @@ def migrate_command(
     ] = Path("."),
     base_image: Annotated[
         str | None,
-        typer.Option("--base-image", help="Override base image (chapkit-py, chapkit-r, chapkit-r-inla)."),
+        typer.Option(
+            "--base-image",
+            help="Override base image (chapkit-py, chapkit-r, chapkit-r-tidyverse, chapkit-r-inla).",
+        ),
     ] = None,
     dry_run: Annotated[
         bool,

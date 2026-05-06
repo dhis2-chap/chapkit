@@ -53,11 +53,12 @@ Arbitrary files at the project root that aren't in the chaff list stay put — s
 `chapkit mlproject migrate` picks the right base image from [chapkit-images](https://github.com/dhis2-chap/chapkit-images) by scanning your repo:
 
 - **Python only** (`.py` at root) → `ghcr.io/dhis2-chap/chapkit-py:latest` (multi-arch, lean).
-- **R without INLA** (`.r`/`.R` at root, no `library(INLA)` / `library(fmesher)`, no `docker_r_inla` in MLproject `docker_env`) → `ghcr.io/dhis2-chap/chapkit-r:latest` (multi-arch).
-- **R with INLA** → `ghcr.io/dhis2-chap/chapkit-r-inla:latest` (`amd64` only).
+- **R + INLA** (`library(INLA)` / `library(fmesher)` in any root R script, or `docker_r_inla` in MLproject `docker_env`) → `ghcr.io/dhis2-chap/chapkit-r-inla:latest` (`amd64` only).
+- **R + tidyverse** (any of `library(tidyverse)`, `dplyr`, `ggplot2`, `tidyr`, `readr`, `purrr`, `tibble`, `fable`, `tsibble`, `feasts`, `forecast`, `ranger`, `xgboost`, `glmnet`, `lubridate`, `janitor` and **no** INLA) → `ghcr.io/dhis2-chap/chapkit-r-tidyverse:latest` (multi-arch).
+- **R, no INLA or tidyverse hints** → `ghcr.io/dhis2-chap/chapkit-r:latest` (multi-arch, minimal).
 - **Both R and Python** → `chapkit-r-inla` (fat image covers both); migrate prompts to confirm unless `--yes` is set.
 
-Override the detection with `--base-image chapkit-{py,r,r-inla}`.
+Override the detection with `--base-image {chapkit-py,chapkit-r,chapkit-r-tidyverse,chapkit-r-inla}`.
 
 ## Dynamic config becomes a typed class
 

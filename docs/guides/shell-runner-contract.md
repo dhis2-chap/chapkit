@@ -1,6 +1,6 @@
 # Shell-runner workspace contract
 
-This page documents exactly what `ShellModelRunner` does for each train and predict invocation - which files chapkit writes, which files your script is expected to write, and how data flows from train into predict. It applies to projects scaffolded with `chapkit init --template shell-py` and `--template shell-r`, and to projects produced by `chapkit mlproject migrate`.
+This page documents exactly what `ShellModelRunner` does for each train and predict invocation - which files chapkit writes, which files your script is expected to write, and how data flows from train into predict. It applies to projects scaffolded with `chapkit init --template shell-py`, `--template shell-r`, `--template shell-r-tidyverse`, or `--template shell-r-inla`, and to projects produced by `chapkit mlproject migrate`.
 
 ## At a glance
 
@@ -103,7 +103,7 @@ The output file is read back into the response, and the entire workspace is pers
 
 The shape of `config.yml` depends on which path scaffolded your project:
 
-### `chapkit init --template shell-py` / `shell-r` (flat)
+### `chapkit init --template shell-py` / `shell-r` / `shell-r-tidyverse` / `shell-r-inla` (flat)
 
 Every `Config` field is a top-level key:
 

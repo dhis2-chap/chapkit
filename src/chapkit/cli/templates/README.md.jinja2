@@ -4,7 +4,7 @@
 
 This project was scaffolded using the [Chapkit](https://dhis2-chap.github.io/chapkit) CLI.
 
-{% if TEMPLATE == "shell-r" %}
+{% if TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 ## What you'll edit
 
 You typically only edit three places:
@@ -19,13 +19,12 @@ plumbing) is wiring you can leave alone.
 
 ## What you need installed
 
-- **Docker** with the compose plugin (the Docker image ships R + INLA + the spatial /
-  time-series stack, so you don't need a local R install).
+- **Docker** with the compose plugin (the Docker image ships {% if TEMPLATE == "shell-r-inla" %}R + INLA + the spatial / time-series stack{% elif TEMPLATE == "shell-r-tidyverse" %}R + tidyverse + the Posit forecasting / ML stack{% else %}a minimal R runtime (R + renv + pak){% endif %}, so you don't need a local R install).
 - **Python 3.13 + uv** *(optional, only for fast iteration without rebuilding the
   Docker image)*. Install uv from [astral.sh/uv](https://docs.astral.sh/uv/).
 
-`chapkit` itself is bundled inside the Docker image; you don't have to install
-it on your host.
+`chapkit` itself is installed into the Docker image at build time; you don't
+have to install it on your host.
 {% elif TEMPLATE == "shell-py" %}
 ## What you'll edit
 
@@ -63,11 +62,10 @@ can leave alone.
 
 ## Quick Start
 
-{% if TEMPLATE == "shell-r" %}
+{% if TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 ### Run with Docker (recommended)
 
-The Docker image bundles everything (R, INLA, chapkit), so this works without a
-local Python or R install:
+The Docker image bundles {% if TEMPLATE == "shell-r-inla" %}R + INLA + the spatial / time-series stack{% elif TEMPLATE == "shell-r-tidyverse" %}R + tidyverse + the Posit forecasting / ML stack{% else %}a minimal R runtime{% endif %}, so this works without a local Python or R install:
 
 ```bash
 # One-time: generates uv.lock that the Dockerfile pins against. Needs uv installed.
@@ -254,7 +252,7 @@ reads `config.yml` from the workspace, and writes its model artefact to disk
 Edit `scripts/predict_model.py`. It receives `--historic`, `--future`, `--output`
 (and optional `--geo`), loads the model written by training, and writes
 predictions to the `--output` CSV.
-{% elif TEMPLATE == "shell-r" %}
+{% elif TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 ### Customize Training (Shell Runner, R)
 
 Edit `scripts/train.R` to implement your model training logic. The script
@@ -270,12 +268,25 @@ predictions to the `--output` CSV.
 
 ### R packages
 
-The default Docker image (`chapkit-r-inla`) ships a curated R stack: `INLA`,
+{% if TEMPLATE == "shell-r-inla" %}
+The Docker image (`chapkit-r-inla`) ships a curated R stack: `INLA`,
 `fmesher`, `dlnm`, `tsModel`, `sn`, `xgboost`, `sf`, `spdep`, `dplyr`, `readr`,
-`yaml`, `jsonlite`, `pak`, `renv`. To add packages, either install them at
-build time in the `Dockerfile` (`RUN R -e "install.packages('foo')"`) or
-commit an `renv.lock` and bake it in. See
-[chapkit-r-inla](https://github.com/dhis2-chap/chapkit-images) for the full list.
+`yaml`, `jsonlite`, `pak`, `renv`.
+{% elif TEMPLATE == "shell-r-tidyverse" %}
+The Docker image (`chapkit-r-tidyverse`) ships a curated forecasting / ML
+stack on top of plain R: `tidyverse`, `readxl`, `janitor`, `lubridate`,
+`fable`, `tsibble`, `feasts`, `forecast`, `urca`, `tseries`, `zoo`, `xts`,
+`ranger`, `randomForest`, `xgboost`, `glmnet`, `e1071`, `lme4`,
+`distributional`, `here`, `patchwork`.
+{% else %}
+The Docker image (`chapkit-r`) is a minimal R runtime - R itself plus `renv`
+and `pak` for package management. No ML / stats packages are preinstalled,
+so anything beyond base R needs to be added.
+{% endif %}
+To add packages, either install them at build time in the `Dockerfile`
+(`RUN R -e "install.packages('foo')"`) or commit an `renv.lock` and bake it
+in. See [chapkit-images](https://github.com/dhis2-chap/chapkit-images) for the
+full list of base images.
 {% else %}
 ### Customize Training
 
@@ -295,7 +306,7 @@ Edit the `on_predict` function in `main.py` to implement your prediction logic.
 ├── scripts/             # External training/prediction scripts (Python)
 │   ├── train_model.py   # Training script
 │   └── predict_model.py # Prediction script
-{% elif TEMPLATE == "shell-r" %}
+{% elif TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 ├── scripts/             # External training/prediction scripts (R)
 │   ├── train.R          # Training script
 │   └── predict.R        # Prediction script

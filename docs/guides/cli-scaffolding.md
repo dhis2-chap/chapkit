@@ -119,7 +119,7 @@ chapkit init PROJECT_NAME [OPTIONS]
 
 - `--path PATH` - Target directory (default: current directory)
 - `--with-validation` - Scaffold `on_validate_train` / `on_validate_predict` stubs so the `$validate` endpoint can emit domain-specific diagnostics. Off by default.
-- `--template TYPE` - Template type: `fn-py` (default), `shell-py`, or `shell-r`
+- `--template TYPE` - Template type: `fn-py` (default), `shell-py`, `shell-r`, `shell-r-tidyverse`, or `shell-r-inla`
 - `--help` - Show help message
 
 > Looking for Prometheus + Grafana? The scaffolded service exposes `/metrics`
@@ -142,8 +142,14 @@ chapkit init my-service --path ~/projects
 # Create project with shell-py template (Python scripts under scripts/)
 chapkit init my-service --template shell-py
 
-# Create project with shell-r template (R scripts on chapkit-r-inla)
+# Create project with shell-r template (R scripts on plain chapkit-r)
 chapkit init my-service --template shell-r
+
+# Create project with shell-r-tidyverse template (R + tidyverse / forecasting stack)
+chapkit init my-service --template shell-r-tidyverse
+
+# Create project with shell-r-inla template (R + INLA spatial stack, amd64-only)
+chapkit init my-service --template shell-r-inla
 
 # Create project with $validate hook stubs
 chapkit init my-service --with-validation
@@ -305,18 +311,27 @@ Train and predict via external Python scripts in `scripts/`, driven by `ShellMod
 
 ### `shell-r`
 
-Same `ShellModelRunner` shape as `shell-py`, but with R scripts in `scripts/` (`train.R`, `predict.R`). Defaults to the [`chapkit-r-inla`](https://github.com/dhis2-chap/chapkit-images) base image (R 4.5 + INLA + spatial / time-series stack preinstalled). The Dockerfile ships a commented `chapkit-r` alternative for projects that don't need INLA (smaller image, multi-arch).
+Same `ShellModelRunner` shape as `shell-py`, but with R scripts in `scripts/` (`train.R`, `predict.R`). Targets the [`chapkit-r`](https://github.com/dhis2-chap/chapkit-images) base image — a minimal R runtime (R + `renv` + `pak`) with no preinstalled ML / stats packages. Multi-arch.
 
-**Pros:**
-- R 4.5 + INLA / spatial / time-series stack ready out of the box
-- File-based interchange (CSV, YAML, RDS) — same conventions as `shell-py`
-- Closest match to `chapkit_ewars_model` and other published R models
+> **Breaking change in chapkit 0.25**: `--template shell-r` previously selected `chapkit-r-inla` as the base image. It now selects plain `chapkit-r`. Use `--template shell-r-inla` to get the previous behavior.
+
+**Best for:** R models that bring their own dependencies via `renv.lock` or `install_packages.R`, or that need a small starting point.
+
+### `shell-r-tidyverse`
+
+Same shape as `shell-r`, but on the [`chapkit-r-tidyverse`](https://github.com/dhis2-chap/chapkit-images) base image — `chapkit-r` plus a curated forecasting / ML stack: `tidyverse`, `fable`, `tsibble`, `feasts`, `forecast`, `urca`, `tseries`, `zoo`, `xts`, `ranger`, `randomForest`, `xgboost`, `glmnet`, `e1071`, `lme4`, `lubridate`, `janitor`, `readxl`, `distributional`, `here`, `patchwork`. Multi-arch.
+
+**Best for:** R models built on the modern Posit forecasting stack — fable / tsibble time-series, tree-based ML, GLM / mixed-effects.
+
+### `shell-r-inla`
+
+Same shape as `shell-r`, but on the [`chapkit-r-inla`](https://github.com/dhis2-chap/chapkit-images) base image — R 4.5 + INLA + the spatial / time-series stack (`sf`, `spdep`, `dlnm`, `tsModel`, `sn`, `xgboost`, `fmesher`, ...).
 
 **Cons:**
 - `chapkit-r-inla` is amd64-only (Apple Silicon needs Rosetta)
-- ~570 MB image footprint
+- Larger image footprint than the other R bases
 
-**Best for:** R-language epidemiology / time-series models, especially anything using INLA.
+**Best for:** R-language epidemiology / time-series models that need INLA, especially anything in the chap-core ecosystem (e.g. `chapkit_ewars_model`).
 
 ---
 
@@ -355,9 +370,15 @@ my-service/
 └── README.md            # Project documentation
 ```
 
-### `shell-r`
+### `shell-r` / `shell-r-tidyverse` / `shell-r-inla`
 
-When using `--template shell-r`, external R scripts are generated under `scripts/`. The Dockerfile defaults to `chapkit-r-inla` (with a commented `chapkit-r` alternative for non-INLA projects):
+When using any of the R-shell templates, external R scripts are generated under `scripts/`. The three templates differ only in the base image referenced in the generated `Dockerfile`:
+
+| Template            | Base image                          | Platform   |
+| ------------------- | ----------------------------------- | ---------- |
+| `shell-r`           | `chapkit-r` (minimal R)             | multi-arch |
+| `shell-r-tidyverse` | `chapkit-r-tidyverse`               | multi-arch |
+| `shell-r-inla`      | `chapkit-r-inla` (R + INLA stack)   | amd64-only |
 
 ```
 my-service/
@@ -366,8 +387,8 @@ my-service/
 │   ├── train.R          # Training script
 │   └── predict.R        # Prediction script
 ├── pyproject.toml       # Python deps for the service layer (chapkit only by default)
-├── Dockerfile           # FROM chapkit-r-inla + uv sync
-├── compose.yml          # Docker Compose configuration
+├── Dockerfile           # FROM chapkit-r{-tidyverse,-inla} + uv sync
+├── compose.yml          # Docker Compose configuration (pins linux/amd64 only for shell-r-inla)
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (created at runtime)
 ├── .gitignore           # Python gitignore
@@ -376,7 +397,7 @@ my-service/
 
 ### With Validation Hooks
 
-Applies to all three templates (`fn-py`, `shell-py`, `shell-r`).
+Applies to all five templates (`fn-py`, `shell-py`, `shell-r`, `shell-r-tidyverse`, `shell-r-inla`).
 
 When using `--with-validation` with an ML template, the generated `main.py`
 gains two extra async functions and wires them into the runner:
@@ -421,10 +442,10 @@ The generated `main.py` varies by template:
 - **Shell Commands**: `train_command` / `predict_command` strings invoking `python scripts/train_model.py …`
 - **Scripts Directory**: `scripts/train_model.py` and `scripts/predict_model.py`
 
-**`shell-r`:**
+**`shell-r` / `shell-r-tidyverse` / `shell-r-inla`:**
 - Same `ShellModelRunner` shape as `shell-py` but the commands invoke `Rscript scripts/train.R …`
 - **Scripts Directory**: `scripts/train.R` and `scripts/predict.R`
-- **Dockerfile**: defaults to `chapkit-r-inla` (with a commented `chapkit-r` alternative for non-INLA models)
+- **Dockerfile**: `FROM ghcr.io/dhis2-chap/chapkit-r:latest` (`shell-r`), `chapkit-r-tidyverse:latest` (`shell-r-tidyverse`), or `chapkit-r-inla:latest` (`shell-r-inla`, amd64-pinned)
 
 **Example structure (`fn-py` template):**
 

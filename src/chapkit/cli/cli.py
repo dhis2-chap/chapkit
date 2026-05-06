@@ -49,9 +49,10 @@ _TOP_HELP = """\
 Chapkit CLI - scaffold and manage ML services for the chap-core ecosystem.
 
 Quick start:
-  chapkit init my-model --template shell-r   # R model on chapkit-r-inla
-  chapkit init my-model --template shell-py  # Python model with external scripts
-  chapkit init my-model                      # Python model in main.py (default)
+  chapkit init my-model --template shell-r-tidyverse  # R + tidyverse / forecasting stack
+  chapkit init my-model --template shell-r-inla       # R + INLA spatial / time-series stack
+  chapkit init my-model --template shell-py           # Python model with external scripts
+  chapkit init my-model                               # Python model in main.py (default)
 
 Once you've cd'd into a scaffolded project, `chapkit test` exercises the full
 config -> train -> predict flow against the running service. See
@@ -85,7 +86,9 @@ _INIT_EPILOG = (
     "[bold]Examples:[/bold]\n\n"
     "[bold cyan]chapkit init my-model[/bold cyan] - Python model in main.py (default)\n\n"
     "[bold cyan]chapkit init my-model --template shell-py[/bold cyan] - Python train/predict scripts\n\n"
-    "[bold cyan]chapkit init my-model --template shell-r[/bold cyan] - R scripts on chapkit-r-inla\n\n"
+    "[bold cyan]chapkit init my-model --template shell-r[/bold cyan] - R scripts on plain chapkit-r\n\n"
+    "[bold cyan]chapkit init my-model --template shell-r-tidyverse[/bold cyan] - R + tidyverse/forecasting stack\n\n"
+    "[bold cyan]chapkit init my-model --template shell-r-inla[/bold cyan] - R + INLA spatial stack (amd64-only)\n\n"
     "[bold]After scaffolding:[/bold] [cyan]cd my-model && uv lock && docker compose up --build[/cyan]"
 )
 
