@@ -71,7 +71,10 @@ def _suggest_chapkit_image(project_dir: Path, mlproject: MLProject) -> str:
     if has_r and has_py:
         return "chapkit-r-inla"
     docker_env_image = mlproject.env_hints.get("docker_env", "")
-    uses_inla = docker_env_image.startswith("ghcr.io/dhis2-chap/docker_r_inla")
+    # Match migrate.detect_base_image's substring check so the hint and the
+    # actual migrated image agree on inputs like `docker_r_inla:master` or any
+    # other registry path that still mentions docker_r_inla.
+    uses_inla = "docker_r_inla" in docker_env_image
     if not uses_inla and has_r:
         uses_inla = _any_r_script_uses(project_dir, ("INLA", "fmesher", "inla"))
     if has_r and uses_inla:
