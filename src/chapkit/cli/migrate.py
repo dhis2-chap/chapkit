@@ -611,14 +611,27 @@ def _check_entry_points_reference_main_py(mlproject: MLProject) -> None:
 
 
 def _any_r_script_uses(project_path: Path, packages: tuple[str, ...]) -> bool:
+    """Return True if any root-level R script imports one of the given packages.
+
+    Matches library / require / requireNamespace with optional whitespace before
+    the opening paren, optional single or double quotes around the package name,
+    and a trailing comma or close-paren (so `library(fable, quietly = TRUE)` and
+    `requireNamespace("fable")` both count). Case-sensitive on the package name.
+    """
+    if not packages:
+        return False
+    pattern = re.compile(
+        r"\b(?:library|require|requireNamespace)\s*\(\s*['\"]?(?:"
+        + "|".join(re.escape(pkg) for pkg in packages)
+        + r")['\"]?\s*[,\)]"
+    )
     for script in project_path.glob("*.[rR]"):
         try:
             text = script.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        for pkg in packages:
-            if f"library({pkg})" in text or f'library("{pkg}")' in text:
-                return True
+        if pattern.search(text):
+            return True
     return False
 
 
@@ -641,6 +654,16 @@ def detect_base_image(
 
     if r_scripts and py_scripts:
         rationale = "found both R and Python scripts; chapkit-r-inla covers both"
+        # chapkit-r-inla is the only image bundling Python + R, but it doesn't
+        # ship the full tidyverse / forecasting stack. Flag this when the R
+        # side imports tidyverse-style packages so the user knows to bake them
+        # in via install_packages.R / renv.lock.
+        if _any_r_script_uses(project_path, _TIDYVERSE_HINTS):
+            rationale += (
+                "; R side imports tidyverse-style packages - chapkit-r-inla does not ship "
+                "the full tidyverse/forecasting stack, bake missing packages in via "
+                "install_packages.R or renv.lock"
+            )
         return "chapkit-r-inla", "mixed", rationale
     if r_scripts:
         if uses_inla:

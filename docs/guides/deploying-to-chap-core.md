@@ -89,8 +89,9 @@ docker run --rm -p 9090:8000 my-model:dev
 **If your model has R or other system dependencies**, swap the base image for one of the pre-built [chapkit-images](https://github.com/dhis2-chap/chapkit-images):
 
 - `ghcr.io/dhis2-chap/chapkit-py:latest` — Python (multi-arch).
-- `ghcr.io/dhis2-chap/chapkit-r:latest` — R without INLA (multi-arch).
-- `ghcr.io/dhis2-chap/chapkit-r-inla:latest` — R + INLA (amd64 only; add `--platform=linux/amd64` and expect emulation on Apple Silicon).
+- `ghcr.io/dhis2-chap/chapkit-r:latest` — minimal R + `renv` + `pak`, no preinstalled R packages (multi-arch).
+- `ghcr.io/dhis2-chap/chapkit-r-tidyverse:latest` — R + tidyverse + Posit forecasting / ML stack (fable, tsibble, feasts, forecast, ranger, xgboost, glmnet, lubridate, janitor, ...) (multi-arch).
+- `ghcr.io/dhis2-chap/chapkit-r-inla:latest` — R + INLA + spatial / time-series stack (amd64 only; add `--platform=linux/amd64` and expect emulation on Apple Silicon).
 
 See [MLproject Runner → Running in a Container](mlproject-runner.md#running-in-a-container) for the full image table (sizes, architectures, contents) and [chapkit mlproject migrate → Base image auto-detection](mlproject-migrate.md#base-image-auto-detection) for how the right base is picked when adopting an existing MLproject.
 
@@ -258,4 +259,4 @@ To put the DB somewhere else, set an absolute `DATABASE_URL` (note the four slas
 - [`chapkit_ewars_model/.github/workflows/publish-docker.yml`](https://github.com/chap-models/chapkit_ewars_model/blob/main/.github/workflows/publish-docker.yml) — a fuller GHCR publish workflow with cache, semver tags, and SLSA attestations.
 - [`chap-core/compose.ewars.yml`](https://github.com/dhis2-chap/chap-core/blob/master/compose.ewars.yml) — the per-model overlay that drops the image onto the chap-core network and triggers self-registration.
 - [`chap-core/compose.chapkit.yml`](https://github.com/dhis2-chap/chap-core/blob/master/compose.chapkit.yml) — umbrella overlay that `include`s every chapkit-converted model overlay so operators can launch all of them with a single `-f` flag.
-- [`dhis2-chap/chapkit-images`](https://github.com/dhis2-chap/chapkit-images) — Dockerfiles and publish workflow for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` base images referenced throughout this guide.
+- [`dhis2-chap/chapkit-images`](https://github.com/dhis2-chap/chapkit-images) — Dockerfiles and publish workflow for the `chapkit-py`, `chapkit-r`, `chapkit-r-tidyverse`, and `chapkit-r-inla` base images referenced throughout this guide.

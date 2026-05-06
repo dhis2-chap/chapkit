@@ -54,7 +54,8 @@ Arbitrary files at the project root that aren't in the chaff list stay put — s
 
 - **Python only** (`.py` at root) → `ghcr.io/dhis2-chap/chapkit-py:latest` (multi-arch, lean).
 - **R + INLA** (`library(INLA)` / `library(fmesher)` in any root R script, or `docker_r_inla` in MLproject `docker_env`) → `ghcr.io/dhis2-chap/chapkit-r-inla:latest` (`amd64` only).
-- **R + tidyverse** (any of `library(tidyverse)`, `dplyr`, `ggplot2`, `tidyr`, `readr`, `purrr`, `tibble`, `fable`, `tsibble`, `feasts`, `forecast`, `ranger`, `xgboost`, `glmnet`, `lubridate`, `janitor` and **no** INLA) → `ghcr.io/dhis2-chap/chapkit-r-tidyverse:latest` (multi-arch).
+- **R + tidyverse** (any of `library(tidyverse)`, `dplyr`, `ggplot2`, `tidyr`, `readr`, `purrr`, `tibble`, `fable`, `tsibble`, `feasts`, `forecast`, `ranger`, `xgboost`, `glmnet`, `lubridate`, `janitor` and **no** INLA) → `ghcr.io/dhis2-chap/chapkit-r-tidyverse:latest` (multi-arch). Detection covers `library` / `require` / `requireNamespace`, single or double quotes, and trailing arguments — `library(fable)`, `library('fable')`, `library(fable, quietly = TRUE)`, and `requireNamespace("fable")` all count.
+- **Both R and Python with tidyverse hints** → still `chapkit-r-inla` (the only image bundling both runtimes), but migrate flags the missing tidyverse stack so you can bake it in via `install_packages.R` or `renv.lock`.
 - **R, no INLA or tidyverse hints** → `ghcr.io/dhis2-chap/chapkit-r:latest` (multi-arch, minimal).
 - **Both R and Python** → `chapkit-r-inla` (fat image covers both); migrate prompts to confirm unless `--yes` is set.
 

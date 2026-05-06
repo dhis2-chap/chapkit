@@ -65,6 +65,11 @@ def _suggest_chapkit_image(project_dir: Path, mlproject: MLProject) -> str:
     """
     has_r = any(project_dir.glob("*.r")) or any(project_dir.glob("*.R"))
     has_py = any(project_dir.glob("*.py"))
+    # Mixed R + Python at the project root: only chapkit-r-inla bundles both
+    # runtimes. Mirrors migrate.detect_base_image's mixed-language branch so the
+    # `docker run` hint matches what `chapkit mlproject migrate` would build.
+    if has_r and has_py:
+        return "chapkit-r-inla"
     docker_env_image = mlproject.env_hints.get("docker_env", "")
     uses_inla = docker_env_image.startswith("ghcr.io/dhis2-chap/docker_r_inla")
     if not uses_inla and has_r:

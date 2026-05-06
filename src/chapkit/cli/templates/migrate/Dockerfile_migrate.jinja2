@@ -10,7 +10,7 @@ FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest
 FROM ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest
 {% endif %}
 
-# chapkit-py runs as root; matches chapkit-r / chapkit-r-inla.
+# chapkit-py runs as root; matches chapkit-r / chapkit-r-tidyverse / chapkit-r-inla.
 USER root
 
 WORKDIR /work

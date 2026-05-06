@@ -20,7 +20,7 @@ FROM ghcr.io/dhis2-chap/chapkit-r:latest
 FROM ghcr.io/dhis2-chap/chapkit-py:latest
 {% endif %}
 
-# chapkit-py runs as root; matches chapkit-r / chapkit-r-inla.
+# chapkit-py runs as root; matches chapkit-r / chapkit-r-tidyverse / chapkit-r-inla.
 USER root
 
 WORKDIR /work
