@@ -1,0 +1,1885 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="ML service modules built on servicekit - config management and ML workflows">
+      
+      
+      
+        <link rel="canonical" href="https://dhis2-chap.github.io/chapkit/guides/mlproject-migration-checklist/">
+      
+      
+        <link rel="prev" href="../mlproject-runner/">
+      
+      
+        <link rel="next" href="../mlproject-migrate/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>MLproject Migration Checklist - Chapkit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mlproject-migration-checklist" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Chapkit" class="md-header__button md-logo" aria-label="Chapkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Chapkit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MLproject Migration Checklist
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/dhis2-chap/chapkit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dhis2-chap/chapkit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../r-quickstart/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Chapkit" class="md-nav__button md-logo" aria-label="Chapkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Chapkit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/dhis2-chap/chapkit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dhis2-chap/chapkit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../r-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    R Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mlproject-runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Runner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Migration Checklist
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Migration Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Before migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-declare-every-column-your-scripts-hardcode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Declare every column your scripts hardcode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-declare-every-option-your-scripts-read-from-configyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Declare every option your scripts read from config.yml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-pin-your-python-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Pin your Python dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-tell-migrate-about-your-python-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Tell migrate about your Python environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-use-canonical-parameter-names-in-entry_points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Use canonical parameter names in entry_points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-fill-in-meta_data-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Fill in meta_data (recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-declare-service-level-flags-if-they-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Declare service-level flags if they apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-keep-your-scripts-workspace-root-relative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Keep your scripts workspace-root-relative
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-confirm-your-trainpredict-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Confirm your train/predict contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-dry-run-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Dry-run locally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-30-second-pre-flight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 30-second pre-flight
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run migrate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#after-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="After migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-read-the-migrate-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Read the migrate summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-smoke-test-with-chapkit-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Smoke-test with chapkit test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-build-and-run-in-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Build and run in Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-iterating-on-chapkit-test-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Iterating on chapkit test failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-bump-author_assessed_status-once-youre-confident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Bump author_assessed_status once you're confident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-commit-but-decide-what-to-do-with-_old" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Commit, but decide what to do with _old/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-register-with-chap-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Register with chap-core
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-publish-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Publish the image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-retire-_old-once-youre-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Retire _old/ once you're done
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mlproject-migrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Migrate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploying-to-chap-core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploying to chap-core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing-ml-services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing ML Services
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifact-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shell-runner-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shell-runner Contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataframe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DataFrame
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../database-migrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Migrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#before-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Before migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-declare-every-column-your-scripts-hardcode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Declare every column your scripts hardcode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-declare-every-option-your-scripts-read-from-configyml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Declare every option your scripts read from config.yml
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-pin-your-python-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Pin your Python dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-tell-migrate-about-your-python-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Tell migrate about your Python environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-use-canonical-parameter-names-in-entry_points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Use canonical parameter names in entry_points
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-fill-in-meta_data-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Fill in meta_data (recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-declare-service-level-flags-if-they-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Declare service-level flags if they apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-keep-your-scripts-workspace-root-relative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Keep your scripts workspace-root-relative
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-confirm-your-trainpredict-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Confirm your train/predict contract
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-dry-run-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Dry-run locally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-30-second-pre-flight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The 30-second pre-flight
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-migrate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run migrate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#after-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After migration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="After migration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-read-the-migrate-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Read the migrate summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-smoke-test-with-chapkit-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Smoke-test with chapkit test
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-build-and-run-in-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Build and run in Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-iterating-on-chapkit-test-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Iterating on chapkit test failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15-bump-author_assessed_status-once-youre-confident" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Bump author_assessed_status once you're confident
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16-commit-but-decide-what-to-do-with-_old" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Commit, but decide what to do with _old/
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17-register-with-chap-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Register with chap-core
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18-publish-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Publish the image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#19-retire-_old-once-youre-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Retire _old/ once you're done
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="mlproject-migration-checklist">MLproject Migration Checklist<a class="headerlink" href="#mlproject-migration-checklist" title="Permanent link">&para;</a></h1>
+<p>This guide is the full lifecycle checklist for migrating an existing <a href="https://mlflow.org/docs/latest/projects.html">MLflow-style <code>MLproject</code></a> directory into a chapkit service. Use it to prepare your repo <strong>before</strong> you run <a href="../mlproject-migrate/"><code>chapkit mlproject migrate</code></a>, and to iterate <strong>after</strong> when the first <code>chapkit test</code> run surfaces something.</p>
+<div class="admonition info">
+<p class="admonition-title">Scope: shell-based runners</p>
+<p><code>chapkit mlproject migrate</code> always emits a <a href="../ml-workflows/#shellmodelrunner"><code>ShellModelRunner</code></a> in the generated <code>main.py</code>. Your train/predict scripts run as shell commands in a copied workspace, with input/output bound to well-known filenames. That's the model this guide addresses. If you need a Python-native runner (<a href="../ml-workflows/#functionalmodelrunner"><code>FunctionalModelRunner</code></a> or a custom <a href="../ml-workflows/#basemodelrunner"><code>BaseModelRunner</code></a>), start from <a href="../cli-scaffolding/"><code>chapkit init</code></a> instead and wire your functions directly — migrate doesn't produce those runners.</p>
+</div>
+<h2 id="before-migration">Before migration<a class="headerlink" href="#before-migration" title="Permanent link">&para;</a></h2>
+<p>The more your MLproject tells chapkit up front, the less hand-editing you need after. Work through these items and commit the result before you run migrate.</p>
+<h3 id="1-declare-every-column-your-scripts-hardcode">1. Declare every column your scripts hardcode<a class="headerlink" href="#1-declare-every-column-your-scripts-hardcode" title="Permanent link">&para;</a></h3>
+<p>If your <code>train.py</code> / <code>train.R</code> reaches for a column by name, declare it as a <a href="../ml-workflows/#mlserviceinfo-fields"><code>required_covariate</code></a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">required_covariates</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rainfall</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mean_temperature</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mean_relative_humidity</span>
+</code></pre></div>
+<p>This flows into <code>MLServiceInfo.required_covariates</code> in the generated <code>main.py</code>, and <a href="../testing-ml-services/"><code>chapkit test</code></a>'s synthetic data generator emits those columns automatically so the first smoke test finds them.</p>
+<p>Skip this and <code>chapkit test</code> generates data with only the canonical columns (<code>time_period</code>, <code>location</code>, <code>disease_cases</code>, <code>population</code>, <code>rainfall</code>, <code>mean_temperature</code>). Your script reaches for a column that isn't there and crashes with <code>KeyError: "['&lt;col&gt;'] not in index"</code>.</p>
+<p><strong>Rule of thumb:</strong> if removing a column would break the model, it's a <code>required_covariate</code>.</p>
+<h3 id="2-declare-every-option-your-scripts-read-from-configyml">2. Declare every option your scripts read from <code>config.yml</code><a class="headerlink" href="#2-declare-every-option-your-scripts-read-from-configyml" title="Permanent link">&para;</a></h3>
+<p>For each knob your scripts access as <code>config["user_option_values"]["&lt;name&gt;"]</code> (Python) or <code>config$user_option_values$&lt;name&gt;</code> (R), declare it under <a href="../mlproject-migrate/#dynamic-config-becomes-a-typed-class"><code>user_options</code></a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">user_options</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">alpha</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">number</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.5</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Weighting parameter for the forecast blend.</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">n_lags</span><span class="p">:</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Number of lags to include.</span>
+</code></pre></div>
+<p>Types: <code>integer</code>, <code>number</code> (float), <code>string</code>, <code>boolean</code>, <code>path</code>. A missing <code>default</code> marks the field required — the orchestrator must supply it per config POST.</p>
+<p>Migrate emits each as a typed field on the generated <code>&lt;Name&gt;Config</code> class; <code>chapkit test</code> generates a config instance and POSTs it through. Skip the declaration and your script crashes with <code>KeyError: '&lt;name&gt;'</code> the first time it reads from config.</p>
+<h3 id="3-pin-your-python-dependencies">3. Pin your Python dependencies<a class="headerlink" href="#3-pin-your-python-dependencies" title="Permanent link">&para;</a></h3>
+<p>Bare names like <code>- pandas</code> in <code>pyenv.yaml</code> resolve to whatever's latest on PyPI at <code>docker build</code> time. That's fine until a major bump removes an API your scripts rely on — pandas 2.1 dropped <code>fillna(method=...)</code> and silently broke models written against 2.0.</p>
+<p>Pin everything that matters:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># pyenv.yaml</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">dependencies</span><span class="p">:</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pandas&gt;=2.0,&lt;2.1</span><span class="w">       </span><span class="c1"># pin before 2.1&#39;s fillna(method=) removal</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">statsmodels&gt;=0.14</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">joblib&gt;=1.3</span>
+</code></pre></div>
+<p><code>conda.yaml</code>, <code>environment.yaml</code>, or the <code>[project.dependencies]</code> section of <code>pyproject.toml</code> work the same way. <code>chapkit mlproject migrate</code> carries entries verbatim and warns in its summary about any unpinned name it finds, but pinning upstream keeps the MLproject self-contained.</p>
+<h3 id="4-tell-migrate-about-your-python-environment">4. Tell migrate about your Python environment<a class="headerlink" href="#4-tell-migrate-about-your-python-environment" title="Permanent link">&para;</a></h3>
+<p>If your MLproject declares one of these, migrate picks it up automatically:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">python_env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pyenv.yaml</span><span class="w">        </span><span class="c1"># MLflow-style python_env</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">conda_env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">environment.yaml</span><span class="w">   </span><span class="c1"># conda-style</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">uv_env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pyproject.toml</span><span class="w">         </span><span class="c1"># uv-native</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nt">renv_env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">renv.lock</span><span class="w">            </span><span class="c1"># R, reproducible library</span>
+</code></pre></div>
+<p>Docker-only MLprojects that ship a <code>pyenv.yaml</code> alongside without declaring <code>python_env:</code> also work — migrate probes the project root for <code>pyenv.yaml</code>, <code>conda.yaml</code>, or <code>environment.yaml</code> as a fallback — but the explicit declaration is clearer.</p>
+<h3 id="5-use-canonical-parameter-names-in-entry_points">5. Use canonical parameter names in <code>entry_points</code><a class="headerlink" href="#5-use-canonical-parameter-names-in-entry_points" title="Permanent link">&para;</a></h3>
+<p>Migrate translates MLproject's <code>{param}</code> placeholders into chapkit workspace filenames. The canonical set that Just Works:</p>
+<table>
+<thead>
+<tr>
+<th>MLproject param</th>
+<th>Substituted with</th>
+<th>Where chapkit writes / expects it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{train_data}</code></td>
+<td><code>{data_file}</code></td>
+<td>Panel-data CSV at workspace root, training</td>
+</tr>
+<tr>
+<td><code>{historic_data}</code></td>
+<td><code>{historic_file}</code></td>
+<td>Historic CSV, prediction input</td>
+</tr>
+<tr>
+<td><code>{future_data}</code></td>
+<td><code>{future_file}</code></td>
+<td>Future CSV (<code>disease_cases</code> nulled), prediction input</td>
+</tr>
+<tr>
+<td><code>{out_file}</code></td>
+<td><code>{output_file}</code></td>
+<td>Your predict script writes predictions here</td>
+</tr>
+<tr>
+<td><code>{model}</code></td>
+<td><code>model</code></td>
+<td>Arbitrary path your scripts save/load</td>
+</tr>
+<tr>
+<td><code>{model_config}</code></td>
+<td><code>config.yml</code></td>
+<td>Written by chapkit from the typed Config</td>
+</tr>
+<tr>
+<td><code>{polygons}</code></td>
+<td><code>{geo_file}</code></td>
+<td>GeoJSON (only when <code>requires_geo: true</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Non-canonical names are supported — migrate stops and asks for the filename, or <code>--param NAME=FILENAME</code> pre-answers — but canonical is less friction.</p>
+<h3 id="6-fill-in-meta_data-recommended">6. Fill in <code>meta_data</code> (recommended)<a class="headerlink" href="#6-fill-in-meta_data-recommended" title="Permanent link">&para;</a></h3>
+<p>The chap-core orchestrator UI uses this to describe your model to end-users:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">meta_data</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">display_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EWARS for Dengue</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Epidemic early-warning model for dengue using weather lags.</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">author</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CHAP team</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="nt">author_note</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Calibrated for Rwanda; other contexts need re-calibration.</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span><span class="nt">author_assessed_status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yellow</span><span class="w">    </span><span class="c1"># green|yellow|orange|red|gray</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">  </span><span class="nt">contact_email</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">team@example.org</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span><span class="nt">organization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HISP Centre, University of Oslo</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nt">organization_logo_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.org/logo.png</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="nt">citation_info</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Author et al. (2024), Model description.</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="nt">repository_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/your-org/your-model</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="nt">documentation_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://your-org.github.io/your-model</span>
+</code></pre></div>
+<p>The traffic-light <code>author_assessed_status</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>green</code></td>
+<td>Validated, recommended for production use</td>
+</tr>
+<tr>
+<td><code>yellow</code></td>
+<td>Works, but results should be reviewed</td>
+</tr>
+<tr>
+<td><code>orange</code></td>
+<td>Experimental; correctness not guaranteed</td>
+</tr>
+<tr>
+<td><code>red</code></td>
+<td>Known issues; don't use in production</td>
+</tr>
+<tr>
+<td><code>gray</code></td>
+<td>Not yet assessed</td>
+</tr>
+</tbody>
+</table>
+<p>Migrate defaults to <code>yellow</code> if you don't set one — adjust up or down to match reality.</p>
+<h3 id="7-declare-service-level-flags-if-they-apply">7. Declare service-level flags if they apply<a class="headerlink" href="#7-declare-service-level-flags-if-they-apply" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">supported_period_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monthly</span><span class="w">                      </span><span class="c1"># or: weekly</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">requires_geo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                                  </span><span class="c1"># if scripts read geo.json</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="nt">allow_free_additional_continuous_covariates</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">   </span><span class="c1"># let orchestrators POST extra climate covariates</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">disease_cases</span><span class="w">                               </span><span class="c1"># the column being predicted</span>
+</code></pre></div>
+<p>All four land in <code>MLServiceInfo</code> in the generated <code>main.py</code>.</p>
+<h3 id="8-keep-your-scripts-workspace-root-relative">8. Keep your scripts workspace-root-relative<a class="headerlink" href="#8-keep-your-scripts-workspace-root-relative" title="Permanent link">&para;</a></h3>
+<p><code>ShellModelRunner</code> copies your entire project directory into a temp workspace per train/predict call. Your script runs with <code>cwd=&lt;workspace&gt;</code>, and chapkit writes:</p>
+<ul>
+<li><code>data.csv</code> (training), or <code>historic.csv</code> + <code>future.csv</code> (prediction)</li>
+<li><code>config.yml</code></li>
+<li><code>geo.json</code> (only when <code>requires_geo</code> is set)</li>
+</ul>
+<p>Your script loads those by <strong>relative path</strong> (<code>"config.yml"</code>, <code>"data.csv"</code>). Don't hardcode <code>/absolute/paths/</code>; don't assume the script is running from a particular check-out. Helper modules, lookup tables, and arbitrary data files your script <code>read("schema.yaml")</code>s at startup continue to work — the whole repo is copied in (minus <code>.git</code>, <code>.venv</code>, <code>__pycache__</code>, build artefacts).</p>
+<h3 id="9-confirm-your-trainpredict-contract">9. Confirm your train/predict contract<a class="headerlink" href="#9-confirm-your-trainpredict-contract" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>train</code></strong> must leave a model file at whatever path is bound to <code>{model}</code> (commonly <code>"model"</code>). The entire workspace is zipped as an <a href="../artifact-storage/">artifact</a> afterwards, so anything else you write (<code>metrics.json</code>, training plots, …) is preserved automatically.</li>
+<li><strong><code>predict</code></strong> must write predictions to the path bound to <code>{out_file}</code> (commonly <code>"predictions.csv"</code>), with at minimum <code>time_period</code>, <code>location</code>, and one or more prediction columns. Chapkit reads that file to return predictions over HTTP.</li>
+</ul>
+<h3 id="10-dry-run-locally">10. Dry-run locally<a class="headerlink" href="#10-dry-run-locally" title="Permanent link">&para;</a></h3>
+<p>Before migrating, confirm your scripts run end-to-end with real input:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>train.py<span class="w"> </span>example_data/training_data.csv<span class="w"> </span>model.pickle<span class="w"> </span>config.yml
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>python<span class="w"> </span>predict.py<span class="w"> </span>model.pickle<span class="w"> </span>example_data/historic.csv<span class="w"> </span>example_data/future.csv<span class="w"> </span>predictions.csv<span class="w"> </span>config.yml
+</code></pre></div>
+<p>If that works, your scripts are ready for migrate.</p>
+<h3 id="the-30-second-pre-flight">The 30-second pre-flight<a class="headerlink" href="#the-30-second-pre-flight" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Hardcoded columns → <code>required_covariates</code>.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>config["user_option_values"][...]</code> keys → <code>user_options</code> with types and defaults.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> All Python deps pinned.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>python_env:</code> / <code>conda_env:</code> / <code>uv_env:</code> / <code>renv_env:</code> set.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Entry-point <code>{params}</code> use canonical names.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>meta_data:</code> filled in (especially <code>display_name</code>, <code>description</code>, <code>author_assessed_status</code>).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Service flags set where applicable (<code>supported_period_type</code>, <code>requires_geo</code>, <code>allow_free_additional_continuous_covariates</code>).</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Scripts use relative paths in the workspace.</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Local end-to-end dry-run clean.</li>
+</ul>
+<h2 id="run-migrate">Run migrate<a class="headerlink" href="#run-migrate" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nb">cd</span><span class="w"> </span>/path/to/your/mlproject
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>chapkit<span class="w"> </span>mlproject<span class="w"> </span>migrate<span class="w"> </span>--dry-run<span class="w">      </span><span class="c1"># preview the plan without touching anything</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>chapkit<span class="w"> </span>mlproject<span class="w"> </span>migrate<span class="w">                </span><span class="c1"># execute with interactive prompts</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>chapkit<span class="w"> </span>mlproject<span class="w"> </span>migrate<span class="w"> </span>--yes<span class="w">          </span><span class="c1"># execute non-interactively (CI / scripts)</span>
+</code></pre></div>
+<p>Full flag reference and behavioural details in the <a href="../mlproject-migrate/">MLproject Migrate guide</a>.</p>
+<h2 id="after-migration">After migration<a class="headerlink" href="#after-migration" title="Permanent link">&para;</a></h2>
+<p>Migrate succeeded — now confirm the wiring is sound and polish the generated project.</p>
+<h3 id="11-read-the-migrate-summary">11. Read the migrate summary<a class="headerlink" href="#11-read-the-migrate-summary" title="Permanent link">&para;</a></h3>
+<p>The last thing migrate prints is a summary with:</p>
+<ul>
+<li>how many items moved to <code>_old/</code></li>
+<li>how many files were generated</li>
+<li>how many user deps got merged into <code>pyproject.toml</code></li>
+<li><strong>a warning about any unpinned deps</strong> (you should see zero if step 3 was done)</li>
+</ul>
+<p>If the unpinned-deps note is non-empty, decide whether to pin them at the source (<code>pyenv.yaml</code> / <code>pyproject.toml</code> — re-run migrate) or in the generated <code>pyproject.toml</code> (edit in place).</p>
+<h3 id="12-smoke-test-with-chapkit-test">12. Smoke-test with <code>chapkit test</code><a class="headerlink" href="#12-smoke-test-with-chapkit-test" title="Permanent link">&para;</a></h3>
+<p><strong>Python models — one-shot:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>make<span class="w"> </span><span class="nb">test</span><span class="w">                          </span><span class="c1"># uv run chapkit test --start-service</span>
+</code></pre></div>
+<p><code>--start-service</code> spawns <code>python main.py</code> in the local uv venv, runs the smoke test, tears the service down. Only works for Python-based models — see the R caveat below.</p>
+<p><strong>Python models — two-terminal (when you want to inspect the live service):</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># terminal 1:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>make<span class="w"> </span>run
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># terminal 2 (from the same project dir):</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>make<span class="w"> </span>test-remote
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">R models: Docker only</p>
+<p><code>chapkit test --start-service</code> (and the <code>make test</code> / <code>make run</code> paths underneath) spawn <code>main.py</code> in the <strong>host's Python environment</strong> via <code>subprocess.Popen([sys.executable, "main.py"], ...)</code>. For an R model, <code>main.py</code> then shells out to <code>Rscript train.R</code> — which fails unless R and every package in <code>renv.lock</code> are installed on the host. That is essentially never what a developer has locally.</p>
+<p>For R models, use Docker instead:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># terminal 1:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>make<span class="w"> </span>docker-build
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>make<span class="w"> </span>docker-run
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># terminal 2 (once the container reports healthy):</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>make<span class="w"> </span>test-remote
+</code></pre></div>
+<p>The generated Docker image (built on <a href="https://github.com/dhis2-chap/chapkit-images"><code>chapkit-r</code></a>, <a href="https://github.com/dhis2-chap/chapkit-images"><code>chapkit-r-tidyverse</code></a>, or <a href="https://github.com/dhis2-chap/chapkit-images"><code>chapkit-r-inla</code></a>, depending on the imports detected by <code>chapkit mlproject migrate</code>) ships R and pre-restores <code>renv.lock</code> so your scripts run in the environment they were written for.</p>
+</div>
+<p>A clean run looks like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Configs created:       1
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>Trainings completed:   1
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>Trainings failed:      0
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>Predictions completed: 1
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>Predictions failed:    0
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>Result: ALL TESTS PASSED
+</code></pre></div>
+<p>If something failed, the <strong>service logs</strong> hold the actual stderr — the terminal running <code>make run</code> for local runs, or <code>docker logs &lt;container&gt;</code> for Docker. See <a href="#14-iterating-on-chapkit-test-failures">Iterating on <code>chapkit test</code> failures</a> below.</p>
+<h3 id="13-build-and-run-in-docker">13. Build and run in Docker<a class="headerlink" href="#13-build-and-run-in-docker" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>my-model<span class="w"> </span>.
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">9090</span>:8000<span class="w"> </span>my-model
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># elsewhere:</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>chapkit<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--url<span class="w"> </span>http://localhost:9090
+</code></pre></div>
+<p>If the image starts but <code>chapkit test</code> hangs or returns errors, look at <code>docker logs</code> for the service — it'll have the structured log output with <code>train_script_failed</code> / <code>predict_script_failed</code> events and their <code>stderr</code>.</p>
+<h3 id="14-iterating-on-chapkit-test-failures">14. Iterating on <code>chapkit test</code> failures<a class="headerlink" href="#14-iterating-on-chapkit-test-failures" title="Permanent link">&para;</a></h3>
+<p>The three failure shapes we've seen most often on real <code>chap-models</code> repos:</p>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>KeyError: "['&lt;col&gt;'] not in index"</code> at train time</td>
+<td>Missed a hardcoded column. Add it to <code>required_covariates:</code> in the (now in <code>_old/</code>) MLproject and re-run migrate, or edit <code>MLServiceInfo.required_covariates=[...]</code> directly in the generated <code>main.py</code>.</td>
+</tr>
+<tr>
+<td><code>KeyError: '&lt;name&gt;'</code> reading from config.yml</td>
+<td>Missed a <code>user_options</code> entry. Re-run migrate with the MLproject updated, or add the typed field to the <code>&lt;Name&gt;Config</code> class in <code>main.py</code> directly.</td>
+</tr>
+<tr>
+<td><code>TypeError: &lt;func&gt;() got an unexpected keyword argument '&lt;kw&gt;'</code> (or similar deprecation errors)</td>
+<td>Unpinned dep resolved to a newer major version than the script was written against. Either pin the dep in <code>pyproject.toml</code> (e.g. <code>"pandas&gt;=2.0,&lt;2.1"</code>) and rebuild, or update the script to the new API.</td>
+</tr>
+</tbody>
+</table>
+<p>Re-running migrate is always safe if <code>_old/</code> is clean — the classifier is deterministic and re-pulls your MLproject and scripts. Tiny <code>main.py</code> tweaks are usually faster than a full re-migrate once the project is otherwise good.</p>
+<h3 id="15-bump-author_assessed_status-once-youre-confident">15. Bump <code>author_assessed_status</code> once you're confident<a class="headerlink" href="#15-bump-author_assessed_status-once-youre-confident" title="Permanent link">&para;</a></h3>
+<p>Migrate defaults to <code>yellow</code>. After your smoke tests pass and you've verified against real data, bump to <code>green</code>. If issues are known, drop to <code>orange</code> or <code>red</code> — it's self-assessed and visible to everyone browsing chap-core.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># main.py</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">model_metadata</span><span class="o">=</span><span class="n">ModelMetadata</span><span class="p">(</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="o">...</span><span class="p">,</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">author_assessed_status</span><span class="o">=</span><span class="n">AssessedStatus</span><span class="o">.</span><span class="n">green</span><span class="p">,</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="p">),</span>
+</code></pre></div>
+<h3 id="16-commit-but-decide-what-to-do-with-_old">16. Commit, but decide what to do with <code>_old/</code><a class="headerlink" href="#16-commit-but-decide-what-to-do-with-_old" title="Permanent link">&para;</a></h3>
+<p><code>_old/</code> holds your original <code>MLproject</code>, pre-chapkit project metadata, and example data. Two reasonable choices:</p>
+<ul>
+<li><strong>Keep it in git</strong> (default) — useful while you iterate; you can re-run migrate or port config by hand. A bit of repo bloat.</li>
+<li><strong><code>.gitignore</code> it</strong> — tell git to forget it once the migration is stable. Makes the repo cleaner. The generated <code>.gitignore</code> does <strong>not</strong> ignore <code>_old/</code> by default; add a line if you want it out.</li>
+</ul>
+<p>Either way:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>git<span class="w"> </span>add<span class="w"> </span>-A
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;chore: migrate MLproject to chapkit&quot;</span>
+</code></pre></div>
+<h3 id="17-register-with-chap-core">17. Register with chap-core<a class="headerlink" href="#17-register-with-chap-core" title="Permanent link">&para;</a></h3>
+<p>The generated <code>main.py</code> calls <code>.with_registration()</code>, so when the service starts with <code>SERVICEKIT_ORCHESTRATOR_URL</code> set, it auto-registers with chap-core and sends keepalive pings. Without the env var it silently no-ops.</p>
+<p>Typical compose-based setup (runs your model alongside a chap-core instance):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="nt">my-model</span><span class="p">:</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">      </span><span class="nt">SERVICEKIT_ORCHESTRATOR_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://chap:8000/v2/services/$$register</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">      </span><span class="c1"># SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}   # optional shared secret</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">      </span><span class="nt">chap</span><span class="p">:</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">        </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_healthy</span>
+</code></pre></div>
+<h3 id="18-publish-the-image">18. Publish the image<a class="headerlink" href="#18-publish-the-image" title="Permanent link">&para;</a></h3>
+<p>Push to a registry you control (typically GitHub Container Registry):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docker<span class="w"> </span>tag<span class="w"> </span>my-model<span class="w"> </span>ghcr.io/your-org/my-model:latest
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>docker<span class="w"> </span>push<span class="w"> </span>ghcr.io/your-org/my-model:latest
+</code></pre></div>
+<p>Point the <code>image:</code> in your production compose file at the tag, and you're live.</p>
+<h3 id="19-retire-_old-once-youre-done">19. Retire <code>_old/</code> once you're done<a class="headerlink" href="#19-retire-_old-once-youre-done" title="Permanent link">&para;</a></h3>
+<p>Once the migrated project has been running cleanly for a release cycle and nothing in <code>_old/</code> is relevant anymore:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>git<span class="w"> </span>rm<span class="w"> </span>-r<span class="w"> </span>_old/
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;chore: drop _old/ now that migration is stable&quot;</span>
+</code></pre></div>
+<p>If a future teammate asks what used to live there, the commit history has the answer.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../mlproject-migrate/">MLproject Migrate</a> — full <code>chapkit mlproject migrate</code> reference: flags, classification rules, what's generated.</li>
+<li><a href="../testing-ml-services/"><code>chapkit test</code></a> — smoke-test harness used in step 12.</li>
+<li><a href="../ml-workflows/">ML Workflows</a> — runner types, <code>MLServiceInfo</code>, <code>ModelMetadata</code> fields.</li>
+<li><a href="../configuration-management/">Configuration Management</a> — <code>BaseConfig</code>, typed schemas, HTTP lifecycle.</li>
+<li><a href="../artifact-storage/">Artifact Storage</a> — how training workspaces are persisted.</li>
+<li><a href="https://github.com/dhis2-chap/chapkit-images">chapkit-images</a> — base Docker images the generated Dockerfile builds on.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/dhis2-chap/chapkit" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

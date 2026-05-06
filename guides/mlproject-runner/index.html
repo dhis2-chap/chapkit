@@ -1,0 +1,1522 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="ML service modules built on servicekit - config management and ML workflows">
+      
+      
+      
+        <link rel="canonical" href="https://dhis2-chap.github.io/chapkit/guides/mlproject-runner/">
+      
+      
+        <link rel="prev" href="../cli-scaffolding/">
+      
+      
+        <link rel="next" href="../mlproject-migration-checklist/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>MLproject Runner - Chapkit</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mlproject-runner" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Chapkit" class="md-header__button md-logo" aria-label="Chapkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Chapkit
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MLproject Runner
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/dhis2-chap/chapkit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dhis2-chap/chapkit
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../r-quickstart/" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../api-reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Chapkit" class="md-nav__button md-logo" aria-label="Chapkit" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Chapkit
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/dhis2-chap/chapkit" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dhis2-chap/chapkit
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../r-quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    R Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli-scaffolding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Scaffolding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Runner
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Runner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#canonical-parameter-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical Parameter Mapping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Canonical Parameter Mapping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overriding-the-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overriding the Map
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dynamic-config-from-user_options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Config from user_options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-hints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Hints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-in-a-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running in a Container
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running in a Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-level-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model-Level Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-chap-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with chap-core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations-and-when-to-prefer-chapkit-mlproject-migrate-or-chapkit-init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and When to Prefer chapkit mlproject migrate or chapkit init
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mlproject-migration-checklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Migration Checklist
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mlproject-migrate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLproject Migrate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploying-to-chap-core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deploying to chap-core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing-ml-services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing ML Services
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifact-storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Artifact Storage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shell-runner-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Shell-runner Contract
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dataframe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DataFrame
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../database-migrations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database Migrations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#canonical-parameter-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Canonical Parameter Mapping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Canonical Parameter Mapping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overriding-the-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overriding the Map
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dynamic-config-from-user_options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dynamic Config from user_options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-hints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Hints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-in-a-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running in a Container
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Running in a Container">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#model-level-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model-Level Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-chap-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with chap-core
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations-and-when-to-prefer-chapkit-mlproject-migrate-or-chapkit-init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and When to Prefer chapkit mlproject migrate or chapkit init
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="mlproject-runner">MLproject Runner<a class="headerlink" href="#mlproject-runner" title="Permanent link">&para;</a></h1>
+<p><code>chapkit mlproject run</code> turns any directory containing an MLflow-style <code>MLproject</code> file into a running chapkit service — no code generation, no changes to the MLproject repo. It is aimed at users coming to chapkit with an existing <code>train.r</code> / <code>predict.py</code> (or any shell-command-driven model) who want a chapkit HTTP API around their scripts in seconds.</p>
+<h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
+<p>Point it at a directory. All three forms work:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>chapkit<span class="w"> </span>mlproject<span class="w"> </span>run<span class="w">              </span><span class="c1"># uses current directory</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>chapkit<span class="w"> </span>mlproject<span class="w"> </span>run<span class="w"> </span>.<span class="w">            </span><span class="c1"># same</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>chapkit<span class="w"> </span>mlproject<span class="w"> </span>run<span class="w"> </span>/path/to/my_mlproject
+</code></pre></div>
+<p>This parses the <code>MLproject</code> file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with <code>/api/v1/ml/$train</code> and <code>/$predict</code> endpoints, and serves on <code>127.0.0.1:8000</code> by default. Override host/port with <code>--host</code> and <code>--port</code>.</p>
+<p>A minimal R MLproject like <code>dhis2-chap/minimalist_example_r</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">minimalist_r</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">renv_env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">renv.lock</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">entry_points</span><span class="p">:</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">train</span><span class="p">:</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">train_data</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Rscript</span><span class="nv"> </span><span class="s">train.r</span><span class="nv"> </span><span class="s">{train_data}</span><span class="nv"> </span><span class="s">{model}&quot;</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">predict</span><span class="p">:</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">parameters</span><span class="p">:</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="nt">historic_data</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">future_data</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">str</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="nt">out_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Rscript</span><span class="nv"> </span><span class="s">predict.r</span><span class="nv"> </span><span class="s">{model}</span><span class="nv"> </span><span class="s">{historic_data}</span><span class="nv"> </span><span class="s">{future_data}</span><span class="nv"> </span><span class="s">{out_file}&quot;</span>
+</code></pre></div>
+<p>...becomes a service that accepts <code>POST /api/v1/ml/$train</code> (with your CSV as a <code>DataFrame</code> payload), runs <code>Rscript train.r data.csv model</code> in an isolated workspace, and stores the resulting workspace as an artifact. Predict works the same way, re-entering the training workspace.</p>
+<hr />
+<h2 id="canonical-parameter-mapping">Canonical Parameter Mapping<a class="headerlink" href="#canonical-parameter-mapping" title="Permanent link">&para;</a></h2>
+<p><code>chapkit mlproject run</code> recognises the canonical MLproject parameter names used across chap-core-compatible models. Each is substituted with a fixed filename that matches chapkit's <code>ShellModelRunner</code> workspace layout:</p>
+<table>
+<thead>
+<tr>
+<th>MLproject parameter</th>
+<th>Substitutes to</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>train_data</code></td>
+<td><code>data.csv</code></td>
+<td>Training data CSV written by chapkit</td>
+</tr>
+<tr>
+<td><code>historic_data</code></td>
+<td><code>historic.csv</code></td>
+<td>Historic data CSV during predict</td>
+</tr>
+<tr>
+<td><code>future_data</code></td>
+<td><code>future.csv</code></td>
+<td>Future-period data CSV during predict</td>
+</tr>
+<tr>
+<td><code>out_file</code></td>
+<td><code>predictions.csv</code></td>
+<td>Where your script writes predictions</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>model</code></td>
+<td>Literal path; your script saves to and loads from it. The file (or directory) persists across train → predict via workspace copy.</td>
+</tr>
+<tr>
+<td><code>model_config</code></td>
+<td><code>config.yml</code></td>
+<td>Config YAML chapkit writes from <code>user_options</code> + <code>prediction_periods</code></td>
+</tr>
+<tr>
+<td><code>polygons</code></td>
+<td><code>geo.json</code></td>
+<td>Optional GeoJSON for spatial models</td>
+</tr>
+</tbody>
+</table>
+<p>These names are the lingua franca used by chap-core (<code>chap_core/runners/command_line_runner.py</code>) so any MLproject that already runs under chap-core is expected to run under <code>chapkit mlproject run</code> without change.</p>
+<h3 id="overriding-the-map">Overriding the Map<a class="headerlink" href="#overriding-the-map" title="Permanent link">&para;</a></h3>
+<p>If your MLproject uses a non-canonical placeholder (e.g. <code>{dataset}</code>), provide an override at launch:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>chapkit<span class="w"> </span>mlproject<span class="w"> </span>run<span class="w"> </span>.<span class="w"> </span>--param<span class="w"> </span><span class="nv">dataset</span><span class="o">=</span>data.csv
+</code></pre></div>
+<p>The <code>--param NAME=FILENAME</code> flag is repeatable. Overrides win over the canonical map, which lets you re-point <code>{model}</code> or any other parameter if your scripts expect a different filename.</p>
+<hr />
+<h2 id="dynamic-config-from-user_options">Dynamic Config from <code>user_options</code><a class="headerlink" href="#dynamic-config-from-user_options" title="Permanent link">&para;</a></h2>
+<p>MLproject <code>user_options</code> become typed fields on a chapkit <code>BaseConfig</code> subclass, generated at startup with <code>pydantic.create_model</code>. Given:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ewars_template</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">user_options</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">n_lags</span><span class="p">:</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Number of lags to include in the model.</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">precision</span><span class="p">:</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">number</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.01</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prior on the precision of fixed effects.</span>
+</code></pre></div>
+<p><code>chapkit mlproject run</code> builds an <code>ewars_templateConfig</code> with <code>n_lags: int = 3</code>, <code>precision: float = 0.01</code>, and the standard <code>prediction_periods: int = 3</code> injected automatically. Scripts read these values from <code>config.yml</code>, which chapkit writes to the workspace root before invoking your train/predict command.</p>
+<p>Supported <code>type</code> values: <code>integer</code>/<code>int</code>, <code>number</code>/<code>float</code>, <code>string</code>/<code>str</code>, <code>boolean</code>/<code>bool</code>, <code>path</code> (treated as string). Unknown types fall back to <code>str</code>. Options without a <code>default</code> become required fields.</p>
+<hr />
+<h2 id="environment-hints">Environment Hints<a class="headerlink" href="#environment-hints" title="Permanent link">&para;</a></h2>
+<p>If your MLproject declares a runtime environment (<code>docker_env</code>, <code>renv_env</code>, <code>python_env</code>, <code>uv_env</code>, <code>conda_env</code>), <code>chapkit mlproject run</code> <strong>warns</strong> about it on startup but does <strong>not</strong> auto-activate it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>WARNING: chapkit mlproject run does not auto-activate environments.
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  - uv_env: pyproject.toml
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Activate the right runtime (R/renv, conda, Docker image, etc.) before launching
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>chapkit mlproject run, or invoke chapkit mlproject run from inside it.
+</code></pre></div>
+<p>Because <code>chapkit mlproject run</code> shells out <code>python ...</code> / <code>Rscript ...</code> via <code>ShellModelRunner</code>, the subprocess inherits whatever is on <code>PATH</code> at launch time. Invoking the chapkit entry point directly (e.g. <code>./.venv/bin/chapkit mlproject run .</code>) does <strong>not</strong> put <code>.venv/bin</code> on subprocess <code>PATH</code>, so <code>import pandas</code> (or similar) will fail.</p>
+<p>Recommended invocations:</p>
+<ul>
+<li><strong>Python MLproject:</strong> <code>uv run chapkit mlproject run .</code> (preferred) or <code>source .venv/bin/activate &amp;&amp; chapkit mlproject run .</code></li>
+<li><strong>R MLproject:</strong> run <code>chapkit mlproject run .</code> from inside an R-capable container or an <code>renv</code>-activated shell.</li>
+</ul>
+<p>The published container images (below) set <code>PATH</code> correctly so this is a non-issue there.</p>
+<hr />
+<h2 id="running-in-a-container">Running in a Container<a class="headerlink" href="#running-in-a-container" title="Permanent link">&para;</a></h2>
+<p>The Dockerfiles and publish workflow live in the companion <a href="https://github.com/dhis2-chap/chapkit-images">dhis2-chap/chapkit-images</a> repo so image builds don't block chapkit's own CI. Two variants are published per language flavour:</p>
+<ul>
+<li><strong><code>chapkit-py</code> / <code>chapkit-r</code> / <code>chapkit-r-tidyverse</code> / <code>chapkit-r-inla</code></strong> — runtime base only (Python+uv, plus the R toolchain / R + tidyverse / R + INLA where relevant). <strong>Chapkit is not installed.</strong> Use these as the <code>FROM</code> for your own Dockerfile when your project's <code>pyproject.toml</code> already pins chapkit and a <code>uv sync</code> step installs it. This is what <code>chapkit init</code> and <code>chapkit mlproject migrate</code> produce. See the <a href="../deploying-to-chap-core/">deployment guide</a> for that flow.</li>
+<li><strong><code>chapkit-py-cli</code> / <code>chapkit-r-cli</code> / <code>chapkit-r-tidyverse-cli</code> / <code>chapkit-r-inla-cli</code></strong> — same runtime base, <strong>with chapkit pre-installed</strong>. Use these for the "no local chapkit needed" workflow: <code>docker run</code> an MLproject directly via the bundled <code>chapkit run .</code> CMD, or invoke any other <code>chapkit</code> subcommand (e.g. <code>chapkit mlproject migrate</code>) without installing chapkit on the host.</li>
+</ul>
+<p>The two-variant split exists because pre-installing chapkit in the runtime base caused a measurable runtime memory overhead for projects that pinned a different chapkit version than the base image — <code>uv sync</code> had to take an uninstall + reinstall path with a heavier profile. Splitting keeps the install path uniform for <code>FROM</code>-style use, while preserving the convenience of <code>docker run</code> for CLI-style use.</p>
+<p>The <code>-cli</code> images, all built on <code>debian:trixie-slim</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Image</th>
+<th>Contents</th>
+<th>Architectures</th>
+<th>Typical size (amd64)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ghcr.io/dhis2-chap/chapkit-py-cli:latest</code></td>
+<td>Python 3.13, chapkit, uv</td>
+<td><code>linux/amd64</code>, <code>linux/arm64</code></td>
+<td>~220 MB</td>
+</tr>
+<tr>
+<td><code>ghcr.io/dhis2-chap/chapkit-r-cli:latest</code></td>
+<td>R 4.5 + <code>renv</code> + <code>pak</code>, Python 3.13, chapkit, uv</td>
+<td><code>linux/amd64</code>, <code>linux/arm64</code></td>
+<td>~400 MB</td>
+</tr>
+<tr>
+<td><code>ghcr.io/dhis2-chap/chapkit-r-tidyverse-cli:latest</code></td>
+<td>R 4.5 + tidyverse + Posit forecasting / ML stack (fable, tsibble, feasts, forecast, ranger, xgboost, glmnet, lubridate, janitor, ...), Python 3.13, chapkit</td>
+<td><code>linux/amd64</code>, <code>linux/arm64</code></td>
+<td>~600 MB</td>
+</tr>
+<tr>
+<td><code>ghcr.io/dhis2-chap/chapkit-r-inla-cli:latest</code></td>
+<td>R 4.5 + INLA + spatial / time-series R stack (sf, spdep, dlnm, tsModel, sn, xgboost, fmesher, ...), Python 3.13, chapkit</td>
+<td><code>linux/amd64</code> (INLA x86_64 only)</td>
+<td>~570 MB</td>
+</tr>
+</tbody>
+</table>
+<p>Each <code>-cli</code> image also publishes a <code>:dev</code> tag, rebuilt nightly with chapkit installed from the <code>main</code> branch instead of PyPI — use it to test against unreleased chapkit changes.</p>
+<p>Which one to pick:</p>
+<ul>
+<li><strong>Python MLproject?</strong> Use <code>chapkit-py-cli</code> — lean and multi-arch.</li>
+<li><strong>R MLproject with no preinstalled stack?</strong> (e.g. <code>minimalist_example_r</code>) Use <code>chapkit-r-cli</code>. Multi-arch, includes the R toolchain and <code>renv</code>/<code>pak</code> so you can install additional CRAN packages or restore a lockfile at runtime.</li>
+<li><strong>R MLproject using the tidyverse / forecasting stack?</strong> Use <code>chapkit-r-tidyverse-cli</code>. Multi-arch, ships tidyverse + fable/tsibble/feasts/forecast + ranger/xgboost/glmnet/lubridate/janitor and friends.</li>
+<li><strong>R MLproject that uses INLA?</strong> (e.g. EWARS-style) Use <code>chapkit-r-inla-cli</code>. INLA + fmesher + the chap-core R-model parity set (sf, spdep, sn, dlnm, tsModel, xgboost, ...) are pre-installed. amd64 only; you will need Rosetta emulation on Apple Silicon.</li>
+</ul>
+<p>All four set <code>WORKDIR /work</code> and default to <code>CMD ["chapkit", "run", ".", "--host", "0.0.0.0", "--port", "8000"]</code>, so mounting your MLproject into <code>/work</code> is enough:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Python model</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/work&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>ghcr.io/dhis2-chap/chapkit-py-cli:latest
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="c1"># R model on a minimal R image (multi-arch)</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/work&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span>ghcr.io/dhis2-chap/chapkit-r-cli:latest
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="c1"># R model with tidyverse / forecasting stack (multi-arch)</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/work&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">  </span>ghcr.io/dhis2-chap/chapkit-r-tidyverse-cli:latest
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># R model with INLA (amd64-only; Rosetta on Apple Silicon)</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>--platform<span class="o">=</span>linux/amd64<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/work&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">  </span>ghcr.io/dhis2-chap/chapkit-r-inla-cli:latest
+</code></pre></div>
+<p>The same images run any other <code>chapkit</code> subcommand without local install — for example, migrating an existing MLproject directory:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/work&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>ghcr.io/dhis2-chap/chapkit-py-cli:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>chapkit<span class="w"> </span>mlproject<span class="w"> </span>migrate<span class="w"> </span>.<span class="w"> </span>--yes
+</code></pre></div>
+<h3 id="model-level-dependencies">Model-Level Dependencies<a class="headerlink" href="#model-level-dependencies" title="Permanent link">&para;</a></h3>
+<p>The <code>-cli</code> images contain chapkit, Python, and (for <code>chapkit-r-cli</code>) the R toolchain (<code>renv</code> + <code>pak</code>, no preinstalled R packages); <code>chapkit-r-tidyverse-cli</code> and <code>chapkit-r-inla-cli</code> add the tidyverse / forecasting and INLA / spatial stacks respectively. They do <strong>not</strong> ship your model's extra dependencies (pandas, scikit-learn, additional CRAN packages, etc.). Add them in one of two ways:</p>
+<ol>
+<li>
+<p><strong>Bake your own image</strong> (production-recommended):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">FROM</span><span class="w"> </span><span class="s">ghcr.io/dhis2-chap/chapkit-py-cli:latest</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">WORKDIR</span><span class="w"> </span><span class="s">/work</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">COPY</span><span class="w"> </span>.<span class="w"> </span>.
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">RUN</span><span class="w"> </span>uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span>/app/.venv/bin/python<span class="w"> </span>-e<span class="w"> </span>.
+</code></pre></div>
+</li>
+<li>
+<p><strong>Install at container start</strong> (quick dev):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>-p<span class="w"> </span><span class="m">8000</span>:8000<span class="w"> </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">:/work&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>ghcr.io/dhis2-chap/chapkit-py-cli:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;uv pip install --python /app/.venv/bin/python -e . &amp;&amp; exec chapkit mlproject run . --host 0.0.0.0&quot;</span>
+</code></pre></div>
+</li>
+</ol>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<p>Both images currently run as <code>root</code>. Non-root hardening needs the usual volume-mapping dance (writable <code>/tmp</code>, per-user cache dirs, etc. — see <code>chap-core/compose.yml</code> for the reference pattern) and is a planned follow-up. The images are intended to sit in a trusted compose network behind chap-core.</p>
+<hr />
+<h2 id="integration-with-chap-core">Integration with chap-core<a class="headerlink" href="#integration-with-chap-core" title="Permanent link">&para;</a></h2>
+<p><code>chapkit mlproject run</code> is designed to sit on a <code>docker compose</code> network alongside chap-core. Self-registration with chap-core is handled by servicekit's <code>SERVICEKIT_ORCHESTRATOR_URL</code> environment variable (the same mechanism used by <code>chap-core/compose.ewars.yml</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">services</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">my-model</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io/dhis2-chap/chapkit-r-cli:latest</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">platform</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux/amd64</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./my_mlproject:/work</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">      </span><span class="nt">SERVICEKIT_ORCHESTRATOR_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://chap:8000/v2/services/$$register</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">      </span><span class="c1"># Optional shared secret, if chap has SERVICEKIT_REGISTRATION_KEY set:</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">      </span><span class="c1"># SERVICEKIT_REGISTRATION_KEY: ${SERVICEKIT_REGISTRATION_KEY:-}</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">      </span><span class="nt">chap</span><span class="p">:</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">        </span><span class="nt">condition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_healthy</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="w">    </span><span class="nt">networks</span><span class="p">:</span>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chap</span>
+</code></pre></div>
+<p>No chapkit-side configuration is needed — if <code>SERVICEKIT_ORCHESTRATOR_URL</code> is set, the service registers itself with chap-core on startup.</p>
+<hr />
+<h2 id="limitations-and-when-to-prefer-chapkit-mlproject-migrate-or-chapkit-init">Limitations and When to Prefer <code>chapkit mlproject migrate</code> or <code>chapkit init</code><a class="headerlink" href="#limitations-and-when-to-prefer-chapkit-mlproject-migrate-or-chapkit-init" title="Permanent link">&para;</a></h2>
+<p><code>chapkit mlproject run</code> is a thin runtime wrapper: it does not generate, edit, or version any files in your MLproject. That keeps it ideal for:</p>
+<ul>
+<li>Rapid evaluation of an existing MLproject under chapkit.</li>
+<li>Running a model in a docker-compose network alongside chap-core without a port to chapkit.</li>
+<li>Models whose train/predict logic is stable and already well-tested outside chapkit.</li>
+</ul>
+<p>When you're ready to <strong>own</strong> the service code (commit it, extend it, ship it as your own image), reach for <a href="../mlproject-migrate/"><code>chapkit mlproject migrate</code></a>: it's the code-generating sibling of <code>run</code> that adopts your MLproject in place and produces a committable <code>main.py</code>, <code>Dockerfile</code>, <code>pyproject.toml</code> (with your deps merged in), <code>compose.yml</code>, and <code>CHAPKIT.md</code>. Your train/predict scripts stay put; only chapkit-owned metadata and chaff moves to <code>_old/</code>.</p>
+<p>Use <a href="../cli-scaffolding/"><code>chapkit init</code></a> instead when you want to start a <strong>greenfield</strong> chapkit project — no existing MLproject to adopt, full template choice (<code>fn-py</code>, <code>shell-py</code>, <code>shell-r</code>, <code>shell-r-tidyverse</code>, <code>shell-r-inla</code>), validation-hook stubs.</p>
+<table>
+<thead>
+<tr>
+<th>You have…</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An MLproject you want to quickly evaluate</td>
+<td><code>chapkit mlproject run</code></td>
+</tr>
+<tr>
+<td>An MLproject you want to own as a chapkit project</td>
+<td><code>chapkit mlproject migrate</code></td>
+</tr>
+<tr>
+<td>Nothing yet</td>
+<td><code>chapkit init</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/dhis2-chap/chapkit" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
