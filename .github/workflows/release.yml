@@ -1,0 +1,87 @@
+name: release
+
+# Cuts a release to PyPI when a `v*` tag is pushed.
+#
+# Auth uses PyPI's trusted-publishing flow: no API tokens stored on
+# our side - PyPI verifies the OIDC token GitHub mints for this
+# specific workflow file + environment combination.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - name: Sanity-check tag matches pyproject version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pyproject="$(grep -E '^version = ' pyproject.toml | head -1 | sed -E 's/.*"(.*)".*/\1/')"
+          if [ "$tag" != "$pyproject" ]; then
+            echo "Tag $GITHUB_REF_NAME (-> $tag) does not match pyproject version $pyproject"
+            exit 1
+          fi
+      - name: Build distributions
+        run: uv build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI (trusted publishing)
+    needs: build
+    runs-on: ubuntu-latest
+    # Match the environment name configured on PyPI under
+    # "trusted publisher" for this project. Gating behind a GitHub
+    # Environment also lets you require manual approval per release.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/chapkit/
+    permissions:
+      id-token: write   # required for the OIDC token PyPI verifies
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        # No `password:` here - the action reads the GitHub OIDC
+        # token from the runner and exchanges it with PyPI.
+
+  github-release:
+    name: Publish GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required to create the release + attach assets
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - name: Create release with auto-generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag \
+            dist/*.whl dist/*.tar.gz
