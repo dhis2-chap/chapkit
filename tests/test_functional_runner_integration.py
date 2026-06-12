@@ -1,10 +1,10 @@
-"""Tests for ml_basic example with LinearRegression disease prediction.
+"""Integration tests for the functional runner ML train/predict workflow.
 
-This example demonstrates the ML train/predict workflow:
-- Training models with pandas DataFrames
+Covers:
+- Training models and storing them in artifacts
 - Predictions using trained models stored in artifacts
 - Jobs for async execution
-- Artifact hierarchy for model lineage (predictions → trained model)
+- Artifact hierarchy for model lineage (predictions linked to trained model)
 """
 
 from __future__ import annotations
@@ -20,10 +20,9 @@ from fastapi.testclient import TestClient
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
-    pytest.importorskip("pandas")
-    from examples.ml_functional.main import app
+    from tests.fixtures.functional_app import build_functional_app
 
-    with TestClient(app) as test_client:
+    with TestClient(build_functional_app()) as test_client:
         yield test_client
 
 

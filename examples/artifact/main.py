@@ -1,16 +1,29 @@
-"""FastAPI service with read-only artifact API, hierarchies, and non-JSON payloads."""
+"""FastAPI service demonstrating artifact hierarchies, config linking, read-only API, and non-JSON payloads."""
 
 from __future__ import annotations
 
-from typing import TypedDict
+import random
+from typing import NotRequired, TypedDict
 
 from fastapi import FastAPI
+from pydantic import EmailStr
 from servicekit import Database
+from servicekit.api.routers.health import HealthState
 from ulid import ULID
 
-from chapkit import BaseConfig
+from chapkit import (
+    BaseConfig,
+    ConfigIn,
+    ConfigManager,
+    ConfigRepository,
+)
 from chapkit.api import ServiceBuilder, ServiceInfo
-from chapkit.artifact import ArtifactHierarchy, ArtifactIn, ArtifactManager, ArtifactRepository
+from chapkit.artifact import (
+    ArtifactHierarchy,
+    ArtifactIn,
+    ArtifactManager,
+    ArtifactRepository,
+)
 
 
 class MockLinearModel:
@@ -32,193 +45,210 @@ class MockLinearModel:
 
 
 class ArtifactSeed(TypedDict):
-    """TypedDict for artifact seed data with id and payload."""
+    """Typed dictionary for seeding artifact trees with parent-child relationships."""
 
     id: str
     data: object
+    children: NotRequired[list["ArtifactSeed"]]
 
 
-class StageSeed(TypedDict):
-    """TypedDict for stage seed data with id, metadata, and child artifacts."""
+class ExperimentSeed(TypedDict):
+    """Typed dictionary for seeding complete experiments with config and artifact tree."""
 
-    id: str
-    data: dict[str, str]
-    artifacts: list[ArtifactSeed]
-
-
-class PipelineSeed(TypedDict):
-    """TypedDict for pipeline seed data with label, root artifact, and stages."""
-
-    label: str
-    root: ArtifactSeed
-    stages: list[StageSeed]
+    config_id: str
+    config_name: str
+    config_payload: dict[str, object]
+    root_artifact: ArtifactSeed
 
 
-EXPERIMENT_HIERARCHY = ArtifactHierarchy(
-    name="ml_experiment",
-    level_labels={0: "experiment", 1: "stage", 2: "artifact"},
-)
-
-PIPELINES: tuple[PipelineSeed, ...] = (
-    {
-        "label": "experiment_alpha",
-        "root": {
-            "id": "01K72P5N5KCRM6MD3BRE4P07NB",
-            "data": {"name": "experiment_alpha", "stage": "train", "status": "succeeded"},
-        },
-        "stages": [
-            {
-                "id": "01K72P5N5KCRM6MD3BRE4P07NC",
-                "data": {"stage": "feature_engineering"},
-                "artifacts": [
-                    {
-                        "id": "01K72P5N5KCRM6MD3BRE4P07ND",
-                        "data": {"kind": "dataset", "path": "alpha/features.parquet"},
-                    },
-                    {
-                        "id": "01K72P5N5KCRM6MD3BRE4P07NE",
-                        "data": {"kind": "notebook", "path": "alpha/features.ipynb"},
-                    },
-                ],
-            },
-            {
-                "id": "01K72P5N5KCRM6MD3BRE4P07NF",
-                "data": {"stage": "model_training"},
-                "artifacts": [
-                    {
-                        "id": "01K72P5N5KCRM6MD3BRE4P07NG",
-                        "data": {"kind": "model", "format": "pickle", "path": "alpha/model.pkl"},
-                    },
-                    {
-                        "id": "01K72P5N5KCRM6MD3BRE4P07NH",
-                        "data": {"kind": "metrics", "format": "json", "path": "alpha/metrics.json"},
-                    },
-                    {
-                        "id": "01K72P5N5KCRM6MD3BRE4P07NJ",
-                        "data": MockLinearModel(
-                            coefficients=(0.42, 0.18, -0.07),
-                            intercept=0.12,
-                        ),
-                    },
-                ],
-            },
-        ],
-    },
-    {
-        "label": "experiment_beta",
-        "root": {
-            "id": "01K72P5N5KCRM6MD3BRE4P07NK",
-            "data": {"name": "experiment_beta", "stage": "train", "status": "running"},
-        },
-        "stages": [
-            {
-                "id": "01K72P5N5KCRM6MD3BRE4P07NM",
-                "data": {"stage": "data_validation"},
-                "artifacts": [
-                    {
-                        "id": "01K72P5N5KCRM6MD3BRE4P07NN",
-                        "data": {"kind": "report", "path": "beta/validation_report.html"},
-                    },
-                ],
-            },
-            {
-                "id": "01K72P5N5KCRM6MD3BRE4P07NP",
-                "data": {"stage": "batch_scoring"},
-                "artifacts": [
-                    {
-                        "id": "01K72P5N5KCRM6MD3BRE4P07NQ",
-                        "data": {"kind": "predictions", "format": "parquet", "path": "beta/preds.parquet"},
-                    },
-                    {
-                        "id": "01K72P60ZNX2PJ6QJWZK7RMCRT",
-                        "data": {"kind": "log", "path": "beta/batch.log"},
-                    },
-                ],
-            },
-        ],
-    },
-)
-
-
-class PipelineMetadata(BaseConfig):
-    """Configuration schema for pipeline metadata including owner and notification settings."""
+class ExperimentConfig(BaseConfig):
+    """Configuration schema for machine learning experiment parameters."""
 
     prediction_periods: int = 3
-    owner: str
-    stage: str
-    notification_channel: str
+    model: str
+    learning_rate: float
+    epochs: int
+    batch_size: int
+
+
+PIPELINE_HIERARCHY = ArtifactHierarchy(
+    name="training_pipeline",
+    level_labels={0: "train", 1: "predict", 2: "result"},
+)
+
+EXPERIMENTS: tuple[ExperimentSeed, ...] = (
+    {
+        "config_id": "01K72PWT05GEXK1S24AVKAZ9VE",
+        "config_name": "experiment_alpha",
+        "config_payload": {
+            "model": "xgboost",
+            "learning_rate": 0.05,
+            "epochs": 50,
+            "batch_size": 256,
+        },
+        "root_artifact": {
+            "id": "01K72PWT05GEXK1S24AVKAZ9VF",
+            "data": {"stage": "train", "dataset": "alpha_train.parquet"},
+            "children": [
+                {
+                    "id": "01K72PWT05GEXK1S24AVKAZ9VG",
+                    "data": {"stage": "predict", "run": "2024-01-05", "path": "alpha/preds_20240105.parquet"},
+                    "children": [
+                        {
+                            "id": "01K72PWT05GEXK1S24AVKAZ9VH",
+                            "data": {"stage": "result", "metrics": {"accuracy": 0.91, "f1": 0.88}},
+                        },
+                        {
+                            # Non-JSON payload: arbitrary Python objects are pickled transparently
+                            "id": "01K72PWT05GEXK1S24AVKAZ9VQ",
+                            "data": {
+                                "stage": "result",
+                                "content": MockLinearModel(coefficients=(0.42, 0.18, -0.07), intercept=0.12),
+                                "content_type": "application/x-pickle",
+                                "metadata": {"kind": "model", "format": "pickle"},
+                            },
+                        },
+                    ],
+                },
+                {
+                    "id": "01K72PWT05GEXK1S24AVKAZ9VJ",
+                    "data": {"stage": "predict", "run": "2024-01-12", "path": "alpha/preds_20240112.parquet"},
+                },
+            ],
+        },
+    },
+    {
+        "config_id": "01K72PWT05GEXK1S24AVKAZ9VK",
+        "config_name": "experiment_beta",
+        "config_payload": {
+            "model": "lightgbm",
+            "learning_rate": 0.02,
+            "epochs": 80,
+            "batch_size": 512,
+        },
+        "root_artifact": {
+            "id": "01K72PWT05GEXK1S24AVKAZ9VM",
+            "data": {"stage": "train", "dataset": "beta_train.parquet"},
+            "children": [
+                {
+                    "id": "01K72PWT05GEXK1S24AVKAZ9VN",
+                    "data": {"stage": "predict", "run": "2024-02-01", "path": "beta/preds_20240201.parquet"},
+                    "children": [
+                        {
+                            "id": "01K72PWT05GEXK1S24AVKAZ9VP",
+                            "data": {"stage": "result", "metrics": {"accuracy": 0.87, "f1": 0.84}},
+                        }
+                    ],
+                }
+            ],
+        },
+    },
+)
 
 
 class ArtifactServiceInfo(ServiceInfo):
-    """Extended service info with additional fields for artifact service metadata."""
+    """Extended service information with hierarchy and experiment metadata."""
 
     author: str | None = None
-    maintainer_contact: str | None = None
+    contact_email: EmailStr | None = None
     hierarchy: dict[str, object]
-    pipelines: list[str]
+    configs: list[str]
     non_json_payload: str
 
 
-async def seed_artifacts(app: FastAPI) -> None:
-    """Startup hook that seeds the database with predefined artifact hierarchies."""
+async def create_artifact_tree(
+    manager: ArtifactManager,
+    seed: ArtifactSeed,
+    parent_id: ULID | None = None,
+) -> ULID:
+    """Recursively creates an artifact tree from seed data with parent-child relationships."""
+    artifact_id = ULID.from_str(seed["id"])
+    artifact = await manager.save(
+        ArtifactIn(
+            id=artifact_id,
+            parent_id=parent_id,
+            data=seed["data"],
+        )
+    )
+
+    for child in seed.get("children", []) or []:
+        await create_artifact_tree(manager, child, parent_id=artifact.id)
+
+    return artifact.id
+
+
+async def seed_demo_data(app: FastAPI) -> None:
+    """Startup hook that seeds the database with demo experiments and artifact trees."""
     database: Database | None = getattr(app.state, "database", None)
     if database is None:
         return
 
     async with database.session() as session:
-        manager = ArtifactManager(ArtifactRepository(session), hierarchy=EXPERIMENT_HIERARCHY)
-        await manager.delete_all()
+        config_repository = ConfigRepository(session)
+        artifact_repository = ArtifactRepository(session)
 
-        for pipeline in PIPELINES:
-            root_seed = pipeline["root"]
-            root = await manager.save(ArtifactIn(id=ULID.from_str(root_seed["id"]), data=root_seed["data"]))
+        config_manager = ConfigManager[ExperimentConfig](config_repository, ExperimentConfig)
+        artifact_manager = ArtifactManager(artifact_repository, hierarchy=PIPELINE_HIERARCHY)
 
-            for stage in pipeline["stages"]:
-                stage_node = await manager.save(
-                    ArtifactIn(
-                        id=ULID.from_str(stage["id"]),
-                        parent_id=root.id,
-                        data=stage["data"],
-                    )
+        await artifact_manager.delete_all()
+        await config_manager.delete_all()
+
+        for experiment in EXPERIMENTS:
+            payload = ExperimentConfig.model_validate(experiment["config_payload"])
+            config = await config_manager.save(
+                ConfigIn[ExperimentConfig](
+                    id=ULID.from_str(experiment["config_id"]),
+                    name=experiment["config_name"],
+                    data=payload,
                 )
+            )
 
-                for artifact_seed in stage["artifacts"]:
-                    await manager.save(
-                        ArtifactIn(
-                            id=ULID.from_str(artifact_seed["id"]),
-                            parent_id=stage_node.id,
-                            data=artifact_seed["data"],
-                        )
-                    )
+            root_id = await create_artifact_tree(artifact_manager, experiment["root_artifact"])
+            await config_manager.link_artifact(config.id, root_id)
+
+
+async def check_flaky_service() -> tuple[HealthState, str | None]:
+    """Custom health check that randomly returns healthy, degraded, or unhealthy states."""
+    outcome = random.choice([HealthState.HEALTHY, HealthState.DEGRADED, HealthState.UNHEALTHY])
+
+    if outcome == HealthState.HEALTHY:
+        return (HealthState.HEALTHY, None)
+    elif outcome == HealthState.DEGRADED:
+        return (HealthState.DEGRADED, "Service experiencing intermittent issues")
+    else:
+        return (HealthState.UNHEALTHY, "Service unavailable")
 
 
 info = ArtifactServiceInfo(
     id="chapkit-artifact-service",
     display_name="Chapkit Artifact Service",
-    description="Artifact CRUD and tree operations example",
+    version="1.0.0",
+    description="Artifact hierarchies with config linking, read-only API, and non-JSON payloads",
     author="Morten Hansen",
-    maintainer_contact="morten@dhis2.org",
+    contact_email="morten@dhis2.org",
     hierarchy={
-        "name": EXPERIMENT_HIERARCHY.name,
-        "level_labels": dict(EXPERIMENT_HIERARCHY.level_labels),
+        "name": PIPELINE_HIERARCHY.name,
+        "level_labels": dict(PIPELINE_HIERARCHY.level_labels),
     },
-    pipelines=[pipeline["label"] for pipeline in PIPELINES],
+    configs=[experiment["config_name"] for experiment in EXPERIMENTS],
     non_json_payload="MockLinearModel",
 )
 
 app: FastAPI = (
     ServiceBuilder(info=info)
     .with_landing_page()
-    .with_health()
+    .with_logging()
+    .with_health(checks={"flaky_service": check_flaky_service})
     .with_system()
-    .with_config(PipelineMetadata)
+    .with_config(ExperimentConfig)
     .with_artifacts(
-        hierarchy=EXPERIMENT_HIERARCHY,
+        hierarchy=PIPELINE_HIERARCHY,
+        enable_config_linking=True,
         allow_create=False,
         allow_update=False,
         allow_delete=False,
     )
-    .on_startup(seed_artifacts)
+    .on_startup(seed_demo_data)
     .build()
 )
 

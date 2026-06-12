@@ -1,13 +1,11 @@
-"""Shell-based ML example using external Python scripts for train/predict.
+"""Shell-based ML test fixture using external Python scripts for train/predict.
 
-This example demonstrates:
-- Using ShellModelRunner to execute external scripts
+This fixture app exercises:
+- ShellModelRunner executing external scripts
 - Command template variable substitution
-- Language-agnostic ML workflows (could use R, Julia, etc.)
 - File-based data interchange (CSV, YAML, pickle)
 - Full project isolation with relative imports support
 - Shared utility code (lib/) imported by both train and predict scripts
-- Realistic ML workflow with feature engineering and validation
 """
 
 from chapkit import BaseConfig

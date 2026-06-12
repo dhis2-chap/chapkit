@@ -1,4 +1,4 @@
-"""Integration tests for ml_shell example with shell-based runner."""
+"""Integration tests for ShellModelRunner using the shell_project fixture."""
 
 import os
 import time
@@ -14,14 +14,14 @@ from fastapi.testclient import TestClient
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
     pytest.importorskip("pandas")
-    # Change to example directory so Path.cwd() works correctly in ShellModelRunner
+    # Change to fixture directory so Path.cwd() works correctly in ShellModelRunner
     original_cwd = Path.cwd()
-    example_dir = Path(__file__).parent.parent / "examples" / "ml_shell"
-    os.chdir(example_dir)
+    fixture_dir = Path(__file__).parent / "fixtures" / "shell_project"
+    os.chdir(fixture_dir)
 
     try:
         # Import app after changing directory
-        from examples.ml_shell.main import app
+        from tests.fixtures.shell_project.main import app
 
         with TestClient(app) as test_client:
             yield test_client

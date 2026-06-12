@@ -863,7 +863,7 @@ await manager.delete_by_id(config_id)
 
 ## Complete Example
 
-See `examples/config/` and `examples/config_artifact/` for working examples — `config` walks through the CRUD surface; `config_artifact` shows how a config can link to an artifact for experiment tracking.
+See `examples/config/` and `examples/artifact/` for working examples — `config` walks through the CRUD surface; `artifact` shows how a config can link to an artifact tree for experiment tracking.
 
 ---
 

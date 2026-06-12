@@ -691,20 +691,12 @@ After scaffolding your project:
 
 ## Examples
 
-The `examples/` directory contains pattern-focused examples (use `chapkit init` for a fresh starter project):
+The `examples/` directory contains pattern-focused examples for what `chapkit init` does not cover (use `chapkit init` for a fresh starter project):
 
-**ML Workflow Patterns:**
-- `ml_functional/` - `FunctionalModelRunner` (matches `--template fn-py`)
-- `ml_class/` - Class-based `BaseModelRunner` subclass
-- `ml_shell/` - `ShellModelRunner` with external Python scripts (matches `--template shell-py`)
-
-**Other Patterns:**
-- `ml_pipeline/` - Multi-stage ML pipeline with hierarchical artifacts
-- `config_artifact/` - Configuration with artifact linking
+- `ml_class/` - Class-based `BaseModelRunner` subclass (the functional and shell runner patterns are covered by `chapkit init` templates)
 - `config/` - Config CRUD walkthrough
-- `artifact/` - Read-only artifact API
+- `artifact/` - Artifact hierarchies with config linking, read-only API, and non-JSON payloads
 - `library_usage/` - Using chapkit as a library with custom models
-- `dataframe_usage/` - Working with `chapkit.data.DataFrame`
 
 ## Related Documentation
 

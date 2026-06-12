@@ -1005,8 +1005,8 @@ See [Artifact Storage Guide](./artifact-storage.md#get-apiv1artifactsiddownload)
 ### Basic Functional Workflow
 
 ```bash
-# 1. Start service
-fastapi dev examples/ml_basic.py
+# 1. Start a functional ML service (scaffold one with: chapkit init my-service)
+fastapi dev main.py
 
 # 2. Create config
 CONFIG_ID=$(curl -s -X POST http://localhost:9090/api/v1/configs \
@@ -1074,7 +1074,7 @@ curl http://localhost:9090/api/v1/artifacts/$PRED_ARTIFACT_ID | jq '.data.conten
 ### Class-Based with Preprocessing
 
 ```python
-# examples/ml_class.py demonstrates:
+# examples/ml_class/main.py demonstrates:
 # - StandardScaler for feature normalization
 # - State management (scaler shared between train/predict)
 # - Lifecycle hooks (on_init, on_cleanup)
@@ -1132,7 +1132,7 @@ class WeatherModelRunner(BaseModelRunner[WeatherConfig]):
 ### Shell-Based Language-Agnostic
 
 ```python
-# examples/ml_shell.py demonstrates:
+# A shell-based service (chapkit init --template shell-py) demonstrates:
 # - External R/Julia/Python scripts
 # - File-based data interchange
 # - No code modification required
@@ -1181,7 +1181,7 @@ cat("SUCCESS: Model trained\n")
 
 **Terminal 1:**
 ```bash
-fastapi dev examples/ml_basic.py
+fastapi dev main.py
 ```
 
 **Terminal 2:**
@@ -1851,7 +1851,6 @@ else:
 - **Monitoring:** Track model performance with Prometheus metrics
 
 For more examples:
-- `examples/ml_basic.py` - Functional runner with LinearRegression
-- `examples/ml_class.py` - Class-based runner with preprocessing
-- `examples/ml_shell.py` - Shell-based runner with external scripts
-- `tests/test_example_ml_basic.py` - Complete test suite
+- `chapkit init my-service` - Scaffold a functional runner service (`--template shell-py` for a shell runner)
+- `examples/ml_class/main.py` - Class-based runner with preprocessing
+- [Shell-runner workspace contract](shell-runner-contract.md) - Shell runner file contract

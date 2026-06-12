@@ -145,7 +145,7 @@ The train workspace is restored into the predict workspace before your script ru
 Two possibilities. Either you're on `chap_core` format and reading `config$n_lags` instead of `config$user_option_values$n_lags`, or your `Config` field uses a Python attribute name (`n_lags`) but chap-core wants the original hyphenated name (`n-lags`). For the second case, declare `n_lags: int = Field(alias="n-lags")` in the Config class - chapkit serialises with `by_alias=True` so the YAML key matches what your script expects.
 
 **My script needs a helper module from `scripts/`.**
-The whole project directory is copied to the workspace, so `source("scripts/lib.R")` and `from scripts.helpers import foo` both work. Paths are relative to the project root, not to your script's location.
+The whole project directory is copied to the workspace, so `source("scripts/lib.R")` and `from scripts.helpers import foo` both work. Paths are relative to the project root, not to your script's location. This also means you can keep shared code in a dedicated package - e.g. a `lib/` directory with preprocessing and validation helpers that both `scripts/train.py` and `scripts/predict.py` import via `from lib import ...`.
 
 **Stderr/stdout from a failing script.**
 Both are captured into the workspace artifact's metadata. Pull the artifact and inspect `stdout` / `stderr`. From the running container: `docker compose logs` shows them in real time.

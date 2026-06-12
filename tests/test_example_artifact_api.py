@@ -1,7 +1,4 @@
-"""Tests for artifact_api example using TestClient.
-
-This example demonstrates a read-only artifact API with hierarchical data.
-"""
+"""Tests for the artifact example: hierarchies, config linking, read-only API, non-JSON payloads."""
 
 from __future__ import annotations
 
@@ -11,6 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from examples.artifact.main import app
+
+ALPHA_CONFIG_ID = "01K72PWT05GEXK1S24AVKAZ9VE"
+ALPHA_TRAIN_ID = "01K72PWT05GEXK1S24AVKAZ9VF"
+ALPHA_RESULT_ID = "01K72PWT05GEXK1S24AVKAZ9VH"
+MODEL_ARTIFACT_ID = "01K72PWT05GEXK1S24AVKAZ9VQ"
+BETA_TRAIN_ID = "01K72PWT05GEXK1S24AVKAZ9VM"
 
 
 @pytest.fixture(scope="module")
@@ -28,11 +31,11 @@ def test_landing_page(client: TestClient) -> None:
 
 
 def test_health_endpoint(client: TestClient) -> None:
-    """Test health check returns healthy status."""
+    """Test health check returns a status (flaky_service check randomizes the overall state)."""
     response = client.get("/health")
-    assert response.status_code == 200
+    assert response.status_code in (200, 503)
     data = response.json()
-    assert data["status"] == "healthy"
+    assert data["status"] in ("healthy", "degraded", "unhealthy")
 
 
 def test_info_endpoint(client: TestClient) -> None:
@@ -41,11 +44,10 @@ def test_info_endpoint(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["display_name"] == "Chapkit Artifact Service"
-    assert data["description"] == "Artifact CRUD and tree operations example"
     assert "hierarchy" in data
-    assert data["hierarchy"]["name"] == "ml_experiment"
-    assert "pipelines" in data
-    assert len(data["pipelines"]) == 2
+    assert data["hierarchy"]["name"] == "training_pipeline"
+    assert data["configs"] == ["experiment_alpha", "experiment_beta"]
+    assert data["non_json_payload"] == "MockLinearModel"
 
 
 def test_list_artifacts(client: TestClient) -> None:
@@ -54,9 +56,9 @@ def test_list_artifacts(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
 
-    # Should be a list of artifacts from 2 pipelines
+    # Two experiments seed eight artifacts in total
     assert isinstance(data, list)
-    assert len(data) > 0
+    assert len(data) == 8
 
     # Verify structure
     for artifact in data:
@@ -88,18 +90,14 @@ def test_list_artifacts_with_pagination(client: TestClient) -> None:
 
 def test_get_artifact_by_id(client: TestClient) -> None:
     """Test retrieving artifact by ID."""
-    # First get the list to obtain a valid ID
-    list_response = client.get("/api/v1/artifacts")
-    artifacts = list_response.json()
-    artifact_id = artifacts[0]["id"]
-
-    response = client.get(f"/api/v1/artifacts/{artifact_id}")
+    response = client.get(f"/api/v1/artifacts/{ALPHA_TRAIN_ID}")
     assert response.status_code == 200
     data = response.json()
 
-    assert data["id"] == artifact_id
-    assert "data" in data
-    assert "level" in data
+    assert data["id"] == ALPHA_TRAIN_ID
+    assert data["data"]["stage"] == "train"
+    assert data["data"]["dataset"] == "alpha_train.parquet"
+    assert data["level"] == 0
 
 
 def test_get_artifact_by_id_not_found(client: TestClient) -> None:
@@ -112,29 +110,21 @@ def test_get_artifact_by_id_not_found(client: TestClient) -> None:
 
 def test_get_artifact_tree(client: TestClient) -> None:
     """Test retrieving artifact tree structure with $tree operation."""
-    # Get a root artifact (level 0)
-    list_response = client.get("/api/v1/artifacts")
-    artifacts = list_response.json()
-    root_artifact = next((a for a in artifacts if a["level"] == 0), None)
-    assert root_artifact is not None
-
-    root_id = root_artifact["id"]
-    response = client.get(f"/api/v1/artifacts/{root_id}/$tree")
+    response = client.get(f"/api/v1/artifacts/{ALPHA_TRAIN_ID}/$tree")
     assert response.status_code == 200
     data = response.json()
 
     # Verify tree structure
-    assert data["id"] == root_id
+    assert data["id"] == ALPHA_TRAIN_ID
     assert "data" in data
     assert "children" in data
     assert isinstance(data["children"], list)
 
     # Verify hierarchical structure
-    if len(data["children"]) > 0:
-        child = data["children"][0]
-        assert "id" in child
-        assert "data" in child
-        assert "children" in child
+    child = data["children"][0]
+    assert "id" in child
+    assert "data" in child
+    assert "children" in child
 
 
 def test_get_artifact_tree_not_found(client: TestClient) -> None:
@@ -147,50 +137,36 @@ def test_get_artifact_tree_not_found(client: TestClient) -> None:
 
 def test_expand_artifact(client: TestClient) -> None:
     """Test expanding artifact with $expand operation returns hierarchy metadata without children."""
-    # Get a root artifact (level 0)
-    list_response = client.get("/api/v1/artifacts")
-    artifacts = list_response.json()
-    root_artifact = next((a for a in artifacts if a["level"] == 0), None)
-    assert root_artifact is not None
-
-    root_id = root_artifact["id"]
-    response = client.get(f"/api/v1/artifacts/{root_id}/$expand")
+    response = client.get(f"/api/v1/artifacts/{ALPHA_TRAIN_ID}/$expand")
     assert response.status_code == 200
     data = response.json()
 
     # Verify expanded structure
-    assert data["id"] == root_id
+    assert data["id"] == ALPHA_TRAIN_ID
     assert "data" in data
-    assert "level" in data
-    assert "level_label" in data
-    assert "hierarchy" in data
-
-    # Verify hierarchy metadata is present
-    assert data["hierarchy"] == "ml_experiment"
-    assert data["level_label"] == "experiment"
+    assert data["level"] == 0
+    assert data["level_label"] == "train"
+    assert data["hierarchy"] == "training_pipeline"
 
     # Verify children is None (not included in expand)
     assert data["children"] is None
 
 
 def test_expand_artifact_with_parent(client: TestClient) -> None:
-    """Test expanding artifact with parent includes hierarchy metadata."""
-    # Get a child artifact (level 1)
+    """Test expanding a child artifact includes hierarchy metadata."""
     list_response = client.get("/api/v1/artifacts")
     artifacts = list_response.json()
-    child_artifact = next((a for a in artifacts if a["level"] == 1), None)
-    assert child_artifact is not None
+    child_artifact = next(a for a in artifacts if a["level"] == 1)
 
-    child_id = child_artifact["id"]
-    response = client.get(f"/api/v1/artifacts/{child_id}/$expand")
+    response = client.get(f"/api/v1/artifacts/{child_artifact['id']}/$expand")
     assert response.status_code == 200
     data = response.json()
 
     # Verify expanded structure
-    assert data["id"] == child_id
+    assert data["id"] == child_artifact["id"]
     assert data["level"] == 1
-    assert data["level_label"] == "stage"
-    assert data["hierarchy"] == "ml_experiment"
+    assert data["level_label"] == "predict"
+    assert data["hierarchy"] == "training_pipeline"
     assert data["children"] is None
 
 
@@ -203,22 +179,60 @@ def test_expand_artifact_not_found(client: TestClient) -> None:
 
 
 def test_artifact_with_non_json_payload(client: TestClient) -> None:
-    """Test artifact with non-JSON payload (MockLinearModel) is serialized with metadata."""
-    # Find the artifact with MockLinearModel (ID: 01K72P5N5KCRM6MD3BRE4P07NJ)
-    response = client.get("/api/v1/artifacts/01K72P5N5KCRM6MD3BRE4P07NJ")
+    """Test artifact with non-JSON content (MockLinearModel) is serialized with metadata."""
+    response = client.get(f"/api/v1/artifacts/{MODEL_ARTIFACT_ID}")
     assert response.status_code == 200
     data = response.json()
 
-    # Verify the MockLinearModel is serialized with metadata fields
-    assert "data" in data
     artifact_data = data["data"]
-    assert isinstance(artifact_data, dict)
-    assert artifact_data["_type"] == "MockLinearModel"
-    assert artifact_data["_module"] == "examples.artifact.main"
-    assert "MockLinearModel" in artifact_data["_repr"]
-    assert "coefficients" in artifact_data["_repr"]
-    assert "intercept" in artifact_data["_repr"]
-    assert "_serialization_error" in artifact_data
+    assert artifact_data["content_type"] == "application/x-pickle"
+    assert artifact_data["metadata"] == {"kind": "model", "format": "pickle"}
+
+    # The MockLinearModel content is serialized with fallback metadata fields
+    content = artifact_data["content"]
+    assert content["_type"] == "MockLinearModel"
+    assert content["_module"] == "examples.artifact.main"
+    assert "MockLinearModel" in content["_repr"]
+    assert "coefficients" in content["_repr"]
+    assert "intercept" in content["_repr"]
+    assert "_serialization_error" in content
+
+
+def test_artifact_metadata_operation(client: TestClient) -> None:
+    """Test $metadata operation returns JSON metadata without the pickled content."""
+    response = client.get(f"/api/v1/artifacts/{MODEL_ARTIFACT_ID}/$metadata")
+    assert response.status_code == 200
+    assert response.json() == {"kind": "model", "format": "pickle"}
+
+
+def test_get_linked_artifacts_for_config(client: TestClient) -> None:
+    """Test $artifacts operation on a config returns its linked root artifacts."""
+    response = client.get(f"/api/v1/configs/{ALPHA_CONFIG_ID}/$artifacts")
+    assert response.status_code == 200
+    artifacts = response.json()
+
+    assert len(artifacts) == 1
+    assert artifacts[0]["id"] == ALPHA_TRAIN_ID
+
+
+def test_get_config_for_artifact(client: TestClient) -> None:
+    """Test $config operation on a root artifact returns the linked config."""
+    response = client.get(f"/api/v1/artifacts/{ALPHA_TRAIN_ID}/$config")
+    assert response.status_code == 200
+    config = response.json()
+
+    assert config["id"] == ALPHA_CONFIG_ID
+    assert config["name"] == "experiment_alpha"
+    assert config["data"]["model"] == "xgboost"
+
+
+def test_get_config_for_nested_artifact(client: TestClient) -> None:
+    """Test $config operation on a nested artifact traverses to the root's linked config."""
+    response = client.get(f"/api/v1/artifacts/{ALPHA_RESULT_ID}/$config")
+    assert response.status_code == 200
+    config = response.json()
+
+    assert config["name"] == "experiment_alpha"
 
 
 def test_create_artifact_not_allowed(client: TestClient) -> None:
@@ -231,67 +245,54 @@ def test_create_artifact_not_allowed(client: TestClient) -> None:
 
 def test_update_artifact_not_allowed(client: TestClient) -> None:
     """Test that updating artifacts is disabled (read-only API)."""
-    # Get an existing artifact ID
-    list_response = client.get("/api/v1/artifacts")
-    artifacts = list_response.json()
-    artifact_id = artifacts[0]["id"]
+    updated_artifact = {"id": ALPHA_TRAIN_ID, "data": {"updated": True}}
 
-    updated_artifact = {"id": artifact_id, "data": {"updated": True}}
-
-    response = client.put(f"/api/v1/artifacts/{artifact_id}", json=updated_artifact)
+    response = client.put(f"/api/v1/artifacts/{ALPHA_TRAIN_ID}", json=updated_artifact)
     assert response.status_code == 405  # Method Not Allowed
 
 
 def test_delete_artifact_not_allowed(client: TestClient) -> None:
     """Test that deleting artifacts is disabled (read-only API)."""
-    # Get an existing artifact ID
-    list_response = client.get("/api/v1/artifacts")
-    artifacts = list_response.json()
-    artifact_id = artifacts[0]["id"]
-
-    response = client.delete(f"/api/v1/artifacts/{artifact_id}")
+    response = client.delete(f"/api/v1/artifacts/{ALPHA_TRAIN_ID}")
     assert response.status_code == 405  # Method Not Allowed
 
 
 def test_list_configs(client: TestClient) -> None:
-    """Test listing configs endpoint exists."""
+    """Test listing configs returns the seeded experiments."""
     response = client.get("/api/v1/configs")
     assert response.status_code == 200
     data = response.json()
-    assert isinstance(data, list)
+    names = [config["name"] for config in data]
+    assert "experiment_alpha" in names
+    assert "experiment_beta" in names
 
 
 def test_experiment_alpha_tree_structure(client: TestClient) -> None:
     """Test experiment_alpha tree has correct hierarchical structure."""
-    # Root artifact for experiment_alpha
-    root_id = "01K72P5N5KCRM6MD3BRE4P07NB"
-    response = client.get(f"/api/v1/artifacts/{root_id}/$tree")
+    response = client.get(f"/api/v1/artifacts/{ALPHA_TRAIN_ID}/$tree")
     assert response.status_code == 200
     tree = response.json()
 
     # Verify root
-    assert tree["id"] == root_id
-    assert tree["data"]["name"] == "experiment_alpha"
+    assert tree["id"] == ALPHA_TRAIN_ID
+    assert tree["data"]["stage"] == "train"
     assert tree["level"] == 0
-    assert len(tree["children"]) == 2  # Two stages
+    assert len(tree["children"]) == 2  # Two prediction runs
 
-    # Verify stages
-    for stage in tree["children"]:
-        assert stage["level"] == 1
-        assert "stage" in stage["data"]
-        assert "artifacts" in stage or "children" in stage
+    # Verify predict nodes
+    for predict_node in tree["children"]:
+        assert predict_node["level"] == 1
+        assert predict_node["data"]["stage"] == "predict"
 
 
 def test_experiment_beta_tree_structure(client: TestClient) -> None:
     """Test experiment_beta tree has correct hierarchical structure."""
-    # Root artifact for experiment_beta
-    root_id = "01K72P5N5KCRM6MD3BRE4P07NK"
-    response = client.get(f"/api/v1/artifacts/{root_id}/$tree")
+    response = client.get(f"/api/v1/artifacts/{BETA_TRAIN_ID}/$tree")
     assert response.status_code == 200
     tree = response.json()
 
     # Verify root
-    assert tree["id"] == root_id
-    assert tree["data"]["name"] == "experiment_beta"
+    assert tree["id"] == BETA_TRAIN_ID
+    assert tree["data"]["stage"] == "train"
     assert tree["level"] == 0
-    assert len(tree["children"]) == 2  # Two stages
+    assert len(tree["children"]) == 1  # One prediction run
