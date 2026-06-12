@@ -1,4 +1,4 @@
-"""Integration tests for ml_class example with class-based runner."""
+"""Integration tests for the class-based runner: lifecycle hooks, shared state, and train/predict."""
 
 import time
 from collections.abc import Generator
@@ -11,10 +11,9 @@ from fastapi.testclient import TestClient
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
-    pytest.importorskip("pandas")
-    from examples.ml_class.main import app
+    from tests.fixtures.class_runner_app import build_class_runner_app
 
-    with TestClient(app) as test_client:
+    with TestClient(build_class_runner_app()) as test_client:
         yield test_client
 
 

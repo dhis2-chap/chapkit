@@ -1,7 +1,4 @@
-"""Tests for config_api example using TestClient.
-
-Tests use FastAPI's TestClient instead of running a separate server.
-"""
+"""Integration tests for the config service: CRUD, seeding, pagination, and custom service info."""
 
 from __future__ import annotations
 
@@ -10,13 +7,13 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.config.main import app
+from tests.fixtures.config_app import build_config_app
 
 
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
-    with TestClient(app) as test_client:
+    with TestClient(build_config_app()) as test_client:
         yield test_client
 
 

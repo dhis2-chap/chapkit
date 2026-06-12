@@ -167,11 +167,10 @@ class TestCheckTrainingWorkspace:
 
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
-    """Spin up the ml_class example app for validate integration tests."""
-    pytest.importorskip("pandas")
-    from examples.ml_class.main import app
+    """Spin up the class-based runner fixture app for validate integration tests."""
+    from tests.fixtures.class_runner_app import build_class_runner_app
 
-    with TestClient(app) as test_client:
+    with TestClient(build_class_runner_app()) as test_client:
         yield test_client
 
 
@@ -362,9 +361,9 @@ def test_validate_predict_empty_historic_and_future(client: TestClient) -> None:
 
 def test_validate_train_runner_diagnostic_flows_through(client: TestClient) -> None:
     """A domain diagnostic from on_validate_train reaches the response."""
-    # WeatherConfig.min_samples defaults to 5 in the example; WeatherModelRunner's
-    # on_validate_train override (see examples/ml_class/main.py) emits an error
-    # diagnostic when data has fewer rows than min_samples.
+    # ClassRunnerConfig.min_samples defaults to 5; FixtureModelRunner's
+    # on_validate_train override (see tests/fixtures/class_runner_app.py) emits an
+    # error diagnostic when data has fewer rows than min_samples.
     config_id = _create_config(client, min_samples=10)
     body = {
         "type": "train",

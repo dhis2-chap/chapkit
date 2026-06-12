@@ -1,4 +1,4 @@
-"""Tests for the artifact example: hierarchies, config linking, read-only API, non-JSON payloads."""
+"""Integration tests for the artifact service: hierarchies, config linking, read-only API, non-JSON payloads."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.artifact.main import app
+from tests.fixtures.artifact_app import build_artifact_app
 
 ALPHA_CONFIG_ID = "01K72PWT05GEXK1S24AVKAZ9VE"
 ALPHA_TRAIN_ID = "01K72PWT05GEXK1S24AVKAZ9VF"
@@ -19,7 +19,7 @@ BETA_TRAIN_ID = "01K72PWT05GEXK1S24AVKAZ9VM"
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
-    with TestClient(app) as test_client:
+    with TestClient(build_artifact_app()) as test_client:
         yield test_client
 
 
@@ -191,7 +191,7 @@ def test_artifact_with_non_json_payload(client: TestClient) -> None:
     # The MockLinearModel content is serialized with fallback metadata fields
     content = artifact_data["content"]
     assert content["_type"] == "MockLinearModel"
-    assert content["_module"] == "examples.artifact.main"
+    assert content["_module"] == "tests.fixtures.artifact_app"
     assert "MockLinearModel" in content["_repr"]
     assert "coefficients" in content["_repr"]
     assert "intercept" in content["_repr"]

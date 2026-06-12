@@ -1,8 +1,4 @@
-"""Tests for library_usage_api example using TestClient.
-
-This example demonstrates using chapkit as a library with custom models.
-Tests use FastAPI's TestClient instead of running a separate server.
-"""
+"""Integration tests for using chapkit as a library with a custom Entity, Manager, and CrudRouter."""
 
 from __future__ import annotations
 
@@ -11,13 +7,13 @@ from collections.abc import Generator
 import pytest
 from fastapi.testclient import TestClient
 
-from examples.library_usage.main import app
+from tests.fixtures.custom_entity_app import build_custom_entity_app
 
 
 @pytest.fixture(scope="module")
 def client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for testing with lifespan context."""
-    with TestClient(app) as test_client:
+    with TestClient(build_custom_entity_app()) as test_client:
         yield test_client
 
 
