@@ -1006,7 +1006,7 @@ See [Artifact Storage Guide](./artifact-storage.md#get-apiv1artifactsiddownload)
 
 ```bash
 # 1. Start a functional ML service (scaffold one with: chapkit init my-service)
-fastapi dev main.py
+cd my-service && uv run python main.py   # serves on http://localhost:9090
 
 # 2. Create config
 CONFIG_ID=$(curl -s -X POST http://localhost:9090/api/v1/configs \
@@ -1181,7 +1181,7 @@ cat("SUCCESS: Model trained\n")
 
 **Terminal 1:**
 ```bash
-fastapi dev main.py
+cd my-service && uv run python main.py   # serves on http://localhost:9090
 ```
 
 **Terminal 2:**
