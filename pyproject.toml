@@ -145,27 +145,17 @@ disallow_any_unimported = false
 module = [
   "chapkit.artifact.*",
   "chapkit.config.*",
-  "chapkit.task.*",
   "examples.*",
 ]
 warn_return_any = false
 
 [[tool.mypy.overrides]]
-module = "examples.custom_migrations.*"
-ignore_missing_imports = true
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "examples.artifact_manager.*"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = ["chapkit.data.dataframe", "examples.dataframe_usage.*"]
+module = "chapkit.data.dataframe"
 disable_error_code = ["import-not-found"]
 
 [tool.pyright]
 include = ["src", "tests", "examples"]
-exclude = ["examples/artifact_manager", "examples/dataframe_usage", "**/.venv"]
+exclude = ["**/.venv"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 useLibraryCodeForTypes = true

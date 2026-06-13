@@ -16,14 +16,14 @@ from ulid import ULID
 @pytest.fixture(scope="module")
 def shell_client() -> Generator[TestClient, None, None]:
     """Create FastAPI TestClient for shell runner testing."""
-    # Change to example directory so Path.cwd() works correctly in ShellModelRunner
+    # Change to fixture directory so Path.cwd() works correctly in ShellModelRunner
     original_cwd = Path.cwd()
-    example_dir = Path(__file__).parent.parent / "examples" / "ml_shell"
-    os.chdir(example_dir)
+    fixture_dir = Path(__file__).parent / "fixtures" / "shell_project"
+    os.chdir(fixture_dir)
 
     try:
         # Import app after changing directory
-        from examples.ml_shell.main import app as shell_app
+        from tests.fixtures.shell_project.main import app as shell_app
 
         with TestClient(shell_app) as test_client:
             yield test_client
@@ -55,7 +55,7 @@ def test_predict_with_failed_training_artifact(shell_client: TestClient) -> None
     config_id = config_response.json()["id"]
 
     # Submit training job that will fail (exit 1)
-    # The shell runner in examples/ml_shell has train script that may fail
+    # The shell_project fixture has a train script that may fail
     # We need to create a training artifact with status="failed"
     train_request = {
         "config_id": config_id,

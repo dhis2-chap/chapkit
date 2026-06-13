@@ -1,4 +1,4 @@
-"""FastAPI service demonstrating artifact hierarchies, config linking, read-only API, and non-JSON payloads."""
+"""Artifact service factory with seeded hierarchies, config linking, and non-JSON payloads for tests."""
 
 from __future__ import annotations
 
@@ -11,19 +11,9 @@ from servicekit import Database
 from servicekit.api.routers.health import HealthState
 from ulid import ULID
 
-from chapkit import (
-    BaseConfig,
-    ConfigIn,
-    ConfigManager,
-    ConfigRepository,
-)
+from chapkit import BaseConfig, ConfigIn, ConfigManager, ConfigRepository
 from chapkit.api import ServiceBuilder, ServiceInfo
-from chapkit.artifact import (
-    ArtifactHierarchy,
-    ArtifactIn,
-    ArtifactManager,
-    ArtifactRepository,
-)
+from chapkit.artifact import ArtifactHierarchy, ArtifactIn, ArtifactManager, ArtifactRepository
 
 
 class MockLinearModel:
@@ -219,41 +209,36 @@ async def check_flaky_service() -> tuple[HealthState, str | None]:
         return (HealthState.UNHEALTHY, "Service unavailable")
 
 
-info = ArtifactServiceInfo(
-    id="chapkit-artifact-service",
-    display_name="Chapkit Artifact Service",
-    version="1.0.0",
-    description="Artifact hierarchies with config linking, read-only API, and non-JSON payloads",
-    author="Morten Hansen",
-    contact_email="morten@dhis2.org",
-    hierarchy={
-        "name": PIPELINE_HIERARCHY.name,
-        "level_labels": dict(PIPELINE_HIERARCHY.level_labels),
-    },
-    configs=[experiment["config_name"] for experiment in EXPERIMENTS],
-    non_json_payload="MockLinearModel",
-)
-
-app: FastAPI = (
-    ServiceBuilder(info=info)
-    .with_landing_page()
-    .with_logging()
-    .with_health(checks={"flaky_service": check_flaky_service})
-    .with_system()
-    .with_config(ExperimentConfig)
-    .with_artifacts(
-        hierarchy=PIPELINE_HIERARCHY,
-        enable_config_linking=True,
-        allow_create=False,
-        allow_update=False,
-        allow_delete=False,
+def build_artifact_app() -> FastAPI:
+    """Build a read-only artifact service with seeded experiment trees and config linking."""
+    info = ArtifactServiceInfo(
+        id="chapkit-artifact-service",
+        display_name="Chapkit Artifact Service",
+        version="1.0.0",
+        description="Artifact hierarchies with config linking, read-only API, and non-JSON payloads",
+        author="Morten Hansen",
+        contact_email="morten@dhis2.org",
+        hierarchy={
+            "name": PIPELINE_HIERARCHY.name,
+            "level_labels": dict(PIPELINE_HIERARCHY.level_labels),
+        },
+        configs=[experiment["config_name"] for experiment in EXPERIMENTS],
+        non_json_payload="MockLinearModel",
     )
-    .on_startup(seed_demo_data)
-    .build()
-)
-
-
-if __name__ == "__main__":
-    from chapkit.api import run_app
-
-    run_app("main:app")
+    return (
+        ServiceBuilder(info=info)
+        .with_landing_page()
+        .with_logging()
+        .with_health(checks={"flaky_service": check_flaky_service})
+        .with_system()
+        .with_config(ExperimentConfig)
+        .with_artifacts(
+            hierarchy=PIPELINE_HIERARCHY,
+            enable_config_linking=True,
+            allow_create=False,
+            allow_update=False,
+            allow_delete=False,
+        )
+        .on_startup(seed_demo_data)
+        .build()
+    )

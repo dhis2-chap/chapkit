@@ -1721,14 +1721,6 @@ uv add 'servicekit[arrow]'
 
 ## Examples
 
-### Example Files
-
-See `examples/` directory:
-- Basic DataFrame operations
-- API integration patterns
-- CSV upload/download
-- Data validation workflows
-
 ### Interactive Session
 
 ```python
@@ -1811,7 +1803,6 @@ polars_df = pl.read_csv("large_file.csv")
 
 - **Learn More**: See other guides for integrating DataFrame with APIs
 - **Contribute**: Submit PRs for new format support (Parquet, Arrow, etc.)
-- **Examples**: Check `examples/` directory for real-world usage
 
 For related features, see:
 - [Servicekit Repository](https://github.com/winterop-com/servicekit) - Building services with servicekit

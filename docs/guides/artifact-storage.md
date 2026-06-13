@@ -373,7 +373,7 @@ Use `DataFrame` schema for tabular data:
 
 ```python
 from chapkit.artifact import ArtifactIn
-from servicekit.data import DataFrame
+from chapkit.data import DataFrame
 import pandas as pd
 
 df = pd.DataFrame({
@@ -667,7 +667,7 @@ sqlite3 data.db ".backup backup_$(date +%Y%m%d).db"
 
 ## Complete Example
 
-See `examples/artifact_storage_api.py` for a complete working example with document versioning system.
+See `examples/artifact/` for a complete working example with artifact hierarchies, config linking, and non-JSON payloads.
 
 ## Next Steps
 

@@ -5,16 +5,13 @@ from typing import Any
 import pytest
 from starlette.testclient import TestClient
 
+from tests.fixtures.functional_app import build_functional_app
+
 
 @pytest.fixture(scope="module")
 def client():
-    """Create test client using ML functional example."""
-    pytest.importorskip("pandas")
-    from examples.ml_functional.main import app
-
-    # The example app initializes the database on lifespan startup
-    # TestClient handles this automatically
-    with TestClient(app) as test_client:
+    """Create test client for a minimal functional ML service."""
+    with TestClient(build_functional_app()) as test_client:
         yield test_client
 
 
