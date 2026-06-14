@@ -9,6 +9,8 @@ from .schemas import (
     ArtifactHierarchy,
     ArtifactIn,
     ArtifactOut,
+    ArtifactSummaryOut,
+    ArtifactSummaryTreeNode,
     ArtifactTreeNode,
     BaseArtifactData,
     GenericArtifactData,
@@ -16,6 +18,7 @@ from .schemas import (
     MLMetadata,
     MLPredictionArtifactData,
     MLTrainingWorkspaceArtifactData,
+    strip_content,
     validate_artifact_data,
 )
 
@@ -24,6 +27,8 @@ __all__ = [
     "ArtifactHierarchy",
     "ArtifactIn",
     "ArtifactOut",
+    "ArtifactSummaryOut",
+    "ArtifactSummaryTreeNode",
     "ArtifactTreeNode",
     "ArtifactRepository",
     "ArtifactManager",
@@ -35,5 +40,6 @@ __all__ = [
     "GenericArtifactData",
     "MLMetadata",
     "GenericMetadata",
+    "strip_content",
     "validate_artifact_data",
 ]

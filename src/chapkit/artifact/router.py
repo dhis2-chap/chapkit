@@ -5,11 +5,17 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, Response, status
 from servicekit.api.crud import CrudPermissions, CrudRouter
+from servicekit.schemas import PaginatedResponse
 
 from ..config.schemas import BaseConfig, ConfigOut
 from ..data import DataFrame
 from .manager import ArtifactManager
-from .schemas import ArtifactIn, ArtifactOut, ArtifactTreeNode
+from .schemas import (
+    ArtifactIn,
+    ArtifactOut,
+    ArtifactSummaryOut,
+    ArtifactSummaryTreeNode,
+)
 
 
 class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
@@ -40,6 +46,29 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
             **kwargs,
         )
 
+    def _register_find_all_route(self, manager_dependency: Any, manager_annotation: Any) -> None:
+        """Register the list route returning content-less artifact summaries."""
+        summary_annotation: Any = ArtifactSummaryOut
+        collection_response_model: Any = list[summary_annotation] | PaginatedResponse[summary_annotation]
+
+        @self.router.get("", response_model=collection_response_model)
+        async def find_all(
+            page: int | None = None,
+            size: int | None = None,
+            manager: ArtifactManager = manager_dependency,
+        ) -> list[ArtifactSummaryOut] | PaginatedResponse[ArtifactSummaryOut]:
+            from servicekit.api.pagination import create_paginated_response
+
+            if page is not None and size is not None:
+                items, total = await manager.find_paginated(page, size)
+                summaries = [ArtifactSummaryOut.from_artifact(item) for item in items]
+                return create_paginated_response(summaries, total, page, size)
+            artifacts = await manager.find_all()
+            return [ArtifactSummaryOut.from_artifact(item) for item in artifacts]
+
+        self._annotate_manager(find_all, manager_annotation)
+        find_all.__annotations__["return"] = list[summary_annotation] | PaginatedResponse[summary_annotation]
+
     def _register_routes(self) -> None:
         """Register artifact CRUD routes and tree operations."""
         super()._register_routes()
@@ -49,7 +78,7 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
         async def expand_artifact(
             entity_id: str,
             manager: ArtifactManager = Depends(manager_factory),
-        ) -> ArtifactTreeNode:
+        ) -> ArtifactSummaryTreeNode:
             ulid_id = self._parse_ulid(entity_id)
 
             expanded = await manager.expand_artifact(ulid_id)
@@ -58,12 +87,12 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Artifact with id {entity_id} not found",
                 )
-            return expanded
+            return ArtifactSummaryTreeNode.from_tree_node(expanded)
 
         async def build_tree(
             entity_id: str,
             manager: ArtifactManager = Depends(manager_factory),
-        ) -> ArtifactTreeNode:
+        ) -> ArtifactSummaryTreeNode:
             ulid_id = self._parse_ulid(entity_id)
 
             tree = await manager.build_tree(ulid_id)
@@ -72,22 +101,22 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Artifact with id {entity_id} not found",
                 )
-            return tree
+            return ArtifactSummaryTreeNode.from_tree_node(tree)
 
         self.register_entity_operation(
             "expand",
             expand_artifact,
-            response_model=ArtifactTreeNode,
+            response_model=ArtifactSummaryTreeNode,
             summary="Expand artifact",
-            description="Get artifact with hierarchy metadata but without children",
+            description="Get artifact with hierarchy metadata but without children or content",
         )
 
         self.register_entity_operation(
             "tree",
             build_tree,
-            response_model=ArtifactTreeNode,
+            response_model=ArtifactSummaryTreeNode,
             summary="Build artifact tree",
-            description="Build hierarchical tree structure rooted at the given artifact",
+            description="Build hierarchical tree structure rooted at the given artifact, without content",
         )
 
         # Conditionally register config access endpoint
