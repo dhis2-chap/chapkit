@@ -192,3 +192,145 @@ class TestArtifactAPIWithNonSerializableData:
 
         finally:
             await db.dispose()
+
+
+CONTENT_ARTIFACT_DATA = {
+    "type": "generic",
+    "metadata": {"status": "success", "note": "result"},
+    "content": {"columns": ["time", "value"], "data": [["2024-01", 1], ["2024-02", 2]]},
+    "content_type": "application/json",
+    "content_size": 64,
+}
+
+
+def _make_artifact_app() -> FastAPI:
+    """Build a FastAPI app exposing the artifact router for projection tests."""
+    app = FastAPI()
+    artifact_router = ArtifactRouter.create(
+        prefix="/api/v1/artifacts",
+        tags=["Artifacts"],
+        manager_factory=get_artifact_manager,
+        entity_in_type=ArtifactIn,
+        entity_out_type=ArtifactOut,
+    )
+    app.include_router(artifact_router)
+    add_error_handlers(app)
+    return app
+
+
+class TestArtifactContentProjection:
+    """Test that list and tree responses omit inline content while detail keeps it."""
+
+    @pytest.mark.asyncio
+    async def test_list_omits_content_keeps_metadata(self) -> None:
+        """The list endpoint omits content but keeps type, metadata, content_type and content_size."""
+        db = SqliteDatabaseBuilder.in_memory().build()
+        await db.init()
+        set_database(db)
+        try:
+            app = _make_artifact_app()
+            async with db.session() as session:
+                manager = ArtifactManager(ArtifactRepository(session))
+                await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
+
+            with TestClient(app) as client:
+                response = client.get("/api/v1/artifacts")
+                assert response.status_code == 200
+                items = response.json()
+                assert len(items) == 1
+                data = items[0]["data"]
+                assert "content" not in data
+                assert data["type"] == "generic"
+                assert data["metadata"] == {"status": "success", "note": "result"}
+                assert data["content_type"] == "application/json"
+                assert data["content_size"] == 64
+        finally:
+            await db.dispose()
+
+    @pytest.mark.asyncio
+    async def test_list_paginated_omits_content(self) -> None:
+        """The paginated list omits content from every item."""
+        db = SqliteDatabaseBuilder.in_memory().build()
+        await db.init()
+        set_database(db)
+        try:
+            app = _make_artifact_app()
+            async with db.session() as session:
+                manager = ArtifactManager(ArtifactRepository(session))
+                for _ in range(3):
+                    await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
+
+            with TestClient(app) as client:
+                response = client.get("/api/v1/artifacts", params={"page": 1, "size": 10})
+                assert response.status_code == 200
+                body = response.json()
+                assert body["total"] == 3
+                assert len(body["items"]) == 3
+                assert all("content" not in item["data"] for item in body["items"])
+        finally:
+            await db.dispose()
+
+    @pytest.mark.asyncio
+    async def test_tree_and_expand_omit_content_recursively(self) -> None:
+        """The $tree and $expand endpoints omit content at every level."""
+        db = SqliteDatabaseBuilder.in_memory().build()
+        await db.init()
+        set_database(db)
+        try:
+            app = _make_artifact_app()
+            async with db.session() as session:
+                manager = ArtifactManager(ArtifactRepository(session))
+                root = await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
+                await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA), parent_id=root.id))
+                root_id = root.id
+
+            with TestClient(app) as client:
+                tree = client.get(f"/api/v1/artifacts/{root_id}/$tree").json()
+                assert "content" not in tree["data"]
+                assert tree["data"]["content_type"] == "application/json"
+                assert "content" not in tree["children"][0]["data"]
+
+                expanded = client.get(f"/api/v1/artifacts/{root_id}/$expand").json()
+                assert "content" not in expanded["data"]
+                assert expanded["children"] is None
+        finally:
+            await db.dispose()
+
+    @pytest.mark.asyncio
+    async def test_get_by_id_includes_content(self) -> None:
+        """The single-artifact GET still returns the full content."""
+        db = SqliteDatabaseBuilder.in_memory().build()
+        await db.init()
+        set_database(db)
+        try:
+            app = _make_artifact_app()
+            async with db.session() as session:
+                manager = ArtifactManager(ArtifactRepository(session))
+                saved = await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
+                artifact_id = saved.id
+
+            with TestClient(app) as client:
+                data = client.get(f"/api/v1/artifacts/{artifact_id}").json()["data"]
+                assert data["content"] == CONTENT_ARTIFACT_DATA["content"]
+        finally:
+            await db.dispose()
+
+    @pytest.mark.asyncio
+    async def test_download_returns_content(self) -> None:
+        """The $download endpoint still serves the content as a file."""
+        db = SqliteDatabaseBuilder.in_memory().build()
+        await db.init()
+        set_database(db)
+        try:
+            app = _make_artifact_app()
+            async with db.session() as session:
+                manager = ArtifactManager(ArtifactRepository(session))
+                saved = await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
+                artifact_id = saved.id
+
+            with TestClient(app) as client:
+                response = client.get(f"/api/v1/artifacts/{artifact_id}/$download")
+                assert response.status_code == 200
+                assert response.json() == CONTENT_ARTIFACT_DATA["content"]
+        finally:
+            await db.dispose()

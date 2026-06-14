@@ -39,6 +39,40 @@ class ArtifactTreeNode(ArtifactOut):
         return cls.model_validate(artifact.model_dump())
 
 
+def strip_content(data: Any) -> Any:
+    """Return a shallow copy of artifact data without the heavy 'content' key."""
+    if not isinstance(data, dict):
+        return data
+    return {key: value for key, value in data.items() if key != "content"}
+
+
+class ArtifactSummaryOut(ArtifactOut):
+    """Artifact output without the heavy inline 'content', for list responses."""
+
+    @classmethod
+    def from_artifact(cls, artifact: ArtifactOut) -> Self:
+        """Create a content-less summary from a full artifact output schema."""
+        return cls.model_validate({**artifact.model_dump(exclude={"data"}), "data": strip_content(artifact.data)})
+
+
+class ArtifactSummaryTreeNode(ArtifactTreeNode):
+    """Artifact tree node without inline 'content', with content stripped recursively."""
+
+    @classmethod
+    def from_tree_node(cls, node: ArtifactTreeNode) -> Self:
+        """Create a content-less tree node, stripping content from the node and its children."""
+        children = (
+            [cls.from_tree_node(child).model_dump() for child in node.children] if node.children is not None else None
+        )
+        return cls.model_validate(
+            {
+                **node.model_dump(exclude={"data", "children"}),
+                "data": strip_content(node.data),
+                "children": children,
+            }
+        )
+
+
 class ArtifactHierarchy(BaseModel):
     """Configuration for artifact hierarchy with level labels."""
 
