@@ -64,6 +64,7 @@ dev = [
   "types-pyyaml>=6.0.12.20260408",
   "pandas>=3.0.2",
   "numpy>=2.4.4",
+  "httpx2>=2.4.0",
 ]
 
 [build-system]
