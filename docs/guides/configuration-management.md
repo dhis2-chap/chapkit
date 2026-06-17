@@ -238,8 +238,8 @@ Enable artifact operations when building the service:
 ```python
 app = (
     ServiceBuilder(info=info)
-    .with_config(MLConfig, enable_artifact_operations=True)
-    .with_artifacts(hierarchy=hierarchy)
+    .with_config(MLConfig)
+    .with_artifacts(hierarchy=hierarchy, enable_config_linking=True)
     .build()
 )
 ```
@@ -486,11 +486,11 @@ class WeatherModelConfig(BaseConfig):
 app = (
     ServiceBuilder(info=ServiceInfo(id="weather-model-service", display_name="Weather Model Service"))
     .with_health()
-    .with_config(WeatherModelConfig, enable_artifact_operations=True)
+    .with_config(WeatherModelConfig)
     .with_artifacts(hierarchy=ArtifactHierarchy(
         name="weather_models",
         level_labels={0: "ml_training_workspace", 1: "ml_prediction"}
-    ))
+    ), enable_config_linking=True)
     .build()
 )
 ```

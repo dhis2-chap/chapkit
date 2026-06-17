@@ -267,17 +267,9 @@ Update artifact data.
 
 Delete artifact (fails if artifact has children).
 
-### POST /api/v1/artifacts/$tree
+### GET /api/v1/artifacts/{id}/$tree
 
-Get artifact tree structure.
-
-**Request:**
-```json
-{
-  "root_id": "01ARTIFACT456...",
-  "max_depth": 3
-}
-```
+Get artifact tree structure rooted at the given artifact (no request body).
 
 **Response:**
 ```json
@@ -615,9 +607,7 @@ CHILD_ID=$(curl -s -X POST http://localhost:9090/api/v1/artifacts \
   }' | jq -r '.id')
 
 # Get tree
-curl -X POST http://localhost:9090/api/v1/artifacts/\$tree \
-  -H "Content-Type: application/json" \
-  -d '{"root_id": "'$ROOT_ID'"}' | jq
+curl http://localhost:9090/api/v1/artifacts/$ROOT_ID/\$tree | jq
 ```
 
 ---

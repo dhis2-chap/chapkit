@@ -13,7 +13,7 @@ Build production-ready ML services with train/predict workflows, artifact storag
 from geojson_pydantic import FeatureCollection
 
 from chapkit import BaseConfig
-from chapkit.api import MLServiceBuilder, MLServiceInfo
+from chapkit.api import MLServiceBuilder, MLServiceInfo, AssessedStatus, ModelMetadata, PeriodType
 from chapkit.artifact import ArtifactHierarchy
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner
@@ -55,7 +55,12 @@ async def predict(
 
 app = (
     MLServiceBuilder(
-        info=MLServiceInfo(id="disease-prediction-service", display_name="Disease Prediction Service"),
+        info=MLServiceInfo(
+            id="disease-prediction-service",
+            display_name="Disease Prediction Service",
+            model_metadata=ModelMetadata(author="ML Team", author_assessed_status=AssessedStatus.green),
+            period_type=PeriodType.monthly,
+        ),
         config_schema=MyMLConfig,
         hierarchy=ArtifactHierarchy(
             name="ml",
@@ -69,8 +74,9 @@ app = (
 ```
 
 **What you get:**
-- `POST /api/v1/ml/train` - Train models with versioning
-- `POST /api/v1/ml/predict` - Make predictions
+- `POST /api/v1/ml/$train` - Train models with versioning
+- `POST /api/v1/ml/$predict` - Make predictions
+- `POST /api/v1/ml/$validate` - Validate model configurations
 - `GET /api/v1/configs` - Manage model configurations
 - `GET /api/v1/artifacts` - Browse trained models and predictions
 - `GET /api/v1/jobs` - Monitor training/prediction jobs

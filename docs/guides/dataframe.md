@@ -1362,7 +1362,7 @@ high_sales = df.filter(lambda r: r['sales'] > 1000)
 summary = high_sales.groupby('region').count()
 
 # Chain with other operations
-df.groupby('product').sum('sales').sort('sales_sum', reverse=True).head(5)
+df.groupby('product').sum('sales').sort('sales_sum', ascending=False).head(5)
 ```
 
 **Design notes:**
