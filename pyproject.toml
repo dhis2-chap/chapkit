@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "0.29.0"
+version = "1.0.0"
 description = "ML and data service modules built on servicekit - config, artifacts, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
@@ -11,12 +11,11 @@ keywords = [
   "machine-learning",
   "data-science",
   "artifacts",
-  "tasks",
   "config",
   "servicekit",
 ]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.13",
