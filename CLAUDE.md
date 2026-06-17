@@ -108,7 +108,7 @@ class AuthManager:
 
 ## Project Overview
 
-`chapkit` is a collection of ML-specific modules built on top of the [servicekit](https://github.com/winterop-com/servicekit) framework. It provides config management and ML workflows, using servicekit's artifact and task infrastructure.
+`chapkit` is a collection of ML-specific modules built on top of the [servicekit](https://github.com/dhis2-chap/servicekit) framework. It provides config management and ML workflows, using servicekit's artifact and task infrastructure.
 
 **Primary Modules:** Config (key-value with JSON), ML (train/predict operations with artifact-based model storage)
 
@@ -298,5 +298,5 @@ uv lock --upgrade         # Update all
 ## Additional Resources
 
 - Full examples: `examples/` directory
-- servicekit docs: https://winterop-com.github.io/servicekit
+- servicekit docs: https://dhis2-chap.github.io/servicekit
 - Chapkit docs: https://dhis2-chap.github.io/chapkit

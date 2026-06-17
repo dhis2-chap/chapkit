@@ -259,5 +259,5 @@ AGPL-3.0-or-later
 
 ## Related Projects
 
-- **[servicekit](https://github.com/winterop-com/servicekit)** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.) ([docs](https://winterop-com.github.io/servicekit))
+- **[servicekit](https://github.com/dhis2-chap/servicekit)** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.) ([docs](https://dhis2-chap.github.io/servicekit))
 - **[chapkit-images](https://github.com/dhis2-chap/chapkit-images)** - Dockerfiles and CI for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` runtime images used by `chapkit mlproject run`.

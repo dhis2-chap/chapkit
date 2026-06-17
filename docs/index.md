@@ -91,7 +91,7 @@ Chapkit automatically installs servicekit as a dependency.
 
 - [Repository](https://github.com/dhis2-chap/chapkit)
 - [Issues](https://github.com/dhis2-chap/chapkit/issues)
-- [Servicekit](https://github.com/winterop-com/servicekit) - Core framework foundation ([docs](https://winterop-com.github.io/servicekit))
+- [Servicekit](https://github.com/dhis2-chap/servicekit) - Core framework foundation ([docs](https://dhis2-chap.github.io/servicekit))
 
 ## License
 
