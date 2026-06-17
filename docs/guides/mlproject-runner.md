@@ -12,7 +12,7 @@ chapkit mlproject run .            # same
 chapkit mlproject run /path/to/my_mlproject
 ```
 
-This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:8000` by default. Override host/port with `--host` and `--port`.
+This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`.
 
 A minimal R MLproject like `dhis2-chap/minimalist_example_r`:
 

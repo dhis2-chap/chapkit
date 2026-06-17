@@ -10,7 +10,7 @@ Chapkit provides a complete ML workflow system for training models and making pr
 from chapkit.artifact import ArtifactHierarchy
 
 from chapkit import BaseConfig
-from chapkit.api import MLServiceBuilder, MLServiceInfo
+from chapkit.api import MLServiceBuilder, MLServiceInfo, AssessedStatus, ModelMetadata, PeriodType
 from chapkit.ml import FunctionalModelRunner
 import pandas as pd
 from sklearn.linear_model import LinearRegression
@@ -34,7 +34,12 @@ runner = FunctionalModelRunner(on_train=on_train, on_predict=on_predict)
 
 app = (
     MLServiceBuilder(
-        info=MLServiceInfo(id="my-ml-service", display_name="My ML Service"),
+        info=MLServiceInfo(
+            id="my-ml-service",
+            display_name="My ML Service",
+            model_metadata=ModelMetadata(author="ML Team", author_assessed_status=AssessedStatus.green),
+            period_type=PeriodType.monthly,
+        ),
         config_schema=ModelConfig,
         hierarchy=ArtifactHierarchy(name="ml", level_labels={0: "ml_training_workspace", 1: "ml_prediction"}),
         runner=runner,
@@ -403,7 +408,6 @@ MLServiceBuilder(
     config_schema=YourConfig,
     hierarchy=hierarchy,
     runner=runner,
-    max_concurrency=5,       # Limit concurrent jobs (default: unlimited)
     database_url="ml.db",    # Persistent storage (default: in-memory)
 )
 ```
@@ -729,7 +733,7 @@ All tabular data uses the `DataFrame` schema:
 
 **Python Usage:**
 ```python
-from servicekit.data import DataFrame
+from chapkit.data import DataFrame
 
 # Create from DataFrame
 df = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
@@ -1316,7 +1320,6 @@ MLServiceBuilder(
     config_schema=config_schema,
     hierarchy=hierarchy,
     runner=runner,
-    max_concurrency=3,  # Limit concurrent training jobs
 )
 ```
 
@@ -1708,7 +1711,7 @@ curl http://localhost:9090/api/v1/jobs/$JOB_ID | jq '.error'
 **Solution:**
 ```python
 # Limit concurrent jobs
-MLServiceBuilder(..., max_concurrency=2)
+MLServiceBuilder(...)
 
 # Implement artifact cleanup
 async def cleanup_old_artifacts(app):
