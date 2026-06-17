@@ -35,6 +35,7 @@ from .config import (
     ConfigManager,
     ConfigOut,
     ConfigRepository,
+    ConfigRouter,
 )
 
 # Data feature
@@ -42,6 +43,7 @@ from .data import DataFrame, GroupBy
 
 # ML feature
 from .ml import (
+    BaseModelRunner,
     FunctionalModelRunner,
     MLManager,
     MLPredictionArtifactData,
@@ -50,6 +52,7 @@ from .ml import (
     ModelRunnerProtocol,
     PredictRequest,
     PredictResponse,
+    ShellModelRunner,
     TrainRequest,
     TrainResponse,
 )
@@ -92,10 +95,12 @@ __all__ = [
     "ConfigManager",
     "ConfigOut",
     "ConfigRepository",
+    "ConfigRouter",
     # Data
     "DataFrame",
     "GroupBy",
     # ML
+    "BaseModelRunner",
     "FunctionalModelRunner",
     "MLManager",
     "MLPredictionArtifactData",
@@ -104,6 +109,7 @@ __all__ = [
     "ModelRunnerProtocol",
     "PredictRequest",
     "PredictResponse",
+    "ShellModelRunner",
     "TrainRequest",
     "TrainResponse",
 ]
