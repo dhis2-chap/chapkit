@@ -13,6 +13,7 @@ import { PageHeader, PageBody } from '@/components/console/page'
 import {
   GeneratorPanel,
   DiagnosticsView,
+  DataFrameField,
   DEFAULT_GENERATOR_PARAMS,
   toSampleOptions,
   parseDataFrame,
@@ -29,7 +30,6 @@ import {
   CardFooter,
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectTrigger,
@@ -236,20 +236,16 @@ export function TrainPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="train-data">Training data (DataFrame JSON)</Label>
-                  <Textarea
-                    id="train-data"
-                    className="font-mono text-xs"
-                    rows={14}
-                    placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
-                    value={dataText}
-                    onChange={(event) => {
-                      setDataText(event.target.value)
-                      invalidate()
-                    }}
-                  />
-                </div>
+                <DataFrameField
+                  id="train-data"
+                  label="Training data"
+                  placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
+                  value={dataText}
+                  onChange={(next) => {
+                    setDataText(next)
+                    invalidate()
+                  }}
+                />
 
                 <div className="flex flex-wrap gap-2">
                   <Button

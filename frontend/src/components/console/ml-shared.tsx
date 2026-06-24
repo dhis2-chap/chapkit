@@ -1,4 +1,5 @@
 // Shared building blocks for the Train and Predict console pages.
+import { useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -14,6 +15,8 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Select,
   SelectTrigger,
@@ -23,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { DataFrameTable } from '@/components/console/dataframe-table'
 
 /** Narrow an unknown value to a DataFrameContent after a minimal shape check. */
 export function asDataFrame(value: unknown): DataFrameContent | null {
@@ -57,6 +61,63 @@ export function parseDataFrame(raw: string, label: string): DataFrameContent | n
 /** A short, monospaced rendering of a ULID-style id. */
 export function shortId(id: string): string {
   return id.length > 10 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id
+}
+
+/** Bounded, tabbed DataFrame editor: a read-only Table preview plus an editable JSON pane. */
+export function DataFrameField({
+  id,
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string
+  label: string
+  value: string
+  placeholder?: string
+  onChange: (next: string) => void
+}) {
+  const frame = asDataFrame(safeParse(value))
+  const [tab, setTab] = useState<string>(frame ? 'table' : 'json')
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={`${id}-json`}>{label}</Label>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="table">Table</TabsTrigger>
+          <TabsTrigger value="json">JSON</TabsTrigger>
+        </TabsList>
+        <TabsContent value="table" className="mt-2">
+          {frame ? (
+            <DataFrameTable frame={frame} />
+          ) : (
+            <p className="rounded-md border border-dashed p-4 text-xs text-muted-foreground">
+              Enter valid DataFrame JSON in the JSON tab to preview.
+            </p>
+          )}
+        </TabsContent>
+        <TabsContent value="json" className="mt-2">
+          <Textarea
+            id={`${id}-json`}
+            className="h-72 max-h-72 overflow-auto font-mono text-xs"
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+/** Parse JSON without throwing; returns undefined on failure. */
+function safeParse(raw: string): unknown {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return undefined
+  }
 }
 
 /** Tunable parameters for the synthetic data generator (config_id is supplied separately). */

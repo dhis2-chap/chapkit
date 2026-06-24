@@ -40,6 +40,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { DataFrameTable } from '@/components/console/dataframe-table'
+import { DataFrameChart } from '@/components/console/dataframe-chart'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
@@ -189,7 +190,20 @@ function ContentTab({ artifact }: { artifact: Artifact }) {
   if (content === null || content === undefined) {
     body = <p className="text-sm text-muted-foreground">No content.</p>
   } else if (isDataFrame(content)) {
-    body = <DataFrameTable frame={content} />
+    body = (
+      <Tabs defaultValue="table">
+        <TabsList>
+          <TabsTrigger value="table">Table</TabsTrigger>
+          <TabsTrigger value="chart">Chart</TabsTrigger>
+        </TabsList>
+        <TabsContent value="table" className="pt-3">
+          <DataFrameTable frame={content} />
+        </TabsContent>
+        <TabsContent value="chart" className="pt-3">
+          <DataFrameChart frame={content} />
+        </TabsContent>
+      </Tabs>
+    )
   } else if (isBinaryPlaceholder(content)) {
     body = (
       <div className="space-y-3">
@@ -383,22 +397,45 @@ function ArtifactDetail({
         ) : null}
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="metadata">
-          <TabsList>
-            <TabsTrigger value="metadata">Metadata</TabsTrigger>
-            <TabsTrigger value="content">Content</TabsTrigger>
-            <TabsTrigger value="raw">Raw</TabsTrigger>
-          </TabsList>
-          <TabsContent value="metadata" className="pt-3">
-            <MetadataTab artifact={data} />
-          </TabsContent>
-          <TabsContent value="content" className="pt-3">
-            <ContentTab artifact={data} />
-          </TabsContent>
-          <TabsContent value="raw" className="pt-3">
-            <JsonView value={data} />
-          </TabsContent>
-        </Tabs>
+        {isDataFrame(data.data.content) ? (
+          <Tabs defaultValue="chart">
+            <TabsList>
+              <TabsTrigger value="chart">Chart</TabsTrigger>
+              <TabsTrigger value="table">Table</TabsTrigger>
+              <TabsTrigger value="metadata">Metadata</TabsTrigger>
+              <TabsTrigger value="raw">Raw</TabsTrigger>
+            </TabsList>
+            <TabsContent value="chart" className="pt-3">
+              <DataFrameChart frame={data.data.content} />
+            </TabsContent>
+            <TabsContent value="table" className="pt-3">
+              <DataFrameTable frame={data.data.content} />
+            </TabsContent>
+            <TabsContent value="metadata" className="pt-3">
+              <MetadataTab artifact={data} />
+            </TabsContent>
+            <TabsContent value="raw" className="pt-3">
+              <JsonView value={data} />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <Tabs defaultValue="metadata">
+            <TabsList>
+              <TabsTrigger value="metadata">Metadata</TabsTrigger>
+              <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="raw">Raw</TabsTrigger>
+            </TabsList>
+            <TabsContent value="metadata" className="pt-3">
+              <MetadataTab artifact={data} />
+            </TabsContent>
+            <TabsContent value="content" className="pt-3">
+              <ContentTab artifact={data} />
+            </TabsContent>
+            <TabsContent value="raw" className="pt-3">
+              <JsonView value={data} />
+            </TabsContent>
+          </Tabs>
+        )}
       </CardContent>
     </Card>
   )

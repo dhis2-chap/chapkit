@@ -13,6 +13,7 @@ import { PageHeader, PageBody } from '@/components/console/page'
 import {
   GeneratorPanel,
   DiagnosticsView,
+  DataFrameField,
   DEFAULT_GENERATOR_PARAMS,
   toSampleOptions,
   parseDataFrame,
@@ -29,7 +30,6 @@ import {
   CardFooter,
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectTrigger,
@@ -265,35 +265,27 @@ export function PredictPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="predict-historic">Historic data (DataFrame JSON)</Label>
-                  <Textarea
-                    id="predict-historic"
-                    className="font-mono text-xs"
-                    rows={10}
-                    placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
-                    value={historicText}
-                    onChange={(event) => {
-                      setHistoricText(event.target.value)
-                      invalidate()
-                    }}
-                  />
-                </div>
+                <DataFrameField
+                  id="predict-historic"
+                  label="Historic data"
+                  placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
+                  value={historicText}
+                  onChange={(next) => {
+                    setHistoricText(next)
+                    invalidate()
+                  }}
+                />
 
-                <div className="space-y-2">
-                  <Label htmlFor="predict-future">Future data (DataFrame JSON)</Label>
-                  <Textarea
-                    id="predict-future"
-                    className="font-mono text-xs"
-                    rows={10}
-                    placeholder='{ "columns": ["time_period"], "data": [["2021-01"]] }'
-                    value={futureText}
-                    onChange={(event) => {
-                      setFutureText(event.target.value)
-                      invalidate()
-                    }}
-                  />
-                </div>
+                <DataFrameField
+                  id="predict-future"
+                  label="Future data"
+                  placeholder='{ "columns": ["time_period"], "data": [["2021-01"]] }'
+                  value={futureText}
+                  onChange={(next) => {
+                    setFutureText(next)
+                    invalidate()
+                  }}
+                />
 
                 <div className="flex flex-wrap gap-2">
                   <Button
