@@ -156,3 +156,6 @@ examples/*/uv.lock
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# Claude Code local settings
+.claude/
