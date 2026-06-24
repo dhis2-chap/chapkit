@@ -1,5 +1,6 @@
 // Configs screen: master/detail browser with create/edit/delete for chapkit configs.
 import { useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import {
   useMutation,
@@ -105,7 +106,12 @@ type DialogMode =
 
 export function ConfigsPage() {
   const queryClient = useQueryClient()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const navigate = useNavigate()
+  // Selection lives in the URL (#/configs/:configId) so it deep-links and
+  // survives a refresh.
+  const { configId } = useParams()
+  const selectedId = configId ?? null
+  const select = (id: string) => navigate(`/configs/${id}`)
   const [dialog, setDialog] = useState<DialogMode>({ kind: 'closed' })
   const [deleteTarget, setDeleteTarget] = useState<ConfigItem | null>(null)
 
@@ -127,7 +133,7 @@ export function ConfigsPage() {
     mutationFn: (id: string) => api.deleteConfig(id),
     onSuccess: (_data, id) => {
       toast.success('Config deleted')
-      if (selectedId === id) setSelectedId(null)
+      if (selectedId === id) navigate('/configs')
       setDeleteTarget(null)
       void invalidate()
     },
@@ -197,7 +203,7 @@ export function ConfigsPage() {
                           config.id === selectedId ? 'selected' : undefined
                         }
                         className="cursor-pointer"
-                        onClick={() => setSelectedId(config.id)}
+                        onClick={() => select(config.id)}
                       >
                         <TableCell className="max-w-[14rem] truncate font-medium">
                           {config.name}
@@ -239,7 +245,7 @@ export function ConfigsPage() {
         onClose={() => setDialog({ kind: 'closed' })}
         onSaved={(config) => {
           setDialog({ kind: 'closed' })
-          setSelectedId(config.id)
+          select(config.id)
           void invalidate()
         }}
       />

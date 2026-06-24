@@ -76,8 +76,11 @@ export default function App() {
           <Route element={<Shell />}>
             <Route index element={<OverviewPage />} />
             <Route path="configs" element={<ConfigsPage />} />
+            <Route path="configs/:configId" element={<ConfigsPage />} />
             <Route path="artifacts" element={<ArtifactsPage />} />
+            <Route path="artifacts/:artifactId" element={<ArtifactsPage />} />
             <Route path="jobs" element={<JobsPage />} />
+            <Route path="jobs/:jobId" element={<JobsPage />} />
             <Route path="train" element={<TrainPage />} />
             <Route path="predict" element={<PredictPage />} />
             <Route path="api" element={<EndpointsPage />} />

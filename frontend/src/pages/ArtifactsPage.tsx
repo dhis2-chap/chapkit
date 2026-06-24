@@ -1,5 +1,6 @@
 // Two-pane artifact browser: hierarchy tree on the left, selected artifact detail on the right.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import {
   ChevronRight,
@@ -443,7 +444,12 @@ function ArtifactDetail({
 
 export function ArtifactsPage() {
   const queryClient = useQueryClient()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const navigate = useNavigate()
+  // Selection lives in the URL (#/artifacts/:artifactId) so it deep-links and
+  // survives a refresh.
+  const { artifactId } = useParams()
+  const selectedId = artifactId ?? null
+  const select = (id: string) => navigate(`/artifacts/${id}`)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const { data, isLoading, error } = useQuery({
@@ -452,6 +458,25 @@ export function ArtifactsPage() {
   })
 
   const forest = useMemo(() => buildForest(data ?? []), [data])
+
+  // Auto-expand the ancestors of a deep-linked selection so it is visible.
+  useEffect(() => {
+    if (!selectedId || !data) return
+    const byId = new Map(data.map((a) => [a.id, a]))
+    const ancestors = new Set<string>()
+    let current = byId.get(selectedId)?.parent_id
+    while (current) {
+      ancestors.add(current)
+      current = byId.get(current)?.parent_id ?? null
+    }
+    if (ancestors.size > 0) {
+      setExpanded((prev) => {
+        const next = new Set(prev)
+        for (const id of ancestors) next.add(id)
+        return next
+      })
+    }
+  }, [selectedId, data])
 
   // The hierarchy name lives on $expand, not the flat list; fetch it from the
   // first artifact to title the tree panel.
@@ -522,7 +547,7 @@ export function ArtifactsPage() {
                         expanded={expanded}
                         onToggle={toggle}
                         selectedId={selectedId}
-                        onSelect={setSelectedId}
+                        onSelect={select}
                       />
                     ))}
                   </div>
@@ -533,7 +558,7 @@ export function ArtifactsPage() {
               {selectedId ? (
                 <ArtifactDetail
                   id={selectedId}
-                  onDeleted={() => setSelectedId(null)}
+                  onDeleted={() => navigate('/artifacts')}
                 />
               ) : (
                 <EmptyState
