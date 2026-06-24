@@ -125,16 +125,22 @@ function TreeRow({
   const isExpanded = expanded.has(node.id)
   const isSelected = selectedId === node.id
 
+  // Clicking a node selects it and, if it has children, toggles its expansion.
+  const activate = () => {
+    onSelect(node.id)
+    if (hasChildren) onToggle(node.id)
+  }
+
   return (
     <div>
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onSelect(node.id)}
+        onClick={activate}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            onSelect(node.id)
+            activate()
           }
         }}
         className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-muted ${
