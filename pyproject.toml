@@ -1,6 +1,6 @@
 [project]
 name = "chapkit"
-version = "1.0.0"
+version = "1.0.1"
 description = "ML and data service modules built on servicekit - config, artifacts, and ML workflows"
 readme = "README.md"
 authors = [{ name = "Morten Hansen", email = "morten@dhis2.org" }]
@@ -27,7 +27,7 @@ dependencies = [
   "geojson-pydantic>=2.1.1",
   "typer>=0.24.2",
   "jinja2>=3.1.6",
-  "servicekit>=1.0.0",
+  "servicekit>=1.0.1",
   "httpx>=0.28.1",
 ]
 
