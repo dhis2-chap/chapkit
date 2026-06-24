@@ -39,6 +39,10 @@ COPY main.py ./
 COPY scripts/ ./scripts/
 {% endif %}
 
+# The container binds 8000; PORT keeps main.py's self-registration advertising
+# the same port (locally it defaults to 9090).
+ENV PORT=8000
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

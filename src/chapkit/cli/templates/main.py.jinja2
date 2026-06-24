@@ -241,6 +241,11 @@ if DATABASE_URL.startswith("sqlite") and ":///" in DATABASE_URL:
     db_path = Path(DATABASE_URL.split("///")[1])
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
+# Port the app binds to. Drives both uvicorn and self-registration so the URL
+# advertised to chap-core always matches where the app actually listens.
+# Defaults to 9090 locally; the Docker image sets PORT=8000 to match its bind.
+PORT = int(os.getenv("PORT", "9090"))
+
 # Build the FastAPI application
 app = (
     MLServiceBuilder(
@@ -252,7 +257,8 @@ app = (
     )
     .with_monitoring()
     # See compose.yml for chap-core self-registration env vars.
-    .with_registration()
+    # Pass PORT so registration advertises the same port uvicorn binds.
+    .with_registration(port=PORT)
     .build()
 )
 
@@ -260,7 +266,7 @@ app = (
 if __name__ == "__main__":
     from chapkit.api import run_app
 
-    # Default to port 9090 to match the Docker compose host port and avoid the usual
-    # busy ports (8000, 8080). Override with the PORT env var. Set reload=True to
-    # enable hot reloading during development.
-    run_app("main:app", reload=False, port=9090)
+    # PORT defaults to 9090 to match the Docker compose host port and avoid the
+    # usual busy ports (8000, 8080). Override with the PORT env var. Set reload=True
+    # to enable hot reloading during development.
+    run_app("main:app", reload=False, port=PORT)
