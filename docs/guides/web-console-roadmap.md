@@ -14,6 +14,8 @@ lost. None of these are implemented yet.
   a raw JSON textarea, with the JSON view as an advanced fallback.
 - **Apply from Dry run.** Surface a one-click "Run" action directly from a
   successful Dry run result.
+- **Resizable panels.** Let the user resize the master/detail split (and the
+  chart) via drag handles (e.g. shadcn `resizable` / react-resizable-panels).
 - **Jobs: multi-select + grouping.** Row selection for bulk cancel/remove and
   grouping (e.g. by status).
 - **Deep-link routing for Jobs.** Configs and Artifacts already drive selection
