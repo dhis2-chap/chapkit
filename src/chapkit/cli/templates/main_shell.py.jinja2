@@ -35,6 +35,15 @@ from geojson_pydantic import FeatureCollection
 from chapkit.ml import ShellModelRunner
 {% endif %}
 
+# Read the service version from this project's package metadata (pyproject.toml is
+# the single source of truth), the same way chapkit derives its own __version__.
+try:
+    from importlib.metadata import version as _get_version
+
+    __version__ = _get_version("{{ PROJECT_SLUG }}")
+except Exception:
+    __version__ = "unknown"
+
 
 class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseConfig):
     """Configuration for {{ PROJECT_NAME }}."""
@@ -189,7 +198,7 @@ runner: ShellModelRunner[{{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', 
 info = MLServiceInfo(
     id="{{ PROJECT_SERVICE_ID }}",
     display_name="{{ PROJECT_NAME }}",
-    version="1.0.0",
+    version=__version__,
     description="Shell-based ML service using external scripts for train/predict. Scripts can be implemented in any language (Python, R, Julia, etc.)",
     model_metadata=ModelMetadata(
         author="Your Name",

@@ -15,8 +15,10 @@ Example:
 # ruff: noqa: F401
 
 from .dataframe import DataFrame, GroupBy
+from .generator import TestDataGenerator
 
 __all__ = [
     "DataFrame",
     "GroupBy",
+    "TestDataGenerator",
 ]

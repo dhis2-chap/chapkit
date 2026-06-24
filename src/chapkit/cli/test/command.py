@@ -8,7 +8,6 @@ from typing import Annotated, Any, Literal
 import typer
 from ulid import ULID
 
-from chapkit.cli.test.generator import TestDataGenerator
 from chapkit.cli.test.runner import TestRunner
 from chapkit.cli.test.utils import (
     find_project_main,
@@ -16,6 +15,7 @@ from chapkit.cli.test.utils import (
     start_service_subprocess,
     wait_for_service_ready,
 )
+from chapkit.data.generator import TestDataGenerator
 
 
 def test_command(

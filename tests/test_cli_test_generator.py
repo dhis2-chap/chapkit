@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from chapkit.cli.test.generator import TestDataGenerator
 from chapkit.config.schemas import BaseConfig
+from chapkit.data.generator import TestDataGenerator
 
 
 class TestGeneratePredictionData:
@@ -71,3 +71,18 @@ class TestGenerateConfigDataFromSchema:
         schema = BaseConfig.model_json_schema()
         data = generator.generate_config_data_from_schema(schema, variation=0)
         assert data["prediction_periods"] >= 1
+
+    def test_boolean_default_is_not_mutated_into_int(self) -> None:
+        """Verify bool defaults stay boolean across variations (bool is a subclass of int)."""
+        generator = TestDataGenerator(seed=42)
+        schema = {"properties": {"flag": {"type": "boolean", "default": True}}}
+        for variation in range(3):
+            data = generator.generate_config_data_from_schema(schema, variation=variation)
+            assert data["flag"] is True
+
+    def test_boolean_false_default_is_preserved(self) -> None:
+        """Verify a False boolean default is preserved as-is."""
+        generator = TestDataGenerator(seed=42)
+        schema = {"properties": {"flag": {"type": "boolean", "default": False}}}
+        data = generator.generate_config_data_from_schema(schema, variation=2)
+        assert data["flag"] is False

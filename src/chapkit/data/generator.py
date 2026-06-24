@@ -1,4 +1,4 @@
-"""Test data generator for ML workflows."""
+"""Synthetic data generator for ML workflows (shared by the CLI test runner and the console)."""
 
 import random
 from typing import Any, Literal
@@ -8,6 +8,9 @@ from ulid import ULID
 
 class TestDataGenerator:
     """Generate synthetic test data for ML workflows."""
+
+    # Not a pytest test class despite the name; suppress collection.
+    __test__ = False
 
     def __init__(self, seed: int | None = None) -> None:
         """Initialize generator with optional random seed."""
@@ -166,6 +169,10 @@ class TestDataGenerator:
         """Generate a value matching the field schema type."""
         if "default" in field_schema:
             default = field_schema["default"]
+            # bool is a subclass of int, so it must be checked first to avoid
+            # mutating a boolean default into an out-of-range integer (True + 1 -> 2).
+            if isinstance(default, bool):
+                return default
             if isinstance(default, int):
                 return default + variation
             elif isinstance(default, float):

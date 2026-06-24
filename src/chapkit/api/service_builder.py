@@ -192,6 +192,10 @@ class ServiceBuilder(BaseServiceBuilder):
         )
         return self
 
+    def with_landing_page(self) -> Self:
+        """Serve the chapkit web console at the root path."""
+        return self.with_app(("chapkit.api", "apps/console"))
+
     def with_ml(
         self,
         runner: ModelRunnerProtocol,
@@ -277,10 +281,18 @@ class ServiceBuilder(BaseServiceBuilder):
         if self._ml_options:
             ml_options = self._ml_options
             ml_dep = self._build_ml_dependency()
+            sample_metadata: dict[str, Any] | None = None
+            if isinstance(self.info, MLServiceInfo):
+                sample_metadata = {
+                    "required_covariates": list(self.info.required_covariates),
+                    "requires_geo": self.info.requires_geo,
+                    "period_type": str(self.info.period_type),
+                }
             ml_router = MLRouter.create(
                 prefix=ml_options.prefix,
                 tags=ml_options.tags,
                 manager_factory=ml_dep,
+                sample_metadata=sample_metadata,
             )
             app.include_router(ml_router)
             app.dependency_overrides[default_get_ml_manager] = ml_dep
