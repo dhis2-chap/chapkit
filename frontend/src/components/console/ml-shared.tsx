@@ -1,5 +1,5 @@
 // Shared building blocks for the Train and Predict console pages.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -78,7 +78,19 @@ export function DataFrameField({
   onChange: (next: string) => void
 }) {
   const frame = asDataFrame(safeParse(value))
-  const [tab, setTab] = useState<string>(frame ? 'table' : 'json')
+  const hasFrame = Boolean(frame)
+  const [tab, setTab] = useState<string>(hasFrame ? 'table' : 'json')
+
+  // When a valid frame first appears (e.g. "Fill with sample data"), surface the
+  // Table preview — unless the user is mid-edit in the JSON textarea.
+  const hadFrameRef = useRef(hasFrame)
+  useEffect(() => {
+    if (hasFrame && !hadFrameRef.current) {
+      const editing = document.activeElement?.id === `${id}-json`
+      if (!editing) setTab('table')
+    }
+    hadFrameRef.current = hasFrame
+  }, [hasFrame, id])
 
   return (
     <div className="space-y-2">
