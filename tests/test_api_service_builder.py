@@ -281,9 +281,9 @@ def test_service_builder_landing_page(service_info: ServiceInfo) -> None:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
-        # Check that the page contains JavaScript to fetch service info
-        assert "fetch('/api/v1/info')" in response.text
-        assert "/docs" in response.text  # Navigation link to API docs
+        # The landing page is the chapkit web console (a single-page app).
+        assert "Chapkit Console" in response.text
+        assert '<div id="root">' in response.text
 
         # Verify that /api/v1/info returns the correct data
         info_response = client.get("/api/v1/info")
@@ -345,10 +345,10 @@ def test_service_builder_landing_page_with_custom_fields() -> None:
     app = ServiceBuilder(info=info).with_landing_page().build()
 
     with TestClient(app) as client:
-        # Check landing page HTML loads properly
+        # Check the console landing page loads properly
         response = client.get("/")
         assert response.status_code == 200
-        assert "fetch('/api/v1/info')" in response.text
+        assert "Chapkit Console" in response.text
 
         # Check that /api/v1/info includes custom fields
         info_response = client.get("/api/v1/info")

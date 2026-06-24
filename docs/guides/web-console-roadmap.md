@@ -44,6 +44,22 @@ lost. None of these are implemented yet.
     non-tensor models need a different contract (keep pickle, or define a
     tensor-only model interface). Likely "support both" during transition.
 
+## Geospatial
+
+- **Map view for geo-enabled services.** When a service uses geo, the data
+  carries a GeoJSON `FeatureCollection` with one feature per `location` (keyed by
+  `properties.id`). Render it on a map and join per-location predictions /
+  covariates to the features (e.g. a choropleth that animates over `time_period`).
+  Candidate open mapping stack: [GeoLibre](https://geolibre.app/).
+  Geometry source is normally the service's own GeoJSON; when running alongside
+  DHIS2 it could optionally be enriched from org units
+  (`/api/organisationUnits?fields=*`, or a trimmed field set by level), keeping
+  the console usable standalone.
+- **Bounding box.** To frame the map, compute (or approximate) a `bbox` from the
+  feature geometries. GeoJSON does not always include one, so derive it from the
+  coordinates, or approximate from feature centroids when geometries are large or
+  missing.
+
 ## Framework
 
 - **Monitoring screen.** A metrics screen backed by OpenTelemetry
