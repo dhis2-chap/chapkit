@@ -9,11 +9,9 @@ import {
   Play,
   Settings2,
   SlidersHorizontal,
-  TerminalSquare,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import {
   Sidebar,
   SidebarContent,
@@ -21,12 +19,10 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import { api } from '@/lib/api'
 
 interface NavItem {
   to: string
@@ -78,27 +74,9 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
 }
 
 export function AppSidebar() {
-  const { data: info } = useQuery({ queryKey: ['info'], queryFn: api.info })
-
   return (
     <Sidebar>
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <TerminalSquare className="size-4" />
-          </div>
-          <div className="grid leading-tight">
-            <span className="truncate text-sm font-semibold">
-              {info?.display_name ?? 'Chapkit'}
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-              {info ? `v${info.version}` : 'Console'}
-            </span>
-          </div>
-        </div>
-      </SidebarHeader>
-
-      <SidebarContent>
+      <SidebarContent className="pt-2">
         <NavGroup label="Service" items={NAV} />
         <NavGroup label="Explore" items={EXPLORE} />
       </SidebarContent>

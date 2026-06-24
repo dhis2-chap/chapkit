@@ -1,5 +1,5 @@
 // Interactive Predict screen — run a $predict job from a trained model behind a $validate gate.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, FlaskConical, Loader2, Play, ShieldCheck, Sparkles } from 'lucide-react'
@@ -96,6 +96,13 @@ export function PredictPage() {
       ),
     [artifactsQuery.data],
   )
+
+  // Auto-select the first trained model once loaded so the form is actionable out of the box.
+  useEffect(() => {
+    if (trainingArtifacts.length > 0 && artifactId === '') {
+      setArtifactId(trainingArtifacts[0].id)
+    }
+  }, [trainingArtifacts, artifactId])
 
   /** Fetch a sample payload, push it into form state, and return the generated predict payload. */
   async function fetchAndFillSample(): Promise<PredictPayload> {
@@ -258,6 +265,36 @@ export function PredictPage() {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="predict-historic">Historic data (DataFrame JSON)</Label>
+                  <Textarea
+                    id="predict-historic"
+                    className="font-mono text-xs"
+                    rows={10}
+                    placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
+                    value={historicText}
+                    onChange={(event) => {
+                      setHistoricText(event.target.value)
+                      invalidate()
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="predict-future">Future data (DataFrame JSON)</Label>
+                  <Textarea
+                    id="predict-future"
+                    className="font-mono text-xs"
+                    rows={10}
+                    placeholder='{ "columns": ["time_period"], "data": [["2021-01"]] }'
+                    value={futureText}
+                    onChange={(event) => {
+                      setFutureText(event.target.value)
+                      invalidate()
+                    }}
+                  />
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
@@ -294,36 +331,6 @@ export function PredictPage() {
                     {predictMutation.isPending ? <Loader2 className="animate-spin" /> : <Play />}
                     Predict
                   </Button>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="predict-historic">Historic data (DataFrame JSON)</Label>
-                  <Textarea
-                    id="predict-historic"
-                    className="font-mono text-xs"
-                    rows={10}
-                    placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
-                    value={historicText}
-                    onChange={(event) => {
-                      setHistoricText(event.target.value)
-                      invalidate()
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="predict-future">Future data (DataFrame JSON)</Label>
-                  <Textarea
-                    id="predict-future"
-                    className="font-mono text-xs"
-                    rows={10}
-                    placeholder='{ "columns": ["time_period"], "data": [["2021-01"]] }'
-                    value={futureText}
-                    onChange={(event) => {
-                      setFutureText(event.target.value)
-                      invalidate()
-                    }}
-                  />
                 </div>
               </CardContent>
             </Card>

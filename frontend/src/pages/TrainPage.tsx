@@ -1,5 +1,5 @@
 // Interactive Train screen — submit a $train job behind a successful $validate gate.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, FlaskConical, Loader2, Play, ShieldCheck, Sparkles } from 'lucide-react'
@@ -87,6 +87,14 @@ export function TrainPage() {
     setValidated(false)
     setValidation(null)
   }
+
+  // Auto-select the first config once loaded so the form is actionable out of the box.
+  useEffect(() => {
+    const configs = configsQuery.data ?? []
+    if (configs.length > 0 && configId === '') {
+      setConfigId(configs[0].id)
+    }
+  }, [configsQuery.data, configId])
 
   /** Fetch a sample payload, push it into form state, and return the generated train payload. */
   async function fetchAndFillSample(): Promise<TrainPayload> {
@@ -228,6 +236,21 @@ export function TrainPage() {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="train-data">Training data (DataFrame JSON)</Label>
+                  <Textarea
+                    id="train-data"
+                    className="font-mono text-xs"
+                    rows={14}
+                    placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
+                    value={dataText}
+                    onChange={(event) => {
+                      setDataText(event.target.value)
+                      invalidate()
+                    }}
+                  />
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
@@ -260,21 +283,6 @@ export function TrainPage() {
                     {trainMutation.isPending ? <Loader2 className="animate-spin" /> : <Play />}
                     Train
                   </Button>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="train-data">Training data (DataFrame JSON)</Label>
-                  <Textarea
-                    id="train-data"
-                    className="font-mono text-xs"
-                    rows={14}
-                    placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
-                    value={dataText}
-                    onChange={(event) => {
-                      setDataText(event.target.value)
-                      invalidate()
-                    }}
-                  />
                 </div>
               </CardContent>
             </Card>

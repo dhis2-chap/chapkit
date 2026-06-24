@@ -87,6 +87,8 @@ export const api = {
   artifact: (id: string) => request<Artifact>(`api/v1/artifacts/${id}`),
   artifactTree: (id: string) =>
     request<Artifact>(`api/v1/artifacts/${id}/$tree`),
+  artifactExpand: (id: string) =>
+    request<Artifact>(`api/v1/artifacts/${id}/$expand`),
   deleteArtifact: (id: string) =>
     request<void>(`api/v1/artifacts/${id}`, { method: 'DELETE' }),
   /** Direct browser download URL for an artifact's content. */

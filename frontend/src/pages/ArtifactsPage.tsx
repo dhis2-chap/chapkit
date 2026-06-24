@@ -39,14 +39,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { DataFrameTable } from '@/components/console/dataframe-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
@@ -60,8 +53,6 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
-
-const MAX_DATAFRAME_ROWS = 100
 
 /** Short trailing id fragment for compact labels. */
 function shortId(id: string): string {
@@ -89,13 +80,6 @@ function isBinaryPlaceholder(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Record<string, unknown>
   return candidate._type === 'bytes' || '_serialization_error' in candidate
-}
-
-/** Render a primitive cell value as a string. */
-function cellText(value: unknown): string {
-  if (value === null || value === undefined) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
 }
 
 interface TreeNode extends Artifact {
@@ -198,42 +182,6 @@ function TreeRow({
   )
 }
 
-function DataFrameTable({ frame }: { frame: DataFrameContent }) {
-  const total = frame.data.length
-  const rows = frame.data.slice(0, MAX_DATAFRAME_ROWS)
-  return (
-    <div className="space-y-2">
-      <div className="overflow-auto rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {frame.columns.map((column, index) => (
-                <TableHead key={`${column}-${index}`}>{column}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((row, rowIndex) => (
-              <TableRow key={rowIndex}>
-                {frame.columns.map((_, colIndex) => (
-                  <TableCell key={colIndex} className="font-mono text-xs">
-                    {cellText(Array.isArray(row) ? row[colIndex] : undefined)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      {total > rows.length ? (
-        <p className="text-xs text-muted-foreground">
-          showing {rows.length} of {total} rows
-        </p>
-      ) : null}
-    </div>
-  )
-}
-
 function ContentTab({ artifact }: { artifact: Artifact }) {
   const { content, content_type, content_size } = artifact.data
 
@@ -293,6 +241,15 @@ function MetadataTab({ artifact }: { artifact: Artifact }) {
       summary.push({ label: 'Exit code', value: String(metadata.exit_code) })
   }
 
+  // Remaining metadata fields shown as a clean key-value list (raw JSON lives in
+  // the Raw tab). Skip the ones already surfaced as summary cards and empties.
+  const summaryKeys = new Set(['status', 'config_id', 'duration_seconds', 'exit_code'])
+  const rest = metadata
+    ? Object.entries(metadata).filter(
+        ([key, value]) => !summaryKeys.has(key) && value != null && value !== '',
+      )
+    : []
+
   return (
     <div className="space-y-3">
       {summary.length > 0 ? (
@@ -305,11 +262,21 @@ function MetadataTab({ artifact }: { artifact: Artifact }) {
           ))}
         </div>
       ) : null}
-      {metadata ? (
-        <JsonView value={metadata} />
-      ) : (
+      {rest.length > 0 ? (
+        <dl className="divide-y rounded-md border text-sm">
+          {rest.map(([key, value]) => (
+            <div key={key} className="grid grid-cols-[11rem_1fr] gap-2 px-3 py-1.5">
+              <dt className="text-muted-foreground">{key}</dt>
+              <dd className="min-w-0 break-words font-mono text-xs">
+                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      {!metadata ? (
         <p className="text-sm text-muted-foreground">No metadata.</p>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -449,6 +416,16 @@ export function ArtifactsPage() {
 
   const forest = useMemo(() => buildForest(data ?? []), [data])
 
+  // The hierarchy name lives on $expand, not the flat list; fetch it from the
+  // first artifact to title the tree panel.
+  const firstId = data?.[0]?.id
+  const { data: rootExpand } = useQuery({
+    queryKey: ['artifact-hierarchy', firstId],
+    queryFn: () => api.artifactExpand(firstId as string),
+    enabled: Boolean(firstId),
+  })
+  const hierarchyName = rootExpand?.hierarchy
+
   const toggle = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)
@@ -490,7 +467,12 @@ export function ArtifactsPage() {
           <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
             <Card className="overflow-hidden">
               <CardHeader className="py-3">
-                <CardTitle className="text-sm">Hierarchy</CardTitle>
+                <CardTitle className="text-sm">
+                  {hierarchyName ?? 'Hierarchy'}
+                </CardTitle>
+                {hierarchyName ? (
+                  <p className="text-xs text-muted-foreground">Artifact hierarchy</p>
+                ) : null}
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-[calc(100vh-16rem)]">
