@@ -1,12 +1,5 @@
 // Overview screen: service identity, model metadata, health, and quick links.
-import {
-  Activity,
-  BookOpen,
-  Boxes,
-  ExternalLink,
-  ListTree,
-  SlidersHorizontal,
-} from 'lucide-react'
+import { Activity, Boxes, ListTree, SlidersHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -73,14 +66,6 @@ export function OverviewPage() {
       <PageHeader
         title={svc.display_name}
         description={svc.description ?? 'Chapkit service console'}
-        actions={
-          <Button variant="outline" size="sm" asChild>
-            <a href="docs" target="_blank" rel="noreferrer">
-              <BookOpen className="size-4" /> API Docs
-              <ExternalLink className="size-3.5" />
-            </a>
-          </Button>
-        }
       />
       <PageBody>
         <div className="grid gap-4 lg:grid-cols-3">

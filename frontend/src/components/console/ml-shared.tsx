@@ -312,14 +312,20 @@ export function GeneratorPanel({
 }
 
 /** One Alert per diagnostic, colored by severity, plus a pass banner. */
-export function DiagnosticsView({ result }: { result: ValidationResult }) {
+export function DiagnosticsView({
+  result,
+  actionLabel = 'run',
+}: {
+  result: ValidationResult
+  actionLabel?: string
+}) {
   if (result.valid && result.diagnostics.length === 0) {
     return (
       <Alert className="border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400">
         <ShieldCheck className="size-4" />
         <AlertTitle>Validation passed</AlertTitle>
         <AlertDescription className="text-emerald-700/80 dark:text-emerald-400/80">
-          The payload is ready to submit.
+          Ready to {actionLabel}.
         </AlertDescription>
       </Alert>
     )

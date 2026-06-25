@@ -22,6 +22,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from '@/components/ui/sidebar'
 
 interface NavItem {
@@ -75,7 +76,7 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
 
 export function AppSidebar() {
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarContent className="pt-2">
         <NavGroup label="Service" items={NAV} />
         <NavGroup label="Explore" items={EXPLORE} />
@@ -92,6 +93,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <SidebarTrigger className="text-sidebar-foreground/70" />
       </SidebarFooter>
     </Sidebar>
   )

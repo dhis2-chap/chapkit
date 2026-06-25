@@ -38,7 +38,6 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import {
   Sheet,
   SheetTrigger,
@@ -264,17 +263,15 @@ export function TrainPage() {
               </CardContent>
             </Card>
 
-            {validation ? (
-              <>
-                <Separator />
-                <DiagnosticsView result={validation} />
-              </>
-            ) : null}
-
             {result ? <JobResultCard job={result} onViewJobs={() => navigate('/jobs')} /> : null}
           </div>
 
-          <div className="shrink-0 border-t bg-background px-6 py-3">
+          <div className="shrink-0 space-y-3 border-t bg-background px-6 py-3">
+            {validation ? (
+              <div className="max-h-40 overflow-auto">
+                <DiagnosticsView result={validation} actionLabel="train" />
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex">
                 <Button
