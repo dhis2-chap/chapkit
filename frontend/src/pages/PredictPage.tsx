@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ExternalLink, Loader2, Play, ShieldCheck, Sparkles } from 'lucide-react'
+import { ExternalLink, Loader2, Play, Settings2, ShieldCheck, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
@@ -316,7 +316,7 @@ export function PredictPage() {
                   disabled={pending}
                 >
                   {sampleMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                  Fill with sample data
+                  Generate
                 </Button>
                 <Sheet open={generatorOpen} onOpenChange={setGeneratorOpen}>
                   <SheetTrigger asChild>
@@ -325,9 +325,9 @@ export function PredictPage() {
                       size="icon"
                       className="rounded-l-none border-l-0"
                       disabled={pending}
-                      aria-label="Sample data options"
+                      aria-label="Sample data generator options"
                     >
-                      <ChevronDown />
+                      <Settings2 />
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="right" className="w-full sm:max-w-md">
