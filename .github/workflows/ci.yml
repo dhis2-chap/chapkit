@@ -39,3 +39,43 @@ jobs:
       uses: codecov/codecov-action@v7
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 11
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: pnpm
+        cache-dependency-path: frontend/pnpm-lock.yaml
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Typecheck
+      run: pnpm exec tsc -b --noEmit
+
+    - name: Lint
+      run: pnpm lint
+
+    - name: Build console
+      run: pnpm build
+
+    - name: Verify committed console bundle is up to date
+      run: |
+        if ! git diff --quiet -- ../src/chapkit/api/apps/console; then
+          echo "::error::Committed console bundle (src/chapkit/api/apps/console) is stale - run 'pnpm build' in frontend/ and commit the result."
+          git diff --stat -- ../src/chapkit/api/apps/console
+          exit 1
+        fi
