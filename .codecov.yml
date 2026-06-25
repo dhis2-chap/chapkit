@@ -4,10 +4,37 @@ coverage:
       default:
         target: auto
         threshold: 1%
+        flags:
+          - python
+      frontend:
+        target: auto
+        threshold: 2%
+        flags:
+          - frontend
     patch:
       default:
         target: 70%
         threshold: 5%
+        flags:
+          - python
+      frontend:
+        # The console is exercised by an e2e smoke suite, not line-targeted unit
+        # tests, so track its patch coverage but don't block PRs on it.
+        target: 50%
+        threshold: 10%
+        informational: true
+        flags:
+          - frontend
+
+flags:
+  python:
+    paths:
+      - src/
+    carryforward: true
+  frontend:
+    paths:
+      - frontend/src/
+    carryforward: true
 
 comment:
   layout: "condensed_header, condensed_files, condensed_footer"
@@ -17,3 +44,4 @@ ignore:
   - "examples/**"
   - "tests/**"
   - "docs/**"
+  - "frontend/e2e/**"
