@@ -1,11 +1,12 @@
 // Shared building blocks for the Train and Predict console pages.
 import { useEffect, useRef, useState } from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { Check, Pencil, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 import type { SampleDataOptions } from '@/lib/api'
 import type { DataFrameContent, ValidationDiagnostic, ValidationResult } from '@/lib/types'
 
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { JsonEditor } from '@/components/console/json-editor'
@@ -74,6 +75,9 @@ export function DataFrameField({
   const frame = asDataFrame(safeParse(value))
   const hasFrame = Boolean(frame)
   const [tab, setTab] = useState<string>(hasFrame ? 'table' : 'json')
+  // The JSON pane is a read-only viewer by default (stable syntax highlighting);
+  // editing is opt-in so glancing at the data never toggles it into edit mode.
+  const [editing, setEditing] = useState(false)
 
   // When a valid frame first appears (e.g. "Generate"), surface the Table preview
   // — unless the user is mid-edit in the JSON editor.
@@ -103,11 +107,22 @@ export function DataFrameField({
             </p>
           )}
         </TabsContent>
-        <TabsContent value="json" className="mt-2">
+        <TabsContent value="json" className="mt-2 space-y-2">
+          <div className="flex justify-end">
+            <Button
+              variant={editing ? 'secondary' : 'outline'}
+              size="xs"
+              onClick={() => setEditing((prev) => !prev)}
+            >
+              {editing ? <Check /> : <Pencil />}
+              {editing ? 'Done' : 'Edit'}
+            </Button>
+          </div>
           <div id={`${id}-json`}>
             <JsonEditor
               value={value}
               onChange={onChange}
+              readOnly={!editing}
               placeholder={placeholder}
               ariaLabel={label}
               minHeight="14rem"
