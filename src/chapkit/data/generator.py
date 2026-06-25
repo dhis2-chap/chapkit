@@ -1,5 +1,6 @@
 """Synthetic data generator for ML workflows (shared by the CLI test runner and the console)."""
 
+import math
 import random
 from typing import Any, Literal
 
@@ -61,10 +62,35 @@ class TestDataGenerator:
         for i in range(extra_covariates):
             columns.append(f"extra_covariate_{i}")
 
-        # Generate panel data: periods x locations (periods grouped together)
+        # Stable per-location parameters (deterministic under the configured seed):
+        # a constant population, a continuous seasonal phase so each location's
+        # season peaks on an arbitrary month and can straddle the year boundary
+        # (rather than every season starting in Jan and ending in Dec), plus a
+        # baseline disease level and seasonal amplitude.
+        periods_per_year = 52 if period_type == "weekly" else 12
+        location_params = [
+            {
+                "population": random.randint(50_000, 1_500_000),
+                "phase": random.random(),
+                "base_cases": random.uniform(20.0, 70.0),
+                "amplitude": random.uniform(0.45, 0.7),
+            }
+            for _ in range(num_locations)
+        ]
+        # Smooth seasonal covariates instead of static noise: every covariate
+        # column after the canonical set gets its own phase offset.
+        num_covariate_cols = len(columns) - 6
+
+        # Generate panel data: periods x locations (periods grouped together).
+        # Climate covariates and the disease target follow an annual cycle, and
+        # disease_cases is correlated with the seasonal signal and rainfall so a
+        # model has something real to learn.
         data: list[list[Any]] = []
         for period_idx in range(num_periods):
+            # Continuous position within the year, in [0, 1).
+            year_fraction = (period_idx % periods_per_year) / periods_per_year
             for loc_idx in range(num_locations):
+                params = location_params[loc_idx]
                 row: list[Any] = []
 
                 # Time period
@@ -80,33 +106,36 @@ class TestDataGenerator:
                 # Location (matches geojson.properties.id)
                 row.append(f"location_{loc_idx}")
 
-                # Disease cases (health outcome, whole number as float)
-                row.append(float(random.randint(1, 100)))
+                # Seasonal signal for this location/period in [-1, 1].
+                season = math.sin(2.0 * math.pi * (year_fraction - params["phase"]))
+                # rainfall (mm / period): wet season aligned to the location's phase.
+                rainfall = max(0.0, 150.0 + 130.0 * season + random.uniform(-25.0, 25.0))
+                # mean_temperature (degrees Celsius): a regional annual climate cycle.
+                temperature = 24.0 + 7.0 * math.sin(2.0 * math.pi * (year_fraction - 0.08)) + random.uniform(-1.5, 1.5)
+                # disease_cases (target): seasonal, rainfall-driven, per-location level.
+                cases = (
+                    params["base_cases"] * (1.0 + params["amplitude"] * season)
+                    + 0.06 * rainfall
+                    + random.gauss(0.0, 4.0)
+                )
 
-                # population (chap-core canonical, non-optional): realistic district-sized integer
-                row.append(random.randint(50_000, 1_500_000))
+                # disease_cases (health outcome, whole number as float)
+                row.append(float(max(0, round(cases))))
+                # population (chap-core canonical, non-optional): stable per location
+                row.append(params["population"])
+                # rainfall
+                row.append(round(rainfall, 2))
+                # mean_temperature
+                row.append(round(temperature, 2))
 
-                # rainfall (mm / period): 0-400 is a reasonable monthly range
-                row.append(random.uniform(0, 400))
-
-                # mean_temperature (degrees Celsius): tropical-to-temperate range
-                row.append(random.uniform(10, 35))
-
-                # Feature values (climate data)
-                for _ in range(num_features):
-                    row.append(random.uniform(0, 100))
-
-                # Required covariate values
-                for _ in required_covariates:
-                    row.append(random.uniform(0, 100))
-
-                # Additional continuous covariate values
-                for _ in additional_covariates:
-                    row.append(random.uniform(0, 100))
-
-                # Extra covariate values
-                for _ in range(extra_covariates):
-                    row.append(random.uniform(0, 100))
+                # Remaining covariate columns (features, required, additional, extra),
+                # each a smooth seasonal signal in [0, 100] with its own phase.
+                for cov_idx in range(num_covariate_cols):
+                    cov_phase = (cov_idx + 1) / (num_covariate_cols + 1)
+                    value = (
+                        50.0 + 35.0 * math.sin(2.0 * math.pi * (year_fraction - cov_phase)) + random.uniform(-8.0, 8.0)
+                    )
+                    row.append(round(min(100.0, max(0.0, value)), 2))
 
                 data.append(row)
 
