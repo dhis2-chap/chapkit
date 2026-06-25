@@ -29,6 +29,19 @@ class ConfigManager[DataT: BaseConfig](BaseManager[Config, ConfigIn[DataT], Conf
             return self._to_output_schema(config)
         return None
 
+    async def delete_by_id(self, id: ULID) -> None:
+        """Delete a config and cascade-delete its linked artifact trees."""
+        entity = await self.repository.find_by_id(id)
+        if entity is None:
+            return
+        await self.pre_delete(entity)
+        # Use the repository's cascading delete (which also removes the linked
+        # artifact subtrees) instead of the base manager's plain entity delete,
+        # which would leave those artifacts orphaned with a dangling config_id.
+        await self.repository.delete_by_id(id)
+        await self.repository.commit()
+        await self.post_delete(entity)
+
     async def link_artifact(self, config_id: ULID, artifact_id: ULID) -> None:
         """Link a config to a root artifact."""
         await self.repository.link_artifact(config_id, artifact_id)

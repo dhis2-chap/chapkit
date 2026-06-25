@@ -268,3 +268,43 @@ async def test_cascade_delete_config_deletes_artifacts() -> None:
         assert await artifact_repo.find_by_id(child.id) is None
 
     await db.dispose()
+
+
+async def test_manager_delete_config_cascades_to_artifacts() -> None:
+    """ConfigManager.delete_by_id (the path the DELETE route uses) should cascade delete artifacts."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+
+    async with db.session() as session:
+        config_repo = ConfigRepository(session)
+        artifact_repo = ArtifactRepository(session)
+        manager = ConfigManager[DemoConfig](config_repo, DemoConfig)
+
+        # Create a config with a linked root -> child artifact tree.
+        config = Config(name="test_config", data=DemoConfig(x=1, y=2, z=3, tags=["test"]))
+        await config_repo.save(config)
+        await config_repo.commit()
+        await config_repo.refresh_many([config])
+
+        root = Artifact(data={"name": "root"}, level=0)
+        await artifact_repo.save(root)
+        await artifact_repo.commit()
+        await artifact_repo.refresh_many([root])
+
+        child = Artifact(data={"name": "child"}, parent_id=root.id, level=1)
+        await artifact_repo.save(child)
+        await artifact_repo.commit()
+        await artifact_repo.refresh_many([child])
+
+        await config_repo.link_artifact(config.id, root.id)
+        await config_repo.commit()
+
+        # Delete through the manager (what the HTTP DELETE route invokes), not the
+        # repository directly — this is the path that previously orphaned artifacts.
+        await manager.delete_by_id(config.id)
+
+        assert await config_repo.find_by_id(config.id) is None
+        assert await artifact_repo.find_by_id(root.id) is None
+        assert await artifact_repo.find_by_id(child.id) is None
+
+    await db.dispose()

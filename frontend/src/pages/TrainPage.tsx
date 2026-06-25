@@ -1,0 +1,317 @@
+// Interactive Train screen — submit a $train job behind a successful $validate gate.
+import { useEffect, useState } from 'react'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { Loader2, Play, Settings2, ShieldCheck, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
+
+import { api } from '@/lib/api'
+import type { TrainPayload, ValidationResult } from '@/lib/types'
+
+import { Loading, ErrorState, EmptyState } from '@/components/console/common'
+import { PageHeader } from '@/components/console/page'
+import {
+  GeneratorPanel,
+  DiagnosticsView,
+  DataFrameField,
+  DEFAULT_GENERATOR_PARAMS,
+  toSampleOptions,
+  parseDataFrame,
+  asDataFrame,
+  hasDiagnostics,
+  useColumnsPlaceholder,
+} from '@/components/console/ml-shared'
+import type { GeneratorParams } from '@/components/console/ml-shared'
+import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
+
+/** Train console page. */
+export function TrainPage() {
+  const navigate = useNavigate()
+  const configsQuery = useQuery({ queryKey: ['configs'], queryFn: api.configs })
+  const columnsPlaceholder = useColumnsPlaceholder('train')
+
+  const [configId, setConfigId] = useState<string>('')
+  const [dataText, setDataText] = useState<string>('')
+  const [geo, setGeo] = useState<unknown>(undefined)
+  const [generator, setGenerator] = useState<GeneratorParams>(DEFAULT_GENERATOR_PARAMS)
+  const [generatorOpen, setGeneratorOpen] = useState(false)
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
+  const [validated, setValidated] = useState(false)
+
+  function invalidate() {
+    setValidated(false)
+    setValidation(null)
+  }
+
+  // Auto-select the first config once loaded so the form is actionable out of the box.
+  useEffect(() => {
+    const configs = configsQuery.data ?? []
+    if (configs.length > 0 && configId === '') {
+      setConfigId(configs[0].id)
+    }
+  }, [configsQuery.data, configId])
+
+  /** Fetch a sample payload, push it into form state, and return the generated train payload. */
+  async function fetchAndFillSample(): Promise<TrainPayload> {
+    const payload = (await api.sampleData('train', {
+      config_id: configId || undefined,
+      ...toSampleOptions(generator),
+    })) as TrainPayload
+    setDataText(JSON.stringify(payload.data, null, 2))
+    setGeo(payload.geo)
+    if (payload.config_id) setConfigId(payload.config_id)
+    invalidate()
+    return payload
+  }
+
+  const sampleMutation = useMutation({
+    mutationFn: fetchAndFillSample,
+    onSuccess: () => toast.success('Sample training data loaded'),
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
+  })
+
+  const validateMutation = useMutation({
+    mutationFn: (body: Record<string, unknown>) => api.validate(body),
+    onSuccess: (res) => {
+      setValidation(res)
+      setValidated(res.valid)
+      toast[res.valid ? 'success' : 'error'](
+        res.valid ? 'Validation passed' : 'Validation found problems',
+      )
+    },
+    onError: (error: unknown) => {
+      setValidated(false)
+      toast.error(error instanceof Error ? error.message : String(error))
+    },
+  })
+
+  const trainMutation = useMutation({
+    mutationFn: (body: TrainPayload) => api.train(body),
+    onSuccess: (res) => {
+      toast.success(`Training job ${res.job_id} submitted`, {
+        action: { label: 'View jobs', onClick: () => navigate('/jobs') },
+      })
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
+  })
+
+  /** Build the $validate request body from a concrete train payload. */
+  function buildValidateBody(payload: TrainPayload): Record<string, unknown> {
+    return {
+      type: 'train',
+      config_id: payload.config_id || configId,
+      data: payload.data,
+      ...(payload.geo ? { geo: payload.geo } : {}),
+    }
+  }
+
+  function handleValidate() {
+    if (!configId) {
+      toast.error('Select a config first')
+      return
+    }
+    const data = parseDataFrame(dataText, 'Training data')
+    if (!data) {
+      setValidated(false)
+      return
+    }
+    validateMutation.mutate(buildValidateBody({ config_id: configId, data, geo }))
+  }
+
+  function handleSubmit() {
+    if (!configId) return
+    const data = parseDataFrame(dataText, 'Training data')
+    if (!data) return
+    trainMutation.mutate({ config_id: configId, data, ...(geo ? { geo } : {}) })
+  }
+
+  const configs = configsQuery.data ?? []
+  const pending =
+    sampleMutation.isPending || validateMutation.isPending || trainMutation.isPending
+  // Whether the data field currently holds a valid DataFrame, used to enable
+  // Validate only when there is something to validate.
+  const hasValidData = (() => {
+    try {
+      return asDataFrame(JSON.parse(dataText)) !== null
+    } catch {
+      return false
+    }
+  })()
+
+  return (
+    <>
+      <PageHeader
+        title="Train"
+        description="Submit a training job ($train) with $validate gating."
+      />
+      {configsQuery.isLoading ? (
+        <div className="flex-1 overflow-auto p-6">
+          <Loading label="Loading configs…" />
+        </div>
+      ) : configsQuery.isError ? (
+        <div className="flex-1 overflow-auto p-6">
+          <ErrorState error={configsQuery.error} />
+        </div>
+      ) : configs.length === 0 ? (
+        <div className="flex-1 overflow-auto p-6">
+          <EmptyState
+            title="No configs yet"
+            hint="Create a configuration on the Configs page before training a model."
+          />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 space-y-4 overflow-auto p-6 pb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Training input</CardTitle>
+                <CardDescription>
+                  Choose a config and provide the training DataFrame, then validate before
+                  submitting.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="train-config">Config</Label>
+                  <Select
+                    value={configId}
+                    onValueChange={(value) => {
+                      setConfigId(value)
+                      invalidate()
+                    }}
+                  >
+                    <SelectTrigger id="train-config" className="w-full">
+                      <SelectValue placeholder="Select a config…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {configs.map((config) => (
+                        <SelectItem key={config.id} value={config.id}>
+                          <span className="truncate">
+                            {config.name}{' '}
+                            <span className="text-muted-foreground">{config.id}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <DataFrameField
+                  id="train-data"
+                  label="Training data"
+                  placeholder={columnsPlaceholder}
+                  value={dataText}
+                  onChange={(next) => {
+                    setDataText(next)
+                    invalidate()
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="shrink-0 space-y-3 border-t bg-background px-6 py-3">
+            {hasDiagnostics(validation) ? (
+              <div className="max-h-40 overflow-auto">
+                <DiagnosticsView result={validation!} />
+              </div>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex">
+                <Button
+                  variant="outline"
+                  className="rounded-r-none"
+                  onClick={() => sampleMutation.mutate()}
+                  disabled={pending}
+                >
+                  {sampleMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                  Generate
+                </Button>
+                <Sheet open={generatorOpen} onOpenChange={setGeneratorOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="rounded-l-none border-l-0"
+                      disabled={pending}
+                      aria-label="Sample data generator options"
+                    >
+                      <Settings2 />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-md">
+                    <SheetHeader>
+                      <SheetTitle>Sample data generator</SheetTitle>
+                      <SheetDescription>
+                        Tune chapkit&apos;s synthetic data generator, then generate.
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="space-y-4 overflow-auto px-4">
+                      <GeneratorPanel
+                        params={generator}
+                        onChange={setGenerator}
+                        disabled={sampleMutation.isPending}
+                      />
+                    </div>
+                    <SheetFooter>
+                      <Button
+                        onClick={() => {
+                          setGeneratorOpen(false)
+                          sampleMutation.mutate()
+                        }}
+                        disabled={sampleMutation.isPending}
+                      >
+                        {sampleMutation.isPending ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Sparkles />
+                        )}
+                        Generate
+                      </Button>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={handleValidate}
+                disabled={pending || !configId || !hasValidData}
+              >
+                {validateMutation.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+                Validate
+              </Button>
+              <Button onClick={handleSubmit} disabled={pending || !validated}>
+                {trainMutation.isPending ? <Loader2 className="animate-spin" /> : <Play />}
+                Train
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}

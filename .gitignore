@@ -153,3 +153,9 @@ alembic.ini.bak
 
 # Example uv.lock files (examples use local editable chapkit)
 examples/*/uv.lock
+
+# Playwright MCP session artifacts
+.playwright-mcp/
+
+# Claude Code local settings
+.claude/

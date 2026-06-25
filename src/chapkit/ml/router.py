@@ -52,17 +52,79 @@ class MLRouter(Router):
         prefix: str,
         tags: list[str],
         manager_factory: Any,
+        sample_metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize ML router with manager factory."""
         self.manager_factory = manager_factory
+        self.sample_metadata = sample_metadata or {}
         super().__init__(prefix=prefix, tags=tags, **kwargs)
 
     def _register_routes(self) -> None:
         """Register ML train and predict routes."""
+        from typing import Literal
+
         from fastapi import HTTPException
 
         manager_factory = self.manager_factory
+        sample_metadata = self.sample_metadata
+
+        @self.router.get(
+            "/$generate-sample-data",
+            summary="Generate a sample train or predict payload",
+            description=(
+                "Return a ready-to-submit sample payload built with chapkit's synthetic data "
+                "generator. Useful for trying out $train and $predict from the console."
+            ),
+        )
+        async def generate_sample_data(
+            kind: Literal["train", "predict"] = "train",
+            config_id: str | None = None,
+            num_locations: int = 5,
+            num_periods: int = 50,
+            num_features: int = 3,
+            period_type: Literal["monthly", "weekly"] | None = None,
+            geo_type: Literal["polygon", "point"] = "polygon",
+            include_geo: bool | None = None,
+            seed: int = -1,
+        ) -> dict[str, Any]:
+            """Build a sample train/predict payload from tunable data-generator parameters."""
+            from chapkit.data.generator import TestDataGenerator
+
+            # A negative seed means "fresh data each call"; a concrete seed is reproducible.
+            generator = TestDataGenerator(seed=None if seed < 0 else seed)
+            required_covariates = list(sample_metadata.get("required_covariates") or [])
+            requires_geo = bool(sample_metadata.get("requires_geo", False))
+            resolved_period = period_type or sample_metadata.get("period_type") or "monthly"
+            want_geo = requires_geo if include_geo is None else include_geo
+            geo = generator.generate_geo_data(num_features=num_locations, geo_type=geo_type) if want_geo else None
+
+            if kind == "predict":
+                historic, future = generator.generate_prediction_data(
+                    num_locations=num_locations,
+                    num_periods=max(1, num_periods),
+                    num_features=num_features,
+                    required_covariates=required_covariates,
+                    period_type=resolved_period,
+                )
+                payload: dict[str, Any] = {"historic": historic, "future": future}
+                if geo is not None:
+                    payload["geo"] = geo
+                return payload
+
+            data = generator.generate_training_data(
+                num_locations=num_locations,
+                num_periods=max(1, num_periods),
+                num_features=num_features,
+                required_covariates=required_covariates,
+                period_type=resolved_period,
+            )
+            payload = {"data": data}
+            if config_id:
+                payload["config_id"] = config_id
+            if geo is not None:
+                payload["geo"] = geo
+            return payload
 
         @self.router.post(
             "/$train",
