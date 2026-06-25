@@ -34,7 +34,7 @@ served straight from the installed package with no Node.js runtime required.
 | Screen | What it does |
 | --- | --- |
 | **Overview** | Service identity, version, model metadata, capability contract (period type, prediction-period bounds, required covariates), and health. |
-| **Configs** | Browse, create, edit, and delete configs. New configs are pre-filled from the service's config JSON schema. |
+| **Configs** | Browse, create, edit, and delete configs inline (no modal). The data editor is a CodeMirror JSON editor with schema-aware autocomplete and validation driven by the service's config JSON schema; new configs are pre-filled from that schema. |
 | **Artifacts** | Browse the artifact hierarchy as a tree, inspect metadata, preview dataframe content, and download artifact contents. |
 | **Jobs** | Live job monitor (auto-refreshing) with status, timing, error tracebacks, cancellation, and a link from a completed job to its result artifact. |
 | **Train** | Submit `$train` jobs interactively, with `$validate` gating and a tunable sample-data generator (see below). |
@@ -72,10 +72,14 @@ that has just been validated.
 
 ![Train screen](../assets/console/console-train.png)
 
-The **Dry run** button is the quick happy path: it generates sample data and runs
-`$validate` in one click, with no job submitted, so you can confirm a payload is
-acceptable before training. Sample-data generation is itself side-effect-free, so
-the whole generate -> inspect -> validate loop never touches your data.
+The flow is **Generate -> Validate -> Train/Predict**. The split **Generate**
+button fills the form with sample data for the selected config/model (a gear opens
+the generator options); **Validate** runs `$validate` with no job submitted, which
+enables the submit button; submitting fires a toast with the job's ULID and a
+**View jobs** link. The data field has **Table** and **JSON** views (the JSON pane
+is a read-only viewer with an Edit toggle), and an empty field hints the model's
+expected columns. Sample-data generation is side-effect-free, so the whole
+generate -> inspect -> validate loop never touches your data.
 
 ### Tunable sample data
 
