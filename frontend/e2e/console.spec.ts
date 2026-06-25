@@ -1,5 +1,6 @@
-import { test, expect, request as playwrightRequest } from '@playwright/test'
+import { request as playwrightRequest } from '@playwright/test'
 import type { APIRequestContext } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 const baseURL = 'http://127.0.0.1:9099'
 

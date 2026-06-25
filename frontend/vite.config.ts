@@ -28,5 +28,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, '../src/chapkit/api/apps/console'),
     emptyOutDir: true,
+    // Emit source maps only for coverage runs so V8 coverage can be remapped to
+    // source; the shipped (committed) bundle stays map-free.
+    sourcemap: !!process.env.COVERAGE,
   },
 })

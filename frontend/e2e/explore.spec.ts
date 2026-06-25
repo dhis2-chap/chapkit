@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 
 test('endpoints page lists operations parsed from openapi', async ({ page }) => {
   await page.goto('/#/api')

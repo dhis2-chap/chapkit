@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { newApi, createConfig } from './helpers'
 
 test('edit a config and save', async ({ page }) => {

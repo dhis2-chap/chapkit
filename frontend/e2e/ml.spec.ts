@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './fixtures'
 import { newApi, createConfig, trainModel } from './helpers'
 
 test.beforeAll(async () => {
