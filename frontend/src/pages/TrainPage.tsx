@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ExternalLink, FlaskConical, Loader2, Play, ShieldCheck, Sparkles } from 'lucide-react'
+import { ChevronDown, ExternalLink, Loader2, Play, ShieldCheck, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
@@ -159,15 +159,6 @@ export function TrainPage() {
     }
   }
 
-  const dryRunMutation = useMutation({
-    mutationFn: async () => {
-      if (!configId) throw new Error('Select a config first')
-      const payload = await fetchAndFillSample()
-      return validateMutation.mutateAsync(buildValidateBody(payload))
-    },
-    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
-  })
-
   function handleValidate() {
     if (!configId) {
       toast.error('Select a config first')
@@ -190,10 +181,7 @@ export function TrainPage() {
 
   const configs = configsQuery.data ?? []
   const pending =
-    sampleMutation.isPending ||
-    validateMutation.isPending ||
-    trainMutation.isPending ||
-    dryRunMutation.isPending
+    sampleMutation.isPending || validateMutation.isPending || trainMutation.isPending
 
   return (
     <>
@@ -278,53 +266,61 @@ export function TrainPage() {
 
           <div className="shrink-0 border-t bg-background px-6 py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Sheet open={generatorOpen} onOpenChange={setGeneratorOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" disabled={pending}>
-                    {sampleMutation.isPending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <Sparkles />
-                    )}
-                    Fill with sample data
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-full sm:max-w-md">
-                  <SheetHeader>
-                    <SheetTitle>Sample data generator</SheetTitle>
-                    <SheetDescription>
-                      Tune chapkit&apos;s synthetic data generator, then generate.
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="space-y-4 overflow-auto px-4">
-                    <GeneratorPanel
-                      params={generator}
-                      onChange={setGenerator}
-                      disabled={sampleMutation.isPending}
-                    />
-                  </div>
-                  <SheetFooter>
+              <div className="inline-flex">
+                <Button
+                  variant="outline"
+                  className="rounded-r-none"
+                  onClick={() => sampleMutation.mutate()}
+                  disabled={pending}
+                >
+                  {sampleMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                  Fill with sample data
+                </Button>
+                <Sheet open={generatorOpen} onOpenChange={setGeneratorOpen}>
+                  <SheetTrigger asChild>
                     <Button
-                      onClick={() => {
-                        setGeneratorOpen(false)
-                        sampleMutation.mutate()
-                      }}
-                      disabled={sampleMutation.isPending}
+                      variant="outline"
+                      size="icon"
+                      className="rounded-l-none border-l-0"
+                      disabled={pending}
+                      aria-label="Sample data options"
                     >
-                      {sampleMutation.isPending ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <Sparkles />
-                      )}
-                      Generate
+                      <ChevronDown />
                     </Button>
-                  </SheetFooter>
-                </SheetContent>
-              </Sheet>
-              <Button onClick={() => dryRunMutation.mutate()} disabled={pending || !configId}>
-                {dryRunMutation.isPending ? <Loader2 className="animate-spin" /> : <FlaskConical />}
-                Dry run
-              </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-md">
+                    <SheetHeader>
+                      <SheetTitle>Sample data generator</SheetTitle>
+                      <SheetDescription>
+                        Tune chapkit&apos;s synthetic data generator, then generate.
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="space-y-4 overflow-auto px-4">
+                      <GeneratorPanel
+                        params={generator}
+                        onChange={setGenerator}
+                        disabled={sampleMutation.isPending}
+                      />
+                    </div>
+                    <SheetFooter>
+                      <Button
+                        onClick={() => {
+                          setGeneratorOpen(false)
+                          sampleMutation.mutate()
+                        }}
+                        disabled={sampleMutation.isPending}
+                      >
+                        {sampleMutation.isPending ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Sparkles />
+                        )}
+                        Generate
+                      </Button>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
+              </div>
               <Button
                 variant="secondary"
                 onClick={handleValidate}
