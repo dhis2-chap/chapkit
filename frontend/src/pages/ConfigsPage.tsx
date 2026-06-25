@@ -377,10 +377,11 @@ function ConfigForm({
 }) {
   const editing = mode === 'edit' ? (config ?? null) : null
 
+  // Fetched for both create and edit: seeds the create skeleton and drives
+  // schema-aware autocomplete + validation in the editor.
   const schemaQuery = useQuery({
     queryKey: ['config-schema'],
     queryFn: () => api.configSchema(),
-    enabled: mode === 'create',
   })
 
   const [name, setName] = useState(editing?.name ?? '')
@@ -462,6 +463,7 @@ function ConfigForm({
               setDataText(next)
               if (parseError) setParseError(null)
             }}
+            schema={schemaQuery.data}
             ariaLabel="Config data"
             minHeight="16rem"
           />

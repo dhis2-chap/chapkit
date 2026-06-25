@@ -1,5 +1,5 @@
 // Shared JSON editor/viewer (CodeMirror) used for config data and ML DataFrames.
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import type { Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
@@ -27,6 +27,7 @@ export function JsonEditor({
   minHeight = '8rem',
   maxHeight = '28rem',
   placeholder,
+  schema,
   ariaLabel,
   className,
 }: {
@@ -36,25 +37,52 @@ export function JsonEditor({
   minHeight?: string
   maxHeight?: string
   placeholder?: string
+  // JSON Schema driving Ctrl-Space completion + inline validation (editable only).
+  schema?: Record<string, unknown>
   ariaLabel?: string
   className?: string
 }) {
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
+  const schemaAware = Boolean(schema) && !readOnly
+
+  // codemirror-json-schema pulls in a full JSON-Schema validator (~160KB gz), so
+  // load it lazily and only when a schema editor is actually mounted — it stays
+  // out of the main bundle and downloads on demand (e.g. opening the config form).
+  const [schemaExt, setSchemaExt] = useState<Extension[] | null>(null)
+  useEffect(() => {
+    if (!schemaAware || !schema) {
+      setSchemaExt(null)
+      return
+    }
+    let cancelled = false
+    void import('codemirror-json-schema').then(({ jsonSchema }) => {
+      if (!cancelled) setSchemaExt(jsonSchema(schema as Parameters<typeof jsonSchema>[0]))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [schemaAware, schema])
 
   const extensions = useMemo<Extension[]>(() => {
-    const exts: Extension[] = [json(), EditorView.lineWrapping, surfaceTheme]
-    // Inline JSON lint (squiggles + gutter markers) only while editing, and not
-    // for an empty field (an untouched editor shouldn't show a JSON error).
-    if (!readOnly) {
-      const jsonLint = jsonParseLinter()
-      exts.push(
-        lintGutter(),
-        linter((view) => (view.state.doc.toString().trim() === '' ? [] : jsonLint(view))),
-      )
+    const exts: Extension[] = [EditorView.lineWrapping, surfaceTheme]
+    if (schemaAware && schemaExt) {
+      // jsonSchema() bundles the JSON language + schema completion/validation/hover.
+      exts.push(...schemaExt, lintGutter())
+    } else {
+      exts.push(json())
+      // Inline parse lint only while editing, and not for an empty field
+      // (an untouched editor shouldn't show a JSON error).
+      if (!readOnly) {
+        const jsonLint = jsonParseLinter()
+        exts.push(
+          lintGutter(),
+          linter((view) => (view.state.doc.toString().trim() === '' ? [] : jsonLint(view))),
+        )
+      }
     }
     return exts
-  }, [readOnly])
+  }, [readOnly, schemaExt, schemaAware])
 
   return (
     <div
@@ -79,7 +107,8 @@ export function JsonEditor({
           foldGutter: !readOnly,
           highlightActiveLine: false,
           highlightActiveLineGutter: false,
-          autocompletion: false,
+          // Enable the autocomplete extension only when a schema drives it.
+          autocompletion: schemaAware,
         }}
         aria-label={ariaLabel}
       />
