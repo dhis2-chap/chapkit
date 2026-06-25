@@ -131,7 +131,7 @@ export const api = {
       }
     }
     return request<TrainPayload | PredictPayload>(
-      `api/v1/ml/$sample-data?${params.toString()}`,
+      `api/v1/ml/$generate-sample-data?${params.toString()}`,
     )
   },
 }

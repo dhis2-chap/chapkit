@@ -89,7 +89,7 @@ the data before generating it.
 Under the hood this calls a small endpoint that is added whenever ML is enabled:
 
 ```
-GET /api/v1/ml/$sample-data?kind=train|predict
+GET /api/v1/ml/$generate-sample-data?kind=train|predict
 ```
 
 Query parameters:

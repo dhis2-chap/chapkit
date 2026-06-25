@@ -1,4 +1,4 @@
-"""Tests for the MLRouter $sample-data endpoint."""
+"""Tests for the MLRouter $generate-sample-data endpoint."""
 
 from unittest.mock import Mock
 
@@ -29,7 +29,7 @@ def test_sample_data_train_returns_dataframe() -> None:
     """A train sample payload contains a DataFrame and echoes the config id."""
     client = _client({"required_covariates": ["population"], "period_type": "monthly"})
 
-    response = client.get("/api/v1/ml/$sample-data", params={"kind": "train", "config_id": "cfg-1"})
+    response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "train", "config_id": "cfg-1"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -43,7 +43,7 @@ def test_sample_data_predict_returns_historic_and_future() -> None:
     """A predict sample payload contains historic and future DataFrames."""
     client = _client()
 
-    response = client.get("/api/v1/ml/$sample-data", params={"kind": "predict"})
+    response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "predict"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -56,7 +56,7 @@ def test_sample_data_honors_tunable_params() -> None:
     client = _client()
 
     response = client.get(
-        "/api/v1/ml/$sample-data",
+        "/api/v1/ml/$generate-sample-data",
         params={"kind": "train", "num_locations": 2, "num_periods": 3, "period_type": "weekly"},
     )
 
@@ -72,7 +72,7 @@ def test_sample_data_includes_geo_when_requested() -> None:
     client = _client()
 
     response = client.get(
-        "/api/v1/ml/$sample-data",
+        "/api/v1/ml/$generate-sample-data",
         params={"kind": "train", "include_geo": True, "num_locations": 2},
     )
 
@@ -86,7 +86,7 @@ def test_sample_data_omits_geo_by_default() -> None:
     """Without requires_geo or include_geo, no geo is attached."""
     client = _client({"requires_geo": False})
 
-    response = client.get("/api/v1/ml/$sample-data", params={"kind": "train"})
+    response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "train"})
 
     assert response.status_code == 200
     assert "geo" not in response.json()

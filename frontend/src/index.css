@@ -5,6 +5,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Always-visible (non-overlay) thin scrollbars, so horizontally scrollable
+   tables advertise that they scroll instead of hiding the bar until used. */
+@utility show-scrollbars {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    &::-webkit-scrollbar {
+        width: 0.5rem;
+        height: 0.5rem;
+    }
+    &::-webkit-scrollbar-thumb {
+        background-color: var(--border);
+        border-radius: 9999px;
+    }
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+}
+
 @theme inline {
     --font-heading: var(--font-sans);
     /* Match chapkit-app / the DHIS2 design system: Roboto for UI, a system

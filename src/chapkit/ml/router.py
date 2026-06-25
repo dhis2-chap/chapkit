@@ -70,14 +70,14 @@ class MLRouter(Router):
         sample_metadata = self.sample_metadata
 
         @self.router.get(
-            "/$sample-data",
+            "/$generate-sample-data",
             summary="Generate a sample train or predict payload",
             description=(
                 "Return a ready-to-submit sample payload built with chapkit's synthetic data "
                 "generator. Useful for trying out $train and $predict from the console."
             ),
         )
-        async def sample_data(
+        async def generate_sample_data(
             kind: Literal["train", "predict"] = "train",
             config_id: str | None = None,
             num_locations: int = 5,
@@ -86,12 +86,13 @@ class MLRouter(Router):
             period_type: Literal["monthly", "weekly"] | None = None,
             geo_type: Literal["polygon", "point"] = "polygon",
             include_geo: bool | None = None,
-            seed: int = 42,
+            seed: int = -1,
         ) -> dict[str, Any]:
             """Build a sample train/predict payload from tunable data-generator parameters."""
             from chapkit.data.generator import TestDataGenerator
 
-            generator = TestDataGenerator(seed=seed)
+            # A negative seed means "fresh data each call"; a concrete seed is reproducible.
+            generator = TestDataGenerator(seed=None if seed < 0 else seed)
             required_covariates = list(sample_metadata.get("required_covariates") or [])
             requires_geo = bool(sample_metadata.get("requires_geo", False))
             resolved_period = period_type or sample_metadata.get("period_type") or "monthly"

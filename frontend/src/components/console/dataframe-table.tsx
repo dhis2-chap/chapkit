@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -188,8 +187,12 @@ export function DataFrameTable({ frame }: { frame: DataFrameContent }) {
         </DropdownMenu>
       </div>
 
-      <div className="max-h-[32rem] overflow-auto rounded-md border">
-        <Table>
+      {/* Single scroll container (both axes) so the sticky header sticks to the
+          visible top and one always-visible scrollbar indicates h-scroll. Using a
+          raw <table> avoids shadcn Table's inner overflow-x wrapper, which would
+          otherwise become the sticky scroll context and hide the h-scrollbar. */}
+      <div className="show-scrollbars max-h-[32rem] overflow-auto rounded-md border">
+        <table className="w-full caption-bottom text-sm">
           <TableHeader className="sticky top-0 z-10 bg-muted">
             <TableRow>
               {columns.map((col, i) => (
@@ -231,7 +234,7 @@ export function DataFrameTable({ frame }: { frame: DataFrameContent }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </table>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">

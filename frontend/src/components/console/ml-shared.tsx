@@ -134,7 +134,8 @@ export interface GeneratorParams {
   period_type: 'monthly' | 'weekly'
   geo_type: 'polygon' | 'point'
   include_geo?: boolean
-  seed: number
+  // null = no fixed seed -> fresh random data each generate; a number pins it.
+  seed: number | null
 }
 
 export const DEFAULT_GENERATOR_PARAMS: GeneratorParams = {
@@ -144,10 +145,10 @@ export const DEFAULT_GENERATOR_PARAMS: GeneratorParams = {
   period_type: 'monthly',
   geo_type: 'polygon',
   include_geo: undefined,
-  seed: 42,
+  seed: null,
 }
 
-/** Map the generator params into SampleDataOptions, dropping the undefined include_geo. */
+/** Map the generator params into SampleDataOptions, omitting unset (random) seed and include_geo. */
 export function toSampleOptions(params: GeneratorParams): SampleDataOptions {
   const options: SampleDataOptions = {
     num_locations: params.num_locations,
@@ -155,8 +156,8 @@ export function toSampleOptions(params: GeneratorParams): SampleDataOptions {
     num_features: params.num_features,
     period_type: params.period_type,
     geo_type: params.geo_type,
-    seed: params.seed,
   }
+  if (params.seed !== null) options.seed = params.seed
   if (params.include_geo !== undefined) options.include_geo = params.include_geo
   return options
 }
@@ -172,6 +173,11 @@ export function GeneratorPanel({
   disabled?: boolean
 }) {
   function setNumber(key: 'num_locations' | 'num_periods' | 'num_features' | 'seed', raw: string) {
+    // An empty seed means "no fixed seed" -> fresh random data each generate.
+    if (key === 'seed' && raw.trim() === '') {
+      onChange({ ...params, seed: null })
+      return
+    }
     const value = Number(raw)
     onChange({ ...params, [key]: Number.isFinite(value) ? value : 0 })
   }
@@ -298,12 +304,13 @@ export function GeneratorPanel({
           <Input
             id="gen-seed"
             type="number"
-            value={params.seed}
+            value={params.seed ?? ''}
+            placeholder="random"
             disabled={disabled}
             onChange={(event) => setNumber('seed', event.target.value)}
           />
           <p className="text-xs text-muted-foreground">
-            A fixed seed produces identical data every time.
+            Leave blank for fresh random data each time; set a seed to reproduce an exact dataset.
           </p>
         </div>
       </section>
