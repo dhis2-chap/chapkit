@@ -82,7 +82,9 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarTrigger className="text-sidebar-foreground/70" />
+        {/* Collapse control sits at the seam with the content (right edge), the
+            direction it collapses — matching the SidebarRail convention. */}
+        <SidebarTrigger className="self-end text-sidebar-foreground/70 group-data-[collapsible=icon]:self-center" />
       </SidebarFooter>
     </Sidebar>
   )
