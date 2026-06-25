@@ -199,8 +199,8 @@ export function JobsPage() {
                       <TableCell>
                         <JobStatusBadge status={job.status} />
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {shortId(job.id)}
+                      <TableCell className="font-mono text-xs whitespace-nowrap">
+                        {job.id}
                       </TableCell>
                       <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                         {formatDateTime(job.submitted_at)}
@@ -263,14 +263,12 @@ export function JobsPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <span className="font-mono text-sm">
-                    {shortId(selected.id)}
+                  <span className="font-mono text-sm break-all">
+                    {selected.id}
                   </span>
                   <JobStatusBadge status={selected.status} />
                 </DialogTitle>
-                <DialogDescription className="font-mono text-xs break-all">
-                  {selected.id}
-                </DialogDescription>
+                <DialogDescription>Background job details.</DialogDescription>
               </DialogHeader>
 
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">

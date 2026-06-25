@@ -152,7 +152,9 @@ export function PredictPage() {
     mutationFn: (body: PredictPayload) => api.predict(body),
     onSuccess: (res) => {
       setResult(res)
-      toast.success(`Prediction job ${shortId(res.job_id)} submitted`)
+      toast.success(`Prediction job ${shortId(res.job_id)} submitted`, {
+        action: { label: 'View jobs', onClick: () => navigate('/jobs') },
+      })
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
   })

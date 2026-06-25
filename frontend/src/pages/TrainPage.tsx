@@ -146,7 +146,9 @@ export function TrainPage() {
     mutationFn: (body: TrainPayload) => api.train(body),
     onSuccess: (res) => {
       setResult(res)
-      toast.success(`Training job ${shortId(res.job_id)} submitted`)
+      toast.success(`Training job ${shortId(res.job_id)} submitted`, {
+        action: { label: 'View jobs', onClick: () => navigate('/jobs') },
+      })
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
   })
