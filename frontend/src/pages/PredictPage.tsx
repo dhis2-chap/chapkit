@@ -17,6 +17,7 @@ import {
   DEFAULT_GENERATOR_PARAMS,
   toSampleOptions,
   parseDataFrame,
+  asDataFrame,
   shortId,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
@@ -208,6 +209,15 @@ export function PredictPage() {
 
   const pending =
     sampleMutation.isPending || validateMutation.isPending || predictMutation.isPending
+  // Validate is only enabled once both data fields hold valid DataFrames.
+  const isValidFrame = (raw: string) => {
+    try {
+      return asDataFrame(JSON.parse(raw)) !== null
+    } catch {
+      return false
+    }
+  }
+  const hasValidData = isValidFrame(historicText) && isValidFrame(futureText)
 
   return (
     <>
@@ -366,7 +376,7 @@ export function PredictPage() {
               <Button
                 variant="secondary"
                 onClick={handleValidate}
-                disabled={pending || !artifactId}
+                disabled={pending || !artifactId || !hasValidData}
               >
                 {validateMutation.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
                 Validate

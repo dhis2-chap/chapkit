@@ -17,6 +17,7 @@ import {
   DEFAULT_GENERATOR_PARAMS,
   toSampleOptions,
   parseDataFrame,
+  asDataFrame,
   shortId,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
@@ -182,6 +183,15 @@ export function TrainPage() {
   const configs = configsQuery.data ?? []
   const pending =
     sampleMutation.isPending || validateMutation.isPending || trainMutation.isPending
+  // Whether the data field currently holds a valid DataFrame, used to enable
+  // Validate only when there is something to validate.
+  const hasValidData = (() => {
+    try {
+      return asDataFrame(JSON.parse(dataText)) !== null
+    } catch {
+      return false
+    }
+  })()
 
   return (
     <>
@@ -324,7 +334,7 @@ export function TrainPage() {
               <Button
                 variant="secondary"
                 onClick={handleValidate}
-                disabled={pending || !configId}
+                disabled={pending || !configId || !hasValidData}
               >
                 {validateMutation.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
                 Validate
