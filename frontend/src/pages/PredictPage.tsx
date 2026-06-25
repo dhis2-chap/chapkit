@@ -286,44 +286,6 @@ export function PredictPage() {
                     invalidate()
                   }}
                 />
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => sampleMutation.mutate()}
-                    disabled={pending}
-                  >
-                    {sampleMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                    Fill with sample data
-                  </Button>
-                  <Button
-                    onClick={() => dryRunMutation.mutate()}
-                    disabled={pending || !artifactId}
-                  >
-                    {dryRunMutation.isPending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <FlaskConical />
-                    )}
-                    Dry run
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleValidate}
-                    disabled={pending || !artifactId}
-                  >
-                    {validateMutation.isPending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <ShieldCheck />
-                    )}
-                    Validate
-                  </Button>
-                  <Button onClick={handleSubmit} disabled={pending || !validated}>
-                    {predictMutation.isPending ? <Loader2 className="animate-spin" /> : <Play />}
-                    Predict
-                  </Button>
-                </div>
               </CardContent>
             </Card>
 
@@ -335,6 +297,35 @@ export function PredictPage() {
             ) : null}
 
             {result ? <JobResultCard job={result} onViewJobs={() => navigate('/jobs')} /> : null}
+
+            <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => sampleMutation.mutate()}
+                  disabled={pending}
+                >
+                  {sampleMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                  Fill with sample data
+                </Button>
+                <Button onClick={() => dryRunMutation.mutate()} disabled={pending || !artifactId}>
+                  {dryRunMutation.isPending ? <Loader2 className="animate-spin" /> : <FlaskConical />}
+                  Dry run
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={handleValidate}
+                  disabled={pending || !artifactId}
+                >
+                  {validateMutation.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+                  Validate
+                </Button>
+                <Button onClick={handleSubmit} disabled={pending || !validated}>
+                  {predictMutation.isPending ? <Loader2 className="animate-spin" /> : <Play />}
+                  Predict
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </PageBody>
