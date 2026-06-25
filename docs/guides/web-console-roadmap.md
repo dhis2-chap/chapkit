@@ -20,7 +20,14 @@ lost. None of these are implemented yet.
   grouping (e.g. by status).
 - **Deep-link routing for Jobs.** Configs and Artifacts already drive selection
   from the URL (`#/configs/:id`, `#/artifacts/:id`); extend the same to the Jobs
-  detail.
+  detail, so the submit toast can link straight to a specific job (today it links
+  to the Jobs list).
+- **Job type / label in the Jobs list.** Show what each job *is* (train, predict,
+  etc.) in the table and detail. Blocked on the framework: servicekit's
+  `JobRecord` only carries id/status/timestamps/error and `scheduler.add_job`
+  takes no name/label, so the operation type isn't represented anywhere. Needs a
+  servicekit enhancement (a `name`/`label`/`kind` on jobs) that chapkit's ML
+  manager would set when scheduling `$train` / `$predict`.
 
 ## Data & models
 
