@@ -38,7 +38,15 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
 
 /** Result card shown after a successful predict submission. */
 function JobResultCard({ job, onViewJobs }: { job: MLJobResponse; onViewJobs: () => void }) {
@@ -263,8 +271,15 @@ export function PredictPage() {
                     <SelectContent>
                       {trainingArtifacts.map((artifact) => (
                         <SelectItem key={artifact.id} value={artifact.id}>
-                          {shortId(artifact.id)}
-                          {artifact.data?.type ? ` (${artifact.data.type})` : ''}
+                          <span className="truncate">
+                            {artifact.id}
+                            {artifact.data?.type ? (
+                              <span className="text-muted-foreground">
+                                {' '}
+                                ({artifact.data.type})
+                              </span>
+                            ) : null}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -307,8 +322,8 @@ export function PredictPage() {
 
           <div className="shrink-0 border-t bg-background px-6 py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Popover open={generatorOpen} onOpenChange={setGeneratorOpen}>
-                <PopoverTrigger asChild>
+              <Sheet open={generatorOpen} onOpenChange={setGeneratorOpen}>
+                <SheetTrigger asChild>
                   <Button variant="outline" disabled={pending}>
                     {sampleMutation.isPending ? (
                       <Loader2 className="animate-spin" />
@@ -317,16 +332,23 @@ export function PredictPage() {
                     )}
                     Fill with sample data
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" side="top" className="w-[28rem]">
-                  <div className="space-y-3">
+                </SheetTrigger>
+                <SheetContent side="right" className="w-full sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle>Sample data generator</SheetTitle>
+                    <SheetDescription>
+                      Tune chapkit&apos;s synthetic data generator, then generate.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <div className="space-y-4 overflow-auto px-4">
                     <GeneratorPanel
                       params={generator}
                       onChange={setGenerator}
                       disabled={sampleMutation.isPending}
                     />
+                  </div>
+                  <SheetFooter>
                     <Button
-                      className="w-full"
                       onClick={() => {
                         setGeneratorOpen(false)
                         sampleMutation.mutate()
@@ -340,9 +362,9 @@ export function PredictPage() {
                       )}
                       Generate
                     </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
               <Button onClick={() => dryRunMutation.mutate()} disabled={pending || !artifactId}>
                 {dryRunMutation.isPending ? <Loader2 className="animate-spin" /> : <FlaskConical />}
                 Dry run

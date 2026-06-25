@@ -6,13 +6,6 @@ import { toast } from 'sonner'
 import type { SampleDataOptions } from '@/lib/api'
 import type { DataFrameContent, ValidationDiagnostic, ValidationResult } from '@/lib/types'
 
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -183,14 +176,7 @@ export function GeneratorPanel({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sample data generator</CardTitle>
-        <CardDescription>
-          Tune chapkit&apos;s synthetic data generator, then fill the form.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="gen-locations">Locations</Label>
           <Input
@@ -283,8 +269,7 @@ export function GeneratorPanel({
             Include geo (leave unchecked to let the server decide from requires_geo)
           </Label>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   )
 }
 
