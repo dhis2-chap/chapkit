@@ -5,10 +5,6 @@ lost. None of these are implemented yet.
 
 ## Console / UX
 
-- **Automated end-to-end tests.** A committed `@playwright/test` suite with its
-  own config, runnable in CI against a fixture service. The console is currently
-  verified manually; the MCP browser used during development is too sandboxed to
-  rely on for CI.
 - **Schema-driven config form.** Generate the "New config" form dynamically from
   `/api/v1/configs/$schema` (number inputs, checkboxes, array editors) instead of
   a raw JSON textarea, with the JSON view as an advanced fallback.
