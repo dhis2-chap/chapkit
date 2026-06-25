@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
 import { DataFrameTable } from '@/components/console/dataframe-table'
 
 /** Narrow an unknown value to a DataFrameContent after a minimal shape check. */
@@ -176,77 +177,123 @@ export function GeneratorPanel({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="gen-locations">Locations</Label>
-          <Input
-            id="gen-locations"
-            type="number"
-            min={1}
-            value={params.num_locations}
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <div>
+          <h4 className="text-sm font-medium">Panel shape</h4>
+          <p className="text-xs text-muted-foreground">
+            Size of the generated panel dataset (locations x periods).
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="gen-locations">Locations</Label>
+            <Input
+              id="gen-locations"
+              type="number"
+              min={1}
+              value={params.num_locations}
+              disabled={disabled}
+              onChange={(event) => setNumber('num_locations', event.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="gen-periods">Periods</Label>
+            <Input
+              id="gen-periods"
+              type="number"
+              min={1}
+              value={params.num_periods}
+              disabled={disabled}
+              onChange={(event) => setNumber('num_periods', event.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="gen-features">Features</Label>
+            <Input
+              id="gen-features"
+              type="number"
+              min={0}
+              value={params.num_features}
+              disabled={disabled}
+              onChange={(event) => setNumber('num_features', event.target.value)}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          One series per location; extra feature columns are synthetic covariates.
+        </p>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
+        <h4 className="text-sm font-medium">Format</h4>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="gen-period-type">Period type</Label>
+            <Select
+              value={params.period_type}
+              onValueChange={(value) =>
+                onChange({ ...params, period_type: value as GeneratorParams['period_type'] })
+              }
+              disabled={disabled}
+            >
+              <SelectTrigger id="gen-period-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="monthly">monthly</SelectItem>
+                <SelectItem value="weekly">weekly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="gen-geo-type">Geo type</Label>
+            <Select
+              value={params.geo_type}
+              onValueChange={(value) =>
+                onChange({ ...params, geo_type: value as GeneratorParams['geo_type'] })
+              }
+              disabled={disabled}
+            >
+              <SelectTrigger id="gen-geo-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="polygon">polygon</SelectItem>
+                <SelectItem value="point">point</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <label
+          htmlFor="gen-include-geo"
+          className="flex items-start gap-2 rounded-md border p-3 text-sm"
+        >
+          <input
+            id="gen-include-geo"
+            type="checkbox"
+            className="mt-0.5 size-4 accent-primary"
+            checked={params.include_geo ?? false}
             disabled={disabled}
-            onChange={(event) => setNumber('num_locations', event.target.value)}
+            onChange={(event) => onChange({ ...params, include_geo: event.target.checked })}
           />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="gen-periods">Periods</Label>
-          <Input
-            id="gen-periods"
-            type="number"
-            min={1}
-            value={params.num_periods}
-            disabled={disabled}
-            onChange={(event) => setNumber('num_periods', event.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="gen-features">Features</Label>
-          <Input
-            id="gen-features"
-            type="number"
-            min={0}
-            value={params.num_features}
-            disabled={disabled}
-            onChange={(event) => setNumber('num_features', event.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="gen-period-type">Period type</Label>
-          <Select
-            value={params.period_type}
-            onValueChange={(value) =>
-              onChange({ ...params, period_type: value as GeneratorParams['period_type'] })
-            }
-            disabled={disabled}
-          >
-            <SelectTrigger id="gen-period-type" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="monthly">monthly</SelectItem>
-              <SelectItem value="weekly">weekly</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="gen-geo-type">Geo type</Label>
-          <Select
-            value={params.geo_type}
-            onValueChange={(value) =>
-              onChange({ ...params, geo_type: value as GeneratorParams['geo_type'] })
-            }
-            disabled={disabled}
-          >
-            <SelectTrigger id="gen-geo-type" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="polygon">polygon</SelectItem>
-              <SelectItem value="point">point</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
+          <span>
+            <span className="font-medium">Include geometry</span>
+            <span className="block text-xs text-muted-foreground">
+              Attach a GeoJSON feature per location. Leave unchecked to let the
+              server decide from the service&apos;s requires_geo.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-3">
+        <h4 className="text-sm font-medium">Reproducibility</h4>
+        <div className="space-y-1.5">
           <Label htmlFor="gen-seed">Seed</Label>
           <Input
             id="gen-seed"
@@ -255,20 +302,11 @@ export function GeneratorPanel({
             disabled={disabled}
             onChange={(event) => setNumber('seed', event.target.value)}
           />
+          <p className="text-xs text-muted-foreground">
+            A fixed seed produces identical data every time.
+          </p>
         </div>
-        <div className="col-span-2 flex items-center gap-2 sm:col-span-3">
-          <input
-            id="gen-include-geo"
-            type="checkbox"
-            className="size-4 accent-primary"
-            checked={params.include_geo ?? false}
-            disabled={disabled}
-            onChange={(event) => onChange({ ...params, include_geo: event.target.checked })}
-          />
-          <Label htmlFor="gen-include-geo" className="font-normal">
-            Include geo (leave unchecked to let the server decide from requires_geo)
-          </Label>
-        </div>
+      </section>
     </div>
   )
 }
