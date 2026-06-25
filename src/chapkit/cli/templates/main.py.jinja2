@@ -29,15 +29,6 @@ from chapkit.ml import FunctionalModelRunner, ValidationDiagnostic
 from chapkit.ml import FunctionalModelRunner
 {% endif %}
 
-# Read the service version from this project's package metadata (pyproject.toml is
-# the single source of truth), the same way chapkit derives its own __version__.
-try:
-    from importlib.metadata import version as _get_version
-
-    __version__ = _get_version("{{ PROJECT_SLUG }}")
-except Exception:
-    __version__ = "unknown"
-
 log = structlog.get_logger()
 
 
@@ -210,7 +201,7 @@ async def on_validate_predict(
 info = MLServiceInfo(
     id="{{ PROJECT_SERVICE_ID }}",
     display_name="{{ PROJECT_NAME }}",
-    version=__version__,
+    version="1.0.0",
     description="A simple ML service template. Customize with your own model implementation.",
     model_metadata=ModelMetadata(
         author="Your Name",

@@ -73,6 +73,9 @@ lost. None of these are implemented yet.
 
 - **Monitoring screen.** A metrics screen backed by OpenTelemetry
   (`.with_monitoring()` already exposes the data).
-- **servicekit version helper.** A `ServiceInfo` helper that derives the service
-  version from package metadata, so every servicekit service benefits — not just
-  chapkit-scaffolded ones (which already do this in their `main.py`).
+- **Scaffold / servicekit version exposure.** Scaffolded `main.py` currently
+  hardcodes `version="1.0.0"`. Do this properly in its own change: derive the
+  service version from the project's package metadata (single source of truth) and
+  start new projects at `0.1.0` — ideally via a `ServiceInfo` helper in servicekit
+  so every service benefits, rather than `importlib.metadata` boilerplate in each
+  generated `main.py`.
