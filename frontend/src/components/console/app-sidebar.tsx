@@ -22,6 +22,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar'
 
 interface NavItem {
@@ -47,6 +48,7 @@ const EXPLORE: NavItem[] = [
 
 function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
   const { pathname } = useLocation()
+  const { isMobile, setOpenMobile } = useSidebar()
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
@@ -59,7 +61,7 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
             return (
               <SidebarMenuItem key={item.to}>
                 <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                  <Link to={item.to}>
+                  <Link to={item.to} onClick={() => isMobile && setOpenMobile(false)}>
                     <item.icon className="size-4" />
                     <span>{item.label}</span>
                   </Link>
