@@ -70,7 +70,9 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
+    /* Light-grey canvas with white cards, mirroring dark mode where cards sit
+       a step lighter than the background so panels lift off the page. */
+    --background: oklch(0.97 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
