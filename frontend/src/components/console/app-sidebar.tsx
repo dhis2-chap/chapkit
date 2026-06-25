@@ -1,7 +1,6 @@
 // Primary navigation sidebar for the console.
 import {
   Boxes,
-  BookOpen,
   FileCode2,
   LayoutDashboard,
   LineChart,
@@ -83,16 +82,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Swagger API docs">
-              <a href="docs" target="_blank" rel="noreferrer">
-                <BookOpen className="size-4" />
-                <span>API Docs</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
         <SidebarTrigger className="text-sidebar-foreground/70" />
       </SidebarFooter>
     </Sidebar>

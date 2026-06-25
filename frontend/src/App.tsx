@@ -1,7 +1,8 @@
-import { TerminalSquare } from 'lucide-react'
+import { BookOpen, ExternalLink, TerminalSquare } from 'lucide-react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
@@ -37,6 +38,13 @@ function TopNav() {
         </>
       ) : null}
       <div className="ml-auto flex items-center gap-1">
+        <Button variant="ghost" size="sm" asChild>
+          <a href="docs" target="_blank" rel="noreferrer">
+            <BookOpen className="size-4" />
+            API Docs
+            <ExternalLink className="size-3.5" />
+          </a>
+        </Button>
         <ThemeToggle />
       </div>
     </header>
