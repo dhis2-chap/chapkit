@@ -2,13 +2,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ExternalLink, Loader2, Play, Settings2, ShieldCheck, Sparkles } from 'lucide-react'
+import { Loader2, Play, Settings2, ShieldCheck, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { api } from '@/lib/api'
-import type { DataFrameContent, MLJobResponse, PredictPayload, ValidationResult } from '@/lib/types'
+import type { DataFrameContent, PredictPayload, ValidationResult } from '@/lib/types'
 
-import { Loading, ErrorState, EmptyState, JobStatusBadge } from '@/components/console/common'
+import { Loading, ErrorState, EmptyState } from '@/components/console/common'
 import { PageHeader } from '@/components/console/page'
 import {
   GeneratorPanel,
@@ -18,7 +18,7 @@ import {
   toSampleOptions,
   parseDataFrame,
   asDataFrame,
-  shortId,
+  hasDiagnostics,
   useColumnsPlaceholder,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
@@ -29,7 +29,6 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import {
@@ -49,37 +48,6 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 
-/** Result card shown after a successful predict submission. */
-function JobResultCard({ job, onViewJobs }: { job: MLJobResponse; onViewJobs: () => void }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <JobStatusBadge status="pending" />
-          Job submitted
-        </CardTitle>
-        <CardDescription>{job.message}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-1 text-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Job</span>
-          <span className="font-mono">{job.job_id}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">Artifact</span>
-          <span className="font-mono">{job.artifact_id}</span>
-        </div>
-      </CardContent>
-      <CardFooter>
-        <Button variant="outline" size="sm" onClick={onViewJobs}>
-          <ExternalLink />
-          View jobs
-        </Button>
-      </CardFooter>
-    </Card>
-  )
-}
-
 /** Predict console page. */
 export function PredictPage() {
   const navigate = useNavigate()
@@ -94,7 +62,6 @@ export function PredictPage() {
   const [generatorOpen, setGeneratorOpen] = useState(false)
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [validated, setValidated] = useState(false)
-  const [result, setResult] = useState<MLJobResponse | null>(null)
 
   function invalidate() {
     setValidated(false)
@@ -151,8 +118,7 @@ export function PredictPage() {
   const predictMutation = useMutation({
     mutationFn: (body: PredictPayload) => api.predict(body),
     onSuccess: (res) => {
-      setResult(res)
-      toast.success(`Prediction job ${shortId(res.job_id)} submitted`, {
+      toast.success(`Prediction job ${res.job_id} submitted`, {
         action: { label: 'View jobs', onClick: () => navigate('/jobs') },
       })
     },
@@ -308,14 +274,12 @@ export function PredictPage() {
                 />
               </CardContent>
             </Card>
-
-            {result ? <JobResultCard job={result} onViewJobs={() => navigate('/jobs')} /> : null}
           </div>
 
           <div className="shrink-0 space-y-3 border-t bg-background px-6 py-3">
-            {validation ? (
+            {hasDiagnostics(validation) ? (
               <div className="max-h-40 overflow-auto">
-                <DiagnosticsView result={validation} actionLabel="predict" />
+                <DiagnosticsView result={validation!} />
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">

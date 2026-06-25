@@ -367,25 +367,15 @@ export function GeneratorPanel({
   )
 }
 
-/** One Alert per diagnostic, colored by severity, plus a pass banner. */
-export function DiagnosticsView({
-  result,
-  actionLabel = 'run',
-}: {
-  result: ValidationResult
-  actionLabel?: string
-}) {
-  if (result.valid && result.diagnostics.length === 0) {
-    return (
-      <Alert className="border-emerald-500/40 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400">
-        <ShieldCheck className="size-4" />
-        <AlertTitle>Validation passed</AlertTitle>
-        <AlertDescription className="text-emerald-700/80 dark:text-emerald-400/80">
-          Ready to {actionLabel}.
-        </AlertDescription>
-      </Alert>
-    )
-  }
+/** Returns true when validation has something worth showing inline (warnings/errors). */
+export function hasDiagnostics(result: ValidationResult | null): boolean {
+  return result !== null && (!result.valid || result.diagnostics.length > 0)
+}
+
+/** Inline diagnostics list (warnings/errors). A clean pass renders nothing — the
+ *  toast and the enabled submit button are the confirmation. */
+export function DiagnosticsView({ result }: { result: ValidationResult }) {
+  if (result.valid && result.diagnostics.length === 0) return null
   return (
     <div className="space-y-2">
       {result.valid ? (
