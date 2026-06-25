@@ -21,6 +21,7 @@ import {
   formatBytes,
   formatDateTime,
   formatDuration,
+  formatRelative,
 } from '@/lib/format'
 import {
   EmptyState,
@@ -146,6 +147,7 @@ function TreeRow({
         className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-muted ${
           isSelected ? 'bg-muted font-medium' : ''
         }`}
+        title={`${node.id} · created ${formatDateTime(node.created_at)}`}
         style={{ paddingLeft: `${depth * 14 + 8}px` }}
       >
         <button
@@ -155,7 +157,7 @@ function TreeRow({
             event.stopPropagation()
             if (hasChildren) onToggle(node.id)
           }}
-          className={`flex size-4 shrink-0 items-center justify-center ${
+          className={`-m-1.5 flex size-7 shrink-0 items-center justify-center ${
             hasChildren ? '' : 'invisible'
           }`}
         >
@@ -167,8 +169,8 @@ function TreeRow({
         </button>
         <FileBox className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate">{nodeLabel(node)}</span>
-        <span className="ml-auto pl-2 font-mono text-xs text-muted-foreground">
-          {shortId(node.id)}
+        <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">
+          {formatRelative(node.created_at)}
         </span>
       </div>
       {hasChildren && isExpanded ? (
@@ -543,7 +545,7 @@ export function ArtifactsPage() {
                 ) : null}
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[calc(100vh-16rem)]">
+                <ScrollArea className="max-h-[calc(100vh-16rem)]">
                   <div className="p-2">
                     {forest.map((node) => (
                       <TreeRow

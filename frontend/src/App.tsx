@@ -5,7 +5,11 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { Separator } from '@/components/ui/separator'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppSidebar } from '@/components/console/app-sidebar'
 import { ThemeProvider, ThemeToggle } from '@/components/console/theme'
@@ -22,6 +26,7 @@ function TopNav() {
   const { data: info } = useQuery({ queryKey: ['info'], queryFn: api.info })
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-3">
+      <SidebarTrigger className="md:hidden" />
       <div className="flex items-center gap-2">
         <TerminalSquare className="size-5 text-primary" />
         <span className="text-base font-semibold tracking-tight">Chapkit</span>

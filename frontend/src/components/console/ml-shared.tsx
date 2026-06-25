@@ -106,7 +106,7 @@ export function DataFrameField({
         <TabsContent value="json" className="mt-2">
           <Textarea
             id={`${id}-json`}
-            className="h-72 max-h-72 overflow-auto font-mono text-xs"
+            className="h-56 max-h-56 overflow-auto font-mono text-xs md:h-72 md:max-h-72"
             placeholder={placeholder}
             value={value}
             onChange={(event) => onChange(event.target.value)}

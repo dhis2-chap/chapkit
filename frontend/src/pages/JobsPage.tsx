@@ -180,10 +180,10 @@ export function JobsPage() {
                 <TableRow>
                   <TableHead>Status</TableHead>
                   <TableHead>Job id</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Finished</TableHead>
-                  <TableHead>Duration</TableHead>
+                  <TableHead className="hidden md:table-cell">Submitted</TableHead>
+                  <TableHead className="hidden md:table-cell">Started</TableHead>
+                  <TableHead className="hidden md:table-cell">Finished</TableHead>
+                  <TableHead className="hidden md:table-cell">Duration</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -202,16 +202,16 @@ export function JobsPage() {
                       <TableCell className="font-mono text-xs">
                         {shortId(job.id)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                         {formatDateTime(job.submitted_at)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                         {formatDateTime(job.started_at)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                         {formatDateTime(job.finished_at)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                         {formatDuration(jobDurationSeconds(job))}
                       </TableCell>
                       <TableCell className="text-right">

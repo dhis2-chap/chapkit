@@ -241,7 +241,7 @@ export function PredictPage() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-auto p-6">
+          <div className="flex-1 space-y-4 overflow-auto p-6 pb-8">
             <Card>
               <CardHeader>
                 <CardTitle>Prediction input</CardTitle>
