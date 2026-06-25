@@ -170,10 +170,10 @@ export function ConfigsPage() {
           <Loading />
         ) : configsQuery.isError ? (
           <ErrorState error={configsQuery.error} />
-        ) : configs.length === 0 ? (
+        ) : configs.length === 0 && mode !== 'create' ? (
           <EmptyState
             title="No configs yet"
-            hint="Create one to get started, or run `chapkit test` to seed the service."
+            hint="Use New config to add one, or run `chapkit test` to seed the service."
           />
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
