@@ -9,7 +9,7 @@ import { api } from '@/lib/api'
 import type { MLJobResponse, TrainPayload, ValidationResult } from '@/lib/types'
 
 import { Loading, ErrorState, EmptyState, JobStatusBadge } from '@/components/console/common'
-import { PageHeader, PageBody } from '@/components/console/page'
+import { PageHeader } from '@/components/console/page'
 import {
   GeneratorPanel,
   DiagnosticsView,
@@ -38,6 +38,7 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 /** Result card shown after a successful train submission. */
 function JobResultCard({ job, onViewJobs }: { job: MLJobResponse; onViewJobs: () => void }) {
@@ -79,6 +80,7 @@ export function TrainPage() {
   const [dataText, setDataText] = useState<string>('')
   const [geo, setGeo] = useState<unknown>(undefined)
   const [generator, setGenerator] = useState<GeneratorParams>(DEFAULT_GENERATOR_PARAMS)
+  const [generatorOpen, setGeneratorOpen] = useState(false)
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [validated, setValidated] = useState(false)
   const [result, setResult] = useState<MLJobResponse | null>(null)
@@ -191,20 +193,24 @@ export function TrainPage() {
         title="Train"
         description="Submit a training job ($train) with $validate gating."
       />
-      <PageBody>
-        {configsQuery.isLoading ? (
+      {configsQuery.isLoading ? (
+        <div className="flex-1 overflow-auto p-6">
           <Loading label="Loading configs…" />
-        ) : configsQuery.isError ? (
+        </div>
+      ) : configsQuery.isError ? (
+        <div className="flex-1 overflow-auto p-6">
           <ErrorState error={configsQuery.error} />
-        ) : configs.length === 0 ? (
+        </div>
+      ) : configs.length === 0 ? (
+        <div className="flex-1 overflow-auto p-6">
           <EmptyState
             title="No configs yet"
             hint="Create a configuration on the Configs page before training a model."
           />
-        ) : (
-          <div className="space-y-4">
-            <GeneratorPanel params={generator} onChange={setGenerator} disabled={pending} />
-
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 space-y-4 overflow-auto p-6">
             <Card>
               <CardHeader>
                 <CardTitle>Training input</CardTitle>
@@ -257,38 +263,66 @@ export function TrainPage() {
             ) : null}
 
             {result ? <JobResultCard job={result} onViewJobs={() => navigate('/jobs')} /> : null}
+          </div>
 
-            <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => sampleMutation.mutate()}
-                  disabled={pending}
-                >
-                  {sampleMutation.isPending ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                  Fill with sample data
-                </Button>
-                <Button onClick={() => dryRunMutation.mutate()} disabled={pending || !configId}>
-                  {dryRunMutation.isPending ? <Loader2 className="animate-spin" /> : <FlaskConical />}
-                  Dry run
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={handleValidate}
-                  disabled={pending || !configId}
-                >
-                  {validateMutation.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
-                  Validate
-                </Button>
-                <Button onClick={handleSubmit} disabled={pending || !validated}>
-                  {trainMutation.isPending ? <Loader2 className="animate-spin" /> : <Play />}
-                  Train
-                </Button>
-              </div>
+          <div className="shrink-0 border-t bg-background px-6 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Popover open={generatorOpen} onOpenChange={setGeneratorOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" disabled={pending}>
+                    {sampleMutation.isPending ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Sparkles />
+                    )}
+                    Fill with sample data
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" side="top" className="w-[28rem]">
+                  <div className="space-y-3">
+                    <GeneratorPanel
+                      params={generator}
+                      onChange={setGenerator}
+                      disabled={sampleMutation.isPending}
+                    />
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        setGeneratorOpen(false)
+                        sampleMutation.mutate()
+                      }}
+                      disabled={sampleMutation.isPending}
+                    >
+                      {sampleMutation.isPending ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <Sparkles />
+                      )}
+                      Generate
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <Button onClick={() => dryRunMutation.mutate()} disabled={pending || !configId}>
+                {dryRunMutation.isPending ? <Loader2 className="animate-spin" /> : <FlaskConical />}
+                Dry run
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleValidate}
+                disabled={pending || !configId}
+              >
+                {validateMutation.isPending ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+                Validate
+              </Button>
+              <Button onClick={handleSubmit} disabled={pending || !validated}>
+                {trainMutation.isPending ? <Loader2 className="animate-spin" /> : <Play />}
+                Train
+              </Button>
             </div>
           </div>
-        )}
-      </PageBody>
+        </div>
+      )}
     </>
   )
 }
