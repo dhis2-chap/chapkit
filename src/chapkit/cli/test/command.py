@@ -1,5 +1,6 @@
 """Test command implementation."""
 
+import random
 import subprocess
 import time
 from pathlib import Path
@@ -99,6 +100,13 @@ def test_command(
         Literal["polygon", "point"],
         typer.Option("--geo-type", help="Geometry type: 'polygon' (default) or 'point'"),
     ] = "polygon",
+    seed: Annotated[
+        int,
+        typer.Option(
+            "--seed",
+            help="Seed for generated data. -1 (default) uses a fresh random seed each run; pass a value to reproduce.",
+        ),
+    ] = -1,
 ) -> None:
     """Run end-to-end test of the ML service workflow."""
     service_process: subprocess.Popen[bytes] | None = None
@@ -139,7 +147,13 @@ def test_command(
         typer.echo()
 
     runner = TestRunner(url, timeout=timeout, verbose=verbose, debug=debug)
-    generator = TestDataGenerator(seed=42)  # Reproducible data
+    # A negative seed means "fresh random data each run"; report the chosen seed so
+    # a failing run can be reproduced with `--seed <value>`.
+    actual_seed = random.randrange(1, 2**31) if seed < 0 else seed
+    if seed < 0:
+        typer.echo(f"Using random seed {actual_seed} (re-run with --seed {actual_seed} to reproduce)")
+        typer.echo()
+    generator = TestDataGenerator(seed=actual_seed)
 
     # Statistics tracking
     stats: dict[str, Any] = {
