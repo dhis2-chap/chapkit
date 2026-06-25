@@ -19,6 +19,7 @@ import {
   parseDataFrame,
   asDataFrame,
   shortId,
+  useColumnsPlaceholder,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
 import { Button } from '@/components/ui/button'
@@ -83,6 +84,7 @@ function JobResultCard({ job, onViewJobs }: { job: MLJobResponse; onViewJobs: ()
 export function TrainPage() {
   const navigate = useNavigate()
   const configsQuery = useQuery({ queryKey: ['configs'], queryFn: api.configs })
+  const columnsPlaceholder = useColumnsPlaceholder('train')
 
   const [configId, setConfigId] = useState<string>('')
   const [dataText, setDataText] = useState<string>('')
@@ -253,7 +255,7 @@ export function TrainPage() {
                 <DataFrameField
                   id="train-data"
                   label="Training data"
-                  placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
+                  placeholder={columnsPlaceholder}
                   value={dataText}
                   onChange={(next) => {
                     setDataText(next)

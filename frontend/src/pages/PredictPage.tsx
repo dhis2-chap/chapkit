@@ -19,6 +19,7 @@ import {
   parseDataFrame,
   asDataFrame,
   shortId,
+  useColumnsPlaceholder,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
 import { Button } from '@/components/ui/button'
@@ -83,6 +84,7 @@ function JobResultCard({ job, onViewJobs }: { job: MLJobResponse; onViewJobs: ()
 export function PredictPage() {
   const navigate = useNavigate()
   const artifactsQuery = useQuery({ queryKey: ['artifacts'], queryFn: api.artifacts })
+  const columnsPlaceholder = useColumnsPlaceholder('predict')
 
   const [artifactId, setArtifactId] = useState<string>('')
   const [historicText, setHistoricText] = useState<string>('')
@@ -284,7 +286,7 @@ export function PredictPage() {
                 <DataFrameField
                   id="predict-historic"
                   label="Historic data"
-                  placeholder='{ "columns": ["time_period", "value"], "data": [["2020-01", 12]] }'
+                  placeholder={columnsPlaceholder}
                   value={historicText}
                   onChange={(next) => {
                     setHistoricText(next)
@@ -295,7 +297,7 @@ export function PredictPage() {
                 <DataFrameField
                   id="predict-future"
                   label="Future data"
-                  placeholder='{ "columns": ["time_period"], "data": [["2021-01"]] }'
+                  placeholder={columnsPlaceholder}
                   value={futureText}
                   onChange={(next) => {
                     setFutureText(next)

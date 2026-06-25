@@ -1,10 +1,18 @@
 // Shared building blocks for the Train and Predict console pages.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Check, Pencil, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
+import { api } from '@/lib/api'
 import type { SampleDataOptions } from '@/lib/api'
-import type { DataFrameContent, ValidationDiagnostic, ValidationResult } from '@/lib/types'
+import type {
+  DataFrameContent,
+  PredictPayload,
+  TrainPayload,
+  ValidationDiagnostic,
+  ValidationResult,
+} from '@/lib/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,6 +64,29 @@ export function parseDataFrame(raw: string, label: string): DataFrameContent | n
 /** A short, monospaced rendering of a ULID-style id. */
 export function shortId(id: string): string {
   return id.length > 10 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id
+}
+
+/**
+ * Render the model's expected DataFrame columns as a placeholder skeleton, so the
+ * empty field hints at the real schema instead of a generic example. Columns come
+ * from the generator (one tiny sample row, columns only) and don't depend on the
+ * selected config, so this is fetched once and cached.
+ */
+export function useColumnsPlaceholder(kind: 'train' | 'predict'): string | undefined {
+  const query = useQuery({
+    queryKey: ['sample-columns', kind],
+    queryFn: () => api.sampleData(kind, { num_locations: 1, num_periods: 1 }),
+    staleTime: Infinity,
+  })
+  return useMemo(() => {
+    const data = query.data
+    if (!data) return undefined
+    const columns =
+      kind === 'train'
+        ? (data as TrainPayload).data?.columns
+        : (data as PredictPayload).historic?.columns
+    return columns ? JSON.stringify({ columns, data: [] }, null, 2) : undefined
+  }, [query.data, kind])
 }
 
 /** Bounded, tabbed DataFrame editor: a read-only Table preview plus an editable JSON pane. */
