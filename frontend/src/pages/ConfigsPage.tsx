@@ -1,5 +1,5 @@
 // Configs screen: master/detail browser with create/edit/delete for chapkit configs.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import {
@@ -13,12 +13,8 @@ import { api, ApiError } from '@/lib/api'
 import type { ConfigInput, ConfigItem } from '@/lib/types'
 import { formatDateTime, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import {
-  EmptyState,
-  ErrorState,
-  JsonView,
-  Loading,
-} from '@/components/console/common'
+import { EmptyState, ErrorState, Loading } from '@/components/console/common'
+import { JsonEditor } from '@/components/console/json-editor'
 import { PageBody, PageHeader } from '@/components/console/page'
 import { Button } from '@/components/ui/button'
 import {
@@ -30,7 +26,6 @@ import {
 } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Table,
   TableBody,
@@ -99,10 +94,8 @@ function errorMessage(err: unknown): string {
   return err instanceof ApiError ? err.message : String(err)
 }
 
-type DialogMode =
-  | { kind: 'closed' }
-  | { kind: 'create' }
-  | { kind: 'edit'; config: ConfigItem }
+/** What the right-hand panel shows: a read-only view, the edit form, or a create form. */
+type PanelMode = 'view' | 'edit' | 'create'
 
 export function ConfigsPage() {
   const queryClient = useQueryClient()
@@ -111,8 +104,12 @@ export function ConfigsPage() {
   // survives a refresh.
   const { configId } = useParams()
   const selectedId = configId ?? null
-  const select = (id: string) => navigate(`/configs/${id}`)
-  const [dialog, setDialog] = useState<DialogMode>({ kind: 'closed' })
+  const [mode, setMode] = useState<PanelMode>('view')
+  // Selecting a config always returns the panel to read-only view.
+  const select = (id: string) => {
+    setMode('view')
+    navigate(`/configs/${id}`)
+  }
   const [deleteTarget, setDeleteTarget] = useState<ConfigItem | null>(null)
 
   const configsQuery = useQuery({
@@ -161,7 +158,7 @@ export function ConfigsPage() {
               />
               Refresh
             </Button>
-            <Button size="sm" onClick={() => setDialog({ kind: 'create' })}>
+            <Button size="sm" onClick={() => setMode('create')}>
               <Plus className="size-4" />
               New config
             </Button>
@@ -218,12 +215,31 @@ export function ConfigsPage() {
               </CardContent>
             </Card>
 
-            {selected ? (
+            {mode === 'create' ? (
+              <ConfigForm
+                key="create"
+                mode="create"
+                onCancel={() => setMode('view')}
+                onSaved={(config) => {
+                  void invalidate()
+                  select(config.id)
+                }}
+              />
+            ) : selected && mode === 'edit' ? (
+              <ConfigForm
+                key={`edit:${selected.id}`}
+                mode="edit"
+                config={selected}
+                onCancel={() => setMode('view')}
+                onSaved={() => {
+                  setMode('view')
+                  void invalidate()
+                }}
+              />
+            ) : selected ? (
               <ConfigDetail
                 config={selected}
-                onEdit={() =>
-                  setDialog({ kind: 'edit', config: selected })
-                }
+                onEdit={() => setMode('edit')}
                 onDelete={() => setDeleteTarget(selected)}
               />
             ) : (
@@ -231,7 +247,7 @@ export function ConfigsPage() {
                 <CardContent className="py-16">
                   <EmptyState
                     title="No config selected"
-                    hint="Select a config from the list to inspect its data."
+                    hint="Select a config from the list, or create a new one."
                   />
                 </CardContent>
               </Card>
@@ -239,16 +255,6 @@ export function ConfigsPage() {
           </div>
         )}
       </PageBody>
-
-      <ConfigFormDialog
-        mode={dialog}
-        onClose={() => setDialog({ kind: 'closed' })}
-        onSaved={(config) => {
-          setDialog({ kind: 'closed' })
-          select(config.id)
-          void invalidate()
-        }}
-      />
 
       <Dialog
         open={deleteTarget !== null}
@@ -346,72 +352,61 @@ function ConfigDetail({
 
         <div className="space-y-1.5">
           <span className="text-xs text-muted-foreground">Data</span>
-          <JsonView value={config.data} />
+          <JsonEditor
+            value={JSON.stringify(config.data, null, 2)}
+            readOnly
+            ariaLabel="Config data"
+          />
         </div>
       </CardContent>
     </Card>
   )
 }
 
-/** Create/edit dialog with a name field and a JSON data editor. */
-function ConfigFormDialog({
+/** Inline create/edit form rendered in the detail panel (no modal). */
+function ConfigForm({
   mode,
-  onClose,
+  config,
   onSaved,
+  onCancel,
 }: {
-  mode: DialogMode
-  onClose: () => void
+  mode: 'create' | 'edit'
+  config?: ConfigItem
   onSaved: (config: ConfigItem) => void
+  onCancel: () => void
 }) {
-  const open = mode.kind !== 'closed'
-  const editing = mode.kind === 'edit' ? mode.config : null
-
-  const [name, setName] = useState('')
-  const [dataText, setDataText] = useState('')
-  const [parseError, setParseError] = useState<string | null>(null)
-  // Tracks which dialog instance the fields were initialized for, so we only
-  // seed the form once per open rather than on every render.
-  const [initializedFor, setInitializedFor] = useState<string | null>(null)
+  const editing = mode === 'edit' ? (config ?? null) : null
 
   const schemaQuery = useQuery({
     queryKey: ['config-schema'],
     queryFn: () => api.configSchema(),
-    enabled: mode.kind === 'create',
+    enabled: mode === 'create',
   })
 
-  const instanceKey = !open ? null : editing ? `edit:${editing.id}` : 'create'
+  const [name, setName] = useState(editing?.name ?? '')
+  const [dataText, setDataText] = useState(
+    editing ? JSON.stringify(editing.data, null, 2) : '',
+  )
+  const [parseError, setParseError] = useState<string | null>(null)
 
-  // Seed the form fields when a fresh dialog instance opens.
-  if (open && instanceKey !== null && instanceKey !== initializedFor) {
-    if (editing) {
-      setName(editing.name)
-      setDataText(JSON.stringify(editing.data, null, 2))
-      setParseError(null)
-      setInitializedFor(instanceKey)
-    } else if (!schemaQuery.isLoading) {
-      setName('')
+  // Seed the create form from the schema skeleton once it loads (only while untouched).
+  useEffect(() => {
+    if (mode === 'create' && schemaQuery.data && dataText === '') {
       setDataText(JSON.stringify(skeletonFromSchema(schemaQuery.data), null, 2))
-      setParseError(null)
-      setInitializedFor(instanceKey)
     }
-  }
+  }, [mode, schemaQuery.data, dataText])
 
   const saveMutation = useMutation({
     mutationFn: (input: { id: string | null; body: ConfigInput }) =>
       input.id
         ? api.updateConfig(input.id, input.body)
         : api.createConfig(input.body),
-    onSuccess: (config) => {
+    onSuccess: (saved) => {
       toast.success(editing ? 'Config updated' : 'Config created')
-      onSaved(config)
+      onSaved(saved)
     },
     onError: (err: unknown) => toast.error(errorMessage(err)),
   })
-
-  const handleClose = () => {
-    setInitializedFor(null)
-    onClose()
-  }
 
   const handleSubmit = () => {
     let parsed: unknown
@@ -421,11 +416,7 @@ function ConfigFormDialog({
       setParseError(err instanceof Error ? err.message : 'Invalid JSON')
       return
     }
-    if (
-      parsed === null ||
-      typeof parsed !== 'object' ||
-      Array.isArray(parsed)
-    ) {
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
       setParseError('Data must be a JSON object.')
       return
     }
@@ -437,62 +428,48 @@ function ConfigFormDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) handleClose()
-      }}
-    >
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{editing ? 'Edit config' : 'New config'}</DialogTitle>
-          <DialogDescription>
-            {editing
-              ? 'Update the config name or its data payload.'
-              : 'Provide a name and a JSON data object for the new config.'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="config-name">Name</Label>
-            <Input
-              id="config-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="my-config"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="config-data">Data (JSON)</Label>
-            <Textarea
-              id="config-data"
-              value={dataText}
-              onChange={(event) => {
-                setDataText(event.target.value)
-                if (parseError) setParseError(null)
-              }}
-              spellCheck={false}
-              className="h-64 font-mono text-xs"
-            />
-            {parseError ? (
-              <p className="text-xs text-destructive">{parseError}</p>
-            ) : null}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
-          </DialogClose>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <CardTitle>{editing ? 'Edit config' : 'New config'}</CardTitle>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
           <Button
+            size="sm"
             disabled={saveMutation.isPending || name.trim().length === 0}
             onClick={handleSubmit}
           >
             {editing ? 'Save changes' : 'Create config'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="config-name">Name</Label>
+          <Input
+            id="config-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="my-config"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Data (JSON)</Label>
+          <JsonEditor
+            value={dataText}
+            onChange={(next) => {
+              setDataText(next)
+              if (parseError) setParseError(null)
+            }}
+            ariaLabel="Config data"
+            minHeight="16rem"
+          />
+          {parseError ? (
+            <p className="text-xs text-destructive">{parseError}</p>
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

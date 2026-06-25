@@ -8,7 +8,7 @@ import type { DataFrameContent, ValidationDiagnostic, ValidationResult } from '@
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { JsonEditor } from '@/components/console/json-editor'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Select,
@@ -75,12 +75,12 @@ export function DataFrameField({
   const hasFrame = Boolean(frame)
   const [tab, setTab] = useState<string>(hasFrame ? 'table' : 'json')
 
-  // When a valid frame first appears (e.g. "Fill with sample data"), surface the
-  // Table preview — unless the user is mid-edit in the JSON textarea.
+  // When a valid frame first appears (e.g. "Generate"), surface the Table preview
+  // — unless the user is mid-edit in the JSON editor.
   const hadFrameRef = useRef(hasFrame)
   useEffect(() => {
     if (hasFrame && !hadFrameRef.current) {
-      const editing = document.activeElement?.id === `${id}-json`
+      const editing = Boolean(document.activeElement?.closest(`#${id}-json`))
       if (!editing) setTab('table')
     }
     hadFrameRef.current = hasFrame
@@ -104,13 +104,16 @@ export function DataFrameField({
           )}
         </TabsContent>
         <TabsContent value="json" className="mt-2">
-          <Textarea
-            id={`${id}-json`}
-            className="h-56 max-h-56 overflow-auto font-mono text-xs md:h-72 md:max-h-72"
-            placeholder={placeholder}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-          />
+          <div id={`${id}-json`}>
+            <JsonEditor
+              value={value}
+              onChange={onChange}
+              placeholder={placeholder}
+              ariaLabel={label}
+              minHeight="14rem"
+              maxHeight="18rem"
+            />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
