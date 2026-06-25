@@ -389,6 +389,7 @@ function ConfigForm({
     editing ? JSON.stringify(editing.data, null, 2) : '',
   )
   const [parseError, setParseError] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | null>(null)
 
   // Seed the create form from the schema skeleton once it loads (only while untouched).
   useEffect(() => {
@@ -410,6 +411,11 @@ function ConfigForm({
   })
 
   const handleSubmit = () => {
+    if (name.trim() === '') {
+      setNameError('Name is required.')
+      return
+    }
+    setNameError(null)
     let parsed: unknown
     try {
       parsed = JSON.parse(dataText)
@@ -438,7 +444,7 @@ function ConfigForm({
           </Button>
           <Button
             size="sm"
-            disabled={saveMutation.isPending || name.trim().length === 0}
+            disabled={saveMutation.isPending}
             onClick={handleSubmit}
           >
             {editing ? 'Save changes' : 'Create config'}
@@ -451,9 +457,16 @@ function ConfigForm({
           <Input
             id="config-name"
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            onChange={(event) => {
+              setName(event.target.value)
+              if (nameError) setNameError(null)
+            }}
+            aria-invalid={Boolean(nameError)}
             placeholder="my-config"
           />
+          {nameError ? (
+            <p className="text-xs text-destructive">{nameError}</p>
+          ) : null}
         </div>
         <div className="space-y-1.5">
           <Label>Data (JSON)</Label>
