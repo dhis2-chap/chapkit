@@ -273,4 +273,11 @@ class TestDataGenerator:
                 }
             )
 
-        return {"type": "FeatureCollection", "features": features}
+        collection: dict[str, Any] = {"type": "FeatureCollection", "features": features}
+        # Attach a GeoJSON bbox so consumers (e.g. a map view) can frame the data.
+        from chapkit.data.geo import bounding_box
+
+        bbox = bounding_box(collection)
+        if bbox is not None:
+            collection["bbox"] = list(bbox)
+        return collection

@@ -16,6 +16,7 @@ Example:
 
 from .dataframe import DataFrame, DataFrameField, DataFrameSchema, GroupBy
 from .generator import TestDataGenerator
+from .geo import bounding_box
 
 __all__ = [
     "DataFrame",
@@ -23,4 +24,5 @@ __all__ = [
     "DataFrameSchema",
     "GroupBy",
     "TestDataGenerator",
+    "bounding_box",
 ]
