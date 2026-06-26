@@ -7,7 +7,71 @@ import random
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, SerializerFunctionWrapHandler, model_serializer
+
+# Frictionless-style field types the self-describing schema uses.
+FieldType = Literal["string", "integer", "number", "boolean", "any"]
+
+# chap-core canonical columns whose types are known from the contract, not inferred.
+CANONICAL_COLUMN_TYPES: dict[str, FieldType] = {
+    "time_period": "string",
+    "location": "string",
+    "disease_cases": "number",
+    "population": "integer",
+    "rainfall": "number",
+    "mean_temperature": "number",
+}
+
+# Map JSON Schema scalar types (from a config schema) to field types.
+_JSON_SCHEMA_TYPE_MAP: dict[str, FieldType] = {
+    "string": "string",
+    "integer": "integer",
+    "number": "number",
+    "boolean": "boolean",
+}
+
+
+def _infer_field_type(values: list[Any]) -> FieldType:
+    """Infer a field type from a column's Python values (contract fallback)."""
+    seen: set[FieldType] = set()
+    for value in values:
+        if value is None:
+            continue
+        # bool is a subclass of int, so check it first.
+        if isinstance(value, bool):
+            seen.add("boolean")
+        elif isinstance(value, int):
+            seen.add("integer")
+        elif isinstance(value, float):
+            seen.add("number")
+        elif isinstance(value, str):
+            seen.add("string")
+        else:
+            seen.add("any")
+    if not seen:
+        return "any"
+    if seen == {"integer"}:
+        return "integer"
+    if seen <= {"integer", "number"}:
+        return "number"
+    if len(seen) == 1:
+        return next(iter(seen))
+    return "any"
+
+
+class DataFrameField(BaseModel):
+    """A single self-describing column: its name and contract-derived type."""
+
+    name: str
+    type: FieldType
+    title: str | None = None
+    description: str | None = None
+
+
+class DataFrameSchema(BaseModel):
+    """Table-Schema-style description of a DataFrame's columns."""
+
+    fields: list[DataFrameField]
 
 
 def _try_convert_value(value: str) -> tuple[Any, str]:
@@ -82,8 +146,63 @@ def _convert_column(values: list[str], target_type: str) -> list[Any]:
 class DataFrame(BaseModel):
     """Universal interchange format for tabular data from pandas, polars, xarray, and other libraries."""
 
+    # Accept and emit the self-describing schema under the JSON key "schema"; the
+    # Python attribute avoids the name to not shadow BaseModel.schema.
+    model_config = ConfigDict(populate_by_name=True)
+
     columns: list[str]
     data: list[list[Any]]
+    table_schema: DataFrameSchema | None = Field(default=None, alias="schema")
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        """Serialize with the schema under "schema", omitting it entirely when absent.
+
+        This keeps every existing payload byte-identical unless a schema is set,
+        preserving backward compatibility for consumers and stored artifacts.
+        """
+        dumped: dict[str, Any] = handler(self)
+        schema_value = dumped.pop("table_schema", None)
+        if schema_value is not None:
+            dumped["schema"] = schema_value
+        return dumped
+
+    def with_schema(
+        self,
+        *,
+        required_covariates: list[str] | None = None,
+        config_schema: dict[str, Any] | None = None,
+    ) -> Self:
+        """Return a copy with a contract-derived self-describing schema attached.
+
+        Column types come from (in order) the chap-core canonical set, the declared
+        required covariates (numeric), a config JSON Schema's matching properties,
+        then value inference as a fallback.
+        """
+        required = set(required_covariates or [])
+        schema_types: dict[str, FieldType] = {}
+        if config_schema:
+            properties = config_schema.get("properties")
+            if isinstance(properties, dict):
+                for name, prop in properties.items():
+                    declared = prop.get("type") if isinstance(prop, dict) else None
+                    mapped = _JSON_SCHEMA_TYPE_MAP.get(declared) if isinstance(declared, str) else None
+                    if mapped is not None:
+                        schema_types[name] = mapped
+
+        fields: list[DataFrameField] = []
+        for index, column in enumerate(self.columns):
+            if column in CANONICAL_COLUMN_TYPES:
+                field_type = CANONICAL_COLUMN_TYPES[column]
+            elif column in required:
+                field_type = "number"
+            elif column in schema_types:
+                field_type = schema_types[column]
+            else:
+                field_type = _infer_field_type([row[index] for row in self.data])
+            fields.append(DataFrameField(name=column, type=field_type))
+
+        return self.model_copy(update={"table_schema": DataFrameSchema(fields=fields)})
 
     @classmethod
     def from_pandas(cls, df: Any) -> Self:

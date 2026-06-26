@@ -89,11 +89,17 @@ class MLRouter(Router):
             seed: int = -1,
         ) -> dict[str, Any]:
             """Build a sample train/predict payload from tunable data-generator parameters."""
+            from chapkit.data import DataFrame
             from chapkit.data.generator import TestDataGenerator
 
             # A negative seed means "fresh data each call"; a concrete seed is reproducible.
             generator = TestDataGenerator(seed=None if seed < 0 else seed)
             required_covariates = list(sample_metadata.get("required_covariates") or [])
+
+            def describe(frame: dict[str, Any]) -> dict[str, Any]:
+                """Attach a contract-derived self-describing schema to a generated frame."""
+                return DataFrame.model_validate(frame).with_schema(required_covariates=required_covariates).model_dump()
+
             requires_geo = bool(sample_metadata.get("requires_geo", False))
             resolved_period = period_type or sample_metadata.get("period_type") or "monthly"
             want_geo = requires_geo if include_geo is None else include_geo
@@ -107,7 +113,7 @@ class MLRouter(Router):
                     required_covariates=required_covariates,
                     period_type=resolved_period,
                 )
-                payload: dict[str, Any] = {"historic": historic, "future": future}
+                payload: dict[str, Any] = {"historic": describe(historic), "future": describe(future)}
                 if geo is not None:
                     payload["geo"] = geo
                 return payload
@@ -119,7 +125,7 @@ class MLRouter(Router):
                 required_covariates=required_covariates,
                 period_type=resolved_period,
             )
-            payload = {"data": data}
+            payload = {"data": describe(data)}
             if config_id:
                 payload["config_id"] = config_id
             if geo is not None:

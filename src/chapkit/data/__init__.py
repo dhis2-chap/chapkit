@@ -14,11 +14,13 @@ Example:
 
 # ruff: noqa: F401
 
-from .dataframe import DataFrame, GroupBy
+from .dataframe import DataFrame, DataFrameField, DataFrameSchema, GroupBy
 from .generator import TestDataGenerator
 
 __all__ = [
     "DataFrame",
+    "DataFrameField",
+    "DataFrameSchema",
     "GroupBy",
     "TestDataGenerator",
 ]
