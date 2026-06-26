@@ -15,6 +15,7 @@ import { formatDateTime, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EmptyState, ErrorState, Loading } from '@/components/console/common'
 import { JsonEditor } from '@/components/console/json-editor'
+import { MasterDetail } from '@/components/console/master-detail'
 import { PageBody, PageHeader } from '@/components/console/page'
 import { Button } from '@/components/ui/button'
 import {
@@ -176,8 +177,12 @@ export function ConfigsPage() {
             hint="Use New config to add one, or run `chapkit test` to seed the service."
           />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-            <Card className="overflow-hidden">
+          <MasterDetail
+            autoSaveId="console:configs-split"
+            defaultSize={42}
+            minSize={24}
+            master={
+              <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle>Configs</CardTitle>
                 <CardDescription>
@@ -213,9 +218,10 @@ export function ConfigsPage() {
                   </TableBody>
                 </Table>
               </CardContent>
-            </Card>
-
-            {mode === 'create' ? (
+              </Card>
+            }
+            detail={
+              mode === 'create' ? (
               <ConfigForm
                 key="create"
                 mode="create"
@@ -251,8 +257,9 @@ export function ConfigsPage() {
                   />
                 </CardContent>
               </Card>
-            )}
-          </div>
+              )
+            }
+          />
         )}
       </PageBody>
 

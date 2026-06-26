@@ -29,6 +29,7 @@ import {
   JsonView,
   Loading,
 } from '@/components/console/common'
+import { MasterDetail } from '@/components/console/master-detail'
 import { PageBody, PageHeader } from '@/components/console/page'
 import { toast } from 'sonner'
 
@@ -534,8 +535,13 @@ export function ArtifactsPage() {
             hint="Run a training or `chapkit test` to produce artifacts."
           />
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[20rem_1fr]">
-            <Card className="overflow-hidden">
+          <MasterDetail
+            autoSaveId="console:artifacts-split"
+            defaultSize={28}
+            minSize={18}
+            maxSize={45}
+            master={
+              <Card className="overflow-hidden">
               <CardHeader className="py-3">
                 <CardTitle className="text-sm">
                   {hierarchyName ?? 'Hierarchy'}
@@ -561,9 +567,10 @@ export function ArtifactsPage() {
                   </div>
                 </ScrollArea>
               </CardContent>
-            </Card>
-            <div>
-              {selectedId ? (
+              </Card>
+            }
+            detail={
+              selectedId ? (
                 <ArtifactDetail
                   id={selectedId}
                   onDeleted={() => navigate('/artifacts')}
@@ -573,9 +580,9 @@ export function ArtifactsPage() {
                   title="Select an artifact"
                   hint="Choose a node from the hierarchy to inspect its metadata and content."
                 />
-              )}
-            </div>
-          </div>
+              )
+            }
+          />
         )}
       </PageBody>
     </>
