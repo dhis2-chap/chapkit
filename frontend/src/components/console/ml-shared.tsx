@@ -1,5 +1,6 @@
 // Shared building blocks for the Train and Predict console pages.
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Check, Pencil, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
@@ -367,15 +368,18 @@ export function GeneratorPanel({
   )
 }
 
-/** Returns true when validation has something worth showing inline (warnings/errors). */
-export function hasDiagnostics(result: ValidationResult | null): boolean {
-  return result !== null && (!result.valid || result.diagnostics.length > 0)
-}
-
-/** Inline diagnostics list (warnings/errors). A clean pass renders nothing — the
- *  toast and the enabled submit button are the confirmation. */
-export function DiagnosticsView({ result }: { result: ValidationResult }) {
-  if (result.valid && result.diagnostics.length === 0) return null
+/**
+ * Inline validation result. On a clean pass this surfaces the success alert with an
+ * optional one-click apply action (run straight from the dry run); on failure it
+ * lists the diagnostics.
+ */
+export function DiagnosticsView({
+  result,
+  action,
+}: {
+  result: ValidationResult
+  action?: ReactNode
+}) {
   return (
     <div className="space-y-2">
       {result.valid ? (
@@ -383,8 +387,11 @@ export function DiagnosticsView({ result }: { result: ValidationResult }) {
           <ShieldCheck className="size-4" />
           <AlertTitle>Validation passed</AlertTitle>
           <AlertDescription className="text-emerald-700/80 dark:text-emerald-400/80">
-            Submit is enabled. Review any warnings below.
+            {action
+              ? 'Run it now, or review any warnings below.'
+              : 'Submit is enabled. Review any warnings below.'}
           </AlertDescription>
+          {action ? <div className="mt-3">{action}</div> : null}
         </Alert>
       ) : null}
       {result.diagnostics.map((diagnostic, index) => (

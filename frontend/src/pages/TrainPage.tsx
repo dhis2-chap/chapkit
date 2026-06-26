@@ -18,7 +18,6 @@ import {
   toSampleOptions,
   parseDataFrame,
   asDataFrame,
-  hasDiagnostics,
   useColumnsPlaceholder,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
@@ -113,7 +112,7 @@ export function TrainPage() {
     mutationFn: (body: TrainPayload) => api.train(body),
     onSuccess: (res) => {
       toast.success(`Training job ${res.job_id} submitted`, {
-        action: { label: 'View jobs', onClick: () => navigate('/jobs') },
+        action: { label: 'View job', onClick: () => navigate(`/jobs/${res.job_id}`) },
       })
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
@@ -235,9 +234,23 @@ export function TrainPage() {
           </div>
 
           <div className="shrink-0 space-y-3 border-t bg-background px-6 py-3">
-            {hasDiagnostics(validation) ? (
+            {validation ? (
               <div className="max-h-40 overflow-auto">
-                <DiagnosticsView result={validation!} />
+                <DiagnosticsView
+                  result={validation}
+                  action={
+                    validated ? (
+                      <Button size="sm" onClick={handleSubmit} disabled={pending}>
+                        {trainMutation.isPending ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Play />
+                        )}
+                        Train now
+                      </Button>
+                    ) : undefined
+                  }
+                />
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">

@@ -18,7 +18,6 @@ import {
   toSampleOptions,
   parseDataFrame,
   asDataFrame,
-  hasDiagnostics,
   useColumnsPlaceholder,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
@@ -119,7 +118,7 @@ export function PredictPage() {
     mutationFn: (body: PredictPayload) => api.predict(body),
     onSuccess: (res) => {
       toast.success(`Prediction job ${res.job_id} submitted`, {
-        action: { label: 'View jobs', onClick: () => navigate('/jobs') },
+        action: { label: 'View job', onClick: () => navigate(`/jobs/${res.job_id}`) },
       })
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
@@ -277,9 +276,23 @@ export function PredictPage() {
           </div>
 
           <div className="shrink-0 space-y-3 border-t bg-background px-6 py-3">
-            {hasDiagnostics(validation) ? (
+            {validation ? (
               <div className="max-h-40 overflow-auto">
-                <DiagnosticsView result={validation!} />
+                <DiagnosticsView
+                  result={validation}
+                  action={
+                    validated ? (
+                      <Button size="sm" onClick={handleSubmit} disabled={pending}>
+                        {predictMutation.isPending ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Play />
+                        )}
+                        Predict now
+                      </Button>
+                    ) : undefined
+                  }
+                />
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">

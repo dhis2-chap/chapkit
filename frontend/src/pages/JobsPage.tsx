@@ -1,8 +1,8 @@
 // Live job monitor: polls the jobs list, shows a detail dialog, and cancels/removes jobs.
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Ban, ExternalLink, RefreshCw, Trash2, X } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { api, readJobArtifactId } from '@/lib/api'
@@ -74,8 +74,10 @@ function jobDurationSeconds(job: Job): number | null {
 export function JobsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  // Selection lives in the URL (#/jobs/:jobId) so a job detail deep-links and
+  // survives a refresh, matching Configs and Artifacts.
+  const { jobId } = useParams()
   const [filter, setFilter] = useState<StatusFilter>('all')
-  const [selected, setSelected] = useState<Job | null>(null)
 
   const jobsQuery = useQuery({
     queryKey: ['jobs', filter],
@@ -87,10 +89,18 @@ export function JobsPage() {
     },
   })
 
+  const jobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data])
+  const selected = useMemo(
+    () => jobs.find((job) => job.id === jobId) ?? null,
+    [jobs, jobId],
+  )
+
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.cancelJob(id),
     onSuccess: (_data, id) => {
       toast.success(`Job ${shortId(id)} updated`)
+      // The job is gone; close its detail view if it was the one being shown.
+      if (id === jobId) navigate('/jobs')
       void queryClient.invalidateQueries({ queryKey: ['jobs'] })
     },
     onError: (error: unknown) => {
@@ -154,8 +164,6 @@ export function JobsPage() {
     </>
   )
 
-  const jobs = jobsQuery.data ?? []
-
   return (
     <>
       <PageHeader
@@ -193,8 +201,9 @@ export function JobsPage() {
                   return (
                     <TableRow
                       key={job.id}
+                      data-state={job.id === jobId ? 'selected' : undefined}
                       className="cursor-pointer"
-                      onClick={() => setSelected(job)}
+                      onClick={() => navigate(`/jobs/${job.id}`)}
                     >
                       <TableCell>
                         <JobStatusBadge status={job.status} />
@@ -255,7 +264,7 @@ export function JobsPage() {
       <Dialog
         open={selected !== null}
         onOpenChange={(open) => {
-          if (!open) setSelected(null)
+          if (!open) navigate('/jobs')
         }}
       >
         <DialogContent className="max-w-2xl">

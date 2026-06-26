@@ -80,12 +80,9 @@ HIERARCHY = ArtifactHierarchy(
     level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
 )
 
-app = (
-    MLServiceBuilder(
-        info=info,
-        config_schema=DemoConfig,
-        hierarchy=HIERARCHY,
-        runner=DemoRunner(),
-    )
-    .build()
-)
+app = MLServiceBuilder(
+    info=info,
+    config_schema=DemoConfig,
+    hierarchy=HIERARCHY,
+    runner=DemoRunner(),
+).build()
