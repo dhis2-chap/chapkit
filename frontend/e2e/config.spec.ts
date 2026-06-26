@@ -36,6 +36,7 @@ test('config editor offers schema-aware autocomplete', async ({ page }) => {
 
   await page.goto(`/#/configs/${cfg.id}`)
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  await page.getByRole('tab', { name: 'JSON', exact: true }).click()
   await expect(page.locator('.cm-content[contenteditable="true"]')).toBeVisible()
   await page.waitForTimeout(1000) // allow the lazy schema chunk to load
 
@@ -53,6 +54,7 @@ test('config editor flags a value that violates the schema', async ({ page }) =>
 
   await page.goto(`/#/configs/${cfg.id}`)
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
+  await page.getByRole('tab', { name: 'JSON', exact: true }).click()
   await expect(page.locator('.cm-content[contenteditable="true"]')).toBeVisible()
   await page.waitForTimeout(1000)
 
