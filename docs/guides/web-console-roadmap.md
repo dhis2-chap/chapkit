@@ -1,23 +1,15 @@
 # Web Console Roadmap
 
 Planned follow-ups for the [Web Console](web-console.md), captured so they are not
-lost. None of these are implemented yet.
+lost.
+
+Several early items have since shipped and are no longer listed here: Jobs
+deep-linking, apply-from-dry-run, resizable master/detail and sidebar panels,
+Jobs multi-select + grouping, the schema-driven config form, and contiguous
+multi-year sample data.
 
 ## Console / UX
 
-- **Schema-driven config form.** Generate the "New config" form dynamically from
-  `/api/v1/configs/$schema` (number inputs, checkboxes, array editors) instead of
-  a raw JSON textarea, with the JSON view as an advanced fallback.
-- **Apply from Dry run.** Surface a one-click "Run" action directly from a
-  successful Dry run result.
-- **Resizable panels.** Let the user resize the master/detail split (and the
-  chart) via drag handles (e.g. shadcn `resizable` / react-resizable-panels).
-- **Jobs: multi-select + grouping.** Row selection for bulk cancel/remove and
-  grouping (e.g. by status).
-- **Deep-link routing for Jobs.** Configs and Artifacts already drive selection
-  from the URL (`#/configs/:id`, `#/artifacts/:id`); extend the same to the Jobs
-  detail, so the submit toast can link straight to a specific job (today it links
-  to the Jobs list).
 - **Job type / label in the Jobs list.** Show what each job *is* (train, predict,
   etc.) in the table and detail. Blocked on the framework: servicekit's
   `JobRecord` only carries id/status/timestamps/error and `scheduler.add_job`
@@ -27,8 +19,6 @@ lost. None of these are implemented yet.
 
 ## Data & models
 
-- **Multi-year sample data.** Let the data generator span multiple years for more
-  realistic, longer-horizon series.
 - **Backtest / evaluation with n-fold splits.** Rolling-origin / n-split
   backtesting and evaluation, surfaced in the console.
 - **Self-describing DataFrame.** Add an optional Table-Schema-style `schema.fields`
