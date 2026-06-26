@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { BookOpen, ExternalLink, TerminalSquare } from 'lucide-react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -12,6 +14,10 @@ import {
 } from '@/components/ui/sidebar'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppSidebar } from '@/components/console/app-sidebar'
+import {
+  SidebarResizer,
+  SIDEBAR_DEFAULT_WIDTH,
+} from '@/components/console/sidebar-resizer'
 import { ThemeProvider, ThemeToggle } from '@/components/console/theme'
 import { OverviewPage } from '@/pages/OverviewPage'
 import { ConfigsPage } from '@/pages/ConfigsPage'
@@ -60,12 +66,28 @@ function TopNav() {
 // remaining viewport height below it. SidebarProvider is the column root so the
 // trigger in the top nav keeps its context, and the fixed sidebar is offset
 // below the 3.5rem header.
+const SIDEBAR_WIDTH_STORAGE_KEY = 'console:sidebar-width'
+
 function Shell() {
+  // The sidebar width is user-resizable and persisted across sessions.
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return SIDEBAR_DEFAULT_WIDTH
+    const saved = Number(window.localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY))
+    return Number.isFinite(saved) && saved > 0 ? saved : SIDEBAR_DEFAULT_WIDTH
+  })
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
+  }, [sidebarWidth])
+
   return (
-    <SidebarProvider className="!h-svh flex-col [&_[data-slot=sidebar-container]]:!top-14 [&_[data-slot=sidebar-container]]:!h-[calc(100svh-3.5rem)] [&_[data-slot=sidebar-gap]]:!h-[calc(100svh-3.5rem)]">
+    <SidebarProvider
+      className="!h-svh flex-col [&_[data-slot=sidebar-container]]:!top-14 [&_[data-slot=sidebar-container]]:!h-[calc(100svh-3.5rem)] [&_[data-slot=sidebar-gap]]:!h-[calc(100svh-3.5rem)]"
+      style={{ '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}
+    >
       <TopNav />
       <div className="flex min-h-0 w-full flex-1">
         <AppSidebar />
+        <SidebarResizer width={sidebarWidth} onWidth={setSidebarWidth} />
         <SidebarInset className="min-h-0 overflow-hidden">
           <Outlet />
         </SidebarInset>
