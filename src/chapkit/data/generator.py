@@ -27,6 +27,7 @@ class TestDataGenerator:
         additional_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         start_year: int = 2020,
+        start_period: int = 0,
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
@@ -87,20 +88,24 @@ class TestDataGenerator:
         # model has something real to learn.
         data: list[list[Any]] = []
         for period_idx in range(num_periods):
+            # Absolute period index from the series origin; start_period lets a later
+            # block (e.g. prediction's future) continue contiguously from an earlier
+            # one so the calendar and seasonal cycle stay unbroken across the seam.
+            absolute_idx = start_period + period_idx
             # Continuous position within the year, in [0, 1).
-            year_fraction = (period_idx % periods_per_year) / periods_per_year
+            year_fraction = (absolute_idx % periods_per_year) / periods_per_year
             for loc_idx in range(num_locations):
                 params = location_params[loc_idx]
                 row: list[Any] = []
 
                 # Time period
                 if period_type == "weekly":
-                    year = start_year + (period_idx // 52)
-                    week = (period_idx % 52) + 1
+                    year = start_year + (absolute_idx // 52)
+                    week = (absolute_idx % 52) + 1
                     row.append(f"{year}-W{week:02d}")
                 else:  # monthly (default)
-                    year = start_year + (period_idx // 12)
-                    month = (period_idx % 12) + 1
+                    year = start_year + (absolute_idx // 12)
+                    month = (absolute_idx % 12) + 1
                     row.append(f"{year}-{month:02d}")
 
                 # Location (matches geojson.properties.id)
@@ -164,7 +169,10 @@ class TestDataGenerator:
             period_type=period_type,
         )
 
-        # Future data: generate structure then null out disease_cases for prediction
+        # Future data: continue immediately after the historic span (same origin year,
+        # offset by num_periods) so the future horizon is contiguous with history
+        # instead of jumping to a fixed year and leaving a calendar gap. Then null out
+        # disease_cases for prediction.
         future = self.generate_training_data(
             num_locations=num_locations,
             num_periods=num_periods,
@@ -172,7 +180,8 @@ class TestDataGenerator:
             required_covariates=required_covariates,
             additional_covariates=additional_covariates,
             extra_covariates=extra_covariates,
-            start_year=2025,
+            start_year=2020,
+            start_period=num_periods,
             period_type=period_type,
         )
 

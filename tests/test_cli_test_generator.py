@@ -47,6 +47,26 @@ class TestGeneratePredictionData:
         historic, future = generator.generate_prediction_data()
         assert historic["columns"] == future["columns"]
 
+    def test_future_periods_continue_contiguously_after_historic(self) -> None:
+        """Verify future periods follow historic with no overlap or calendar gap."""
+        generator = TestDataGenerator(seed=42)
+        historic, future = generator.generate_prediction_data(num_locations=1, num_periods=24)
+        time_idx = historic["columns"].index("time_period")
+        historic_periods = [row[time_idx] for row in historic["data"]]
+        future_periods = [row[time_idx] for row in future["data"]]
+        # Lexicographic order matches calendar order for the YYYY-MM labels used here.
+        assert max(historic_periods) < min(future_periods)
+        assert historic_periods[-1] == "2021-12"
+        assert future_periods[0] == "2022-01"
+
+    def test_prediction_data_spans_multiple_years(self) -> None:
+        """Verify the generated series covers more than one calendar year."""
+        generator = TestDataGenerator(seed=42)
+        historic, future = generator.generate_prediction_data(num_locations=1, num_periods=24)
+        time_idx = historic["columns"].index("time_period")
+        years = {row[time_idx][:4] for row in historic["data"] + future["data"]}
+        assert len(years) >= 2
+
 
 class TestGenerateConfigDataFromSchema:
     """Tests for generate_config_data_from_schema method."""
