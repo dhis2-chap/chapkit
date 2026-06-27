@@ -263,6 +263,31 @@ make lint      # Linting
 
 **Always run `make lint` and `make test` after changes**
 
+## Web Console Testing
+
+The web console lives in `frontend/` (Vite + React) and is built into
+`src/chapkit/api/apps/console/`, served at `/` by any chapkit service.
+
+**Two distinct layers, use both:**
+- **Interactive verification — use the Playwright MCP (`mcp__playwright__*`).**
+  This is the default way we verify console behavior: drive the live console in
+  a visible browser, click through the actual flow, and confirm it works. Point
+  it at a running chapkit service (e.g. the `frontend/e2e/fixture_service.py`
+  fixture, or any seeded demo service). Prefer this over the headless suite when
+  the goal is to *see* a change working. Do NOT reach for `pnpm exec playwright
+  test --ui` or `--headed` for this — use the Playwright MCP browser tools.
+- **Regression suite — `frontend/e2e/*.spec.ts` via `pnpm exec playwright test`.**
+  The committed, headless e2e suite that CI runs. Add/extend specs here to lock
+  in behavior, but it does not open a visible browser.
+
+**Frontend checks after console changes:**
+```bash
+cd frontend
+pnpm exec tsc -b --noEmit   # typecheck
+pnpm lint                   # oxlint
+pnpm build                  # rebuild the shipped bundle (commit the result)
+```
+
 ## Common Patterns
 
 **Repository naming:**

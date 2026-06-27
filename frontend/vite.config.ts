@@ -9,7 +9,7 @@ import tailwindcss from '@tailwindcss/vite'
 // calls to a running chapkit service during development.
 const target = process.env.VITE_CHAPKIT_TARGET ?? 'http://localhost:8000'
 const proxy = Object.fromEntries(
-  ['/api', '/health', '/openapi.json', '/docs', '/redoc'].map((p) => [
+  ['/api', '/health', '/openapi.json', '/docs', '/redoc', '/metrics'].map((p) => [
     p,
     { target, changeOrigin: true },
   ]),

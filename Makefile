@@ -77,13 +77,14 @@ downgrade:
 	@echo ">>> Reverting last migration"
 	@$(UV) run alembic downgrade -1
 
+# NO_MKDOCS_2_WARNING silences the Material for MkDocs promotional banner.
 docs-serve:
 	@echo ">>> Serving documentation at http://127.0.0.1:8000"
-	@$(UV) run mkdocs serve
+	@NO_MKDOCS_2_WARNING=1 $(UV) run mkdocs serve
 
 docs-build:
 	@echo ">>> Building documentation site"
-	@$(UV) run mkdocs build
+	@NO_MKDOCS_2_WARNING=1 $(UV) run mkdocs build
 
 docs: docs-serve
 

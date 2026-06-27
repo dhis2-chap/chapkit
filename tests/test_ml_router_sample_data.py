@@ -34,9 +34,16 @@ def test_sample_data_train_returns_dataframe() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["config_id"] == "cfg-1"
-    assert set(payload["data"].keys()) == {"columns", "data"}
+    assert set(payload["data"].keys()) == {"columns", "data", "schema"}
     assert "population" in payload["data"]["columns"]
     assert len(payload["data"]["data"]) > 0
+    # The self-describing schema covers every column with contract-derived types.
+    fields = payload["data"]["schema"]["fields"]
+    by_name = {field["name"]: field["type"] for field in fields}
+    assert [field["name"] for field in fields] == payload["data"]["columns"]
+    assert by_name["time_period"] == "string"
+    assert by_name["population"] == "integer"
+    assert by_name["rainfall"] == "number"
 
 
 def test_sample_data_predict_returns_historic_and_future() -> None:
@@ -47,8 +54,8 @@ def test_sample_data_predict_returns_historic_and_future() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert set(payload["historic"].keys()) == {"columns", "data"}
-    assert set(payload["future"].keys()) == {"columns", "data"}
+    assert set(payload["historic"].keys()) == {"columns", "data", "schema"}
+    assert set(payload["future"].keys()) == {"columns", "data", "schema"}
 
 
 def test_sample_data_honors_tunable_params() -> None:

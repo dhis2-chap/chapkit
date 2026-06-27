@@ -27,6 +27,7 @@ class TestDataGenerator:
         additional_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         start_year: int = 2020,
+        start_period: int = 0,
         period_type: Literal["monthly", "weekly"] = "monthly",
     ) -> dict[str, Any]:
         """Generate training DataFrame with panel data structure for climate-health analysis."""
@@ -87,20 +88,24 @@ class TestDataGenerator:
         # model has something real to learn.
         data: list[list[Any]] = []
         for period_idx in range(num_periods):
+            # Absolute period index from the series origin; start_period lets a later
+            # block (e.g. prediction's future) continue contiguously from an earlier
+            # one so the calendar and seasonal cycle stay unbroken across the seam.
+            absolute_idx = start_period + period_idx
             # Continuous position within the year, in [0, 1).
-            year_fraction = (period_idx % periods_per_year) / periods_per_year
+            year_fraction = (absolute_idx % periods_per_year) / periods_per_year
             for loc_idx in range(num_locations):
                 params = location_params[loc_idx]
                 row: list[Any] = []
 
                 # Time period
                 if period_type == "weekly":
-                    year = start_year + (period_idx // 52)
-                    week = (period_idx % 52) + 1
+                    year = start_year + (absolute_idx // 52)
+                    week = (absolute_idx % 52) + 1
                     row.append(f"{year}-W{week:02d}")
                 else:  # monthly (default)
-                    year = start_year + (period_idx // 12)
-                    month = (period_idx % 12) + 1
+                    year = start_year + (absolute_idx // 12)
+                    month = (absolute_idx % 12) + 1
                     row.append(f"{year}-{month:02d}")
 
                 # Location (matches geojson.properties.id)
@@ -164,7 +169,10 @@ class TestDataGenerator:
             period_type=period_type,
         )
 
-        # Future data: generate structure then null out disease_cases for prediction
+        # Future data: continue immediately after the historic span (same origin year,
+        # offset by num_periods) so the future horizon is contiguous with history
+        # instead of jumping to a fixed year and leaving a calendar gap. Then null out
+        # disease_cases for prediction.
         future = self.generate_training_data(
             num_locations=num_locations,
             num_periods=num_periods,
@@ -172,7 +180,8 @@ class TestDataGenerator:
             required_covariates=required_covariates,
             additional_covariates=additional_covariates,
             extra_covariates=extra_covariates,
-            start_year=2025,
+            start_year=2020,
+            start_period=num_periods,
             period_type=period_type,
         )
 
@@ -233,28 +242,42 @@ class TestDataGenerator:
         num_features: int = 5,
         geo_type: Literal["polygon", "point"] = "polygon",
     ) -> dict[str, Any]:
-        """Generate simple GeoJSON FeatureCollection."""
-        features: list[dict[str, Any]] = []
+        """Generate a GeoJSON FeatureCollection laid out as a contiguous grid of regions."""
+        # Tile the locations as adjacent cells so they form a coherent, map-friendly
+        # area (rather than tiny shapes scattered across the globe). Centered over a
+        # plausible land region so it reads as real administrative areas on a basemap.
+        columns = max(1, math.ceil(math.sqrt(num_features)))
+        rows = max(1, math.ceil(num_features / columns))
+        cell = 0.8  # degrees per cell
+        base_lon, base_lat = 36.8, -1.3  # near Nairobi, East Africa
+        origin_lon = base_lon - (columns * cell) / 2.0
+        origin_lat = base_lat - (rows * cell) / 2.0
 
+        features: list[dict[str, Any]] = []
         for i in range(num_features):
-            # Random center point (longitude, latitude)
-            center_lon = random.uniform(-170, 170)
-            center_lat = random.uniform(-80, 80)
+            col = i % columns
+            row = i // columns
+            min_lon = origin_lon + col * cell
+            min_lat = origin_lat + row * cell
 
             if geo_type == "point":
-                geometry: dict[str, Any] = {"type": "Point", "coordinates": [center_lon, center_lat]}
-            else:  # polygon (default)
-                size = 0.5
-                coordinates = [
-                    [
-                        [center_lon - size, center_lat - size],
-                        [center_lon + size, center_lat - size],
-                        [center_lon + size, center_lat + size],
-                        [center_lon - size, center_lat + size],
-                        [center_lon - size, center_lat - size],  # Close the ring
-                    ]
-                ]
-                geometry = {"type": "Polygon", "coordinates": coordinates}
+                geometry: dict[str, Any] = {
+                    "type": "Point",
+                    "coordinates": [min_lon + cell / 2.0, min_lat + cell / 2.0],
+                }
+            else:  # polygon (default): a square cell that tiles with its neighbours
+                geometry = {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [min_lon, min_lat],
+                            [min_lon + cell, min_lat],
+                            [min_lon + cell, min_lat + cell],
+                            [min_lon, min_lat + cell],
+                            [min_lon, min_lat],  # Close the ring
+                        ]
+                    ],
+                }
 
             features.append(
                 {
@@ -264,4 +287,11 @@ class TestDataGenerator:
                 }
             )
 
-        return {"type": "FeatureCollection", "features": features}
+        collection: dict[str, Any] = {"type": "FeatureCollection", "features": features}
+        # Attach a GeoJSON bbox so consumers (e.g. a map view) can frame the data.
+        from chapkit.data.geo import bounding_box
+
+        bbox = bounding_box(collection)
+        if bbox is not None:
+            collection["bbox"] = list(bbox)
+        return collection

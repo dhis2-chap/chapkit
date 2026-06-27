@@ -564,6 +564,13 @@ class MLManager(Generic[ConfigT]):
                 predictions = prediction_result
                 workspace_dir_str = None
 
+            # Attach a self-describing schema to the prediction output when it is a
+            # DataFrame, so stored predictions and API responses are self-describing.
+            from chapkit.data import DataFrame as PredictionDataFrame
+
+            if isinstance(predictions, PredictionDataFrame) and predictions.table_schema is None:
+                predictions = predictions.with_schema()
+
             # Create workspace artifact if workspace was created (both runners can produce workspace)
             if workspace_dir_str:
                 prediction_workspace_dir = Path(workspace_dir_str)

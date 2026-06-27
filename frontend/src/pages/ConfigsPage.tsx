@@ -1,5 +1,5 @@
 // Configs screen: master/detail browser with create/edit/delete for chapkit configs.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import {
@@ -15,7 +15,10 @@ import { formatDateTime, formatRelative } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EmptyState, ErrorState, Loading } from '@/components/console/common'
 import { JsonEditor } from '@/components/console/json-editor'
+import { MasterDetail } from '@/components/console/master-detail'
+import { SchemaForm, schemaHasProperties } from '@/components/console/schema-form'
 import { PageBody, PageHeader } from '@/components/console/page'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -176,8 +179,12 @@ export function ConfigsPage() {
             hint="Use New config to add one, or run `chapkit test` to seed the service."
           />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-            <Card className="overflow-hidden">
+          <MasterDetail
+            autoSaveId="console:configs-split"
+            defaultSize={42}
+            minSize={24}
+            master={
+              <Card className="overflow-hidden">
               <CardHeader>
                 <CardTitle>Configs</CardTitle>
                 <CardDescription>
@@ -213,9 +220,10 @@ export function ConfigsPage() {
                   </TableBody>
                 </Table>
               </CardContent>
-            </Card>
-
-            {mode === 'create' ? (
+              </Card>
+            }
+            detail={
+              mode === 'create' ? (
               <ConfigForm
                 key="create"
                 mode="create"
@@ -251,8 +259,9 @@ export function ConfigsPage() {
                   />
                 </CardContent>
               </Card>
-            )}
-          </div>
+              )
+            }
+          />
         )}
       </PageBody>
 
@@ -385,18 +394,59 @@ function ConfigForm({
   })
 
   const [name, setName] = useState(editing?.name ?? '')
-  const [dataText, setDataText] = useState(
-    editing ? JSON.stringify(editing.data, null, 2) : '',
+  // `data` is the canonical config object (edited by the form); `jsonText` mirrors
+  // it for the advanced JSON tab.
+  const [data, setData] = useState<Record<string, unknown>>(() => editing?.data ?? {})
+  const [jsonText, setJsonText] = useState(() =>
+    JSON.stringify(editing?.data ?? {}, null, 2),
   )
+  const [tab, setTab] = useState<'form' | 'json'>('form')
   const [parseError, setParseError] = useState<string | null>(null)
   const [nameError, setNameError] = useState<string | null>(null)
+  const seededRef = useRef(false)
+
+  const canForm = schemaHasProperties(schemaQuery.data)
 
   // Seed the create form from the schema skeleton once it loads (only while untouched).
   useEffect(() => {
-    if (mode === 'create' && schemaQuery.data && dataText === '') {
-      setDataText(JSON.stringify(skeletonFromSchema(schemaQuery.data), null, 2))
+    if (
+      mode === 'create' &&
+      schemaQuery.data &&
+      !seededRef.current &&
+      Object.keys(data).length === 0
+    ) {
+      seededRef.current = true
+      const skeleton = skeletonFromSchema(schemaQuery.data)
+      setData(skeleton)
+      setJsonText(JSON.stringify(skeleton, null, 2))
     }
-  }, [mode, schemaQuery.data, dataText])
+  }, [mode, schemaQuery.data, data])
+
+  // A schema without editable fields can only be edited as JSON.
+  useEffect(() => {
+    if (schemaQuery.data && !canForm) setTab('json')
+  }, [schemaQuery.data, canForm])
+
+  // Form edits update the object and keep the JSON mirror in sync.
+  const updateData = (next: Record<string, unknown>) => {
+    setData(next)
+    setJsonText(JSON.stringify(next, null, 2))
+    if (parseError) setParseError(null)
+  }
+
+  // JSON edits update the mirror and, when valid, the canonical object.
+  const updateJson = (next: string) => {
+    setJsonText(next)
+    if (parseError) setParseError(null)
+    try {
+      const parsed: unknown = JSON.parse(next)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        setData(parsed as Record<string, unknown>)
+      }
+    } catch {
+      // Surface the error only on submit, not on every keystroke.
+    }
+  }
 
   const saveMutation = useMutation({
     mutationFn: (input: { id: string | null; body: ConfigInput }) =>
@@ -416,22 +466,25 @@ function ConfigForm({
       return
     }
     setNameError(null)
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(dataText)
-    } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'Invalid JSON')
-      return
-    }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      setParseError('Data must be a JSON object.')
-      return
+
+    let body: Record<string, unknown> = data
+    // On the JSON tab the textarea is the source of truth; re-validate it.
+    if (tab === 'json') {
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(jsonText)
+      } catch (err) {
+        setParseError(err instanceof Error ? err.message : 'Invalid JSON')
+        return
+      }
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        setParseError('Data must be a JSON object.')
+        return
+      }
+      body = parsed as Record<string, unknown>
     }
     setParseError(null)
-    saveMutation.mutate({
-      id: editing?.id ?? null,
-      body: { name, data: parsed as Record<string, unknown> },
-    })
+    saveMutation.mutate({ id: editing?.id ?? null, body: { name, data: body } })
   }
 
   return (
@@ -469,17 +522,40 @@ function ConfigForm({
           ) : null}
         </div>
         <div className="space-y-1.5">
-          <Label>Data (JSON)</Label>
-          <JsonEditor
-            value={dataText}
-            onChange={(next) => {
-              setDataText(next)
-              if (parseError) setParseError(null)
-            }}
-            schema={schemaQuery.data}
-            ariaLabel="Config data"
-            minHeight="16rem"
-          />
+          <Label>Data</Label>
+          <Tabs value={tab} onValueChange={(value) => setTab(value as 'form' | 'json')}>
+            <TabsList>
+              <TabsTrigger value="form" disabled={!canForm}>
+                Form
+              </TabsTrigger>
+              <TabsTrigger value="json">JSON</TabsTrigger>
+            </TabsList>
+            <TabsContent value="form" className="pt-3">
+              {schemaQuery.isLoading ? (
+                <p className="text-xs text-muted-foreground">Loading schema…</p>
+              ) : canForm ? (
+                <SchemaForm
+                  schema={schemaQuery.data}
+                  value={data}
+                  disabled={saveMutation.isPending}
+                  onChange={updateData}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  This config has no declared fields. Use the JSON tab.
+                </p>
+              )}
+            </TabsContent>
+            <TabsContent value="json" className="pt-3">
+              <JsonEditor
+                value={jsonText}
+                onChange={updateJson}
+                schema={schemaQuery.data}
+                ariaLabel="Config data"
+                minHeight="16rem"
+              />
+            </TabsContent>
+          </Tabs>
           {parseError ? (
             <p className="text-xs text-destructive">{parseError}</p>
           ) : null}

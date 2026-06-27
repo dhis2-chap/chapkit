@@ -76,7 +76,7 @@ test('train: generate, validate, then submit a job', async ({ page }) => {
 
 test('jobs lists submitted jobs with full ULIDs', async ({ page }) => {
   await page.goto('/#/jobs')
-  const firstId = page.locator('table tbody tr td').nth(1)
+  const firstId = page.locator('table tbody td.font-mono').first()
   await expect(firstId).toBeVisible()
   expect((await firstId.innerText()).trim()).toMatch(/^01[0-9A-Z]{24}$/)
 })

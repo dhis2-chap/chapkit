@@ -18,7 +18,6 @@ import {
   toSampleOptions,
   parseDataFrame,
   asDataFrame,
-  hasDiagnostics,
   useColumnsPlaceholder,
 } from '@/components/console/ml-shared'
 import type { GeneratorParams } from '@/components/console/ml-shared'
@@ -112,8 +111,11 @@ export function TrainPage() {
   const trainMutation = useMutation({
     mutationFn: (body: TrainPayload) => api.train(body),
     onSuccess: (res) => {
+      // Reset the validation gate so the same payload can't be re-submitted on
+      // repeated clicks; the user re-validates before submitting again.
+      invalidate()
       toast.success(`Training job ${res.job_id} submitted`, {
-        action: { label: 'View jobs', onClick: () => navigate('/jobs') },
+        action: { label: 'View job', onClick: () => navigate(`/jobs/${res.job_id}`) },
       })
     },
     onError: (error: unknown) => toast.error(error instanceof Error ? error.message : String(error)),
@@ -185,17 +187,17 @@ export function TrainPage() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-auto p-6 pb-8">
-            <Card>
-              <CardHeader>
+          <div className="flex min-h-0 flex-1 flex-col p-6">
+            <Card className="flex min-h-0 flex-1 flex-col">
+              <CardHeader className="shrink-0">
                 <CardTitle>Training input</CardTitle>
                 <CardDescription>
                   Choose a config and provide the training DataFrame, then validate before
                   submitting.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
+              <CardContent className="flex min-h-0 flex-1 flex-col space-y-4">
+                <div className="shrink-0 space-y-2">
                   <Label htmlFor="train-config">Config</Label>
                   <Select
                     value={configId}
@@ -225,6 +227,7 @@ export function TrainPage() {
                   label="Training data"
                   placeholder={columnsPlaceholder}
                   value={dataText}
+                  fill
                   onChange={(next) => {
                     setDataText(next)
                     invalidate()
@@ -235,9 +238,23 @@ export function TrainPage() {
           </div>
 
           <div className="shrink-0 space-y-3 border-t bg-background px-6 py-3">
-            {hasDiagnostics(validation) ? (
+            {validation ? (
               <div className="max-h-40 overflow-auto">
-                <DiagnosticsView result={validation!} />
+                <DiagnosticsView
+                  result={validation}
+                  action={
+                    validated ? (
+                      <Button size="sm" onClick={handleSubmit} disabled={pending}>
+                        {trainMutation.isPending ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Play />
+                        )}
+                        Train now
+                      </Button>
+                    ) : undefined
+                  }
+                />
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">

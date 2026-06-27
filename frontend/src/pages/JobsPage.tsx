@@ -1,8 +1,8 @@
 // Live job monitor: polls the jobs list, shows a detail dialog, and cancels/removes jobs.
-import { useState } from 'react'
-import { Ban, ExternalLink, RefreshCw, Trash2, X } from 'lucide-react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Ban, ExternalLink, Layers, RefreshCw, Trash2, X } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { api, readJobArtifactId } from '@/lib/api'
@@ -54,6 +54,12 @@ const STATUS_OPTIONS: JobStatus[] = [
 const TERMINAL_STATES = new Set<JobStatus>(['completed', 'failed', 'canceled'])
 const ACTIVE_STATES = new Set<JobStatus>(['pending', 'running'])
 
+// Order status groups active-first when grouping the list.
+const STATUS_ORDER: JobStatus[] = ['running', 'pending', 'completed', 'failed', 'canceled']
+
+// Total table columns (checkbox + 6 data + actions), used for full-width group rows.
+const COLUMN_COUNT = 8
+
 type StatusFilter = 'all' | JobStatus
 
 /** Short, readable form of a job id. */
@@ -74,8 +80,12 @@ function jobDurationSeconds(job: Job): number | null {
 export function JobsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  // Selection lives in the URL (#/jobs/:jobId) so a job detail deep-links and
+  // survives a refresh, matching Configs and Artifacts.
+  const { jobId } = useParams()
   const [filter, setFilter] = useState<StatusFilter>('all')
-  const [selected, setSelected] = useState<Job | null>(null)
+  const [grouped, setGrouped] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const jobsQuery = useQuery({
     queryKey: ['jobs', filter],
@@ -87,10 +97,51 @@ export function JobsPage() {
     },
   })
 
+  const jobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data])
+  const selected = useMemo(
+    () => jobs.find((job) => job.id === jobId) ?? null,
+    [jobs, jobId],
+  )
+
+  // Drop selections whose jobs have disappeared (removed, or filtered out).
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev
+      const present = new Set(jobs.map((job) => job.id))
+      const next = new Set([...prev].filter((id) => present.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [jobs])
+
+  // Group rows by status (active-first) when grouping is on; otherwise one group.
+  const groups = useMemo(() => {
+    if (!grouped) return [{ status: null as JobStatus | null, jobs }]
+    return STATUS_ORDER.map((status) => ({
+      status: status as JobStatus | null,
+      jobs: jobs.filter((job) => job.status === status),
+    })).filter((group) => group.jobs.length > 0)
+  }, [grouped, jobs])
+
+  const allSelected = jobs.length > 0 && jobs.every((job) => selectedIds.has(job.id))
+  const someSelected = selectedIds.size > 0 && !allSelected
+
+  const toggleAll = (checked: boolean) =>
+    setSelectedIds(checked ? new Set(jobs.map((job) => job.id)) : new Set())
+
+  const toggleOne = (id: string, checked: boolean) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+
   const cancelMutation = useMutation({
     mutationFn: (id: string) => api.cancelJob(id),
     onSuccess: (_data, id) => {
       toast.success(`Job ${shortId(id)} updated`)
+      // The job is gone; close its detail view if it was the one being shown.
+      if (id === jobId) navigate('/jobs')
       void queryClient.invalidateQueries({ queryKey: ['jobs'] })
     },
     onError: (error: unknown) => {
@@ -108,6 +159,26 @@ export function JobsPage() {
     cancelMutation.mutate(job.id)
   }
 
+  const bulkMutation = useMutation({
+    mutationFn: (ids: string[]) => Promise.all(ids.map((id) => api.cancelJob(id))),
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} job${ids.length === 1 ? '' : 's'} removed`)
+      if (jobId && ids.includes(jobId)) navigate('/jobs')
+      setSelectedIds(new Set())
+      void queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : String(error))
+    },
+  })
+
+  const handleBulkRemove = () => {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+    if (!window.confirm(`Remove ${ids.length} job${ids.length === 1 ? '' : 's'}?`)) return
+    bulkMutation.mutate(ids)
+  }
+
   const handleViewArtifact = async (job: Job) => {
     try {
       const artifactId = await readJobArtifactId(job.id)
@@ -120,6 +191,73 @@ export function JobsPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  const renderRow = (job: Job) => {
+    const isActive = ACTIVE_STATES.has(job.status)
+    return (
+      <TableRow
+        key={job.id}
+        data-state={job.id === jobId ? 'selected' : undefined}
+        className="cursor-pointer"
+        onClick={() => navigate(`/jobs/${job.id}`)}
+      >
+        <TableCell className="w-8" onClick={(event) => event.stopPropagation()}>
+          <input
+            type="checkbox"
+            className="size-4 align-middle accent-primary"
+            checked={selectedIds.has(job.id)}
+            onChange={(event) => toggleOne(job.id, event.target.checked)}
+            aria-label={`Select job ${shortId(job.id)}`}
+          />
+        </TableCell>
+        <TableCell>
+          <JobStatusBadge status={job.status} />
+        </TableCell>
+        <TableCell className="font-mono text-xs whitespace-nowrap">{job.id}</TableCell>
+        <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+          {formatDateTime(job.submitted_at)}
+        </TableCell>
+        <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+          {formatDateTime(job.started_at)}
+        </TableCell>
+        <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+          {formatDateTime(job.finished_at)}
+        </TableCell>
+        <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+          {formatDuration(jobDurationSeconds(job))}
+        </TableCell>
+        <TableCell className="text-right">
+          {isActive ? (
+            <Button
+              variant="destructive"
+              size="xs"
+              disabled={cancelMutation.isPending}
+              onClick={(event) => {
+                event.stopPropagation()
+                handleCancel(job)
+              }}
+            >
+              <Ban />
+              Cancel
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={cancelMutation.isPending}
+              onClick={(event) => {
+                event.stopPropagation()
+                handleRemove(job)
+              }}
+            >
+              <Trash2 />
+              Remove
+            </Button>
+          )}
+        </TableCell>
+      </TableRow>
+    )
   }
 
   const actions = (
@@ -141,6 +279,15 @@ export function JobsPage() {
         </SelectContent>
       </Select>
       <Button
+        variant={grouped ? 'secondary' : 'outline'}
+        size="sm"
+        aria-pressed={grouped}
+        onClick={() => setGrouped((prev) => !prev)}
+      >
+        <Layers />
+        Group by status
+      </Button>
+      <Button
         variant="outline"
         size="sm"
         onClick={() => jobsQuery.refetch()}
@@ -153,8 +300,6 @@ export function JobsPage() {
       </Button>
     </>
   )
-
-  const jobs = jobsQuery.data ?? []
 
   return (
     <>
@@ -174,88 +319,82 @@ export function JobsPage() {
             hint="Submit a training or prediction, or run `chapkit test`."
           />
         ) : (
-          <Card className="overflow-hidden p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Job id</TableHead>
-                  <TableHead className="hidden md:table-cell">Submitted</TableHead>
-                  <TableHead className="hidden md:table-cell">Started</TableHead>
-                  <TableHead className="hidden md:table-cell">Finished</TableHead>
-                  <TableHead className="hidden md:table-cell">Duration</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {jobs.map((job) => {
-                  const isActive = ACTIVE_STATES.has(job.status)
-                  return (
-                    <TableRow
-                      key={job.id}
-                      className="cursor-pointer"
-                      onClick={() => setSelected(job)}
-                    >
-                      <TableCell>
-                        <JobStatusBadge status={job.status} />
-                      </TableCell>
-                      <TableCell className="font-mono text-xs whitespace-nowrap">
-                        {job.id}
-                      </TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                        {formatDateTime(job.submitted_at)}
-                      </TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                        {formatDateTime(job.started_at)}
-                      </TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                        {formatDateTime(job.finished_at)}
-                      </TableCell>
-                      <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                        {formatDuration(jobDurationSeconds(job))}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {isActive ? (
-                          <Button
-                            variant="destructive"
-                            size="xs"
-                            disabled={cancelMutation.isPending}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleCancel(job)
-                            }}
-                          >
-                            <Ban />
-                            Cancel
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="xs"
-                            disabled={cancelMutation.isPending}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleRemove(job)
-                            }}
-                          >
-                            <Trash2 />
-                            Remove
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </Card>
+          <div className="space-y-3">
+            {selectedIds.size > 0 ? (
+              <div className="flex items-center gap-3 rounded-md border bg-muted/40 px-3 py-2">
+                <span className="text-sm font-medium">{selectedIds.size} selected</span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkRemove}
+                  disabled={bulkMutation.isPending}
+                >
+                  <Trash2 />
+                  Remove selected
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  Clear
+                </Button>
+              </div>
+            ) : null}
+            <Card className="overflow-hidden p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8">
+                      <input
+                        type="checkbox"
+                        className="size-4 align-middle accent-primary"
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected
+                        }}
+                        checked={allSelected}
+                        onChange={(event) => toggleAll(event.target.checked)}
+                        aria-label="Select all jobs"
+                      />
+                    </TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Job id</TableHead>
+                    <TableHead className="hidden md:table-cell">Submitted</TableHead>
+                    <TableHead className="hidden md:table-cell">Started</TableHead>
+                    <TableHead className="hidden md:table-cell">Finished</TableHead>
+                    <TableHead className="hidden md:table-cell">Duration</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groups.map((group) => (
+                    <Fragment key={group.status ?? '__all__'}>
+                      {group.status ? (
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableCell colSpan={COLUMN_COUNT} className="py-1.5">
+                            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                              <JobStatusBadge status={group.status} />
+                              <span>
+                                {group.jobs.length} job{group.jobs.length === 1 ? '' : 's'}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                      {group.jobs.map(renderRow)}
+                    </Fragment>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          </div>
         )}
       </PageBody>
 
       <Dialog
         open={selected !== null}
         onOpenChange={(open) => {
-          if (!open) setSelected(null)
+          if (!open) navigate('/jobs')
         }}
       >
         <DialogContent className="max-w-2xl">

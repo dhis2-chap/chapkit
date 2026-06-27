@@ -36,6 +36,34 @@ test('dataframe table: filter, sort, and download menu', async ({ page }) => {
   await page.keyboard.press('Escape')
 })
 
+test('apply from dry run: Train now submits straight from the success alert', async ({ page }) => {
+  await page.goto('/#/train')
+  await page.getByRole('button', { name: 'Generate', exact: true }).click()
+  await expect(page.locator('table tbody tr').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Validate' }).click()
+
+  const trainNow = page.getByRole('button', { name: 'Train now', exact: true })
+  await expect(trainNow).toBeVisible()
+  await trainNow.click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'submitted' })).toBeVisible()
+})
+
+test('submitting resets the validation gate so the job cannot be re-fired', async ({ page }) => {
+  await page.goto('/#/train')
+  await page.getByRole('button', { name: 'Generate', exact: true }).click()
+  await expect(page.locator('table tbody tr').first()).toBeVisible()
+  await page.getByRole('button', { name: 'Validate' }).click()
+
+  const trainNow = page.getByRole('button', { name: 'Train now', exact: true })
+  await expect(trainNow).toBeVisible()
+  await trainNow.click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'submitted' })).toBeVisible()
+
+  // The gate is reset: the apply action is gone and Train is disabled until re-validated.
+  await expect(page.getByRole('button', { name: 'Train now', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Train', exact: true })).toBeDisabled()
+})
+
 test('Train JSON pane is read-only until Edit is toggled', async ({ page }) => {
   await page.goto('/#/train')
   await page.getByRole('button', { name: 'Generate', exact: true }).click()
