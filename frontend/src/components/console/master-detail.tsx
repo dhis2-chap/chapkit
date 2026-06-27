@@ -53,23 +53,26 @@ export function MasterDetail({
     )
   }
 
+  // Fill the available height and scroll each panel's content internally, so tall
+  // detail content (e.g. a dataframe table with pagination) stays fully reachable
+  // instead of being clipped by the panel's overflow:hidden.
   return (
     <ResizablePanelGroup
       direction="horizontal"
       autoSaveId={autoSaveId}
-      className="min-h-[calc(100svh-13rem)] items-stretch"
+      className="h-full items-stretch"
     >
       <ResizablePanel
         defaultSize={defaultSize}
         minSize={minSize}
         maxSize={maxSize}
-        className="min-w-0 pr-3"
+        className="min-w-0"
       >
-        {master}
+        <div className="h-full overflow-y-auto pr-3">{master}</div>
       </ResizablePanel>
       <ResizableHandle withHandle />
-      <ResizablePanel minSize={40} className="min-w-0 pl-3">
-        {detail}
+      <ResizablePanel minSize={40} className="min-w-0">
+        <div className="h-full overflow-y-auto pl-3">{detail}</div>
       </ResizablePanel>
     </ResizablePanelGroup>
   )
