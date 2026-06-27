@@ -1,6 +1,6 @@
 // Discover whether the service exposes Prometheus monitoring, from the OpenAPI
 // spec the console already loads. (A future servicekit `/system` capability flag
-// could replace this — see web-console-roadmap.md.)
+// could replace this — see WEB_CONSOLE_ROADMAP.md.)
 import type { OpenApiSpec } from '@/lib/types'
 
 /** The metrics endpoint path if the service exposes one, else null. */

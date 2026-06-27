@@ -31,8 +31,6 @@ theme:
 nav:
   - Home: index.md
   - Guides:
-      - Web Console: guides/web-console.md
-      - Web Console Roadmap: guides/web-console-roadmap.md
       - R Quickstart: guides/r-quickstart.md
       - CLI Scaffolding: guides/cli-scaffolding.md
       - MLproject Runner: guides/mlproject-runner.md
@@ -47,6 +45,7 @@ nav:
       - Monitoring: guides/monitoring.md
       - DataFrame: guides/dataframe.md
       - Database Migrations: guides/database-migrations.md
+      - Web Console: guides/web-console.md
   - API Reference: api-reference.md
 
 markdown_extensions:

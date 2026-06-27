@@ -1,7 +1,7 @@
 # Web Console Roadmap
 
-Planned follow-ups for the [Web Console](web-console.md), captured so they are not
-lost.
+Planned follow-ups for the [Web Console](docs/guides/web-console.md), captured so
+they are not lost.
 
 Several items have since shipped and are no longer listed here: Jobs
 deep-linking, apply-from-dry-run, resizable master/detail and sidebar panels,
