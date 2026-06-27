@@ -1,5 +1,6 @@
 // Primary navigation sidebar for the console.
 import {
+  Activity,
   Boxes,
   FileCode2,
   LayoutDashboard,
@@ -10,7 +11,11 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
+
+import { api } from '@/lib/api'
+import { findMetricsPath } from '@/lib/monitoring'
 import {
   Sidebar,
   SidebarContent,
@@ -76,11 +81,17 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
 }
 
 export function AppSidebar() {
+  // Surface Monitoring only when the service exposes a metrics endpoint.
+  const openapi = useQuery({ queryKey: ['openapi'], queryFn: api.openapi })
+  const exploreItems: NavItem[] = findMetricsPath(openapi.data)
+    ? [...EXPLORE, { to: '/monitoring', label: 'Monitoring', icon: Activity }]
+    : EXPLORE
+
   return (
     <Sidebar collapsible="icon">
       <SidebarContent className="pt-2">
         <NavGroup label="Service" items={NAV} />
-        <NavGroup label="Explore" items={EXPLORE} />
+        <NavGroup label="Explore" items={exploreItems} />
       </SidebarContent>
 
       <SidebarFooter>

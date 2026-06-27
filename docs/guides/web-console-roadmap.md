@@ -7,8 +7,9 @@ Several items have since shipped and are no longer listed here: Jobs
 deep-linking, apply-from-dry-run, resizable master/detail and sidebar panels,
 Jobs multi-select + grouping, the schema-driven config form, contiguous
 multi-year sample data, the self-describing DataFrame schema, the GeoJSON
-bounding box, and the Map view (a MapLibre choropleth over an OpenFreeMap
-basemap, animated over time).
+bounding box, the Map view (a MapLibre choropleth over an OpenFreeMap basemap,
+animated over time — currently disabled in the UI), and the live Monitoring
+screen (in-memory polling of the Prometheus `/metrics` endpoint).
 
 ## Console / UX
 
@@ -82,8 +83,13 @@ The Map view ships as a MapLibre GL choropleth over an OpenFreeMap basemap
 
 ## Framework
 
-- **Monitoring screen.** A metrics screen backed by OpenTelemetry
-  (`.with_monitoring()` already exposes the data).
+- **Expose service capabilities in `/system` (servicekit).** The console detects
+  whether monitoring is enabled by checking `/openapi.json` for the `/metrics`
+  route (tagged `Observability`). A cleaner, more discoverable contract would be a
+  `features` / `capabilities` block on servicekit's `SystemInfo` (e.g.
+  `monitoring`, `metrics_path`, `registration`, …) that any client can read
+  directly, instead of inferring from the OpenAPI spec. Needs a servicekit change;
+  the console would prefer the flag when present and fall back to OpenAPI detection.
 - **Scaffold / servicekit version exposure.** Scaffolded `main.py` currently
   hardcodes `version="1.0.0"`. Do this properly in its own change: derive the
   service version from the project's package metadata (single source of truth) and

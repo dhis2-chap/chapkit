@@ -41,6 +41,7 @@ served straight from the installed package with no Node.js runtime required.
 | **Predict** | Submit `$predict` jobs from a trained model, with the same `$validate` gating and sample-data generator. |
 | **Endpoints** | Every HTTP operation exposed by the service, parsed from `/openapi.json`, grouped by tag and filterable. Links out to Swagger. |
 | **System** | Runtime information (host, platform, Python, timezone) and the static apps mounted by the service. |
+| **Monitoring** | Live, in-memory view of the service's Prometheus `/metrics` (request rate, latency, active requests, GC, ML job counters, and Linux process CPU/memory/FDs), with sparklines, a poll-interval control, and a raw-metric explorer. Shown only when the service enables `.with_monitoring()` (detected from the OpenAPI spec); nothing is stored server-side. |
 
 ## Seeding a session
 

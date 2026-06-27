@@ -30,6 +30,7 @@ import { PredictPage } from '@/pages/PredictPage'
 // import { MapPage } from '@/pages/MapPage'
 import { EndpointsPage } from '@/pages/EndpointsPage'
 import { SystemPage } from '@/pages/SystemPage'
+import { MonitoringPage } from '@/pages/MonitoringPage'
 
 function TopNav() {
   const { data: info } = useQuery({ queryKey: ['info'], queryFn: api.info })
@@ -117,6 +118,7 @@ export default function App() {
             {/* <Route path="map" element={<MapPage />} /> */}
             <Route path="api" element={<EndpointsPage />} />
             <Route path="system" element={<SystemPage />} />
+            <Route path="monitoring" element={<MonitoringPage />} />
           </Route>
         </Routes>
         <Toaster position="bottom-right" />
