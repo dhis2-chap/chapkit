@@ -111,6 +111,9 @@ export function TrainPage() {
   const trainMutation = useMutation({
     mutationFn: (body: TrainPayload) => api.train(body),
     onSuccess: (res) => {
+      // Reset the validation gate so the same payload can't be re-submitted on
+      // repeated clicks; the user re-validates before submitting again.
+      invalidate()
       toast.success(`Training job ${res.job_id} submitted`, {
         action: { label: 'View job', onClick: () => navigate(`/jobs/${res.job_id}`) },
       })
