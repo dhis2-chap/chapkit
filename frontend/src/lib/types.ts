@@ -102,9 +102,16 @@ export interface Artifact {
   children?: Artifact[]
 }
 
+export interface DataFrameFieldSchema {
+  name: string
+  type: 'string' | 'integer' | 'number' | 'boolean' | 'any' | string
+}
+
 export interface DataFrameContent {
   columns: string[]
   data: unknown[][]
+  // Optional self-describing schema emitted by chapkit (see DataFrame.with_schema).
+  schema?: { fields: DataFrameFieldSchema[] }
 }
 
 export type JobStatus =

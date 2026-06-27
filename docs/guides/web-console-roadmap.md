@@ -3,10 +3,12 @@
 Planned follow-ups for the [Web Console](web-console.md), captured so they are not
 lost.
 
-Several early items have since shipped and are no longer listed here: Jobs
+Several items have since shipped and are no longer listed here: Jobs
 deep-linking, apply-from-dry-run, resizable master/detail and sidebar panels,
-Jobs multi-select + grouping, the schema-driven config form, and contiguous
-multi-year sample data.
+Jobs multi-select + grouping, the schema-driven config form, contiguous
+multi-year sample data, the self-describing DataFrame schema, the GeoJSON
+bounding box, and the Map view (a MapLibre choropleth over an OpenFreeMap
+basemap, animated over time).
 
 ## Console / UX
 
@@ -21,10 +23,6 @@ multi-year sample data.
 
 - **Backtest / evaluation with n-fold splits.** Rolling-origin / n-split
   backtesting and evaluation, surfaced in the console.
-- **Self-describing DataFrame.** Add an optional Table-Schema-style `schema.fields`
-  to the `DataFrame` model (emitted on output, optional on input) so dataframes
-  are self-describing everywhere, not just in console exports. Best derived from
-  the model contract (`required_covariates`, config schema) rather than inferred.
 - **safetensors model serialization.** Move model artifacts from pickle to
   [safetensors](https://github.com/huggingface/safetensors): non-executable (no
   arbitrary-code-execution on load) and broadly portable across languages and
@@ -41,19 +39,15 @@ multi-year sample data.
 
 ## Geospatial
 
-- **Map view for geo-enabled services.** When a service uses geo, the data
-  carries a GeoJSON `FeatureCollection` with one feature per `location` (keyed by
-  `properties.id`). Render it on a map and join per-location predictions /
-  covariates to the features (e.g. a choropleth that animates over `time_period`).
-  Candidate open mapping stack: [GeoLibre](https://geolibre.app/).
-  Geometry source is normally the service's own GeoJSON; when running alongside
-  DHIS2 it could optionally be enriched from org units
-  (`/api/organisationUnits?fields=*`, or a trimmed field set by level), keeping
-  the console usable standalone.
-- **Bounding box.** To frame the map, compute (or approximate) a `bbox` from the
-  feature geometries. GeoJSON does not always include one, so derive it from the
-  coordinates, or approximate from feature centroids when geometries are large or
-  missing.
+The Map view ships as a MapLibre GL choropleth over an OpenFreeMap basemap
+(framed by the generated `bbox`), so the following remain as enhancements:
+
+- **Offline basemap fallback.** The basemap tiles are fetched from OpenFreeMap at
+  runtime; the GeoJSON overlay still renders if they fail, but a bundled minimal
+  style (or no-tile mode) would keep the map usable fully offline.
+- **DHIS2 org-unit geometry.** When running alongside DHIS2, optionally enrich
+  geometry from org units (`/api/organisationUnits?fields=*`, or a trimmed field
+  set by level), keeping the console usable standalone.
 
 ## Framework
 

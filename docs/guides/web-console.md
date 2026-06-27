@@ -34,11 +34,12 @@ served straight from the installed package with no Node.js runtime required.
 | Screen | What it does |
 | --- | --- |
 | **Overview** | Service identity, version, model metadata, capability contract (period type, prediction-period bounds, required covariates), and health. |
-| **Configs** | Browse, create, edit, and delete configs inline (no modal). The data editor is a CodeMirror JSON editor with schema-aware autocomplete and validation driven by the service's config JSON schema; new configs are pre-filled from that schema. |
+| **Configs** | Browse, create, edit, and delete configs inline (no modal). The data editor offers a schema-driven **Form** tab (typed inputs generated from the service's config JSON schema) and an advanced **JSON** tab (CodeMirror with schema-aware autocomplete and validation); the two stay in sync. |
 | **Artifacts** | Browse the artifact hierarchy as a tree, inspect metadata, preview dataframe content, and download artifact contents. |
 | **Jobs** | Live job monitor (auto-refreshing) with status, timing, error tracebacks, cancellation, and a link from a completed job to its result artifact. |
 | **Train** | Submit `$train` jobs interactively, with `$validate` gating and a tunable sample-data generator (see below). |
 | **Predict** | Submit `$predict` jobs from a trained model, with the same `$validate` gating and sample-data generator. |
+| **Map** | MapLibre GL choropleth of the service's geometries over an [OpenFreeMap](https://openfreemap.org) basemap (same stack as dhis2/open-climate-service), framed by the data's GeoJSON `bbox`. Colors each location by a chosen value column and animates over `time_period` with a play/scrub control. |
 | **Endpoints** | Every HTTP operation exposed by the service, parsed from `/openapi.json`, grouped by tag and filterable. Links out to Swagger. |
 | **System** | Runtime information (host, platform, Python, timezone) and the static apps mounted by the service. |
 

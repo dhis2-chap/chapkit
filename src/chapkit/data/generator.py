@@ -242,28 +242,42 @@ class TestDataGenerator:
         num_features: int = 5,
         geo_type: Literal["polygon", "point"] = "polygon",
     ) -> dict[str, Any]:
-        """Generate simple GeoJSON FeatureCollection."""
-        features: list[dict[str, Any]] = []
+        """Generate a GeoJSON FeatureCollection laid out as a contiguous grid of regions."""
+        # Tile the locations as adjacent cells so they form a coherent, map-friendly
+        # area (rather than tiny shapes scattered across the globe). Centered over a
+        # plausible land region so it reads as real administrative areas on a basemap.
+        columns = max(1, math.ceil(math.sqrt(num_features)))
+        rows = max(1, math.ceil(num_features / columns))
+        cell = 0.8  # degrees per cell
+        base_lon, base_lat = 36.8, -1.3  # near Nairobi, East Africa
+        origin_lon = base_lon - (columns * cell) / 2.0
+        origin_lat = base_lat - (rows * cell) / 2.0
 
+        features: list[dict[str, Any]] = []
         for i in range(num_features):
-            # Random center point (longitude, latitude)
-            center_lon = random.uniform(-170, 170)
-            center_lat = random.uniform(-80, 80)
+            col = i % columns
+            row = i // columns
+            min_lon = origin_lon + col * cell
+            min_lat = origin_lat + row * cell
 
             if geo_type == "point":
-                geometry: dict[str, Any] = {"type": "Point", "coordinates": [center_lon, center_lat]}
-            else:  # polygon (default)
-                size = 0.5
-                coordinates = [
-                    [
-                        [center_lon - size, center_lat - size],
-                        [center_lon + size, center_lat - size],
-                        [center_lon + size, center_lat + size],
-                        [center_lon - size, center_lat + size],
-                        [center_lon - size, center_lat - size],  # Close the ring
-                    ]
-                ]
-                geometry = {"type": "Polygon", "coordinates": coordinates}
+                geometry: dict[str, Any] = {
+                    "type": "Point",
+                    "coordinates": [min_lon + cell / 2.0, min_lat + cell / 2.0],
+                }
+            else:  # polygon (default): a square cell that tiles with its neighbours
+                geometry = {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [min_lon, min_lat],
+                            [min_lon + cell, min_lat],
+                            [min_lon + cell, min_lat + cell],
+                            [min_lon, min_lat + cell],
+                            [min_lon, min_lat],  # Close the ring
+                        ]
+                    ],
+                }
 
             features.append(
                 {

@@ -49,7 +49,7 @@ test('sidebar navigates to every screen', async ({ page }) => {
   await page.goto('/#/')
   // Scope to the sidebar: the Overview "Quick links" card also links to some pages.
   const sidebar = page.locator('[data-slot="sidebar"]')
-  for (const label of ['Configs', 'Artifacts', 'Jobs', 'Train', 'Predict', 'Endpoints', 'System']) {
+  for (const label of ['Configs', 'Artifacts', 'Jobs', 'Train', 'Predict', 'Map', 'Endpoints', 'System']) {
     await sidebar.getByRole('link', { name: label, exact: true }).click()
     await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible()
   }
