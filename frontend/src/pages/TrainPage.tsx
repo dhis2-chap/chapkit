@@ -187,17 +187,17 @@ export function TrainPage() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-auto p-6 pb-8">
-            <Card>
-              <CardHeader>
+          <div className="flex min-h-0 flex-1 flex-col p-6">
+            <Card className="flex min-h-0 flex-1 flex-col">
+              <CardHeader className="shrink-0">
                 <CardTitle>Training input</CardTitle>
                 <CardDescription>
                   Choose a config and provide the training DataFrame, then validate before
                   submitting.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
+              <CardContent className="flex min-h-0 flex-1 flex-col space-y-4">
+                <div className="shrink-0 space-y-2">
                   <Label htmlFor="train-config">Config</Label>
                   <Select
                     value={configId}
@@ -227,6 +227,7 @@ export function TrainPage() {
                   label="Training data"
                   placeholder={columnsPlaceholder}
                   value={dataText}
+                  fill
                   onChange={(next) => {
                     setDataText(next)
                     invalidate()
