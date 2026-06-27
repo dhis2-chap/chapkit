@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   LineChart,
   ListTree,
-  Map,
   Play,
   Settings2,
   SlidersHorizontal,
@@ -40,7 +39,6 @@ const NAV: NavItem[] = [
   { to: '/jobs', label: 'Jobs', icon: Boxes },
   { to: '/train', label: 'Train', icon: Play },
   { to: '/predict', label: 'Predict', icon: LineChart },
-  { to: '/map', label: 'Map', icon: Map },
 ]
 
 const EXPLORE: NavItem[] = [

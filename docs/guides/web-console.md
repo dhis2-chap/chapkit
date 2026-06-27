@@ -39,7 +39,6 @@ served straight from the installed package with no Node.js runtime required.
 | **Jobs** | Live job monitor (auto-refreshing) with status, timing, error tracebacks, cancellation, and a link from a completed job to its result artifact. |
 | **Train** | Submit `$train` jobs interactively, with `$validate` gating and a tunable sample-data generator (see below). |
 | **Predict** | Submit `$predict` jobs from a trained model, with the same `$validate` gating and sample-data generator. |
-| **Map** | MapLibre GL choropleth of the service's geometries over an [OpenFreeMap](https://openfreemap.org) basemap (same stack as dhis2/open-climate-service), framed by the data's GeoJSON `bbox`. Colors each location by a chosen value column and animates over `time_period` with a play/scrub control. |
 | **Endpoints** | Every HTTP operation exposed by the service, parsed from `/openapi.json`, grouped by tag and filterable. Links out to Swagger. |
 | **System** | Runtime information (host, platform, Python, timezone) and the static apps mounted by the service. |
 

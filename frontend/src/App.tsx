@@ -25,7 +25,9 @@ import { ArtifactsPage } from '@/pages/ArtifactsPage'
 import { JobsPage } from '@/pages/JobsPage'
 import { TrainPage } from '@/pages/TrainPage'
 import { PredictPage } from '@/pages/PredictPage'
-import { MapPage } from '@/pages/MapPage'
+// Map view is temporarily disabled in the UI (kept in the codebase): see the
+// "Map real predictions" item in docs/guides/web-console-roadmap.md.
+// import { MapPage } from '@/pages/MapPage'
 import { EndpointsPage } from '@/pages/EndpointsPage'
 import { SystemPage } from '@/pages/SystemPage'
 
@@ -112,7 +114,7 @@ export default function App() {
             <Route path="jobs/:jobId" element={<JobsPage />} />
             <Route path="train" element={<TrainPage />} />
             <Route path="predict" element={<PredictPage />} />
-            <Route path="map" element={<MapPage />} />
+            {/* <Route path="map" element={<MapPage />} /> */}
             <Route path="api" element={<EndpointsPage />} />
             <Route path="system" element={<SystemPage />} />
           </Route>
