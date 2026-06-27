@@ -178,7 +178,12 @@ function SchemaField({
         <Select
           value={current}
           disabled={disabled}
-          onValueChange={(next) => onChange(next)}
+          onValueChange={(next) => {
+            // Radix Select values are strings; map back to the original enum option
+            // so numeric enums (e.g. an integer Literal) keep their type.
+            const original = (field.enum ?? []).find((option) => String(option) === next)
+            onChange(original ?? next)
+          }}
         >
           <SelectTrigger id={inputId} className="w-full">
             <SelectValue placeholder="Select…" />

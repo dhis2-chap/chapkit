@@ -162,7 +162,10 @@ class DataFrame(BaseModel):
         preserving backward compatibility for consumers and stored artifacts.
         """
         dumped: dict[str, Any] = handler(self)
+        # The field appears under its name ("table_schema") or its alias ("schema")
+        # depending on by_alias; handle both so a null schema never leaks either way.
         schema_value = dumped.pop("table_schema", None)
+        schema_value = dumped.pop("schema", schema_value)
         if schema_value is not None:
             dumped["schema"] = schema_value
         return dumped

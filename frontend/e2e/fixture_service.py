@@ -1,7 +1,7 @@
 """Minimal self-contained chapkit ML service used as the Playwright e2e fixture."""
 
 import math
-from typing import Any
+from typing import Any, Literal
 
 from geojson_pydantic import FeatureCollection
 from pydantic import Field
@@ -21,6 +21,7 @@ class DemoConfig(BaseConfig):
     prediction_periods: int = Field(default=3, description="Periods to predict into the future")
     seasonal_amplitude: float = Field(default=0.4, description="Seasonal swing applied to predictions")
     region_seasonal: bool = Field(default=False, description="Include region-specific seasonal effects")
+    lead_time_months: Literal[1, 2, 3] = Field(default=1, description="Forecast lead time in months")
 
 
 class DemoRunner(BaseModelRunner[DemoConfig]):

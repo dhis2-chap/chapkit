@@ -25,6 +25,12 @@ class TestBackwardCompatibility:
         frame = DataFrame.model_validate({"columns": ["a"], "data": [[1]]})
         assert frame.table_schema is None
 
+    def test_by_alias_dump_omits_schema_when_absent(self) -> None:
+        """by_alias serialization (used by FastAPI responses) also omits a null schema."""
+        frame = DataFrame(columns=["a", "b"], data=[[1, 2.5]])
+        assert frame.model_dump(by_alias=True) == {"columns": ["a", "b"], "data": [[1, 2.5]]}
+        assert "schema" not in json.loads(frame.model_dump_json(by_alias=True))
+
 
 class TestWithSchema:
     """with_schema attaches a contract-derived self-describing schema."""
@@ -70,6 +76,11 @@ class TestWithSchema:
             "title": None,
             "description": None,
         }
+
+    def test_described_dump_by_alias_includes_schema(self) -> None:
+        """A described frame still emits the schema under by_alias serialization."""
+        described = DataFrame(columns=["x"], data=[[1]]).with_schema()
+        assert "schema" in described.model_dump(by_alias=True)
 
     def test_with_schema_round_trips_through_validation(self) -> None:
         """A described DataFrame can be re-parsed from its own dump via the alias."""
