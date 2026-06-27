@@ -36,11 +36,12 @@ export function useMetrics(
     if (!metricsPath || intervalMs == null) return
     let cancelled = false
     let timer = 0
+    let polls = 0
 
     const tick = async () => {
       // Skip work while the tab is hidden, but keep the loop alive.
       if (typeof document !== 'undefined' && document.hidden) {
-        schedule()
+        schedule(intervalMs)
         return
       }
       try {
@@ -64,11 +65,14 @@ export function useMetrics(
           setError(err instanceof Error ? err.message : String(err))
         }
       }
-      schedule()
+      polls += 1
+      // Take the second sample quickly so counter rates appear without waiting a
+      // full interval for a delta; then settle into the chosen interval.
+      schedule(polls < 2 ? Math.min(1000, intervalMs) : intervalMs)
     }
 
-    const schedule = () => {
-      if (!cancelled) timer = window.setTimeout(tick, intervalMs)
+    const schedule = (delay: number) => {
+      if (!cancelled) timer = window.setTimeout(tick, delay)
     }
 
     void tick()
