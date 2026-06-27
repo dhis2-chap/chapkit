@@ -68,7 +68,7 @@ function inferFieldType(values: unknown[]): FieldType {
 const DATAFRAME_SCHEMA_ID = 'urn:chapkit:dataframe:1'
 const DATAFRAME_TYPE = 'chapkit.dataframe'
 
-export function DataFrameTable({ frame }: { frame: DataFrameContent }) {
+export function DataFrameTable({ frame, fill = false }: { frame: DataFrameContent; fill?: boolean }) {
   const { columns, data } = frame
   const [query, setQuery] = useState('')
   const [sortCol, setSortCol] = useState<number | null>(null)
@@ -149,7 +149,7 @@ export function DataFrameTable({ frame }: { frame: DataFrameContent }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className={cn('space-y-3', fill && 'flex h-full min-h-0 flex-col gap-3 space-y-0')}>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[14rem] flex-1">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -191,7 +191,12 @@ export function DataFrameTable({ frame }: { frame: DataFrameContent }) {
           visible top and one always-visible scrollbar indicates h-scroll. Using a
           raw <table> avoids shadcn Table's inner overflow-x wrapper, which would
           otherwise become the sticky scroll context and hide the h-scrollbar. */}
-      <div className="show-scrollbars max-h-[32rem] overflow-auto rounded-md border">
+      <div
+        className={cn(
+          'show-scrollbars overflow-auto rounded-md border',
+          fill ? 'min-h-0 flex-1' : 'max-h-[32rem]',
+        )}
+      >
         <table className="w-full caption-bottom text-sm">
           <TableHeader className="sticky top-0 z-10 bg-muted">
             <TableRow>
@@ -237,7 +242,7 @@ export function DataFrameTable({ frame }: { frame: DataFrameContent }) {
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <span>Rows per page</span>
           <Select

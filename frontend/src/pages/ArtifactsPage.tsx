@@ -336,8 +336,8 @@ function ArtifactDetail({
   if (!data) return <EmptyState title="Artifact not found" />
 
   return (
-    <Card className="border-0 shadow-none">
-      <CardHeader>
+    <Card className="flex h-full flex-col border-0 shadow-none">
+      <CardHeader className="shrink-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <CardTitle className="font-mono text-base">{data.id}</CardTitle>
@@ -406,42 +406,42 @@ function ArtifactDetail({
           </div>
         ) : null}
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex min-h-0 flex-1 flex-col">
         {isDataFrame(data.data.content) ? (
-          <Tabs defaultValue="chart">
-            <TabsList>
+          <Tabs defaultValue="chart" className="flex min-h-0 flex-1 flex-col">
+            <TabsList className="shrink-0">
               <TabsTrigger value="chart">Chart</TabsTrigger>
               <TabsTrigger value="table">Table</TabsTrigger>
               <TabsTrigger value="metadata">Metadata</TabsTrigger>
               <TabsTrigger value="raw">Raw</TabsTrigger>
             </TabsList>
-            <TabsContent value="chart" className="pt-3">
+            <TabsContent value="chart" className="min-h-0 flex-1 overflow-auto pt-3">
               <DataFrameChart frame={data.data.content} />
             </TabsContent>
-            <TabsContent value="table" className="pt-3">
-              <DataFrameTable frame={data.data.content} />
+            <TabsContent value="table" className="min-h-0 flex-1 pt-3">
+              <DataFrameTable frame={data.data.content} fill />
             </TabsContent>
-            <TabsContent value="metadata" className="pt-3">
+            <TabsContent value="metadata" className="min-h-0 flex-1 overflow-auto pt-3">
               <MetadataTab artifact={data} />
             </TabsContent>
-            <TabsContent value="raw" className="pt-3">
+            <TabsContent value="raw" className="min-h-0 flex-1 overflow-auto pt-3">
               <JsonView value={data} />
             </TabsContent>
           </Tabs>
         ) : (
-          <Tabs defaultValue="metadata">
-            <TabsList>
+          <Tabs defaultValue="metadata" className="flex min-h-0 flex-1 flex-col">
+            <TabsList className="shrink-0">
               <TabsTrigger value="metadata">Metadata</TabsTrigger>
               <TabsTrigger value="content">Content</TabsTrigger>
               <TabsTrigger value="raw">Raw</TabsTrigger>
             </TabsList>
-            <TabsContent value="metadata" className="pt-3">
+            <TabsContent value="metadata" className="min-h-0 flex-1 overflow-auto pt-3">
               <MetadataTab artifact={data} />
             </TabsContent>
-            <TabsContent value="content" className="pt-3">
+            <TabsContent value="content" className="min-h-0 flex-1 overflow-auto pt-3">
               <ContentTab artifact={data} />
             </TabsContent>
-            <TabsContent value="raw" className="pt-3">
+            <TabsContent value="raw" className="min-h-0 flex-1 overflow-auto pt-3">
               <JsonView value={data} />
             </TabsContent>
           </Tabs>
