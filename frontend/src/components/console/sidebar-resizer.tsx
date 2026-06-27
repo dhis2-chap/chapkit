@@ -19,15 +19,18 @@ function clampWidth(width: number): number {
 export function SidebarResizer({
   width,
   onWidth,
+  onResizingChange,
 }: {
   width: number
   onWidth: (width: number) => void
+  onResizingChange?: (resizing: boolean) => void
 }) {
   const { state, isMobile } = useSidebar()
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       event.preventDefault()
+      onResizingChange?.(true)
       // The sidebar's left edge is the viewport edge, so the cursor x is the width.
       const move = (moveEvent: PointerEvent) => onWidth(clampWidth(moveEvent.clientX))
       const up = () => {
@@ -35,13 +38,14 @@ export function SidebarResizer({
         document.removeEventListener('pointerup', up)
         document.body.style.removeProperty('cursor')
         document.body.style.removeProperty('user-select')
+        onResizingChange?.(false)
       }
       document.body.style.cursor = 'col-resize'
       document.body.style.userSelect = 'none'
       document.addEventListener('pointermove', move)
       document.addEventListener('pointerup', up)
     },
-    [onWidth],
+    [onWidth, onResizingChange],
   )
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {

@@ -4,6 +4,7 @@ import { BookOpen, ExternalLink, TerminalSquare } from 'lucide-react'
 import { Outlet, Route, Routes } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { Separator } from '@/components/ui/separator'
@@ -26,7 +27,7 @@ import { JobsPage } from '@/pages/JobsPage'
 import { TrainPage } from '@/pages/TrainPage'
 import { PredictPage } from '@/pages/PredictPage'
 // Map view is temporarily disabled in the UI (kept in the codebase): see the
-// "Map real predictions" item in docs/guides/web-console-roadmap.md.
+// "Map real predictions" item in WEB_CONSOLE_ROADMAP.md.
 // import { MapPage } from '@/pages/MapPage'
 import { EndpointsPage } from '@/pages/EndpointsPage'
 import { SystemPage } from '@/pages/SystemPage'
@@ -83,15 +84,27 @@ function Shell() {
     window.localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth))
   }, [sidebarWidth])
 
+  // While dragging the resize handle, kill the sidebar's built-in width transition
+  // (meant for the collapse animation) so it tracks the cursor instead of lagging.
+  const [resizing, setResizing] = useState(false)
+
   return (
     <SidebarProvider
-      className="!h-svh flex-col [&_[data-slot=sidebar-container]]:!top-14 [&_[data-slot=sidebar-container]]:!h-[calc(100svh-3.5rem)] [&_[data-slot=sidebar-gap]]:!h-[calc(100svh-3.5rem)]"
+      className={cn(
+        '!h-svh flex-col [&_[data-slot=sidebar-container]]:!top-14 [&_[data-slot=sidebar-container]]:!h-[calc(100svh-3.5rem)] [&_[data-slot=sidebar-gap]]:!h-[calc(100svh-3.5rem)]',
+        resizing &&
+          '[&_[data-slot=sidebar-container]]:!transition-none [&_[data-slot=sidebar-gap]]:!transition-none',
+      )}
       style={{ '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}
     >
       <TopNav />
       <div className="flex min-h-0 w-full flex-1">
         <AppSidebar />
-        <SidebarResizer width={sidebarWidth} onWidth={setSidebarWidth} />
+        <SidebarResizer
+          width={sidebarWidth}
+          onWidth={setSidebarWidth}
+          onResizingChange={setResizing}
+        />
         <SidebarInset className="min-h-0 overflow-hidden">
           <Outlet />
         </SidebarInset>
