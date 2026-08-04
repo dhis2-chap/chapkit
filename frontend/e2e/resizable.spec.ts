@@ -20,14 +20,15 @@ test('configs master/detail is drag/keyboard resizable and persists the split', 
   const after = Number(await handle.getAttribute('aria-valuenow'))
   expect(after).toBeLessThan(before)
 
-  // The chosen split is saved (autoSaveId, debounced) and restored after a reload.
+  // The chosen split is saved (useDefaultLayout, debounced) and restored after a
+  // reload. v4 stores a { panelId: flexGrow } map under the same storage key.
   await expect
     .poll(() =>
       page.evaluate(() =>
         localStorage.getItem('react-resizable-panels:console:configs-split'),
       ),
     )
-    .toContain('"layout"')
+    .toContain('"master"')
   await page.reload()
   const reloaded = page.locator('[data-slot="resizable-handle"]')
   await expect(reloaded).toBeVisible()

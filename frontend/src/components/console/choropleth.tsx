@@ -1,7 +1,8 @@
 // MapLibre choropleth: the service's GeoJSON regions over an OpenFreeMap basemap
 // (matching dhis2/open-climate-service), colored by a per-location value.
 import { useEffect, useRef } from 'react'
-import maplibregl from 'maplibre-gl'
+// maplibre-gl 6 is ESM-only with named exports; there is no default export.
+import * as maplibregl from 'maplibre-gl'
 import type { ExpressionSpecification, GeoJSONSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
