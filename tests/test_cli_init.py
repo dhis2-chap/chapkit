@@ -105,3 +105,52 @@ def test_init_pyproject_pins_chapkit_with_floor_and_ceiling(tmp_path: Path) -> N
     assert int(match.group(4)) == int(match.group(1)) + 1
     assert "dev" not in match.group(0)
     assert "rc" not in match.group(0)
+
+
+@pytest.mark.parametrize("template", ["fn-py", "shell-py", "shell-r"])
+def test_init_readme_curl_examples_match_request_schemas(tmp_path: Path, template: str) -> None:
+    """The scaffolded README documents $train/$predict payloads that the ML schemas accept."""
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["init", f"demo-{template}", "--template", template, "--path", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+
+    readme = (tmp_path / f"demo-{template}" / "README.md").read_text()
+
+    # PredictRequest takes artifact_id, historic and future - not the old model_id shape.
+    assert "model_id" not in readme
+    assert '"artifact_id": "YOUR_TRAIN_ARTIFACT_ID"' in readme
+    assert '"historic": {' in readme
+    assert '"future": {' in readme
+
+    # DataFrame payloads are {columns: [...], data: [[...]]}, not column-keyed objects.
+    assert '"columns": ["time_period", "location", "rainfall", "mean_temperature", "disease_cases"]' in readme
+    assert '"config_id": "YOUR_CONFIG_ID"' in readme
+
+    # Both operations are asynchronous, so the README has to show polling the job.
+    assert "/api/v1/jobs/YOUR_TRAIN_JOB_ID" in readme
+    assert "/api/v1/jobs/YOUR_PREDICT_JOB_ID" in readme
+    assert "/api/v1/artifacts/YOUR_PREDICT_ARTIFACT_ID" in readme
+
+
+def test_init_r_readme_documents_local_yaml_package(tmp_path: Path) -> None:
+    """The R scaffold tells the user to install the R yaml package for local runs."""
+    runner = CliRunner()
+    result = runner.invoke(app, ["init", "demo-r", "--template", "shell-r", "--path", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+
+    readme = (tmp_path / "demo-r" / "README.md").read_text()
+    assert "Rscript -e 'install.packages(\"yaml\")'" in readme
+
+
+def test_init_dockerfile_documents_where_uvicorn_comes_from(tmp_path: Path) -> None:
+    """The Dockerfile comment credits fastapi[standard] rather than the base image for uvicorn."""
+    runner = CliRunner()
+    result = runner.invoke(app, ["init", "demo-py", "--template", "fn-py", "--path", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+
+    dockerfile = (tmp_path / "demo-py" / "Dockerfile").read_text()
+    assert "fastapi[standard]" in dockerfile
+    assert "uvicorn etc. ship with" not in dockerfile
