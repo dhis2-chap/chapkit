@@ -100,8 +100,7 @@ def test_valid_ml_service_builds_successfully() -> None:
 
 async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
     """Test that ML operations require ChapkitScheduler, not just any scheduler."""
-    from servicekit import InMemoryScheduler
-    from servicekit.api.dependencies import set_scheduler
+    from servicekit import InMemoryScheduler, SqliteDatabaseBuilder
 
     builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     hierarchy = ArtifactHierarchy(name="test")
@@ -113,13 +112,13 @@ async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
     # Get the ML manager dependency function
     ml_dependency = builder._build_ml_dependency()
 
-    # Override the scheduler with a non-ChapkitScheduler (use plain InMemoryScheduler)
+    # Resolve the dependency with a non-ChapkitScheduler (use plain InMemoryScheduler)
     wrong_scheduler = InMemoryScheduler()
-    set_scheduler(wrong_scheduler)
+    database = SqliteDatabaseBuilder.in_memory().build()
 
     # Try to get ML manager - should fail because scheduler is wrong type
     with pytest.raises(RuntimeError, match="Scheduler must be ChapkitScheduler"):
-        await ml_dependency()
+        await ml_dependency(scheduler_base=wrong_scheduler, database=database)
 
 
 def test_get_alembic_dir_returns_valid_path() -> None:

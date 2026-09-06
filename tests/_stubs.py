@@ -54,6 +54,9 @@ class ConfigManagerStub(Manager[ConfigIn[ConfigDataT], ConfigOut[ConfigDataT], U
     async def find_by_name(self, name: str) -> ConfigOut[ConfigDataT] | None:
         return self._items_by_name.get(name)
 
+    async def create(self, data: ConfigIn[ConfigDataT]) -> ConfigOut[ConfigDataT]:
+        raise NotImplementedError
+
     async def save(self, data: ConfigIn[ConfigDataT]) -> ConfigOut[ConfigDataT]:
         raise NotImplementedError
 
@@ -112,6 +115,9 @@ class ArtifactManagerStub(Manager[ArtifactIn, ArtifactOut, ULID]):
 
     async def build_tree(self, id: ULID) -> ArtifactTreeNode | None:
         return self._trees.get(id)
+
+    async def create(self, data: ArtifactIn) -> ArtifactOut:
+        raise NotImplementedError
 
     async def save(self, data: ArtifactIn) -> ArtifactOut:
         raise NotImplementedError
