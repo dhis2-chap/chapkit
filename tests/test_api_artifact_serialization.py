@@ -6,7 +6,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from servicekit import SqliteDatabaseBuilder
-from servicekit.api.dependencies import get_session, set_database
+from servicekit.api.dependencies import get_session
 from servicekit.api.middleware import add_error_handlers
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +38,7 @@ class TestArtifactAPIWithNonSerializableData:
         app = FastAPI()
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app.state.database = db
 
         try:
             # Create router
@@ -89,7 +89,7 @@ class TestArtifactAPIWithNonSerializableData:
         app = FastAPI()
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app.state.database = db
 
         try:
             # Create router
@@ -147,7 +147,7 @@ class TestArtifactAPIWithNonSerializableData:
         app = FastAPI()
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app.state.database = db
 
         try:
             # Create router
@@ -226,9 +226,9 @@ class TestArtifactContentProjection:
         """The list endpoint omits content but keeps type, metadata, content_type and content_size."""
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app = _make_artifact_app()
+        app.state.database = db
         try:
-            app = _make_artifact_app()
             async with db.session() as session:
                 manager = ArtifactManager(ArtifactRepository(session))
                 await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
@@ -252,9 +252,9 @@ class TestArtifactContentProjection:
         """The paginated list omits content from every item."""
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app = _make_artifact_app()
+        app.state.database = db
         try:
-            app = _make_artifact_app()
             async with db.session() as session:
                 manager = ArtifactManager(ArtifactRepository(session))
                 for _ in range(3):
@@ -275,9 +275,9 @@ class TestArtifactContentProjection:
         """The $tree and $expand endpoints omit content at every level."""
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app = _make_artifact_app()
+        app.state.database = db
         try:
-            app = _make_artifact_app()
             async with db.session() as session:
                 manager = ArtifactManager(ArtifactRepository(session))
                 root = await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
@@ -301,9 +301,9 @@ class TestArtifactContentProjection:
         """The single-artifact GET still returns the full content."""
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app = _make_artifact_app()
+        app.state.database = db
         try:
-            app = _make_artifact_app()
             async with db.session() as session:
                 manager = ArtifactManager(ArtifactRepository(session))
                 saved = await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))
@@ -320,9 +320,9 @@ class TestArtifactContentProjection:
         """The $download endpoint still serves the content as a file."""
         db = SqliteDatabaseBuilder.in_memory().build()
         await db.init()
-        set_database(db)
+        app = _make_artifact_app()
+        app.state.database = db
         try:
-            app = _make_artifact_app()
             async with db.session() as session:
                 manager = ArtifactManager(ArtifactRepository(session))
                 saved = await manager.save(ArtifactIn(data=dict(CONTENT_ARTIFACT_DATA)))

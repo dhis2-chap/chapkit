@@ -100,8 +100,7 @@ def test_valid_ml_service_builds_successfully() -> None:
 
 async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
     """Test that ML operations require ChapkitScheduler, not just any scheduler."""
-    from servicekit import InMemoryScheduler
-    from servicekit.api.dependencies import set_scheduler
+    from servicekit import InMemoryScheduler, SqliteDatabaseBuilder
 
     builder = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
     hierarchy = ArtifactHierarchy(name="test")
@@ -113,13 +112,13 @@ async def test_ml_with_wrong_scheduler_type_raises_error() -> None:
     # Get the ML manager dependency function
     ml_dependency = builder._build_ml_dependency()
 
-    # Override the scheduler with a non-ChapkitScheduler (use plain InMemoryScheduler)
+    # Resolve the dependency with a non-ChapkitScheduler (use plain InMemoryScheduler)
     wrong_scheduler = InMemoryScheduler()
-    set_scheduler(wrong_scheduler)
+    database = SqliteDatabaseBuilder.in_memory().build()
 
     # Try to get ML manager - should fail because scheduler is wrong type
     with pytest.raises(RuntimeError, match="Scheduler must be ChapkitScheduler"):
-        await ml_dependency()
+        await ml_dependency(scheduler_base=wrong_scheduler, database=database)
 
 
 def test_get_alembic_dir_returns_valid_path() -> None:
@@ -167,3 +166,19 @@ def test_ml_service_builder_with_memory_database() -> None:
     ).build()
 
     assert app is not None
+
+
+async def test_ml_dependency_requires_runner_and_config_schema() -> None:
+    """The ML dependency refuses to build a manager when the builder was not fully configured."""
+    from servicekit import InMemoryScheduler, SqliteDatabaseBuilder
+
+    database = SqliteDatabaseBuilder.in_memory().build()
+    scheduler = InMemoryScheduler()
+
+    without_runner = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
+    with pytest.raises(RuntimeError, match="ML runner not configured"):
+        await without_runner._build_ml_dependency()(scheduler_base=scheduler, database=database)
+
+    without_config = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test")).with_ml(runner=DummyRunner())
+    with pytest.raises(RuntimeError, match="Config schema not configured"):
+        await without_config._build_ml_dependency()(scheduler_base=scheduler, database=database)

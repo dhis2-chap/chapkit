@@ -48,14 +48,15 @@ const STATUS_OPTIONS: JobStatus[] = [
   'running',
   'completed',
   'failed',
+  'canceling',
   'canceled',
 ]
 
 const TERMINAL_STATES = new Set<JobStatus>(['completed', 'failed', 'canceled'])
-const ACTIVE_STATES = new Set<JobStatus>(['pending', 'running'])
+const ACTIVE_STATES = new Set<JobStatus>(['pending', 'running', 'canceling'])
 
 // Order status groups active-first when grouping the list.
-const STATUS_ORDER: JobStatus[] = ['running', 'pending', 'completed', 'failed', 'canceled']
+const STATUS_ORDER: JobStatus[] = ['running', 'pending', 'canceling', 'completed', 'failed', 'canceled']
 
 // Total table columns (checkbox + 6 data + actions), used for full-width group rows.
 const COLUMN_COUNT = 8

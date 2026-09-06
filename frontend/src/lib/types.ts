@@ -119,6 +119,7 @@ export type JobStatus =
   | 'running'
   | 'completed'
   | 'failed'
+  | 'canceling'
   | 'canceled'
   | string
 

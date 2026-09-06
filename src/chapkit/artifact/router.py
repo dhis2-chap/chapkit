@@ -1,10 +1,11 @@
 """Artifact CRUD router with hierarchical tree operations."""
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Annotated, Any, cast
 
-from fastapi import Depends, HTTPException, Response, status
+from fastapi import Depends, HTTPException, Query, Response, status
 from servicekit.api.crud import CrudPermissions, CrudRouter
+from servicekit.api.pagination import PaginationParams, create_paginated_response
 from servicekit.schemas import PaginatedResponse
 
 from ..config.schemas import BaseConfig, ConfigOut
@@ -53,13 +54,13 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
 
         @self.router.get("", response_model=collection_response_model)
         async def find_all(
-            page: int | None = None,
-            size: int | None = None,
+            pagination: Annotated[PaginationParams, Query()],
             manager: ArtifactManager = manager_dependency,
         ) -> list[ArtifactSummaryOut] | PaginatedResponse[ArtifactSummaryOut]:
-            from servicekit.api.pagination import create_paginated_response
-
-            if page is not None and size is not None:
+            """List artifact summaries; pagination is opt-in and requires both page (>= 1) and size (1-100)."""
+            if pagination.is_paginated():
+                page = cast(int, pagination.page)
+                size = cast(int, pagination.size)
                 items, total = await manager.find_paginated(page, size)
                 summaries = [ArtifactSummaryOut.from_artifact(item) for item in items]
                 return create_paginated_response(summaries, total, page, size)

@@ -175,11 +175,11 @@ async def test_add_job_duplicate_id_raises_runtime_error() -> None:
         scheduler._tasks[duplicate_id] = asyncio.create_task(asyncio.sleep(10))
 
     # Try to add a new job with the same ID - this requires monkey-patching ULID generation
-    import chapkit.scheduler
+    import servicekit.scheduler
 
-    old_ulid = chapkit.scheduler.ULID
+    old_ulid = servicekit.scheduler.ULID
     try:
-        chapkit.scheduler.ULID = lambda: duplicate_id  # type: ignore[assignment,misc]
+        servicekit.scheduler.ULID = lambda: duplicate_id  # type: ignore[assignment,misc]
 
         async def dummy() -> None:
             pass
@@ -188,7 +188,7 @@ async def test_add_job_duplicate_id_raises_runtime_error() -> None:
         with pytest.raises(RuntimeError, match=re.escape(f"Job {duplicate_id!r} already scheduled")):
             await scheduler.add_job(dummy)
     finally:
-        chapkit.scheduler.ULID = old_ulid
+        servicekit.scheduler.ULID = old_ulid
         # Clean up the task we created
         async with scheduler._lock:
             if duplicate_id in scheduler._tasks:

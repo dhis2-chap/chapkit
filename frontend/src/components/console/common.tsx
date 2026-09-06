@@ -48,6 +48,7 @@ const JOB_VARIANTS: Record<string, string> = {
   running: 'bg-blue-500/15 text-blue-700 dark:text-blue-400',
   pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   failed: 'bg-destructive/15 text-destructive',
+  canceling: 'bg-muted text-muted-foreground',
   canceled: 'bg-muted text-muted-foreground',
 }
 
