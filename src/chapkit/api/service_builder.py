@@ -10,10 +10,11 @@ from typing import Any, Callable, Coroutine, Self
 
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel, EmailStr, Field, HttpUrl
-from servicekit import SqliteDatabaseBuilder
+from servicekit import Database, SqliteDatabaseBuilder
 from servicekit.api.crud import CrudPermissions
-from servicekit.api.dependencies import get_database, get_scheduler, get_session, set_scheduler
-from servicekit.api.service_builder import BaseServiceBuilder, LifespanFactory, ServiceInfo
+from servicekit.api.dependencies import get_database, get_scheduler, get_session
+from servicekit.api.service_builder import BaseServiceBuilder, LifespanFactory, ServiceInfo, _JobOptions
+from servicekit.scheduler import Scheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from chapkit import get_alembic_dir
@@ -332,19 +333,19 @@ class ServiceBuilder(BaseServiceBuilder):
             min_periods = self.info.min_prediction_periods
             max_periods = self.info.max_prediction_periods
 
-        async def _dependency() -> MLManager:
+        async def _dependency(
+            scheduler_base: Scheduler = Depends(get_scheduler),
+            database: Database = Depends(get_database),
+        ) -> MLManager:
             if ml_runner is None:
                 raise RuntimeError("ML runner not configured")
             if config_schema is None:
                 raise RuntimeError("Config schema not configured")
 
             runner: ModelRunnerProtocol = ml_runner
-            scheduler_base = get_scheduler()
-            # ChapkitScheduler extends AIOJobScheduler which extends JobScheduler
             if not isinstance(scheduler_base, ChapkitScheduler):
                 raise RuntimeError("Scheduler must be ChapkitScheduler for ML operations")
             scheduler: ChapkitScheduler = scheduler_base
-            database = get_database()
             return MLManager(
                 runner,
                 scheduler,
@@ -356,34 +357,27 @@ class ServiceBuilder(BaseServiceBuilder):
 
         return _dependency
 
+    def _create_scheduler(self, job_options: _JobOptions) -> Scheduler:
+        """Create the artifact-tracking scheduler used by chapkit services."""
+        # Default to max_concurrency=1 to avoid SQLite write lock issues
+        max_concurrency = job_options.max_concurrency if job_options.max_concurrency is not None else 1
+        return InMemoryChapkitScheduler(max_concurrency=max_concurrency)
+
     def _build_lifespan(self) -> LifespanFactory:
-        """Build lifespan context manager with InMemoryChapkitScheduler."""
-        # Get parent lifespan factory
+        """Build the base lifespan and dispose a caller-injected database once it has finished."""
         parent_lifespan = super()._build_lifespan()
-        # Capture database instance for cleanup (since we inject it, parent won't dispose)
+        # The base lifespan only disposes databases it created itself, so chapkit disposes the injected one.
         database_instance = self._database_instance
 
         @asynccontextmanager
         async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-            """Override scheduler creation to use InMemoryChapkitScheduler."""
-            # Call parent lifespan which handles database and most setup
-            async with parent_lifespan(app):
-                # Use InMemoryChapkitScheduler if jobs are enabled
-                if self._job_options is not None:
-                    # Default to max_concurrency=1 to avoid SQLite write lock issues
-                    max_concurrency = (
-                        self._job_options.max_concurrency if self._job_options.max_concurrency is not None else 1
-                    )
-                    scheduler = InMemoryChapkitScheduler(max_concurrency=max_concurrency)
-                    set_scheduler(scheduler)
-                    app.state.scheduler = scheduler
-
-                try:
+            """Run the base lifespan, then dispose the injected database."""
+            try:
+                async with parent_lifespan(app):
                     yield
-                finally:
-                    # Dispose injected database (parent won't since should_manage_lifecycle=False)
-                    if database_instance is not None:
-                        await database_instance.dispose()
+            finally:
+                if database_instance is not None:
+                    await database_instance.dispose()
 
         return lifespan
 
