@@ -4,7 +4,7 @@ version = "0.1.0"
 description = {{ PROJECT_DESCRIPTION | tojson }}
 requires-python = ">=3.13"
 dependencies = [
-    {{ ("chapkit>=" ~ CHAPKIT_VERSION) | tojson }},
+    {{ CHAPKIT_REQUIREMENT | tojson }},
 {% for dep in USER_DEPENDENCIES %}
     {{ dep | tojson }},
 {% endfor %}

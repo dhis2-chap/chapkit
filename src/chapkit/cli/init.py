@@ -9,6 +9,8 @@ from typing import Annotated
 import typer
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from .requirements import chapkit_requirement
+
 
 def _get_chapkit_version() -> str:
     """Get chapkit version from package metadata."""
@@ -16,6 +18,11 @@ def _get_chapkit_version() -> str:
         return get_version("chapkit")
     except Exception:
         return "unknown"
+
+
+def _get_chapkit_requirement() -> str:
+    """Build the bounded chapkit requirement rendered into the generated pyproject."""
+    return chapkit_requirement(_get_chapkit_version())
 
 
 def _slugify(text: str) -> str:
@@ -133,7 +140,7 @@ def init_command(
         "PROJECT_DESCRIPTION": f"ML service for {project_name}",
         "WITH_VALIDATION": with_validation,
         "TEMPLATE": template,
-        "CHAPKIT_VERSION": _get_chapkit_version(),
+        "CHAPKIT_REQUIREMENT": _get_chapkit_requirement(),
     }
 
     typer.echo("Generating project files...")

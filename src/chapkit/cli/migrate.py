@@ -30,6 +30,7 @@ from chapkit.cli.mlproject import (
     slugify,
     translate_to_runner_template,
 )
+from chapkit.cli.requirements import chapkit_requirement
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates" / "migrate"
 _SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -1016,7 +1017,7 @@ def _run(
         "USER_DEPENDENCIES": user_deps,
         "USER_INDEX_OPTIONS": user_index_options,
         **uv_pyproject_options,
-        "CHAPKIT_VERSION": _get_chapkit_version(),
+        "CHAPKIT_REQUIREMENT": _get_chapkit_requirement(),
         **build_service_info_context(mlproject),
     }
 
@@ -1096,14 +1097,16 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
     return rendered
 
 
-#: Floor for the `chapkit>=...` dep that migrate emits into the generated
+#: Floor for the `chapkit>=...,<N` dep that migrate emits into the generated
 #: pyproject.toml. This is the minimum chapkit release that has the runtime
 #: bits the generated main.py and Dockerfile CMD depend on. It's explicitly
 #: NOT the running chapkit's own version, because that could be a `.devN`
 #: not-yet-published release and would leave the migrated project with an
-#: uninstallable dep.
-_MIN_CHAPKIT_VERSION = "0.23.0"
+#: uninstallable dep. The ceiling comes from the same helper `chapkit init`
+#: uses, so the two scaffolding paths cannot drift apart.
+_MIN_CHAPKIT_VERSION = "1.1.0"
 
 
-def _get_chapkit_version() -> str:
-    return _MIN_CHAPKIT_VERSION
+def _get_chapkit_requirement() -> str:
+    """Build the bounded chapkit requirement rendered into the migrated pyproject."""
+    return chapkit_requirement(_MIN_CHAPKIT_VERSION)

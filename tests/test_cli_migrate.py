@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import tomllib
 from pathlib import Path
 
@@ -1257,6 +1258,7 @@ dependencies = [
     generated = (tmp_path / "pyproject.toml").read_text()
     assert "user-model" not in generated
     assert "chapkit>=" in generated
+    assert _chapkit_requirement_from(generated) is not None
     assert "pandas>=2.0" in generated
     assert "scikit-learn>=1.3" in generated
     assert '"numpy"' in generated
@@ -1387,3 +1389,33 @@ def test_unknown_param_interactive_prompt(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     source = (tmp_path / "main.py").read_text()
     assert "python train.py data.csv" in source
+
+
+def _chapkit_requirement_from(pyproject: str) -> re.Match[str] | None:
+    """Find a bounded chapkit requirement (floor plus next-major ceiling) in a rendered pyproject."""
+    return re.search(r'"chapkit>=(\d+)\.(\d+)\.(\d+),<(\d+)"', pyproject)
+
+
+def test_migrate_pyproject_pins_chapkit_with_floor_and_ceiling(tmp_path: Path) -> None:
+    """`chapkit mlproject migrate` emits a bounded chapkit requirement without a dev suffix."""
+    _seed_project(tmp_path, PYTHON_MLPROJECT, {"train.py": "...", "predict.py": "..."})
+    runner = CliRunner()
+    result = runner.invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    generated = (tmp_path / "pyproject.toml").read_text()
+    match = _chapkit_requirement_from(generated)
+    assert match is not None, generated
+    assert int(match.group(4)) == int(match.group(1)) + 1
+    assert "dev" not in match.group(0)
+    assert "rc" not in match.group(0)
+
+
+def test_chapkit_requirement_helper_handles_dev_and_unknown_versions() -> None:
+    """The shared helper strips pre-release suffixes and degrades gracefully."""
+    from chapkit.cli.requirements import chapkit_requirement
+
+    assert chapkit_requirement("1.2.0.dev0") == "chapkit>=1.2.0,<2"
+    assert chapkit_requirement("2.0.0rc1") == "chapkit>=2.0.0,<3"
+    assert chapkit_requirement("1.1.0") == "chapkit>=1.1.0,<2"
+    assert chapkit_requirement("unknown") == "chapkit"

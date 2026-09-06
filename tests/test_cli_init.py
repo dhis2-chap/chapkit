@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -90,3 +91,17 @@ def test_init_rejects_unknown_template(tmp_path: Path) -> None:
     assert result.exit_code != 0
     assert "shell-r-tidyverse" in result.output
     assert "shell-r-inla" in result.output
+
+
+def test_init_pyproject_pins_chapkit_with_floor_and_ceiling(tmp_path: Path) -> None:
+    """`chapkit init` emits a bounded chapkit requirement without a dev suffix."""
+    runner = CliRunner()
+    result = runner.invoke(app, ["init", "demo-pin", "--template", "fn-py", "--path", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+
+    pyproject = (tmp_path / "demo-pin" / "pyproject.toml").read_text()
+    match = re.search(r'"chapkit>=(\d+)\.(\d+)\.(\d+),<(\d+)"', pyproject)
+    assert match is not None, pyproject
+    assert int(match.group(4)) == int(match.group(1)) + 1
+    assert "dev" not in match.group(0)
+    assert "rc" not in match.group(0)

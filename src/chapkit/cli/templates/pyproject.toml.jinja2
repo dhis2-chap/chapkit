@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "{{ PROJECT_DESCRIPTION }}"
 requires-python = ">=3.13"
 dependencies = [
-    "chapkit>={{ CHAPKIT_VERSION }}",
+    "{{ CHAPKIT_REQUIREMENT }}",
 {% if TEMPLATE in ("shell-r", "shell-r-tidyverse", "shell-r-inla") %}
     # Data handling lives in the R scripts (scripts/train.R, scripts/predict.R) -
     # add Python deps here only if your service-side code (validation hooks,

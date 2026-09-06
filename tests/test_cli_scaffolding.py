@@ -30,6 +30,15 @@ pytestmark = pytest.mark.slow
 CI_ENV = os.getenv("CI", "").lower() in {"1", "true", "yes"}
 
 
+def _assert_bounded_chapkit_requirement(pyproject: str) -> None:
+    """Assert the scaffolded pyproject pins chapkit with a floor and a next-major ceiling."""
+    match = re.search(r'"chapkit>=(\d+)\.(\d+)\.(\d+),<(\d+)"', pyproject)
+    assert match is not None, pyproject
+    assert int(match.group(4)) == int(match.group(1)) + 1
+    assert "dev" not in match.group(0)
+    assert "rc" not in match.group(0)
+
+
 def find_free_port() -> int:
     """Find a free port on localhost."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -77,6 +86,8 @@ def scaffold_project(tmp_path: Path, chapkit_root: Path) -> Callable[..., Path]:
         # Patch pyproject.toml to use local chapkit
         pyproject = project_dir / "pyproject.toml"
         content = pyproject.read_text()
+
+        _assert_bounded_chapkit_requirement(content)
 
         # Replace the chapkit dependency with a path-based dependency
         local_path = chapkit_root.absolute()
@@ -680,8 +691,15 @@ def test_scaffold_config_artifact_linkage(
 
 #: Latest chapkit release on PyPI. The Docker-build tests pin against this so
 #: the lockfile + container build can resolve from PyPI - the dev-version
-#: scaffolded into pyproject.toml (e.g. 0.22.0.dev0) isn't published yet.
-_LATEST_PUBLISHED_CHAPKIT = "0.22.0"
+#: scaffolded into pyproject.toml (e.g. 1.2.0.dev0) isn't published yet.
+_LATEST_PUBLISHED_CHAPKIT = "1.1.0"
+
+#: Every chapkit release up to 1.1.0 requires `servicekit>=...` with no upper
+#: bound, so a container built today would pull servicekit 2.x into a chapkit
+#: that predates it. The Docker-build tests therefore add the ceiling the
+#: published metadata lacks; drop this once a chapkit release carrying
+#: `servicekit>=2.0.0,<3` is on PyPI.
+_PUBLISHED_CHAPKIT_SERVICEKIT_CEILING = '"servicekit<2"'
 
 
 @pytest.fixture
@@ -718,9 +736,10 @@ def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[st
 
         pyproject = project_dir / "pyproject.toml"
         content = pyproject.read_text()
+        _assert_bounded_chapkit_requirement(content)
         content = re.sub(
             r'"chapkit>=[^"]+"',
-            f'"chapkit>={_LATEST_PUBLISHED_CHAPKIT}"',
+            f'"chapkit>={_LATEST_PUBLISHED_CHAPKIT}",\n    {_PUBLISHED_CHAPKIT_SERVICEKIT_CEILING}',
             content,
         )
         pyproject.write_text(content)
