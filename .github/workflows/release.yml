@@ -76,12 +76,36 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Create release with auto-generated notes
+      # Release notes come from the annotated tag message: the subject line is
+      # ignored (the release title is the tag name) and the body becomes the
+      # notes, followed by GitHub's generated list of merged pull requests.
+      # Write the tag with a real body, for example:
+      #
+      #   git tag -a v1.2.0 -F notes.md
+      #
+      # where notes.md starts with a one-line subject, a blank line, and then
+      # the prose describing what changed, why, and how to upgrade. A tag with
+      # no body still releases, with only the generated list, and a warning is
+      # emitted so the notes get edited afterwards.
+      - name: Assemble release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch --no-tags --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          tag_body="$(git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
+          generated="$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$GITHUB_REF_NAME" --jq .body)"
+          if [ -n "$tag_body" ]; then
+            printf '%s\n\n%s\n' "$tag_body" "$generated" > release-notes.md
+          else
+            echo "::warning::Tag $GITHUB_REF_NAME has no annotation body; release notes contain only the generated pull request list. Edit them with 'gh release edit $GITHUB_REF_NAME --notes-file ...'."
+            printf '%s\n' "$generated" > release-notes.md
+          fi
+      - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
-            --generate-notes \
+            --notes-file release-notes.md \
             --verify-tag \
             dist/*.whl dist/*.tar.gz
