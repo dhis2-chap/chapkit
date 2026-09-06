@@ -46,6 +46,34 @@ type ValidatePredictFunction[ConfigT] = Callable[
 logger = get_logger(__name__)
 
 
+# Number of trailing stderr lines embedded in a ModelRunFailedError message.
+STDERR_TAIL_LINES = 5
+
+
+def format_stderr_tail(stderr: str, tail_lines: int = STDERR_TAIL_LINES) -> str:
+    """Return the last few non-empty stderr lines joined for a single-line error message."""
+    lines = [line for line in stderr.strip().splitlines() if line.strip()]
+    if not lines:
+        return "<no stderr output>"
+    return " | ".join(lines[-tail_lines:])
+
+
+class ModelRunFailedError(RuntimeError):
+    """Raised when a shell script exits non-zero, after its diagnostic artifact has been stored."""
+
+    def __init__(self, phase: Literal["train", "predict"], exit_code: int, artifact_id: Any, stderr: str) -> None:
+        """Build a readable failure message carrying phase, exit code, artifact id and stderr tail."""
+        self.phase = phase
+        self.exit_code = exit_code
+        self.artifact_id = str(artifact_id)
+        self.stderr = stderr
+        super().__init__(
+            f"{phase} script failed with exit code {exit_code}; "
+            f"diagnostic artifact {self.artifact_id} holds the workspace, stdout and stderr; "
+            f"stderr tail: {format_stderr_tail(stderr)}"
+        )
+
+
 def get_temp_dir() -> str | None:
     """Get temp directory from CHAPKIT_TEMP_DIR or use system default."""
     return os.getenv("CHAPKIT_TEMP_DIR")
@@ -77,10 +105,19 @@ WORKSPACE_EXCLUDE_PATTERNS = (
     "dist",
     "*.so",
     "*.dylib",
-    # Databases
+    # Databases (including SQLite sidecar files: WAL, shared-memory, rollback journal)
     "*.db",
+    "*.db-wal",
+    "*.db-shm",
+    "*.db-journal",
     "*.sqlite",
+    "*.sqlite-wal",
+    "*.sqlite-shm",
+    "*.sqlite-journal",
     "*.sqlite3",
+    "*.sqlite3-wal",
+    "*.sqlite3-shm",
+    "*.sqlite3-journal",
 )
 
 
@@ -764,16 +801,21 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             else:
                 logger.info("predict_script_completed", stdout=stdout, stderr=stderr)
 
-            # Load predictions from file
-            if not output_file.exists():
-                raise RuntimeError(f"Prediction script did not create output file at {output_file}")
-
-            predictions = DataFrame.from_csv(output_file)
+            # Load predictions from file. A failed script is reported by the manager once the
+            # diagnostic workspace artifact has been stored, so a missing output file is only an
+            # error when the script claimed success.
+            predictions: DataFrame | None
+            if exit_code == 0:
+                if not output_file.exists():
+                    raise RuntimeError(f"Prediction script did not create output file at {output_file}")
+                predictions = DataFrame.from_csv(output_file)
+            else:
+                predictions = DataFrame.from_csv(output_file) if output_file.exists() else None
 
             # Return workspace directory for artifact storage (like on_train)
             # Workspace preserved for both success and failure (manager will store artifact)
             return {
-                "content": predictions,  # DataFrame loaded from predictions.csv
+                "content": predictions,  # DataFrame loaded from predictions.csv (None if the script failed)
                 "workspace_dir": str(temp_dir),
                 "exit_code": exit_code,
                 "stdout": stdout,

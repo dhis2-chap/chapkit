@@ -19,7 +19,7 @@ from chapkit.config import ConfigManager, ConfigRepository
 from chapkit.config.schemas import BaseConfig
 from chapkit.scheduler import ChapkitScheduler
 
-from .runner import get_temp_dir
+from .runner import ModelRunFailedError, get_temp_dir
 from .schemas import (
     ModelRunnerProtocol,
     PredictRequest,
@@ -34,6 +34,20 @@ from .schemas import (
 )
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
+
+
+def _exit_code_of(runner_result: Any) -> int:
+    """Return the shell exit code carried by a runner result, treating non-shell results as success."""
+    if isinstance(runner_result, dict):
+        return int(runner_result.get("exit_code", 0) or 0)
+    return 0
+
+
+def _stderr_of(runner_result: Any) -> str:
+    """Return the stderr captured by a runner result, or an empty string for non-shell results."""
+    if isinstance(runner_result, dict):
+        return str(runner_result.get("stderr", "") or "")
+    return ""
 
 
 def _has_error(diagnostics: list[ValidationDiagnostic]) -> bool:
@@ -452,6 +466,13 @@ class MLManager(Generic[ConfigT]):
             if workspace_dir and workspace_dir.exists():
                 shutil.rmtree(workspace_dir, ignore_errors=True)
 
+        # Fail the job when the training script exited non-zero. The diagnostic artifact above is
+        # already persisted; the scheduler never calls _on_job_result on the failure path, so the
+        # artifact id is carried in the error message instead of ChapkitJobRecord.artifact_id.
+        exit_code = _exit_code_of(training_result)
+        if exit_code != 0:
+            raise ModelRunFailedError("train", exit_code, artifact_id, _stderr_of(training_result))
+
         return artifact_id
 
     async def _predict_task(self, request: PredictRequest, artifact_id: ULID) -> ULID:
@@ -553,6 +574,40 @@ class MLManager(Generic[ConfigT]):
             )
             prediction_completed_at = datetime.datetime.now(datetime.UTC)
             prediction_duration = (prediction_completed_at - prediction_started_at).total_seconds()
+
+            # A non-zero exit code means the predict script failed. Persist the diagnostic workspace
+            # under the pre-allocated artifact id (so clients can fetch stdout/stderr/exit code from
+            # the artifact_id they already received) and then fail the job. The scheduler never calls
+            # _on_job_result on the failure path, so the id is repeated in the error message.
+            prediction_exit_code = _exit_code_of(prediction_result)
+            if prediction_exit_code != 0:
+                failed_workspace_dir_str = prediction_result.get("workspace_dir")
+                if failed_workspace_dir_str:
+                    prediction_workspace_dir = Path(failed_workspace_dir_str)
+                    failed_workspace_artifact_dict = await self.runner.create_prediction_artifact(
+                        prediction_result=prediction_result,
+                        config_id=str(config_id),
+                        started_at=prediction_started_at,
+                        completed_at=prediction_completed_at,
+                        duration_seconds=round(prediction_duration, 2),
+                    )
+                    async with self.database.session() as session:
+                        artifact_repo = ArtifactRepository(session)
+                        artifact_manager = ArtifactManager(artifact_repo)
+                        await artifact_manager.save(
+                            ArtifactIn(
+                                id=artifact_id,
+                                data=failed_workspace_artifact_dict,
+                                parent_id=request.artifact_id,
+                                level=1,
+                            )
+                        )
+                raise ModelRunFailedError(
+                    "predict",
+                    prediction_exit_code,
+                    artifact_id,
+                    _stderr_of(prediction_result),
+                )
 
             # Extract predictions from result (handles both new dict format and legacy DataFrame)
             if isinstance(prediction_result, dict) and "content" in prediction_result:
