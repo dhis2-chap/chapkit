@@ -683,6 +683,13 @@ def test_scaffold_config_artifact_linkage(
 #: scaffolded into pyproject.toml (e.g. 0.22.0.dev0) isn't published yet.
 _LATEST_PUBLISHED_CHAPKIT = "0.22.0"
 
+#: Every chapkit release up to 1.1.0 requires `servicekit>=...` with no upper
+#: bound, so a container built today would pull servicekit 2.x into a chapkit
+#: that predates it. The Docker-build tests therefore add the ceiling the
+#: published metadata lacks; drop this once a release carrying
+#: `servicekit>=1.0.1,<2` (1.1.1) is the one installed here.
+_PUBLISHED_CHAPKIT_SERVICEKIT_CEILING = '"servicekit<2"'
+
 
 @pytest.fixture
 def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[str, str], Path]:
@@ -720,7 +727,7 @@ def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[st
         content = pyproject.read_text()
         content = re.sub(
             r'"chapkit>=[^"]+"',
-            f'"chapkit>={_LATEST_PUBLISHED_CHAPKIT}"',
+            f'"chapkit>={_LATEST_PUBLISHED_CHAPKIT}",\n    {_PUBLISHED_CHAPKIT_SERVICEKIT_CEILING}',
             content,
         )
         pyproject.write_text(content)
