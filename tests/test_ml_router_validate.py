@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, Mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from servicekit.api.middleware import add_error_handlers
 
 from chapkit.ml import MLManager, MLRouter
 from chapkit.ml.schemas import ValidationDiagnostic, ValidationResponse
@@ -16,6 +17,8 @@ def _client_with_mock(mock_manager: Mock) -> TestClient:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],

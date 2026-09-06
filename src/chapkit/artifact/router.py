@@ -3,9 +3,10 @@
 from collections.abc import Sequence
 from typing import Annotated, Any, cast
 
-from fastapi import Depends, HTTPException, Query, Response, status
+from fastapi import Depends, Query, Response
 from servicekit.api.crud import CrudPermissions, CrudRouter
 from servicekit.api.pagination import PaginationParams, create_paginated_response
+from servicekit.exceptions import BadRequestError, NotFoundError
 from servicekit.schemas import PaginatedResponse
 
 from ..config.schemas import BaseConfig, ConfigOut
@@ -84,9 +85,9 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
 
             expanded = await manager.expand_artifact(ulid_id)
             if expanded is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Artifact with id {entity_id} not found",
+                raise NotFoundError(
+                    f"Artifact with id {entity_id} not found",
+                    instance=f"{self.router.prefix}/{entity_id}",
                 )
             return ArtifactSummaryTreeNode.from_tree_node(expanded)
 
@@ -98,9 +99,9 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
 
             tree = await manager.build_tree(ulid_id)
             if tree is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Artifact with id {entity_id} not found",
+                raise NotFoundError(
+                    f"Artifact with id {entity_id} not found",
+                    instance=f"{self.router.prefix}/{entity_id}",
                 )
             return ArtifactSummaryTreeNode.from_tree_node(tree)
 
@@ -139,9 +140,9 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                 )
 
                 if config is None:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail=f"No config linked to artifact {entity_id}",
+                    raise NotFoundError(
+                        f"No config linked to artifact {entity_id}",
+                        instance=f"{self.router.prefix}/{entity_id}",
                     )
 
                 return config
@@ -164,22 +165,22 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
 
             artifact = await manager.find_by_id(ulid_id)
             if artifact is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Artifact with id {entity_id} not found",
+                raise NotFoundError(
+                    f"Artifact with id {entity_id} not found",
+                    instance=f"{self.router.prefix}/{entity_id}",
                 )
 
             if not isinstance(artifact.data, dict):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Artifact has no downloadable content",
+                raise BadRequestError(
+                    "Artifact has no downloadable content",
+                    instance=f"{self.router.prefix}/{entity_id}",
                 )
 
             content = artifact.data.get("content")
             if content is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Artifact has no content",
+                raise NotFoundError(
+                    "Artifact has no content",
+                    instance=f"{self.router.prefix}/{entity_id}",
                 )
 
             content_type = artifact.data.get("content_type", "application/octet-stream")
@@ -207,9 +208,9 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
 
                     binary = json.dumps(content).encode()
             else:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Cannot serialize content of type {type(content).__name__}",
+                raise BadRequestError(
+                    f"Cannot serialize content of type {type(content).__name__}",
+                    instance=f"{self.router.prefix}/{entity_id}",
                 )
 
             # Determine filename extension
@@ -238,9 +239,9 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
 
             artifact = await manager.find_by_id(ulid_id)
             if artifact is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Artifact with id {entity_id} not found",
+                raise NotFoundError(
+                    f"Artifact with id {entity_id} not found",
+                    instance=f"{self.router.prefix}/{entity_id}",
                 )
 
             if not isinstance(artifact.data, dict):

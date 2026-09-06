@@ -8,6 +8,7 @@ from fastapi import Depends, status
 from opentelemetry.metrics import Counter
 from servicekit.api.monitoring import get_meter
 from servicekit.api.router import Router
+from servicekit.exceptions import BadRequestError, ConflictError, ServicekitException
 
 from .manager import MLManager
 from .schemas import (
@@ -63,8 +64,6 @@ class MLRouter(Router):
     def _register_routes(self) -> None:
         """Register ML train and predict routes."""
         from typing import Literal
-
-        from fastapi import HTTPException
 
         manager_factory = self.manager_factory
         sample_metadata = self.sample_metadata
@@ -150,15 +149,9 @@ class MLRouter(Router):
                 train_counter.add(1)
                 return response
             except ValueError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(e),
-                )
+                raise BadRequestError(str(e)) from e
             except RuntimeError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=str(e),
-                )
+                raise ConflictError(str(e)) from e
 
         @self.router.post(
             "/$predict",
@@ -178,15 +171,9 @@ class MLRouter(Router):
                 predict_counter.add(1)
                 return response
             except ValueError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(e),
-                )
+                raise BadRequestError(str(e)) from e
             except RuntimeError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=str(e),
-                )
+                raise ConflictError(str(e)) from e
 
         @self.router.post(
             "/$validate",
@@ -203,7 +190,4 @@ class MLRouter(Router):
             try:
                 return await manager.validate(request)
             except Exception as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Validation failed: {type(exc).__name__}",
-                )
+                raise ServicekitException(f"Validation failed: {type(exc).__name__}") from exc

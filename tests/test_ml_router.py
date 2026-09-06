@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, Mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from servicekit.api.middleware import add_error_handlers
 
 from chapkit.ml import MLManager, MLRouter
 from chapkit.ml.schemas import PredictResponse, TrainResponse
@@ -20,6 +21,7 @@ def test_train_value_error_returns_400() -> None:
 
     # Create app with router
     app = FastAPI()
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
@@ -36,10 +38,12 @@ def test_train_value_error_returns_400() -> None:
 
     response = client.post("/api/v1/ml/$train", json=train_request)
 
-    # ValueError should be caught by the error handlers and return appropriate status
-    # In our current implementation, ValueError will result in 422 or 500 depending on error handlers
-    # Since we don't have explicit error handling in MLRouter, it will use default FastAPI behavior
-    assert response.status_code in [400, 422, 500]
+    # ValueError is translated to servicekit's BadRequestError, rendered as RFC 9457 Problem Details
+    assert response.status_code == 400
+    assert response.headers["content-type"].startswith("application/problem+json")
+    problem = response.json()
+    assert problem["type"] == "urn:servicekit:error:bad-request"
+    assert problem["detail"] == "Config not found"
 
 
 def test_predict_value_error_returns_400() -> None:
@@ -53,6 +57,7 @@ def test_predict_value_error_returns_400() -> None:
 
     # Create app with router
     app = FastAPI()
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
@@ -82,6 +87,8 @@ def test_train_request_missing_required_fields() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
@@ -105,6 +112,8 @@ def test_predict_request_missing_required_fields() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
@@ -139,6 +148,8 @@ def test_train_successful_submission() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
@@ -181,6 +192,8 @@ def test_predict_successful_submission() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
@@ -214,6 +227,8 @@ def test_train_runtime_error_returns_409() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
@@ -243,6 +258,8 @@ def test_predict_runtime_error_returns_409() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = MLRouter.create(
         prefix="/api/v1/ml",
         tags=["ML"],
