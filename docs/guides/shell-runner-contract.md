@@ -11,6 +11,7 @@ For every train or predict job, chapkit:
 3. Writes the request inputs (`config.yml`, `data.csv` / `historic.csv` + `future.csv`, optional `geo.json`).
 4. Invokes your script with the workspace as the working directory.
 5. Captures the entire workspace (your script's writes included) as an artifact.
+6. Fails the job if your script exited non-zero - after storing the workspace artifact, so the failure is still debuggable.
 
 Your script's only contract is: read the inputs chapkit wrote, write its outputs to known filenames in the same directory. Everything else is bookkeeping chapkit handles.
 
@@ -53,7 +54,20 @@ The script runs with the temp dir as `cwd`, so relative paths Just Work.
 
 ### What chapkit does after
 
-The whole temp directory (your script's writes included) is zipped and persisted as an `ml_training_workspace` artifact. The artifact id is the handle that downstream `$predict` calls use.
+The whole temp directory (your script's writes included) is zipped and persisted as an `ml_training_workspace` artifact, under the artifact id that the `$train` 202 response already returned. The artifact id is the handle that downstream `$predict` calls use.
+
+If the script exited non-zero, chapkit still stores that artifact - with `metadata.status = "failed"`, `metadata.exit_code`, `metadata.stdout` and `metadata.stderr` - and then **fails the job**. The job record ends up as:
+
+```json
+{
+  "status": "failed",
+  "artifact_id": null,
+  "error": "train script failed with exit code 3; diagnostic artifact 01MODEL456... holds the workspace, stdout and stderr; stderr tail: boom: training blew up",
+  "error_traceback": "Traceback (most recent call last): ..."
+}
+```
+
+Note that `artifact_id` on a failed job record is `null` - the job never produced a usable result. The diagnostic artifact id is the one from the 202 response, and it is repeated in the `error` text. The `stderr tail` is the last five non-empty stderr lines joined with ` | `, or `<no stderr output>` when the script wrote nothing to stderr.
 
 ## Predict job lifecycle
 
@@ -98,6 +112,45 @@ Available placeholders:
 ### What chapkit does after
 
 The output file is read back into the response, and the entire workspace is persisted as an `ml_prediction_workspace` artifact for debugging.
+
+If the script exited non-zero, chapkit stores the workspace as an `ml_prediction_workspace` artifact under the id the `$predict` 202 response returned (level 1, parented on the training artifact) with `metadata.status = "failed"`, `metadata.exit_code`, `metadata.stdout` and `metadata.stderr` - and then **fails the job**, exactly as for train:
+
+```json
+{
+  "status": "failed",
+  "artifact_id": null,
+  "error": "predict script failed with exit code 4; diagnostic artifact 01PRED012... holds the workspace, stdout and stderr; stderr tail: boom: prediction blew up",
+  "error_traceback": "Traceback (most recent call last): ..."
+}
+```
+
+A predict script that exits **0** but never writes `predictions.csv` is a different failure: there is no diagnostic artifact for it, and the job fails with `Prediction script did not create output file at ...`. Exit non-zero when your script cannot produce predictions, so you get the workspace back.
+
+## Debugging a failed run
+
+Failed train and predict jobs are debugged the same way: read the error off the job, pull the artifact id out of it, then fetch the artifact.
+
+```bash
+# 1. Fetch the job (the job_id came back in the $train / $predict 202 response)
+curl -s http://localhost:9090/api/v1/jobs/$JOB_ID | jq '{status, artifact_id, error}'
+# {
+#   "status": "failed",
+#   "artifact_id": null,
+#   "error": "train script failed with exit code 3; diagnostic artifact 01MODEL456... holds the workspace, stdout and stderr; stderr tail: boom: training blew up"
+# }
+
+# 2. The diagnostic artifact id is the artifact_id from the 202 response - also named in the error
+ARTIFACT_ID=01MODEL456...
+
+# 3. Fetch the artifact and read the captured exit code and streams
+curl -s http://localhost:9090/api/v1/artifacts/$ARTIFACT_ID | \
+  jq '.data.metadata | {status, exit_code, stdout, stderr}'
+
+# 4. Download the whole workspace to inspect what the script left behind
+curl -s -OJ "http://localhost:9090/api/v1/artifacts/$ARTIFACT_ID/\$download"
+```
+
+For the full traceback, read `error_traceback` on the job record. `docker compose logs` shows the same stdout/stderr in real time under the `train_script_failed` / `predict_script_failed` events.
 
 ## `config.yml` layout
 
@@ -148,7 +201,10 @@ Two possibilities. Either you're on `chap_core` format and reading `config$n_lag
 The whole project directory is copied to the workspace, so `source("scripts/lib.R")` and `from scripts.helpers import foo` both work. Paths are relative to the project root, not to your script's location. This also means you can keep shared code in a dedicated package - e.g. a `lib/` directory with preprocessing and validation helpers that both `scripts/train.py` and `scripts/predict.py` import via `from lib import ...`.
 
 **Stderr/stdout from a failing script.**
-Both are captured into the workspace artifact's metadata. Pull the artifact and inspect `stdout` / `stderr`. From the running container: `docker compose logs` shows them in real time.
+Both are captured into the workspace artifact's metadata. Pull the artifact and inspect `stdout` / `stderr` - see [Debugging a failed run](#debugging-a-failed-run). From the running container: `docker compose logs` shows them in real time.
+
+**My job says `failed` but I expected a completed job with a failed artifact.**
+That was the old behavior. A non-zero exit code now fails the job itself; the diagnostic artifact is still stored, but you find its id in the job's `error` message rather than in `artifact_id`.
 
 **The script ran but predictions don't show up in the response.**
 Make sure you wrote to the path chapkit gave you (the `{output_file}` placeholder), which always resolves to `predictions.csv` relative to the workspace. Writing to an absolute path or a different filename means chapkit can't find the output.
