@@ -166,3 +166,19 @@ def test_ml_service_builder_with_memory_database() -> None:
     ).build()
 
     assert app is not None
+
+
+async def test_ml_dependency_requires_runner_and_config_schema() -> None:
+    """The ML dependency refuses to build a manager when the builder was not fully configured."""
+    from servicekit import InMemoryScheduler, SqliteDatabaseBuilder
+
+    database = SqliteDatabaseBuilder.in_memory().build()
+    scheduler = InMemoryScheduler()
+
+    without_runner = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test"))
+    with pytest.raises(RuntimeError, match="ML runner not configured"):
+        await without_runner._build_ml_dependency()(scheduler_base=scheduler, database=database)
+
+    without_config = ServiceBuilder(info=ServiceInfo(id="test", display_name="Test")).with_ml(runner=DummyRunner())
+    with pytest.raises(RuntimeError, match="Config schema not configured"):
+        await without_config._build_ml_dependency()(scheduler_base=scheduler, database=database)

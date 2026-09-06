@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import ulid
 from pydantic import Field, PrivateAttr
@@ -67,5 +67,6 @@ class InMemoryChapkitScheduler(ChapkitScheduler):
 
     async def _on_job_result(self, record: JobRecord, result: Any) -> None:
         """Track the artifact id when a job returns a ULID."""
-        if isinstance(record, ChapkitJobRecord):
-            record.artifact_id = result if isinstance(result, ULID) else None
+        # Every record this scheduler tracks is created by `_make_record` above.
+        chapkit_record = cast(ChapkitJobRecord, record)
+        chapkit_record.artifact_id = result if isinstance(result, ULID) else None
