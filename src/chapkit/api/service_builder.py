@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr, Field, HttpUrl
 from servicekit import Database, SqliteDatabaseBuilder
 from servicekit.api.crud import CrudPermissions
 from servicekit.api.dependencies import get_database, get_scheduler, get_session
-from servicekit.api.service_builder import BaseServiceBuilder, LifespanFactory, ServiceInfo, _JobOptions
+from servicekit.api.service_builder import BaseServiceBuilder, JobOptions, LifespanFactory, ServiceInfo
 from servicekit.scheduler import Scheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -357,7 +357,7 @@ class ServiceBuilder(BaseServiceBuilder):
 
         return _dependency
 
-    def _create_scheduler(self, job_options: _JobOptions) -> Scheduler:
+    def _create_scheduler(self, job_options: JobOptions) -> Scheduler:
         """Create the artifact-tracking scheduler used by chapkit services."""
         # Default to max_concurrency=1 to avoid SQLite write lock issues
         max_concurrency = job_options.max_concurrency if job_options.max_concurrency is not None else 1
