@@ -90,6 +90,10 @@ faster restart cycles:
 uv sync
 uv run python main.py
 ```
+
+The scaffolded R scripts call `library(yaml)` to read `config.yml`, so a local
+R install needs that package: `Rscript -e 'install.packages("yaml")'` (it is
+already present in the Docker images).
 {% else %}
 ### Development Mode
 
@@ -161,20 +165,26 @@ curl http://localhost:9090/health
 
 ### Configuration Management
 
-Create a configuration:
+Create a configuration. The response contains the config `id` used by `$train`:
 
 ```bash
 curl -X POST http://localhost:9090/api/v1/configs \
   -H "Content-Type: application/json" \
   -d '{
     "name": "my-config",
-    "data": {}
+    "data": {"prediction_periods": 3}
   }'
 ```
 
 ### ML Operations
 
-Train a model:
+Training and prediction data are chapkit `DataFrame` payloads: an object with a
+`columns` list and a `data` list of rows, where each row has one value per
+column. Both `$train` and `$predict` return `202 Accepted` with a `job_id` and
+the `artifact_id` the result will be stored under - the work itself runs in the
+background, so you poll the job.
+
+Train a model (substitute the config id from the previous step):
 
 ```bash
 curl -X POST http://localhost:9090/api/v1/ml/\$train \
@@ -182,25 +192,56 @@ curl -X POST http://localhost:9090/api/v1/ml/\$train \
   -d '{
     "config_id": "YOUR_CONFIG_ID",
     "data": {
-      "feature_1": [1, 2, 3],
-      "feature_2": [4, 5, 6],
-      "target": [7, 8, 9]
+      "columns": ["time_period", "location", "rainfall", "mean_temperature", "disease_cases"],
+      "data": [
+        ["2023-01", "loc-1", 10.0, 25.0, 5.0],
+        ["2023-02", "loc-1", 15.0, 28.0, 8.0],
+        ["2023-03", "loc-1", 8.0, 22.0, 3.0],
+        ["2023-04", "loc-1", 20.0, 30.0, 12.0]
+      ]
     }
   }'
 ```
 
-Make predictions:
+Poll the training job until `status` is `completed` (a failing training script
+ends the job as `failed`, with the exit code and the diagnostic artifact id in
+`error`):
+
+```bash
+curl http://localhost:9090/api/v1/jobs/YOUR_TRAIN_JOB_ID
+```
+
+Make predictions, passing the `artifact_id` returned by `$train`. `historic` is
+the context the model has already seen, `future` the periods to predict:
 
 ```bash
 curl -X POST http://localhost:9090/api/v1/ml/\$predict \
   -H "Content-Type: application/json" \
   -d '{
-    "model_id": "YOUR_MODEL_ID",
+    "artifact_id": "YOUR_TRAIN_ARTIFACT_ID",
+    "historic": {
+      "columns": ["time_period", "location", "rainfall", "mean_temperature", "disease_cases"],
+      "data": [
+        ["2023-03", "loc-1", 8.0, 22.0, 3.0],
+        ["2023-04", "loc-1", 20.0, 30.0, 12.0]
+      ]
+    },
     "future": {
-      "feature_1": [1, 2],
-      "feature_2": [3, 4]
+      "columns": ["time_period", "location", "rainfall", "mean_temperature"],
+      "data": [
+        ["2023-05", "loc-1", 12.0, 26.0],
+        ["2023-06", "loc-1", 18.0, 29.0]
+      ]
     }
   }'
+```
+
+Poll the prediction job, then fetch the predictions from the artifact id that
+`$predict` returned:
+
+```bash
+curl http://localhost:9090/api/v1/jobs/YOUR_PREDICT_JOB_ID
+curl http://localhost:9090/api/v1/artifacts/YOUR_PREDICT_ARTIFACT_ID
 ```
 
 ## Customization

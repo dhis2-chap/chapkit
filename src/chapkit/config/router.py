@@ -3,8 +3,9 @@
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from servicekit.api.crud import CrudPermissions, CrudRouter
+from servicekit.exceptions import BadRequestError
 
 from chapkit.artifact.schemas import ArtifactOut
 
@@ -84,10 +85,7 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
             try:
                 await manager.link_artifact(config_id, request.artifact_id)
             except ValueError as e:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(e),
-                )
+                raise BadRequestError(str(e), instance=f"{self.router.prefix}/{entity_id}") from e
 
         async def unlink_artifact(
             entity_id: str,
@@ -97,10 +95,7 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
             try:
                 await manager.unlink_artifact(request.artifact_id)
             except Exception as e:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=str(e),
-                )
+                raise BadRequestError(str(e), instance=f"{self.router.prefix}/{entity_id}") from e
 
         async def get_linked_artifacts(
             entity_id: str,

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from servicekit.api.middleware import add_error_handlers
 from ulid import ULID
 
 from chapkit.artifact import ArtifactOut
@@ -20,6 +21,8 @@ def test_link_artifact_success() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ConfigRouter.create(
         prefix="/api/v1/configs",
         tags=["Configs"],
@@ -52,6 +55,8 @@ def test_link_artifact_invalid_artifact_returns_400() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ConfigRouter.create(
         prefix="/api/v1/configs",
         tags=["Configs"],
@@ -73,6 +78,12 @@ def test_link_artifact_invalid_artifact_returns_400() -> None:
 
     assert response.status_code == 400
     assert "Artifact not found" in response.text
+    assert response.headers["content-type"].startswith("application/problem+json")
+    problem = response.json()
+    assert problem["type"] == "urn:servicekit:error:bad-request"
+    assert problem["status"] == 400
+    assert problem["detail"] == "Artifact not found"
+    assert problem["instance"] == f"/api/v1/configs/{config_id}"
 
 
 def test_unlink_artifact_success() -> None:
@@ -84,6 +95,8 @@ def test_unlink_artifact_success() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ConfigRouter.create(
         prefix="/api/v1/configs",
         tags=["Configs"],
@@ -116,6 +129,8 @@ def test_unlink_artifact_error_returns_400() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ConfigRouter.create(
         prefix="/api/v1/configs",
         tags=["Configs"],
@@ -167,6 +182,8 @@ def test_get_linked_artifacts_success() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ConfigRouter.create(
         prefix="/api/v1/configs",
         tags=["Configs"],
@@ -197,6 +214,8 @@ def test_artifact_operations_disabled_by_default() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ConfigRouter.create(
         prefix="/api/v1/configs",
         tags=["Configs"],

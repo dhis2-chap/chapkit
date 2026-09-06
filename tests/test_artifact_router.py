@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from servicekit.api.middleware import add_error_handlers
 from ulid import ULID
 
 from chapkit.artifact import ArtifactIn, ArtifactManager, ArtifactOut, ArtifactRouter
@@ -20,6 +21,8 @@ def test_expand_artifact_not_found_returns_404() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -36,6 +39,12 @@ def test_expand_artifact_not_found_returns_404() -> None:
 
     assert response.status_code == 404
     assert f"Artifact with id {artifact_id} not found" in response.text
+    assert response.headers["content-type"].startswith("application/problem+json")
+    problem = response.json()
+    assert problem["type"] == "urn:servicekit:error:not-found"
+    assert problem["title"] == "Resource Not Found"
+    assert problem["status"] == 404
+    assert problem["instance"] == f"/api/v1/artifacts/{artifact_id}"
 
 
 def test_build_tree_not_found_returns_404() -> None:
@@ -47,6 +56,8 @@ def test_build_tree_not_found_returns_404() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -74,6 +85,8 @@ def test_download_artifact_not_found_returns_404() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -105,6 +118,8 @@ def test_download_artifact_with_non_dict_data() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -135,6 +150,8 @@ def test_download_artifact_with_no_content_field() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -168,6 +185,8 @@ def test_download_artifact_with_bytes_content() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -208,6 +227,8 @@ def test_download_artifact_with_dataframe_content() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -256,6 +277,8 @@ def test_download_artifact_with_dataframe_as_csv() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -300,6 +323,8 @@ def test_download_artifact_with_pickled_bytes() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -344,6 +369,8 @@ def test_download_artifact_with_unsupported_type() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -379,6 +406,8 @@ def test_download_artifact_with_dict_content() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -412,6 +441,8 @@ def test_get_metadata_not_found_returns_404() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -456,6 +487,8 @@ def test_get_metadata_returns_metadata_only() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],
@@ -495,6 +528,8 @@ def test_get_metadata_when_no_metadata_field() -> None:
         return mock_manager
 
     app = FastAPI()
+
+    add_error_handlers(app)
     router = ArtifactRouter.create(
         prefix="/api/v1/artifacts",
         tags=["Artifacts"],

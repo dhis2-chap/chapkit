@@ -28,9 +28,11 @@ WORKDIR /work
 # Run `uv sync` once locally before the first `docker build` to generate uv.lock.
 COPY pyproject.toml uv.lock ./
 
-# Sync user deps into the base image's existing venv at /app/.venv. --frozen pins to
-# uv.lock for reproducible builds, --no-dev skips dev-only deps (uvicorn etc. ship with
-# the base), --no-install-project because this project isn't a package, just a service.
+# Sync user deps into the venv at /app/.venv. --frozen pins to uv.lock for reproducible
+# builds, --no-dev skips the dev-only dependency group, --no-install-project because this
+# project isn't a package, just a service. The uvicorn used by the CMD below comes from
+# this sync, not from the base image: chapkit depends on servicekit, which depends on
+# fastapi[standard], which pulls in uvicorn.
 RUN --mount=type=cache,target=/root/.cache/uv \
     UV_PROJECT_ENVIRONMENT=/app/.venv uv sync --frozen --no-dev --no-install-project
 

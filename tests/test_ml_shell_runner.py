@@ -270,9 +270,9 @@ print("Prediction completed")
 
 @pytest.mark.asyncio
 async def test_shell_runner_train_failure() -> None:
-    """Test handling of training script failure (v0.10.0+: preserves workspace on failure)."""
+    """Test that a failed training script preserves the workspace and reports the exit code."""
     # Command that will fail
-    train_command = "exit 1"
+    train_command = "echo 'train boom' >&2; exit 1"
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command=train_command,
@@ -282,21 +282,25 @@ async def test_shell_runner_train_failure() -> None:
     config = MockConfig()
     data = DataFrame(columns=["feature1"], data=[[1], [2], [3]])
 
-    # v0.10.0+: Failed training returns workspace dict (doesn't raise)
+    # on_train itself does not raise: it hands the failure to MLManager, which stores the
+    # diagnostic artifact and then raises ModelRunFailedError so the job ends as failed.
     result = await runner.on_train(config, data)
 
-    assert isinstance(result, dict)
-    assert "workspace_dir" in result
-    assert "exit_code" in result
-    assert result["exit_code"] == 1  # Non-zero exit code
-    assert Path(result["workspace_dir"]).exists()  # Workspace preserved for debugging
+    try:
+        assert isinstance(result, dict)
+        assert "workspace_dir" in result
+        assert result["exit_code"] == 1  # Non-zero exit code
+        assert "train boom" in result["stderr"]
+        assert Path(result["workspace_dir"]).exists()  # Workspace preserved for debugging
+    finally:
+        shutil.rmtree(result["workspace_dir"], ignore_errors=True)
 
 
 @pytest.mark.asyncio
 async def test_shell_runner_predict_failure() -> None:
-    """Test handling of prediction script failure (fails to create output file)."""
+    """Test that a failed prediction script preserves the workspace instead of raising."""
     # Command that will fail and not create output file
-    predict_command = "exit 2"
+    predict_command = "echo 'predict boom' >&2; exit 2"
 
     runner: ShellModelRunner[MockConfig] = ShellModelRunner(
         train_command="echo 'model' > model.pickle",
@@ -308,13 +312,66 @@ async def test_shell_runner_predict_failure() -> None:
     historic = DataFrame(columns=["feature1"], data=[])
     future = DataFrame(columns=["feature1"], data=[[1], [2]])
 
+    result: dict[str, object] | None = None
     try:
-        # Script fails and doesn't create output file -> raises RuntimeError
-        with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
-            await runner.on_predict(config, model, historic, future)
+        # The failed script keeps its workspace so MLManager can store a diagnostic artifact
+        # before failing the job; a missing output file is only an error on a successful exit.
+        result = await runner.on_predict(config, model, historic, future)
+        assert isinstance(result, dict)
+        assert result["exit_code"] == 2
+        assert result["content"] is None
+        assert "predict boom" in str(result["stderr"])
+        assert Path(str(result["workspace_dir"])).exists()
     finally:
         # Cleanup mock workspace
         shutil.rmtree(model["workspace_dir"], ignore_errors=True)
+        if result is not None:
+            shutil.rmtree(str(result["workspace_dir"]), ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_predict_success_requires_output_file() -> None:
+    """Test that a successful prediction script must still produce the output file."""
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command="echo 'model' > model.pickle",
+        predict_command="echo 'no output written'",
+    )
+
+    config = MockConfig()
+    model = create_mock_workspace()
+    historic = DataFrame(columns=["feature1"], data=[])
+    future = DataFrame(columns=["feature1"], data=[[1], [2]])
+
+    try:
+        with pytest.raises(RuntimeError, match="Prediction script did not create output file"):
+            await runner.on_predict(config, model, historic, future)
+    finally:
+        shutil.rmtree(model["workspace_dir"], ignore_errors=True)
+
+
+def test_workspace_exclude_patterns_drop_sqlite_sidecar_files() -> None:
+    """Test that SQLite WAL, shared-memory and journal sidecar files are excluded from workspaces."""
+    from chapkit.ml.runner import prepare_workspace
+
+    source_dir = Path(tempfile.mkdtemp(prefix="chapkit_test_source_"))
+    dest_dir = Path(tempfile.mkdtemp(prefix="chapkit_test_dest_"))
+
+    try:
+        data_dir = source_dir / "data"
+        data_dir.mkdir()
+        (data_dir / "chapkit.db").write_text("db")
+        (data_dir / "chapkit.db-wal").write_text("wal")
+        (data_dir / "chapkit.db-shm").write_text("shm")
+        (data_dir / "chapkit.db-journal").write_text("journal")
+        (data_dir / "keep.csv").write_text("a,b\n1,2\n")
+
+        prepare_workspace(source_dir, dest_dir)
+
+        copied = {path.name for path in (dest_dir / "data").iterdir()}
+        assert copied == {"keep.csv"}
+    finally:
+        shutil.rmtree(source_dir, ignore_errors=True)
+        shutil.rmtree(dest_dir, ignore_errors=True)
 
 
 @pytest.mark.asyncio
