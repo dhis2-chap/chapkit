@@ -227,15 +227,43 @@ Create new artifact.
 }
 ```
 
+**POST is create-only.** Omit `id` and the service assigns one. Supply an `id` that already exists and the request is rejected with `409 Conflict` rather than overwriting the artifact. Use `PUT /api/v1/artifacts/{id}` to update.
+
+Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details, served as `application/problem+json`:
+
+```bash
+curl -i -X POST http://localhost:9090/api/v1/artifacts \
+  -H "Content-Type: application/json" \
+  -d '{"id": "01ARTIFACT456", "data": {"experiment": "weather_prediction"}}'
+```
+
+```
+HTTP/1.1 409 Conflict
+content-type: application/problem+json
+```
+```json
+{
+  "type": "urn:servicekit:error:conflict",
+  "title": "Resource Conflict",
+  "status": 409,
+  "detail": "Entity with id 01ARTIFACT456 already exists",
+  "instance": "http://localhost:9090/api/v1/artifacts"
+}
+```
+
+A request that fails a database constraint - most commonly a `parent_id` that does not name an existing artifact - is also rejected with `409`, but with the generic `detail` `"Entity violates a database constraint"` (servicekit 2.0.1 and later; 2.0.0 reports the same status with a misleading "already exists" detail).
+
 ### GET /api/v1/artifacts
 
-List all artifacts with pagination.
+List artifact summaries (metadata only, no `data` content). Pagination is **opt-in**: pass `page` and `size` together to get a paginated envelope, pass neither to get a plain JSON array of all summaries. Results are ordered by id.
 
 **Query Parameters:**
-- `page`: Page number (default: 1)
-- `size`: Page size (default: 50)
+- `page`: Page number, 1-indexed, minimum 1. No default.
+- `size`: Page size, 1 to 100. No default.
 
-**Response:**
+Passing only one of the two is ignored and returns the plain unpaginated list. A `page` below 1 or a `size` outside 1-100 returns `422 Unprocessable Content`.
+
+**Response (with `?page=1&size=50`):**
 ```json
 {
   "items": [...],
@@ -252,7 +280,7 @@ Get artifact by ID.
 
 ### PUT /api/v1/artifacts/{id}
 
-Update artifact data.
+Update artifact data. PUT is the update path: it applies the fields you send, and an explicit `null` clears a nullable field (`"parent_id": null` detaches the artifact from its parent). Updating an id that does not exist returns `404` as Problem Details.
 
 **Request:**
 ```json

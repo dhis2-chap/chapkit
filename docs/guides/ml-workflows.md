@@ -245,7 +245,7 @@ runner = ShellModelRunner(
 
 **Script Requirements:**
 - **Training script:** Read data from arguments, read config from `config.yml`, train model, optionally save to `model.pickle`
-  - Model file creation is optional - workspace is preserved regardless of exit code
+  - Model file creation is optional - workspace is preserved regardless of exit code, but a non-zero exit code fails the job (see [Failed script runs](#failed-script-runs))
   - Training artifacts store the entire workspace (files, logs, intermediate results)
 - **Prediction script:** Read data from arguments, read config from `config.yml`, load model from `model.pickle`, make predictions, save to `{output_file}`
   - Prediction artifacts store the entire workspace (like training)
@@ -555,10 +555,41 @@ curl http://localhost:9090/api/v1/jobs/$JOB_ID | jq
 # Stream status updates (SSE)
 curl -N http://localhost:9090/api/v1/jobs/$JOB_ID/\$stream
 
-# Get results from artifact
+# Get results from artifact (only set on a completed job)
 ARTIFACT_ID=$(curl -s http://localhost:9090/api/v1/jobs/$JOB_ID | jq -r '.artifact_id')
 curl http://localhost:9090/api/v1/artifacts/$ARTIFACT_ID | jq
 ```
+
+On a failed job, `artifact_id` is `null` and the diagnostic artifact id is named in `error` instead - use the `artifact_id` from the `$train` / `$predict` 202 response. See [Failed script runs](#failed-script-runs).
+
+### Failed script runs
+
+A `ShellModelRunner` script that exits non-zero **fails the job**. The workspace is still captured first, so the failure stays debuggable:
+
+1. The workspace artifact is stored under the artifact id the 202 response returned, with `metadata.status = "failed"` plus `exit_code`, `stdout` and `stderr`.
+2. The job then transitions to `status: "failed"`, with `artifact_id: null`, an `error` naming the phase, exit code, diagnostic artifact id and a tail of stderr, and a full `error_traceback`.
+
+```json
+{
+  "status": "failed",
+  "artifact_id": null,
+  "error": "train script failed with exit code 3; diagnostic artifact 01MODEL456... holds the workspace, stdout and stderr; stderr tail: boom: training blew up",
+  "error_traceback": "Traceback (most recent call last): ..."
+}
+```
+
+To debug, fetch the job, read the artifact id out of `error`, then fetch that artifact:
+
+```bash
+curl -s http://localhost:9090/api/v1/jobs/$JOB_ID | jq '{status, artifact_id, error}'
+
+curl -s http://localhost:9090/api/v1/artifacts/$SUBMITTED_ARTIFACT_ID | \
+  jq '.data.metadata | {status, exit_code, stdout, stderr}'
+```
+
+The same applies to `$predict`: the diagnostic `ml_prediction_workspace` artifact is stored at level 1 under the training artifact before the job fails. A predict script that exits **0** without writing `predictions.csv` has no diagnostic artifact and fails with `Prediction script did not create output file at ...`.
+
+`ModelRunFailedError` (exported from `chapkit.ml`) is the exception behind these failures; it carries `phase`, `exit_code` and `artifact_id` attributes if you handle it in your own code. See the [Shell-runner workspace contract](shell-runner-contract.md#debugging-a-failed-run) for the full walkthrough.
 
 ### POST /api/v1/ml/$validate
 
@@ -798,7 +829,7 @@ Stored at hierarchy level 0 using `MLTrainingWorkspaceArtifactData`. Both `Funct
 **Schema Structure:**
 - `type`: Discriminator field - always `"ml_training_workspace"`
 - `metadata`: Structured execution metadata
-  - `status`: "success" or "failed" (based on exit code)
+  - `status`: "success" or "failed" (based on exit code). A `"failed"` artifact means the job failed too - see [Failed script runs](#failed-script-runs)
   - `exit_code`: Training script exit code (0 = success)
   - `stdout`: Standard output from training script
   - `stderr`: Standard error from training script
@@ -874,7 +905,7 @@ Both FunctionalModelRunner (default) and ShellModelRunner create an additional w
 **Workspace Artifact Schema:**
 - `type`: Discriminator field - always `"ml_prediction_workspace"`
 - `metadata`: Structured execution metadata
-  - `status`: "success" or "failed" (based on exit code for ShellModelRunner)
+  - `status`: "success" or "failed" (based on exit code for ShellModelRunner). On failure this workspace artifact is stored at level 1 under the training artifact, and the job fails - see [Failed script runs](#failed-script-runs)
   - `exit_code`: Script exit code (ShellModelRunner only, null for FunctionalModelRunner)
   - `stdout`: Standard output (ShellModelRunner only, null for FunctionalModelRunner)
   - `stderr`: Standard error (ShellModelRunner only, null for FunctionalModelRunner)
@@ -1644,6 +1675,7 @@ curl http://localhost:9090/api/v1/artifacts | jq
 2. Missing required columns in data
 3. Insufficient training data
 4. Config validation errors
+5. Training script exited non-zero (ShellModelRunner) - see [Failed script runs](#failed-script-runs)
 
 **Solution:**
 ```bash
@@ -1676,7 +1708,7 @@ async def on_predict(self, config, model, historic, future, geo=None):
 
 ### Shell Runner Script Fails
 
-**Problem:** ShellModelRunner returns "script failed with exit code 1"
+**Problem:** The job fails with "train script failed with exit code 1" (or "predict script failed with ...")
 
 **Causes:**
 1. Script not executable
@@ -1695,8 +1727,12 @@ python scripts/train_model.py \
   --data /tmp/test_data.csv \
   --model /tmp/test_model.pkl
 
-# Check script stderr output
+# Check script stderr output: the error carries a stderr tail and the diagnostic artifact id
 curl http://localhost:9090/api/v1/jobs/$JOB_ID | jq '.error'
+
+# Full stdout/stderr live on the diagnostic artifact (the artifact_id from the 202 response)
+curl http://localhost:9090/api/v1/artifacts/$SUBMITTED_ARTIFACT_ID | \
+  jq '.data.metadata | {status, exit_code, stdout, stderr}'
 ```
 
 ### High Memory Usage
@@ -1773,7 +1809,7 @@ MLServiceBuilder(..., database_url="postgresql://...")
 
 **Problem:** "Cannot predict using failed training artifact"
 
-**Cause:** Training script exited with non-zero code, artifact has status="failed"
+**Cause:** The training script exited with a non-zero code, so the training job failed and its diagnostic artifact has `status="failed"`. Such an artifact can never be used for prediction.
 
 **Solution:**
 ```bash

@@ -183,15 +183,41 @@ Create new configuration.
 }
 ```
 
+**POST is create-only.** Omit `id` and the service assigns one. Supply an `id` that already exists and the request is rejected with `409 Conflict` - it will never silently overwrite the existing config. Use `PUT /api/v1/configs/{id}` to update.
+
+Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details, served as `application/problem+json`:
+
+```bash
+curl -i -X POST http://localhost:9090/api/v1/configs \
+  -H "Content-Type: application/json" \
+  -d '{"id": "01K72P5N5KCRM6MD3BRE4P07N8", "name": "production", "data": {}}'
+```
+
+```
+HTTP/1.1 409 Conflict
+content-type: application/problem+json
+```
+```json
+{
+  "type": "urn:servicekit:error:conflict",
+  "title": "Resource Conflict",
+  "status": 409,
+  "detail": "Entity with id 01K72P5N5KCRM6MD3BRE4P07N8 already exists",
+  "instance": "http://localhost:9090/api/v1/configs"
+}
+```
+
 ### GET /api/v1/configs
 
-List all configurations with pagination.
+List configurations. Pagination is **opt-in**: pass `page` and `size` together to get a paginated envelope, pass neither to get a plain JSON array of all configs. Results are ordered by id.
 
 **Query Parameters:**
-- `page`: Page number (default: 1)
-- `size`: Page size (default: 50)
+- `page`: Page number, 1-indexed, minimum 1. No default.
+- `size`: Page size, 1 to 100. No default.
 
-**Response:**
+Passing only one of the two is ignored and returns the plain unpaginated list. A `page` below 1 or a `size` outside 1-100 returns `422 Unprocessable Content`.
+
+**Response (with `?page=1&size=50`):**
 ```json
 {
   "items": [...],
@@ -208,7 +234,7 @@ Get configuration by ID.
 
 ### PUT /api/v1/configs/{id}
 
-Update configuration.
+Update configuration. PUT is the update path: it applies the fields you send, and an explicit `null` clears a nullable field. Updating an id that does not exist returns `404` as Problem Details.
 
 **Request:**
 ```json
