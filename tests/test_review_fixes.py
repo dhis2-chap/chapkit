@@ -404,12 +404,15 @@ async def test_artifact_depth_is_enforced_on_writes_and_trees_are_never_truncate
             with pytest.raises(BadRequestError, match="maximum supported depth"):
                 await manager.save(ArtifactIn(parent_id=chain[-1], data={}))
 
-            # A two-node subtree fits under the level just above the limit, but not one level deeper.
+            # Reparenting checks the moved descendants too: a two-node subtree under level 63 would
+            # put its child at 65, one level above the limit; under level 62 it fits exactly.
             subtree_root = await manager.save(ArtifactIn(data={}))
-            await manager.save(ArtifactIn(parent_id=subtree_root.id, data={}))
+            child = await manager.save(ArtifactIn(parent_id=subtree_root.id, data={}))
             with pytest.raises(BadRequestError, match="maximum supported depth"):
-                await manager.save(ArtifactIn(id=subtree_root.id, parent_id=chain[-1], data={}))
-            moved = await manager.save(ArtifactIn(id=subtree_root.id, parent_id=chain[-2], data={}))
+                await manager.save(ArtifactIn(id=subtree_root.id, parent_id=chain[-2], data={}))
+            moved = await manager.save(ArtifactIn(id=subtree_root.id, parent_id=chain[-3], data={}))
             assert moved.level == MAX_ARTIFACT_DEPTH - 1
+            moved_child = await manager.find_by_id(child.id)
+            assert moved_child is not None and moved_child.level == MAX_ARTIFACT_DEPTH
     finally:
         await db.dispose()
