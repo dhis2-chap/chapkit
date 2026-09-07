@@ -1,9 +1,19 @@
 // Small formatting helpers shared across console screens.
 
+/**
+ * Parse an ISO timestamp from the API. Entity timestamps (created_at, updated_at)
+ * arrive without a UTC offset while job timestamps carry a Z; both are UTC, so an
+ * offset-less string is treated as UTC rather than local time.
+ */
+export function parseApiDate(iso: string): Date {
+  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso)
+  return new Date(hasOffset ? iso : `${iso}Z`)
+}
+
 /** Format an ISO timestamp as a locale date-time, or em dash when absent. */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—'
-  const d = new Date(iso)
+  const d = parseApiDate(iso)
   if (Number.isNaN(d.getTime())) return iso
   return d.toLocaleString()
 }
@@ -11,7 +21,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 /** Human-relative time, e.g. "3 min ago". */
 export function formatRelative(iso: string | null | undefined): string {
   if (!iso) return '—'
-  const d = new Date(iso)
+  const d = parseApiDate(iso)
   if (Number.isNaN(d.getTime())) return iso
   const seconds = Math.round((Date.now() - d.getTime()) / 1000)
   const units: [Intl.RelativeTimeFormatUnit, number][] = [
