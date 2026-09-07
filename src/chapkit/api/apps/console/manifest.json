@@ -1,6 +1,6 @@
 {
   "name": "Chapkit Console",
-  "version": "1.2.0.dev0",
+  "version": "2.0.0",
   "prefix": "/",
   "description": "Default web console for exploring and operating a chapkit service",
   "author": "Chapkit Team",
