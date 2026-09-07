@@ -65,7 +65,11 @@ test('create a config through the UI', async ({ page }) => {
   await page.getByRole('button', { name: 'New config' }).click()
   await page.locator('#config-name').fill('made-in-e2e')
   await page.getByRole('button', { name: 'Create config' }).click()
-  await expect(page.getByText('made-in-e2e').first()).toBeVisible()
+  const row = page.getByRole('row', { name: /made-in-e2e/ })
+  await expect(row).toBeVisible()
+  // Entity timestamps arrive without a UTC offset; the console must still read them as UTC,
+  // so a just-created config shows as seconds old, not hours off by the local timezone.
+  await expect(row).toContainText(/now|second/)
 })
 
 test('train: generate, validate, then submit a job', async ({ page }) => {
