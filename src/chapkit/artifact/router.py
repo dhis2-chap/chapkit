@@ -37,6 +37,8 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
         """Initialize artifact router with entity types and manager factory."""
         # Store enable_config_access to conditionally register config endpoint
         self.enable_config_access = enable_config_access
+        # Kept so custom operations can honour the same permissions as the CRUD routes.
+        self.permissions = permissions or CrudPermissions()
 
         super().__init__(
             prefix=prefix,
@@ -104,6 +106,10 @@ class ArtifactRouter(CrudRouter[ArtifactIn, ArtifactOut]):
                     instance=f"{self.router.prefix}/{entity_id}",
                 )
             return ArtifactSummaryTreeNode.from_tree_node(tree)
+
+        # Tree, expand and config lookups only read, so they follow the read permission.
+        if not self.permissions.read:
+            return
 
         self.register_entity_operation(
             "expand",

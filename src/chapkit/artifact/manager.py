@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from collections import deque
 
+from servicekit.exceptions import BadRequestError
 from servicekit.manager import BaseManager
 from ulid import ULID
 
 from .models import Artifact
-from .repository import ArtifactRepository
+from .repository import MAX_ARTIFACT_DEPTH, ArtifactRepository
 from .schemas import ArtifactHierarchy, ArtifactIn, ArtifactOut, ArtifactTreeNode
 
 
@@ -80,18 +81,40 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
         return super()._should_assign_field(field, value)
 
     async def pre_save(self, entity: Artifact, data: ArtifactIn) -> None:
-        """Compute and set artifact level before saving."""
+        """Reject cycles and over-deep nesting, then set the artifact level before saving."""
+        await self._ensure_acyclic(entity)
         entity.level = await self._compute_level(entity.parent_id)
+        self._ensure_within_depth(entity.level)
 
     async def pre_update(self, entity: Artifact, data: ArtifactIn, old_values: dict[str, object]) -> None:
-        """Recalculate artifact level and cascade updates to descendants if parent changed."""
+        """Reject cycles and over-deep nesting, then recalculate levels and cascade to descendants."""
+        await self._ensure_acyclic(entity)
         previous_level = old_values.get("level", entity.level)
         entity.level = await self._compute_level(entity.parent_id)
         parent_changed = old_values.get("parent_id") != entity.parent_id
         if parent_changed or previous_level != entity.level:
-            await self._recalculate_descendants(entity)
+            deepest = await self._recalculate_descendants(entity)
+            self._ensure_within_depth(deepest)
+        else:
+            self._ensure_within_depth(entity.level)
 
     # Helper utilities ------------------------------------------------
+
+    async def _ensure_acyclic(self, entity: Artifact) -> None:
+        """Reject a parent that is the artifact itself or one of its descendants."""
+        if entity.parent_id is None:
+            return
+        if entity.parent_id == entity.id:
+            raise BadRequestError(f"Artifact {entity.id} cannot be its own parent")
+        # Walk up from the proposed parent; reaching the entity means the parent is a descendant.
+        seen: set[ULID] = set()
+        current: ULID | None = entity.parent_id
+        while current is not None and current not in seen:
+            if current == entity.id:
+                raise BadRequestError(f"Artifact {entity.id} cannot be moved beneath one of its own descendants")
+            seen.add(current)
+            ancestor = await self.repository.find_by_id(current)
+            current = ancestor.parent_id if ancestor is not None else None
 
     async def _compute_level(self, parent_id: ULID | None) -> int:
         """Compute the level of an artifact based on its parent."""
@@ -102,19 +125,30 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
             return 0  # pragma: no cover
         return parent.level + 1
 
-    async def _recalculate_descendants(self, entity: Artifact) -> None:
-        """Recalculate levels for all descendants of an artifact."""
+    async def _recalculate_descendants(self, entity: Artifact) -> int:
+        """Recalculate levels for all descendants of an artifact and return the deepest level reached."""
         subtree = await self.repository.find_subtree(entity.id)
         by_parent: dict[ULID | None, list[Artifact]] = {}
         for node in subtree:
             by_parent.setdefault(node.parent_id, []).append(node)
 
+        deepest = entity.level
         queue: deque[Artifact] = deque([entity])
         while queue:
             current = queue.popleft()
             for child in by_parent.get(current.id, []):
                 child.level = current.level + 1
+                deepest = max(deepest, child.level)
                 queue.append(child)
+        return deepest
+
+    @staticmethod
+    def _ensure_within_depth(level: int) -> None:
+        """Reject a tree that would nest deeper than the supported maximum."""
+        if level > MAX_ARTIFACT_DEPTH:
+            raise BadRequestError(
+                f"Artifact nesting would reach level {level}; the maximum supported depth is {MAX_ARTIFACT_DEPTH}"
+            )
 
     def _to_tree_node(self, entity: Artifact) -> ArtifactTreeNode:
         """Convert artifact entity to tree node with hierarchy metadata."""

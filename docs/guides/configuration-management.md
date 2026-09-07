@@ -290,7 +290,7 @@ Link a root artifact to a config.
 
 ### POST /api/v1/configs/{id}/$unlink-artifact
 
-Unlink an artifact from a config.
+Unlink an artifact from a config. The link must belong to the config in the URL; unlinking through another config returns 404 and leaves the link intact.
 
 **Request:**
 ```json
@@ -657,7 +657,7 @@ async def test_config_artifact_linking(session, artifact_manager, config_manager
     assert linked_artifacts[0].id == artifact.id
 
     # Unlink
-    await config_manager.unlink_artifact(artifact.id)
+    await config_manager.unlink_artifact(config.id, artifact.id)
     linked_artifacts = await config_manager.get_linked_artifacts(config.id)
     assert len(linked_artifacts) == 0
 ```
@@ -879,7 +879,7 @@ curl http://localhost:9090/api/v1/artifacts/$ARTIFACT_ID | jq '.parent_id'
 # Unlink artifacts before deleting config
 artifacts = await manager.get_linked_artifacts(config_id)
 for artifact in artifacts:
-    await manager.unlink_artifact(artifact.id)
+    await manager.unlink_artifact(config_id, artifact.id)
 
 # Then delete config
 await manager.delete_by_id(config_id)

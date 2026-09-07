@@ -1,5 +1,6 @@
 """Config CRUD router with artifact linking operations."""
 
+import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -29,6 +30,8 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
     ) -> None:
         """Initialize config router with entity types and manager factory."""
         self.enable_artifact_operations = enable_artifact_operations
+        # Kept so custom operations can honour the same permissions as the CRUD routes.
+        self.permissions = permissions or CrudPermissions()
         super().__init__(
             prefix=prefix,
             tags=list(tags),
@@ -54,7 +57,17 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
                     # Extract schema name from $ref (e.g., "#/$defs/DiseaseConfig")
                     ref_name = data_prop["$ref"].split("/")[-1]
                     if ref_name in full_schema["$defs"]:
-                        return full_schema["$defs"][ref_name]
+                        schema = dict(full_schema["$defs"][ref_name])
+                        # Nested models are referenced as #/$defs/<Name>; carry those
+                        # definitions along so the returned document is self-contained.
+                        # A recursive config references its own definition too, so keep
+                        # the root definition whenever something points back at it.
+                        defs = {k: v for k, v in full_schema["$defs"].items() if k != ref_name}
+                        if f'"#/$defs/{ref_name}"' in json.dumps({**schema, "$defs": defs}):
+                            defs[ref_name] = full_schema["$defs"][ref_name]
+                        if defs:
+                            schema["$defs"] = defs
+                        return schema
 
             # Fallback to full schema if extraction fails
             return full_schema
@@ -92,9 +105,11 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
             request: UnlinkArtifactRequest,
             manager: ConfigManager[BaseConfig] = Depends(manager_factory),
         ) -> None:
+            config_id = self._parse_ulid(entity_id)
+
             try:
-                await manager.unlink_artifact(request.artifact_id)
-            except Exception as e:
+                await manager.unlink_artifact(config_id, request.artifact_id)
+            except ValueError as e:
                 raise BadRequestError(str(e), instance=f"{self.router.prefix}/{entity_id}") from e
 
         async def get_linked_artifacts(
@@ -104,29 +119,33 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
             config_id = self._parse_ulid(entity_id)
             return await manager.get_linked_artifacts(config_id)
 
-        self.register_entity_operation(
-            "link-artifact",
-            link_artifact,
-            http_method="POST",
-            status_code=status.HTTP_204_NO_CONTENT,
-            summary="Link artifact to config",
-            description="Link a config to a root artifact (parent_id IS NULL)",
-        )
+        # Linking mutates the config's relationships, so it follows the update permission;
+        # listing linked artifacts follows the read permission.
+        if self.permissions.update:
+            self.register_entity_operation(
+                "link-artifact",
+                link_artifact,
+                http_method="POST",
+                status_code=status.HTTP_204_NO_CONTENT,
+                summary="Link artifact to config",
+                description="Link a config to a root artifact (parent_id IS NULL)",
+            )
 
-        self.register_entity_operation(
-            "unlink-artifact",
-            unlink_artifact,
-            http_method="POST",
-            status_code=status.HTTP_204_NO_CONTENT,
-            summary="Unlink artifact from config",
-            description="Remove the link between a config and an artifact",
-        )
+            self.register_entity_operation(
+                "unlink-artifact",
+                unlink_artifact,
+                http_method="POST",
+                status_code=status.HTTP_204_NO_CONTENT,
+                summary="Unlink artifact from config",
+                description="Remove the link between a config and an artifact",
+            )
 
-        self.register_entity_operation(
-            "artifacts",
-            get_linked_artifacts,
-            http_method="GET",
-            response_model=list[ArtifactOut],
-            summary="Get linked artifacts",
-            description="Get all root artifacts linked to this config",
-        )
+        if self.permissions.read:
+            self.register_entity_operation(
+                "artifacts",
+                get_linked_artifacts,
+                http_method="GET",
+                response_model=list[ArtifactOut],
+                summary="Get linked artifacts",
+                description="Get all root artifacts linked to this config",
+            )

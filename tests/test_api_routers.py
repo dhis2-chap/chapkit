@@ -195,11 +195,11 @@ def test_config_router_link_artifact_with_error(config_app: tuple[TestClient, Co
 
 def test_config_router_unlink_artifact_success(config_app: tuple[TestClient, ConfigOut[ExampleConfig]]) -> None:
     """Test successful artifact unlinking from a config."""
-    client, _ = config_app
+    client, record = config_app
 
     artifact_id = ULID()
     response = client.post(
-        "/config/anyid/$unlink-artifact",
+        f"/config/{record.id}/$unlink-artifact",
         json={"artifact_id": str(artifact_id)},
     )
 

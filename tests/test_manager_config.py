@@ -117,7 +117,7 @@ async def test_config_manager_unlink_artifact() -> None:
 
         # Link and then unlink
         await manager.link_artifact(saved_config.id, root_artifact.id)
-        await manager.unlink_artifact(root_artifact.id)
+        await manager.unlink_artifact(saved_config.id, root_artifact.id)
 
         # Verify unlinked
         linked_artifacts = await manager.get_linked_artifacts(saved_config.id)

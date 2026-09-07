@@ -123,7 +123,7 @@ def test_unlink_artifact_success() -> None:
 def test_unlink_artifact_error_returns_400() -> None:
     """Test that unlinking artifact with error returns 400."""
     mock_manager = Mock(spec=ConfigManager)
-    mock_manager.unlink_artifact = AsyncMock(side_effect=Exception("Unlink failed"))
+    mock_manager.unlink_artifact = AsyncMock(side_effect=ValueError("Unlink failed"))
 
     def manager_factory() -> ConfigManager:
         return mock_manager
@@ -245,3 +245,48 @@ def test_artifact_operations_disabled_by_default() -> None:
 
     response = client.get(f"/api/v1/configs/{config_id}/$artifacts")
     assert response.status_code == 404
+
+
+def test_schema_without_nested_models_has_no_defs() -> None:
+    """A flat config schema is returned as-is, without an empty $defs block."""
+    app = FastAPI()
+    add_error_handlers(app)
+    router = ConfigRouter.create(
+        prefix="/api/v1/configs",
+        tags=["Configs"],
+        manager_factory=lambda: Mock(spec=ConfigManager),
+        entity_in_type=ConfigIn[BaseConfig],
+        entity_out_type=ConfigOut[BaseConfig],
+    )
+    app.include_router(router)
+
+    schema = TestClient(app).get("/api/v1/configs/$schema").json()
+
+    assert "prediction_periods" in schema["properties"]
+    assert "$defs" not in schema
+
+
+def test_schema_keeps_root_definition_for_recursive_configs() -> None:
+    """A config that references itself keeps its own definition under $defs."""
+    from pydantic import Field
+
+    class RecursiveConfig(BaseConfig):
+        """Config whose children are configs of the same type."""
+
+        children: list["RecursiveConfig"] = Field(default_factory=list)
+
+    app = FastAPI()
+    add_error_handlers(app)
+    router = ConfigRouter.create(
+        prefix="/api/v1/configs",
+        tags=["Configs"],
+        manager_factory=lambda: Mock(spec=ConfigManager),
+        entity_in_type=ConfigIn[RecursiveConfig],
+        entity_out_type=ConfigOut[RecursiveConfig],
+    )
+    app.include_router(router)
+
+    schema = TestClient(app).get("/api/v1/configs/$schema").json()
+
+    assert schema["properties"]["children"]["items"] == {"$ref": "#/$defs/RecursiveConfig"}
+    assert "children" in schema["$defs"]["RecursiveConfig"]["properties"]

@@ -36,10 +36,14 @@ class ConfigRepository(BaseRepository[Config, ULID]):
         link = ConfigArtifact(config_id=config_id, artifact_id=artifact_id)
         self.s.add(link)
 
-    async def unlink_artifact(self, artifact_id: ULID) -> None:
-        """Unlink an artifact from its config."""
-        stmt = sql_delete(ConfigArtifact).where(ConfigArtifact.artifact_id == artifact_id)
-        await self.s.execute(stmt)
+    async def unlink_artifact(self, config_id: ULID, artifact_id: ULID) -> bool:
+        """Remove the link between a config and an artifact, returning whether a link was removed."""
+        stmt = sql_delete(ConfigArtifact).where(
+            ConfigArtifact.config_id == config_id,
+            ConfigArtifact.artifact_id == artifact_id,
+        )
+        result = await self.s.execute(stmt)
+        return (getattr(result, "rowcount", 0) or 0) > 0
 
     async def delete_by_id(self, id: ULID) -> None:
         """Delete a config and cascade delete all linked artifact trees."""
