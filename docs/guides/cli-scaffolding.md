@@ -499,6 +499,7 @@ Single-stage build on one of the [chapkit base images](https://github.com/dhis2-
 - `uv sync --frozen --no-dev` installs the locked dependencies into the base image's venv, in a layer that only changes when `pyproject.toml` or `uv.lock` change
 - `ARG GIT_REVISION` / `ENV GIT_REVISION` bakes the commit into the image so `/api/v1/info` reports it as `git_revision` (pass `--build-arg GIT_REVISION=$(git rev-parse HEAD)`; the publish workflow and `compose.yml` already do)
 - `main.py` (and `scripts/` for shell templates) copied last
+- An unprivileged `chapkit` user owns `/work/data` and runs the service; `HOME`, `MPLCONFIGDIR` and `XDG_CACHE_HOME` point at `/tmp` so libraries that want a scratch directory get one
 - `HEALTHCHECK` against `/health` and `uvicorn main:app` on port 8000
 
 ### compose.yml
@@ -506,6 +507,7 @@ Single-stage build on one of the [chapkit base images](https://github.com/dhis2-
 - Single service named after the project slug, host port 9090 to container port 8000
 - Builds from the local `Dockerfile`, forwarding `GIT_REVISION` from the shell environment as a build argument
 - Named volume for `data/` so the SQLite database survives restarts
+- Runtime hardening mirroring chap-core's own compose file: `init`, `read_only` root filesystem, `cap_drop: ALL`, `no-new-privileges`, the `chapkit` user, and a tmpfs on `/tmp` for ML workspaces. Models that write elsewhere need an extra volume or `read_only` removed
 - `LOG_FORMAT`, `LOG_LEVEL`, `WORKERS` environment defaults and commented-out chap-core registration variables
 
 ### .github/workflows/publish-docker.yml

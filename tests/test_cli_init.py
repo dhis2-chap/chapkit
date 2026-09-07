@@ -55,6 +55,16 @@ def test_init_dockerfile_and_compose_per_template(
     assert "type=sha,format=short" in workflow
     assert ("platforms: linux/amd64" in workflow) == expects_amd64
 
+    # Hardened runtime: unprivileged user in the image, read-only root fs in compose.
+    assert "RUN useradd --no-create-home --shell /usr/sbin/nologin chapkit" in dockerfile
+    assert dockerfile.rstrip().endswith('CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]')
+    assert dockerfile.index("USER chapkit") > dockerfile.index("uv sync --frozen")
+    assert dockerfile.index("USER chapkit") > dockerfile.index("COPY main.py")
+    assert "read_only: true" in compose_yml
+    assert "no-new-privileges:true" in compose_yml
+    assert "user: chapkit:chapkit" in compose_yml
+    assert "target: /tmp" in compose_yml
+
     dockerignore = (project_dir / ".dockerignore").read_text()
     assert ".git/" in dockerignore
     assert ".venv/" in dockerignore

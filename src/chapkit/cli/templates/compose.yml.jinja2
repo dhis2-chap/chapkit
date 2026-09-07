@@ -28,8 +28,25 @@ services:
       # models, pick a unique host port per overlay (chap-core's ewars overlay uses
       # 5002, for example). The container (right) port stays 8000.
       - "9090:8000"
+    # Runtime hardening, mirroring chap-core's own compose.yml. The image runs as the
+    # unprivileged `chapkit` user (see Dockerfile) with a read-only root filesystem;
+    # the two places the service writes are mounted separately below: /work/data
+    # (SQLite database, named volume) and /tmp (ML workspaces, tmpfs held in RAM -
+    # raise `size` if your model produces large intermediate files). If your model
+    # writes anywhere else, add a volume for that path or drop `read_only`.
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: chapkit:chapkit
     volumes:
       - ck_{{ PROJECT_SLUG }}_data:/work/data
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 2000000000
     environment:
       LOG_FORMAT: json
       LOG_LEVEL: INFO

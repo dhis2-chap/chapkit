@@ -59,6 +59,14 @@ docker run --rm -p 9090:8000 {{ PROJECT_SLUG }}
 `GIT_REVISION` is optional: it bakes the commit into the image so `GET /api/v1/info`
 reports it as `git_revision` (`make docker-build` and `compose.yml` pass it for you).
 
+The image runs as an unprivileged `chapkit` user, and `compose.yml` additionally
+mounts the root filesystem read-only with `/work/data` (SQLite database) and `/tmp`
+(ML workspaces, tmpfs) as the only writable paths. Model code that writes elsewhere
+(a cache directory next to the scripts, for example) needs a volume for that path in
+`compose.yml`, or `read_only: true` removed.{% if HAS_RENV %} The renv library is
+restored at build time into `/opt/renv/cache` and the project library, both readable
+by that user, and renv's sandbox is disabled so nothing is written at startup.{% endif %}
+
 The image builds on [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://github.com/dhis2-chap/chapkit-images), one of the pre-baked [chapkit base images](https://github.com/dhis2-chap/chapkit-images) with Python/R and the common ML stack ready to go.
 {% if BASE_IMAGE == "chapkit-r-inla" %}
 > **Note:** `chapkit-r-inla` is `amd64`-only (INLA ships only x86_64 binaries). On Apple Silicon add `--platform=linux/amd64` to both `docker build` and `docker run`.
