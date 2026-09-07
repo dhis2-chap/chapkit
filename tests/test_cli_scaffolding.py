@@ -690,16 +690,9 @@ def test_scaffold_config_artifact_linkage(
 
 
 #: Latest chapkit release on PyPI. The Docker-build tests pin against this so
-#: the lockfile + container build can resolve from PyPI - the dev-version
-#: scaffolded into pyproject.toml (e.g. 1.2.0.dev0) isn't published yet.
-_LATEST_PUBLISHED_CHAPKIT = "1.1.0"
-
-#: Every chapkit release up to 1.1.0 requires `servicekit>=...` with no upper
-#: bound, so a container built today would pull servicekit 2.x into a chapkit
-#: that predates it. The Docker-build tests therefore add the ceiling the
-#: published metadata lacks; drop this once a chapkit release carrying
-#: `servicekit>=2.0.0,<3` is on PyPI.
-_PUBLISHED_CHAPKIT_SERVICEKIT_CEILING = '"servicekit<2"'
+#: the lockfile + container build can resolve from PyPI - a dev version
+#: scaffolded into pyproject.toml (e.g. 2.1.0.dev0) isn't published yet.
+_LATEST_PUBLISHED_CHAPKIT = "2.0.0"
 
 
 @pytest.fixture
@@ -737,11 +730,7 @@ def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[st
         pyproject = project_dir / "pyproject.toml"
         content = pyproject.read_text()
         _assert_bounded_chapkit_requirement(content)
-        content = re.sub(
-            r'"chapkit>=[^"]+"',
-            f'"chapkit>={_LATEST_PUBLISHED_CHAPKIT}",\n    {_PUBLISHED_CHAPKIT_SERVICEKIT_CEILING}',
-            content,
-        )
+        content = re.sub(r'"chapkit>=[^"]+"', f'"chapkit>={_LATEST_PUBLISHED_CHAPKIT}"', content)
         pyproject.write_text(content)
 
         # Generate uv.lock (the Dockerfile's `uv sync --frozen` requires it).
