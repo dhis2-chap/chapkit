@@ -740,6 +740,14 @@ def scaffold_project_no_sync(tmp_path: Path, chapkit_root: Path) -> Callable[[st
             capture_output=True,
             text=True,
         )
+        # Between a version bump and its PyPI publish the pinned release does not
+        # resolve yet; skip rather than fail, like the Docker build step below.
+        if (
+            lock_result.returncode != 0
+            and "chapkit" in lock_result.stderr
+            and "No solution found" in lock_result.stderr
+        ):
+            pytest.skip(f"chapkit {_LATEST_PUBLISHED_CHAPKIT} not yet published to PyPI - cannot lock the scaffold")
         assert lock_result.returncode == 0, f"uv lock failed: {lock_result.stderr}"
 
         return project_dir
