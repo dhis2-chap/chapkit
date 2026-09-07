@@ -81,6 +81,13 @@ The API will be available at:
 The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
 if you want a different host port.
 
+The container runs as an unprivileged `chapkit` user on a read-only root
+filesystem, the same posture chap-core uses for its own services. The only
+writable paths are `/work/data` (the SQLite database, a named volume) and `/tmp`
+(ML workspaces, a tmpfs held in RAM). If your model writes anywhere else, add a
+volume for that path in `compose.yml` or drop `read_only: true`; if it produces
+large intermediate files, raise the tmpfs `size`.
+
 ### Local dev (optional, faster iteration)
 
 If you have Python 3.13 + uv + R installed locally, you can skip Docker for
@@ -121,6 +128,13 @@ The API will be available at:
 
 The compose stack maps host port 9090 to container port 8000. Edit `compose.yml`
 to change the host port. Local dev (`python main.py`) also defaults to 9090.
+
+The container runs as an unprivileged `chapkit` user on a read-only root
+filesystem, the same posture chap-core uses for its own services. The only
+writable paths are `/work/data` (the SQLite database, a named volume) and `/tmp`
+(ML workspaces, a tmpfs held in RAM). If your model writes anywhere else, add a
+volume for that path in `compose.yml` or drop `read_only: true`; if it produces
+large intermediate files, raise the tmpfs `size`.
 {% endif %}
 
 ### Verify the service

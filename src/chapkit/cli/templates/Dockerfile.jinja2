@@ -20,8 +20,11 @@ FROM ghcr.io/dhis2-chap/chapkit-r:latest
 FROM ghcr.io/dhis2-chap/chapkit-py:latest
 {% endif %}
 
-# chapkit-py runs as root; matches chapkit-r / chapkit-r-tidyverse / chapkit-r-inla.
+# Build steps run as root; the service itself runs as the unprivileged `chapkit`
+# user created here (the switch happens right before CMD). Same posture as
+# chap-core's own images. The base images ship as root, so we add the user ourselves.
 USER root
+RUN useradd --no-create-home --shell /usr/sbin/nologin chapkit
 
 WORKDIR /work
 # Copy lockfile + manifest first so the dep-install layer caches independently of code changes.
@@ -47,6 +50,17 @@ COPY main.py ./
 {% if TEMPLATE in ("shell-py", "shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 COPY scripts/ ./scripts/
 {% endif %}
+
+# The service writes in exactly two places: /work/data (SQLite database, a named
+# volume in compose.yml) and /tmp (ML workspaces, a tmpfs in compose.yml). Everything
+# else stays read-only, which is what compose.yml's `read_only: true` enforces. HOME,
+# MPLCONFIGDIR and XDG_CACHE_HOME point libraries that want a scratch directory
+# (R session files, matplotlib, pip/uv caches) at /tmp as well.
+RUN mkdir -p /work/data && chown -R chapkit:chapkit /work/data
+ENV HOME=/tmp \
+    MPLCONFIGDIR=/tmp \
+    XDG_CACHE_HOME=/tmp/.cache
+USER chapkit
 
 EXPOSE 8000
 

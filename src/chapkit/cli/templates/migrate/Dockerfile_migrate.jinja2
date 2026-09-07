@@ -10,8 +10,11 @@ FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest
 FROM ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest
 {% endif %}
 
-# chapkit-py runs as root; matches chapkit-r / chapkit-r-tidyverse / chapkit-r-inla.
+# Build steps run as root; the service itself runs as the unprivileged `chapkit`
+# user created here (the switch happens right before CMD). Same posture as
+# chap-core's own images. The base images ship as root, so we add the user ourselves.
 USER root
+RUN useradd --no-create-home --shell /usr/sbin/nologin chapkit
 
 WORKDIR /work
 # Copy lockfile + manifest first so the dep-install layer caches independently of code changes.
@@ -44,6 +47,11 @@ COPY . /work
 # Restore the R library declared in renv.lock at image build time so the
 # container starts instantly instead of bootstrapping renv on every run.
 # Installs renv first if the base image doesn't ship it; no-op otherwise.
+# The renv cache goes under /opt (world-readable) instead of root's home, because
+# the project library symlinks into it and the service runs as a different user.
+# The sandbox is disabled so renv does not try to write one at startup.
+ENV RENV_PATHS_CACHE=/opt/renv/cache \
+    RENV_CONFIG_SANDBOX_ENABLED=FALSE
 RUN R -q -e "if (!requireNamespace('renv', quietly = TRUE)) install.packages('renv', repos = 'https://cloud.r-project.org'); renv::restore(prompt = FALSE)"
 {% elif HAS_INSTALL_PACKAGES_R %}
 # The repo ships an install_packages.R helper (chap-models convention for R
@@ -51,6 +59,20 @@ RUN R -q -e "if (!requireNamespace('renv', quietly = TRUE)) install.packages('re
 # declares are baked into the image and the container starts instantly.
 RUN Rscript install_packages.R
 {% endif %}
+{% if HAS_RENV %}
+RUN chown -R chapkit:chapkit /work/renv
+{% endif %}
+
+# The service writes in exactly two places: /work/data (SQLite database, a named
+# volume in compose.yml) and /tmp (ML workspaces, a tmpfs in compose.yml). Everything
+# else stays read-only, which is what compose.yml's `read_only: true` enforces. HOME,
+# MPLCONFIGDIR and XDG_CACHE_HOME point libraries that want a scratch directory
+# (R session files, matplotlib, pip/uv caches) at /tmp as well.
+RUN mkdir -p /work/data && chown -R chapkit:chapkit /work/data
+ENV HOME=/tmp \
+    MPLCONFIGDIR=/tmp \
+    XDG_CACHE_HOME=/tmp/.cache
+USER chapkit
 
 EXPOSE 8000
 

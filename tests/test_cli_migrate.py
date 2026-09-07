@@ -345,7 +345,13 @@ def test_migrate_dockerfile_uses_chapkit_r_tidyverse(tmp_path: Path) -> None:
     assert 'ARG GIT_REVISION=""' in dockerfile
     assert "ENV GIT_REVISION=${GIT_REVISION}" in dockerfile
     assert "--build-arg GIT_REVISION=$(shell git rev-parse HEAD 2>/dev/null)" in (tmp_path / "Makefile").read_text()
-    assert "GIT_REVISION: ${GIT_REVISION:-}" in (tmp_path / "compose.yml").read_text()
+    compose_yml = (tmp_path / "compose.yml").read_text()
+    assert "GIT_REVISION: ${GIT_REVISION:-}" in compose_yml
+    # Hardened runtime: unprivileged user, switched to only after the build steps.
+    assert "RUN useradd --no-create-home --shell /usr/sbin/nologin chapkit" in dockerfile
+    assert dockerfile.index("USER chapkit") > dockerfile.index("COPY . /work")
+    assert "read_only: true" in compose_yml
+    assert "user: chapkit:chapkit" in compose_yml
 
 
 def test_build_service_info_context_ewars(tmp_path: Path) -> None:
