@@ -52,9 +52,12 @@ Poke at [http://127.0.0.1:9090/docs](http://127.0.0.1:9090/docs) for the OpenAPI
 ## Run it in Docker
 
 ```bash
-docker build -t {{ PROJECT_SLUG }} .
+docker build --build-arg GIT_REVISION=$(git rev-parse HEAD) -t {{ PROJECT_SLUG }} .
 docker run --rm -p 9090:8000 {{ PROJECT_SLUG }}
 ```
+
+`GIT_REVISION` is optional: it bakes the commit into the image so `GET /api/v1/info`
+reports it as `git_revision` (`make docker-build` and `compose.yml` pass it for you).
 
 The image builds on [`ghcr.io/dhis2-chap/{{ BASE_IMAGE }}:latest`](https://github.com/dhis2-chap/chapkit-images), one of the pre-baked [chapkit base images](https://github.com/dhis2-chap/chapkit-images) with Python/R and the common ML stack ready to go.
 {% if BASE_IMAGE == "chapkit-r-inla" %}

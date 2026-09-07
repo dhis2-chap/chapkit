@@ -8,6 +8,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Bakes the commit into the image so /api/v1/info reports git_revision:
+      #   GIT_REVISION=$(git rev-parse HEAD) docker compose up --build
+      # Left empty (unknown) when the variable is not set.
+      args:
+        GIT_REVISION: ${GIT_REVISION:-}
 {% if TEMPLATE == "shell-r-inla" %}
     # chapkit-r-inla is amd64-only; runs under Rosetta on Apple Silicon. Drop this if
     # you switch to chapkit-r or chapkit-r-tidyverse in the Dockerfile - both are multi-arch.

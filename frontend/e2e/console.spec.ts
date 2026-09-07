@@ -43,6 +43,11 @@ test('overview renders the live service identity and health', async ({ page }) =
   await page.goto('/#/')
   await expect(page.getByRole('heading', { name: 'Chapkit e2e fixture' })).toBeVisible()
   await expect(page.getByText('healthy').first()).toBeVisible()
+  // Revision shows the short SHA, with the full SHA as the tooltip.
+  const revision = page.getByText('0123456', { exact: true })
+  await expect(revision).toBeVisible()
+  await expect(revision).toHaveAttribute('title', '0123456789abcdef0123456789abcdef01234567')
+  await expect(page.getByText(/chapkit \d+\.\d+/)).toBeVisible()
 })
 
 test('sidebar navigates to every screen', async ({ page }) => {

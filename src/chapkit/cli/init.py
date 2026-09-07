@@ -158,6 +158,10 @@ def init_command(
     _render_template(template_dir, target_dir, "README.md.jinja2", context, "README.md")
     _render_template(template_dir, target_dir, "compose.yml.jinja2", context, "compose.yml")
 
+    workflows_dir = target_dir / ".github" / "workflows"
+    workflows_dir.mkdir(parents=True, exist_ok=True)
+    _render_template(template_dir, workflows_dir, "publish-docker.yml.jinja2", context, "publish-docker.yml")
+
     # For shell templates, create scripts directory with language-specific stubs
     if template == "shell-py":
         scripts_dir = target_dir / "scripts"
@@ -195,6 +199,7 @@ def init_command(
         )
 
     _copy_static_file(template_dir, target_dir, ".gitignore")
+    _copy_static_file(template_dir, target_dir, ".dockerignore")
     _copy_static_file(template_dir, target_dir, ".python-version")
 
     typer.echo()

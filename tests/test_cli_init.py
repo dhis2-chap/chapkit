@@ -45,6 +45,20 @@ def test_init_dockerfile_and_compose_per_template(
 
     assert expected_from in dockerfile
 
+    # GIT_REVISION is baked into every image and forwarded by compose as a build arg.
+    assert 'ARG GIT_REVISION=""' in dockerfile
+    assert "ENV GIT_REVISION=${GIT_REVISION}" in dockerfile
+    assert "GIT_REVISION: ${GIT_REVISION:-}" in compose_yml
+
+    workflow = (project_dir / ".github" / "workflows" / "publish-docker.yml").read_text()
+    assert "GIT_REVISION=${{ github.sha }}" in workflow
+    assert "type=sha,format=short" in workflow
+    assert ("platforms: linux/amd64" in workflow) == expects_amd64
+
+    dockerignore = (project_dir / ".dockerignore").read_text()
+    assert ".git/" in dockerignore
+    assert ".venv/" in dockerignore
+
     # Only chapkit-r-inla pins amd64 - the other R images and chapkit-py are multi-arch.
     if expects_amd64:
         assert "ARG BASE_PLATFORM=linux/amd64" in dockerfile

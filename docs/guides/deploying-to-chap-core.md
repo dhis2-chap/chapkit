@@ -74,6 +74,8 @@ Set these in the compose overlay in Step 6, not in code. Hard-coding URLs into `
 | `required_covariates` | Column names your model needs on the input data. |
 | `min_prediction_periods` / `max_prediction_periods` | Bounds on forecast horizon. |
 | `model_metadata` | Author, contact email, organization, citation, `AssessedStatus`. |
+| `git_revision` | Filled automatically from the `GIT_REVISION` environment variable (a Docker build argument, see Step 4). Lets operators see which commit a running model came from. |
+| `chapkit_version` / `servicekit_version` | Filled automatically from the installed packages. |
 
 The ewars model ([`main.py`](https://github.com/chap-models/chapkit_ewars_model/blob/main/main.py)) is a good concrete example — it declares `PeriodType.monthly`, requires `population`, allows additional continuous covariates, and pins `min/max_prediction_periods=0/100`.
 
@@ -82,9 +84,11 @@ The ewars model ([`main.py`](https://github.com/chap-models/chapkit_ewars_model/
 The scaffolded `Dockerfile` works out of the box for Python models — `FROM ghcr.io/dhis2-chap/chapkit-py:latest`, `uv sync --frozen`, then `uvicorn main:app` on container port 8000 with a `/health` healthcheck. The scaffolded `compose.yml` maps host port 9090 to container 8000.
 
 ```bash
-docker build -t my-model:dev .
+docker build --build-arg GIT_REVISION=$(git rev-parse HEAD) -t my-model:dev .
 docker run --rm -p 9090:8000 my-model:dev
 ```
+
+The `GIT_REVISION` build argument is optional. When set, the Dockerfile exports it as an environment variable and `/api/v1/info` reports it as `git_revision`, the same convention chap-core uses for its own images. `docker compose up --build` reads it from the shell environment (`GIT_REVISION=$(git rev-parse HEAD) docker compose up --build`).
 
 **If your model has R or other system dependencies**, swap the base image for one of the pre-built [chapkit-images](https://github.com/dhis2-chap/chapkit-images):
 
@@ -99,7 +103,7 @@ See [MLproject Runner → Running in a Container](mlproject-runner.md#running-in
 
 chap-core pulls your image by tag from a container registry. GHCR is the path of least resistance: it needs no repo secrets and is already wired to your repo's `GITHUB_TOKEN`.
 
-Drop this workflow into `.github/workflows/publish-docker.yml`:
+`chapkit init` scaffolds a fuller version of this workflow at `.github/workflows/publish-docker.yml` (SHA and semver tags, build cache, provenance attestation). The minimal equivalent:
 
 ```yaml
 name: Publish Docker image
@@ -128,6 +132,8 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
+          build-args: |
+            GIT_REVISION=${{ github.sha }}
 ```
 
 Every push to `main` publishes `ghcr.io/<owner>/<repo>:latest`. No secrets configuration is required — the built-in `GITHUB_TOKEN` is enough thanks to `permissions: packages: write`.
