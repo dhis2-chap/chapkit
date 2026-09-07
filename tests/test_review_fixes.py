@@ -368,3 +368,48 @@ async def test_shell_train_cancellation_removes_workspace_and_process(tmp_path: 
     assert after == before
     await asyncio.sleep(1.0)
     assert not marker.exists()
+
+
+@pytest.mark.asyncio
+async def test_artifact_depth_is_enforced_on_writes_and_trees_are_never_truncated() -> None:
+    """A chain up to the maximum depth is fully readable; nesting beyond it is rejected on create and reparent."""
+    from servicekit import SqliteDatabaseBuilder
+    from servicekit.exceptions import BadRequestError
+
+    from chapkit import ArtifactIn, ArtifactManager, ArtifactRepository
+    from chapkit.artifact.repository import MAX_ARTIFACT_DEPTH
+
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        async with db.session() as session:
+            manager = ArtifactManager(ArtifactRepository(session))
+            chain: list[ULID] = []
+            parent: ULID | None = None
+            for _ in range(MAX_ARTIFACT_DEPTH + 1):
+                saved = await manager.save(ArtifactIn(parent_id=parent, data={}))
+                chain.append(saved.id)
+                parent = saved.id
+
+            deepest = await manager.find_by_id(chain[-1])
+            assert deepest is not None and deepest.level == MAX_ARTIFACT_DEPTH
+            tree = await manager.build_tree(chain[0])
+            depth = 0
+            node = tree
+            while node is not None and node.children:
+                node = node.children[0]
+                depth += 1
+            assert depth == MAX_ARTIFACT_DEPTH
+
+            with pytest.raises(BadRequestError, match="maximum supported depth"):
+                await manager.save(ArtifactIn(parent_id=chain[-1], data={}))
+
+            # A two-node subtree fits under the level just above the limit, but not one level deeper.
+            subtree_root = await manager.save(ArtifactIn(data={}))
+            await manager.save(ArtifactIn(parent_id=subtree_root.id, data={}))
+            with pytest.raises(BadRequestError, match="maximum supported depth"):
+                await manager.save(ArtifactIn(id=subtree_root.id, parent_id=chain[-1], data={}))
+            moved = await manager.save(ArtifactIn(id=subtree_root.id, parent_id=chain[-2], data={}))
+            assert moved.level == MAX_ARTIFACT_DEPTH - 1
+    finally:
+        await db.dispose()

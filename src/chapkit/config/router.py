@@ -1,5 +1,6 @@
 """Config CRUD router with artifact linking operations."""
 
+import json
 from collections.abc import Sequence
 from typing import Any
 
@@ -59,9 +60,13 @@ class ConfigRouter(CrudRouter[ConfigIn[BaseConfig], ConfigOut[BaseConfig]]):
                         schema = dict(full_schema["$defs"][ref_name])
                         # Nested models are referenced as #/$defs/<Name>; carry those
                         # definitions along so the returned document is self-contained.
-                        other_defs = {k: v for k, v in full_schema["$defs"].items() if k != ref_name}
-                        if other_defs:
-                            schema["$defs"] = other_defs
+                        # A recursive config references its own definition too, so keep
+                        # the root definition whenever something points back at it.
+                        defs = {k: v for k, v in full_schema["$defs"].items() if k != ref_name}
+                        if f'"#/$defs/{ref_name}"' in json.dumps({**schema, "$defs": defs}):
+                            defs[ref_name] = full_schema["$defs"][ref_name]
+                        if defs:
+                            schema["$defs"] = defs
                         return schema
 
             # Fallback to full schema if extraction fails

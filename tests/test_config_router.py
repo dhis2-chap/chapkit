@@ -264,3 +264,29 @@ def test_schema_without_nested_models_has_no_defs() -> None:
 
     assert "prediction_periods" in schema["properties"]
     assert "$defs" not in schema
+
+
+def test_schema_keeps_root_definition_for_recursive_configs() -> None:
+    """A config that references itself keeps its own definition under $defs."""
+    from pydantic import Field
+
+    class RecursiveConfig(BaseConfig):
+        """Config whose children are configs of the same type."""
+
+        children: list["RecursiveConfig"] = Field(default_factory=list)
+
+    app = FastAPI()
+    add_error_handlers(app)
+    router = ConfigRouter.create(
+        prefix="/api/v1/configs",
+        tags=["Configs"],
+        manager_factory=lambda: Mock(spec=ConfigManager),
+        entity_in_type=ConfigIn[RecursiveConfig],
+        entity_out_type=ConfigOut[RecursiveConfig],
+    )
+    app.include_router(router)
+
+    schema = TestClient(app).get("/api/v1/configs/$schema").json()
+
+    assert schema["properties"]["children"]["items"] == {"$ref": "#/$defs/RecursiveConfig"}
+    assert "children" in schema["$defs"]["RecursiveConfig"]["properties"]
