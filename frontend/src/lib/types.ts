@@ -21,6 +21,9 @@ export interface ServiceInfo {
   display_name: string
   version: string
   description?: string | null
+  git_revision?: string | null
+  chapkit_version?: string | null
+  servicekit_version?: string | null
   model_metadata?: ModelMetadata | null
   period_type?: string | null
   min_prediction_periods?: number | null

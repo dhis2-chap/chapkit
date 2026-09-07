@@ -218,6 +218,11 @@ def test_command(
                 f"requires_geo={runner.requires_geo}, "
                 f"allow_free_additional_covariates={runner.allow_free_additional_continuous_covariates}"
             )
+            typer.echo(
+                f"  Build: git_revision={runner.git_revision or 'unknown'}, "
+                f"chapkit={runner.chapkit_version or 'unknown'}, "
+                f"servicekit={runner.servicekit_version or 'unknown'}"
+            )
             typer.echo()
 
         # 3. Fetch config schema

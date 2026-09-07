@@ -65,6 +65,7 @@ info = MLServiceInfo(
     display_name="Chapkit e2e fixture",
     version="0.1.0",
     description="Self-contained chapkit ML service used to drive the console e2e tests.",
+    git_revision="0123456789abcdef0123456789abcdef01234567",
     model_metadata=ModelMetadata(
         author="chapkit",
         author_assessed_status=AssessedStatus.green,

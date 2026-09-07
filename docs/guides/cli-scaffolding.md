@@ -345,6 +345,9 @@ my-service/
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # FROM chapkit-py + uv sync
 ├── compose.yml          # Docker Compose configuration
+├── .dockerignore        # Files excluded from the Docker build context
+├── .github/workflows/
+│   └── publish-docker.yml  # Builds and publishes the image to GHCR
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (created at runtime)
 ├── .gitignore           # Python gitignore
@@ -364,6 +367,9 @@ my-service/
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # FROM chapkit-py + uv sync
 ├── compose.yml          # Docker Compose configuration
+├── .dockerignore        # Files excluded from the Docker build context
+├── .github/workflows/
+│   └── publish-docker.yml  # Builds and publishes the image to GHCR
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (created at runtime)
 ├── .gitignore           # Python gitignore
@@ -389,6 +395,9 @@ my-service/
 ├── pyproject.toml       # Python deps for the service layer (chapkit only by default)
 ├── Dockerfile           # FROM chapkit-r{-tidyverse,-inla} + uv sync
 ├── compose.yml          # Docker Compose configuration (pins linux/amd64 only for shell-r-inla)
+├── .dockerignore        # Files excluded from the Docker build context
+├── .github/workflows/
+│   └── publish-docker.yml  # Builds and publishes the image to GHCR (amd64-only for shell-r-inla)
 ├── data/                # Database directory
 │   └── chapkit.db       # SQLite database (created at runtime)
 ├── .gitignore           # Python gitignore
@@ -485,27 +494,23 @@ dev = ["uvicorn[standard]>=0.30.0"]
 
 ### Dockerfile
 
-Multi-stage Docker build with:
+Single-stage build on one of the [chapkit base images](https://github.com/dhis2-chap/chapkit-images):
 
-- **Builder stage**: UV-based dependency installation
-- **Runtime stage**: Slim Python image with gunicorn/uvicorn
-- Health checks and proper user setup
-- Environment variables for configuration
+- `uv sync --frozen --no-dev` installs the locked dependencies into the base image's venv, in a layer that only changes when `pyproject.toml` or `uv.lock` change
+- `ARG GIT_REVISION` / `ENV GIT_REVISION` bakes the commit into the image so `/api/v1/info` reports it as `git_revision` (pass `--build-arg GIT_REVISION=$(git rev-parse HEAD)`; the publish workflow and `compose.yml` already do)
+- `main.py` (and `scripts/` for shell templates) copied last
+- `HEALTHCHECK` against `/health` and `uvicorn main:app` on port 8000
 
 ### compose.yml
 
-**Basic version:**
+- Single service named after the project slug, host port 9090 to container port 8000
+- Builds from the local `Dockerfile`, forwarding `GIT_REVISION` from the shell environment as a build argument
+- Named volume for `data/` so the SQLite database survives restarts
+- `LOG_FORMAT`, `LOG_LEVEL`, `WORKERS` environment defaults and commented-out chap-core registration variables
 
-- Single service (API) on port 8000
-- Health checks
-- Configurable workers and logging
+### .github/workflows/publish-docker.yml
 
-**Monitoring version:**
-
-- API service (port 8000)
-- Prometheus (port 9090)
-- Grafana (port 3000, admin/admin)
-- Pre-configured dashboards and datasources
+Builds and pushes the image to GHCR on every push to `main` (tag `latest`) and on `v*.*.*` tags (semver and `sha-<short>` tags), passing `GIT_REVISION=${{ github.sha }}` as a build argument. Uses the built-in `GITHUB_TOKEN`, so no secrets need configuring. See [Deploying to chap-core](deploying-to-chap-core.md) for the full flow.
 
 ---
 

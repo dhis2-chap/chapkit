@@ -79,6 +79,23 @@ export function OverviewPage() {
                 <code className="text-xs">{svc.id}</code>
               </MetaRow>
               <MetaRow label="Version">{svc.version}</MetaRow>
+              {svc.git_revision ? (
+                <MetaRow label="Revision">
+                  <code className="text-xs" title={svc.git_revision}>
+                    {svc.git_revision.slice(0, 7)}
+                  </code>
+                </MetaRow>
+              ) : null}
+              {svc.chapkit_version || svc.servicekit_version ? (
+                <MetaRow label="Runtime">
+                  {[
+                    svc.chapkit_version ? `chapkit ${svc.chapkit_version}` : null,
+                    svc.servicekit_version ? `servicekit ${svc.servicekit_version}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' / ')}
+                </MetaRow>
+              ) : null}
               {svc.period_type ? (
                 <MetaRow label="Period type">{svc.period_type}</MetaRow>
               ) : null}

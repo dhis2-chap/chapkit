@@ -11,7 +11,7 @@ from servicekit import Database, SqliteDatabaseBuilder
 from servicekit.api.routers.health import HealthState
 
 from chapkit import ArtifactHierarchy, BaseConfig
-from chapkit.api import ServiceBuilder, ServiceInfo
+from chapkit.api import MLServiceInfo, ModelMetadata, PeriodType, ServiceBuilder, ServiceInfo
 
 
 class ExampleConfig(BaseConfig):
@@ -418,3 +418,75 @@ def test_service_builder_with_all_features(service_info: ServiceInfo) -> None:
         assert client.get("/api/v1/configs").status_code == 200
         assert client.get("/api/v1/artifacts").status_code == 200
         assert client.get("/metrics").status_code == 200
+
+
+def _ml_service_info(**overrides: object) -> MLServiceInfo:
+    """Build a minimal MLServiceInfo for provenance tests."""
+    fields: dict[str, object] = {
+        "id": "provenance-service",
+        "display_name": "Provenance Service",
+        "model_metadata": ModelMetadata(author="Tester"),
+        "period_type": PeriodType.monthly,
+    }
+    fields.update(overrides)
+    return MLServiceInfo(**fields)  # type: ignore[arg-type]
+
+
+def test_ml_service_info_git_revision_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GIT_REVISION env var populates git_revision when the author left it unset."""
+    monkeypatch.setenv("GIT_REVISION", "abc123def456")
+    app = ServiceBuilder(info=_ml_service_info()).build()
+
+    with TestClient(app) as client:
+        data = client.get("/api/v1/info").json()
+
+    assert data["git_revision"] == "abc123def456"
+
+
+def test_ml_service_info_empty_git_revision_is_null(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty GIT_REVISION (the Dockerfile default) reports null, not an empty string."""
+    monkeypatch.setenv("GIT_REVISION", "")
+    app = ServiceBuilder(info=_ml_service_info()).build()
+
+    with TestClient(app) as client:
+        data = client.get("/api/v1/info").json()
+
+    assert data["git_revision"] is None
+
+
+def test_ml_service_info_explicit_git_revision_wins(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicitly set git_revision is not overwritten by the env var."""
+    monkeypatch.setenv("GIT_REVISION", "from-env")
+    app = ServiceBuilder(info=_ml_service_info(git_revision="explicit")).build()
+
+    with TestClient(app) as client:
+        data = client.get("/api/v1/info").json()
+
+    assert data["git_revision"] == "explicit"
+
+
+def test_ml_service_info_reports_library_versions(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Installed chapkit and servicekit versions are exposed and can be overridden."""
+    monkeypatch.delenv("GIT_REVISION", raising=False)
+    app = ServiceBuilder(info=_ml_service_info(servicekit_version="9.9.9")).build()
+
+    with TestClient(app) as client:
+        data = client.get("/api/v1/info").json()
+
+    assert data["git_revision"] is None
+    assert isinstance(data["chapkit_version"], str) and data["chapkit_version"]
+    assert data["servicekit_version"] == "9.9.9"
+
+
+def test_plain_service_info_has_no_provenance_fields(
+    service_info: ServiceInfo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plain ServiceInfo services are left untouched by provenance resolution."""
+    monkeypatch.setenv("GIT_REVISION", "abc123")
+    app = ServiceBuilder(info=service_info).build()
+
+    with TestClient(app) as client:
+        data = client.get("/api/v1/info").json()
+
+    assert "git_revision" not in data
+    assert "chapkit_version" not in data

@@ -267,6 +267,20 @@ fields in its UI when listing models:
 
 The scaffold ships `AssessedStatus.yellow`; bump it up or down to match reality.
 
+Three provenance fields are filled in automatically and show up on
+`GET /api/v1/info` next to the identity above:
+
+- `git_revision` - the commit the image was built from. Read from the
+  `GIT_REVISION` environment variable, which the `Dockerfile` takes as a build
+  argument. The scaffolded `.github/workflows/publish-docker.yml` passes
+  `github.sha`; locally, `GIT_REVISION=$(git rev-parse HEAD) docker compose up --build`
+  or `docker build --build-arg GIT_REVISION=$(git rev-parse HEAD) .` does the same.
+  Unset means `null`.
+- `chapkit_version` and `servicekit_version` - the library versions installed in
+  the image.
+
+Set any of them explicitly on `MLServiceInfo` to override the automatic value.
+
 ### Update Model Configuration
 
 Edit the configuration class in `main.py`:
@@ -355,6 +369,9 @@ Edit the `on_predict` function in `main.py` to implement your prediction logic.
 ├── pyproject.toml       # Python dependencies
 ├── Dockerfile           # Docker build configuration
 ├── compose.yml          # Docker Compose configuration
+├── .dockerignore        # Files excluded from the Docker build context
+├── .github/workflows/
+│   └── publish-docker.yml  # Builds and publishes the image to GHCR
 └── data/                # Database directory
     └── chapkit.db       # SQLite database (persisted)
 ```

@@ -26,6 +26,9 @@ class TestRunner:
         self.required_covariates: list[str] = []
         self.requires_geo: bool = False
         self.allow_free_additional_continuous_covariates: bool = False
+        self.git_revision: str | None = None
+        self.chapkit_version: str | None = None
+        self.servicekit_version: str | None = None
 
     def _format_error(self, context: str, exc: Exception) -> str:
         """Format error message, including traceback if debug is enabled."""
@@ -58,6 +61,9 @@ class TestRunner:
                 self.allow_free_additional_continuous_covariates = data.get(
                     "allow_free_additional_continuous_covariates", False
                 )
+                self.git_revision = data.get("git_revision")
+                self.chapkit_version = data.get("chapkit_version")
+                self.servicekit_version = data.get("servicekit_version")
                 return True, "Service info fetched"
             return False, f"Failed to fetch service info: {response.text}"
         except Exception as e:

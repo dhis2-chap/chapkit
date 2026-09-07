@@ -341,6 +341,11 @@ def test_migrate_dockerfile_uses_chapkit_r_tidyverse(tmp_path: Path) -> None:
     # chapkit-r-tidyverse is multi-arch; no amd64 ARG should be emitted.
     assert "ARG BASE_PLATFORM" not in dockerfile
     assert "--platform=" not in dockerfile
+    # GIT_REVISION is baked into the image and passed by the Makefile and compose.yml.
+    assert 'ARG GIT_REVISION=""' in dockerfile
+    assert "ENV GIT_REVISION=${GIT_REVISION}" in dockerfile
+    assert "--build-arg GIT_REVISION=$(shell git rev-parse HEAD 2>/dev/null)" in (tmp_path / "Makefile").read_text()
+    assert "GIT_REVISION: ${GIT_REVISION:-}" in (tmp_path / "compose.yml").read_text()
 
 
 def test_build_service_info_context_ewars(tmp_path: Path) -> None:

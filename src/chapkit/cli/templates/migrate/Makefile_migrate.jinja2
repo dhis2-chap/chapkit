@@ -41,7 +41,7 @@ test-remote:
 	uv run chapkit test --url http://localhost:$(PORT)
 
 docker-build:
-	docker build $(PLATFORM_FLAG) -t $(IMAGE) .
+	docker build $(PLATFORM_FLAG) --build-arg GIT_REVISION=$(shell git rev-parse HEAD 2>/dev/null) -t $(IMAGE) .
 
 docker-run:
 	docker run --rm -p $(PORT):8000 $(PLATFORM_FLAG) $(IMAGE)

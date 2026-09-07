@@ -33,7 +33,7 @@ served straight from the installed package with no Node.js runtime required.
 
 | Screen | What it does |
 | --- | --- |
-| **Overview** | Service identity, version, model metadata, capability contract (period type, prediction-period bounds, required covariates), and health. |
+| **Overview** | Service identity, version, git revision and library versions, model metadata, capability contract (period type, prediction-period bounds, required covariates), and health. |
 | **Configs** | Browse, create, edit, and delete configs inline (no modal). The data editor offers a schema-driven **Form** tab (typed inputs generated from the service's config JSON schema) and an advanced **JSON** tab (CodeMirror with schema-aware autocomplete and validation); the two stay in sync. |
 | **Artifacts** | Browse the artifact hierarchy as a tree, inspect metadata, preview dataframe content, and download artifact contents. |
 | **Jobs** | Live job monitor (auto-refreshing) with status, timing, error tracebacks, cancellation, and a link from a completed job to its result artifact. |

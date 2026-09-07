@@ -36,6 +36,13 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     UV_PROJECT_ENVIRONMENT=/app/.venv uv sync --frozen --no-dev --no-install-project
 
+# Git commit the image was built from, exposed as git_revision on /api/v1/info. Same
+# convention as chap-core: pass --build-arg GIT_REVISION=$(git rev-parse HEAD) (the
+# scaffolded publish workflow and compose.yml already do). Declared after the uv sync
+# layer so a new commit does not invalidate the dependency cache.
+ARG GIT_REVISION=""
+ENV GIT_REVISION=${GIT_REVISION}
+
 COPY main.py ./
 {% if TEMPLATE in ("shell-py", "shell-r", "shell-r-tidyverse", "shell-r-inla") %}
 COPY scripts/ ./scripts/

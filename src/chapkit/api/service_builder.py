@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from enum import StrEnum
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as installed_version
 from typing import Any, Callable, Coroutine, Self
 
 from fastapi import Depends, FastAPI
@@ -86,6 +89,11 @@ class MLServiceInfo(ServiceInfo):
     # Model metadata (required)
     model_metadata: ModelMetadata
 
+    # Build provenance: filled by ServiceBuilder when left unset (see _resolve_build_provenance)
+    git_revision: str | None = None
+    chapkit_version: str | None = None
+    servicekit_version: str | None = None
+
     # Contract: capability constraints
     period_type: PeriodType
     min_prediction_periods: int = 0
@@ -93,6 +101,29 @@ class MLServiceInfo(ServiceInfo):
     allow_free_additional_continuous_covariates: bool = False
     required_covariates: list[str] = Field(default_factory=list)
     requires_geo: bool = False
+
+
+GIT_REVISION_ENV = "GIT_REVISION"
+
+
+def _installed_version(distribution: str) -> str | None:
+    """Return the installed version of a distribution, or None when it is not installed."""
+    try:
+        return installed_version(distribution)
+    except PackageNotFoundError:
+        return None
+
+
+def _resolve_build_provenance(info: MLServiceInfo) -> MLServiceInfo:
+    """Fill unset provenance fields from the GIT_REVISION env var and installed package metadata."""
+    updates: dict[str, str | None] = {}
+    if info.git_revision is None:
+        updates["git_revision"] = os.getenv(GIT_REVISION_ENV) or None
+    if info.chapkit_version is None:
+        updates["chapkit_version"] = _installed_version("chapkit")
+    if info.servicekit_version is None:
+        updates["servicekit_version"] = _installed_version("servicekit")
+    return info.model_copy(update=updates) if updates else info
 
 
 @dataclass(slots=True)
@@ -130,6 +161,9 @@ class ServiceBuilder(BaseServiceBuilder):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize service builder with module-specific state."""
+        info = kwargs.get("info")
+        if isinstance(info, MLServiceInfo):
+            kwargs["info"] = _resolve_build_provenance(info)
         super().__init__(**kwargs)
         self._config_options: _ConfigOptions | None = None
         self._artifact_options: _ArtifactOptions | None = None
