@@ -245,3 +245,22 @@ def test_artifact_operations_disabled_by_default() -> None:
 
     response = client.get(f"/api/v1/configs/{config_id}/$artifacts")
     assert response.status_code == 404
+
+
+def test_schema_without_nested_models_has_no_defs() -> None:
+    """A flat config schema is returned as-is, without an empty $defs block."""
+    app = FastAPI()
+    add_error_handlers(app)
+    router = ConfigRouter.create(
+        prefix="/api/v1/configs",
+        tags=["Configs"],
+        manager_factory=lambda: Mock(spec=ConfigManager),
+        entity_in_type=ConfigIn[BaseConfig],
+        entity_out_type=ConfigOut[BaseConfig],
+    )
+    app.include_router(router)
+
+    schema = TestClient(app).get("/api/v1/configs/$schema").json()
+
+    assert "prediction_periods" in schema["properties"]
+    assert "$defs" not in schema
