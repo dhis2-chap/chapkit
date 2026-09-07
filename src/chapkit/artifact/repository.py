@@ -5,12 +5,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from servicekit.repository import BaseRepository
-from sqlalchemy import select
+from sqlalchemy import literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from ulid import ULID
 
 from .models import Artifact
+
+#: Upper bound on recursion when walking an artifact subtree.
+MAX_SUBTREE_DEPTH = 64
 
 
 class ArtifactRepository(BaseRepository[Artifact, ULID]):
@@ -26,8 +29,19 @@ class ArtifactRepository(BaseRepository[Artifact, ULID]):
 
     async def find_subtree(self, start_id: ULID) -> Iterable[Artifact]:
         """Find all artifacts in the subtree rooted at the given ID using recursive CTE."""
-        cte = select(self.model.id).where(self.model.id == start_id).cte(name="descendants", recursive=True)
-        cte = cte.union_all(select(self.model.id).where(self.model.parent_id == cte.c.id))
+        # The manager rejects cycles on write; the depth cap is a backstop so a corrupted
+        # parent chain can never make this query run forever.
+        cte = (
+            select(self.model.id, literal(0).label("depth"))
+            .where(self.model.id == start_id)
+            .cte(name="descendants", recursive=True)
+        )
+        cte = cte.union_all(
+            select(self.model.id, cte.c.depth + 1).where(
+                self.model.parent_id == cte.c.id,
+                cte.c.depth < MAX_SUBTREE_DEPTH,
+            )
+        )
 
         subtree_ids = (await self.s.scalars(select(cte.c.id))).all()
         rows = (await self.s.scalars(select(self.model).where(self.model.id.in_(subtree_ids)))).all()

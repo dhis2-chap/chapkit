@@ -123,7 +123,7 @@ def test_unlink_artifact_success() -> None:
 def test_unlink_artifact_error_returns_400() -> None:
     """Test that unlinking artifact with error returns 400."""
     mock_manager = Mock(spec=ConfigManager)
-    mock_manager.unlink_artifact = AsyncMock(side_effect=Exception("Unlink failed"))
+    mock_manager.unlink_artifact = AsyncMock(side_effect=ValueError("Unlink failed"))
 
     def manager_factory() -> ConfigManager:
         return mock_manager

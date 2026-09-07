@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 
+from servicekit.exceptions import BadRequestError
 from servicekit.manager import BaseManager
 from ulid import ULID
 
@@ -80,11 +81,13 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
         return super()._should_assign_field(field, value)
 
     async def pre_save(self, entity: Artifact, data: ArtifactIn) -> None:
-        """Compute and set artifact level before saving."""
+        """Reject cycles, then compute and set artifact level before saving."""
+        await self._ensure_acyclic(entity)
         entity.level = await self._compute_level(entity.parent_id)
 
     async def pre_update(self, entity: Artifact, data: ArtifactIn, old_values: dict[str, object]) -> None:
-        """Recalculate artifact level and cascade updates to descendants if parent changed."""
+        """Reject cycles, then recalculate levels and cascade to descendants if the parent changed."""
+        await self._ensure_acyclic(entity)
         previous_level = old_values.get("level", entity.level)
         entity.level = await self._compute_level(entity.parent_id)
         parent_changed = old_values.get("parent_id") != entity.parent_id
@@ -92,6 +95,22 @@ class ArtifactManager(BaseManager[Artifact, ArtifactIn, ArtifactOut, ULID]):
             await self._recalculate_descendants(entity)
 
     # Helper utilities ------------------------------------------------
+
+    async def _ensure_acyclic(self, entity: Artifact) -> None:
+        """Reject a parent that is the artifact itself or one of its descendants."""
+        if entity.parent_id is None:
+            return
+        if entity.parent_id == entity.id:
+            raise BadRequestError(f"Artifact {entity.id} cannot be its own parent")
+        # Walk up from the proposed parent; reaching the entity means the parent is a descendant.
+        seen: set[ULID] = set()
+        current: ULID | None = entity.parent_id
+        while current is not None and current not in seen:
+            if current == entity.id:
+                raise BadRequestError(f"Artifact {entity.id} cannot be moved beneath one of its own descendants")
+            seen.add(current)
+            ancestor = await self.repository.find_by_id(current)
+            current = ancestor.parent_id if ancestor is not None else None
 
     async def _compute_level(self, parent_id: ULID | None) -> int:
         """Compute the level of an artifact based on its parent."""

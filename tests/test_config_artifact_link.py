@@ -104,7 +104,7 @@ async def test_unlink_artifact_removes_link() -> None:
         assert await config_repo.find_by_root_artifact_id(artifact.id) is not None
 
         # Unlink
-        await config_repo.unlink_artifact(artifact.id)
+        assert await config_repo.unlink_artifact(config.id, artifact.id) is True
         await config_repo.commit()
 
         # Verify link removed

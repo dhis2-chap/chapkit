@@ -703,8 +703,8 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 "stderr": stderr,
             }
 
-        except Exception:
-            # Cleanup only on Python exception (not script failure)
+        except BaseException:
+            # Cleanup on Python exception or job cancellation (not on script failure)
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise
 
@@ -810,7 +810,14 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                     raise RuntimeError(f"Prediction script did not create output file at {output_file}")
                 predictions = DataFrame.from_csv(output_file)
             else:
-                predictions = DataFrame.from_csv(output_file) if output_file.exists() else None
+                # A failed script may leave a partial output file behind; never let parsing it
+                # raise, or the workspace (the diagnostic artifact) would be discarded.
+                predictions = None
+                if output_file.exists():
+                    try:
+                        predictions = DataFrame.from_csv(output_file)
+                    except Exception as parse_error:
+                        logger.warning("predict_output_unparseable", error=str(parse_error))
 
             # Return workspace directory for artifact storage (like on_train)
             # Workspace preserved for both success and failure (manager will store artifact)
@@ -822,7 +829,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 "stderr": stderr,
             }
 
-        except Exception:
-            # Cleanup only on Python exception (not script failure)
+        except BaseException:
+            # Cleanup on Python exception or job cancellation (not on script failure)
             shutil.rmtree(temp_dir, ignore_errors=True)
             raise

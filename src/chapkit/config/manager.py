@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from servicekit.exceptions import NotFoundError
 from servicekit.manager import BaseManager
 from ulid import ULID
 
@@ -21,6 +22,14 @@ class ConfigManager[DataT: BaseConfig](BaseManager[Config, ConfigIn[DataT], Conf
         super().__init__(repo, Config, ConfigOut)
         self.repository: ConfigRepository = repo
         self.data_cls = data_cls
+
+    async def pre_save(self, entity: Config, data: ConfigIn[DataT]) -> None:
+        """Persist the fully validated config data so defaults are frozen at write time."""
+        entity.data = data.data
+
+    async def pre_update(self, entity: Config, data: ConfigIn[DataT], old_values: dict[str, object]) -> None:
+        """Persist the fully validated config data on update, not just the fields the client sent."""
+        entity.data = data.data
 
     async def find_by_name(self, name: str) -> ConfigOut[DataT] | None:
         """Find a config by its unique name."""
@@ -47,9 +56,11 @@ class ConfigManager[DataT: BaseConfig](BaseManager[Config, ConfigIn[DataT], Conf
         await self.repository.link_artifact(config_id, artifact_id)
         await self.repository.commit()
 
-    async def unlink_artifact(self, artifact_id: ULID) -> None:
-        """Unlink an artifact from its config."""
-        await self.repository.unlink_artifact(artifact_id)
+    async def unlink_artifact(self, config_id: ULID, artifact_id: ULID) -> None:
+        """Unlink an artifact from the given config; raises NotFoundError when no such link exists."""
+        removed = await self.repository.unlink_artifact(config_id, artifact_id)
+        if not removed:
+            raise NotFoundError(f"Artifact {artifact_id} is not linked to config {config_id}")
         await self.repository.commit()
 
     async def get_config_for_artifact(

@@ -36,10 +36,10 @@ class ConfigManagerStub(Manager[ConfigIn[ConfigDataT], ConfigOut[ConfigDataT], U
         if self._link_error:
             raise ValueError(self._link_error)
 
-    async def unlink_artifact(self, artifact_id: ULID) -> None:
-        """Unlink an artifact from its config."""
+    async def unlink_artifact(self, config_id: ULID, artifact_id: ULID) -> None:
+        """Unlink an artifact from the given config."""
         if self._link_error:
-            raise Exception(self._link_error)
+            raise ValueError(self._link_error)
 
     async def get_linked_artifacts(self, config_id: ULID) -> list[ArtifactOut]:
         """Get all artifacts linked to a config."""

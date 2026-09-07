@@ -30,7 +30,7 @@ from chapkit.cli.mlproject import (
     slugify,
     translate_to_runner_template,
 )
-from chapkit.cli.requirements import chapkit_requirement
+from chapkit.cli.requirements import base_version, chapkit_requirement, installed_chapkit_version
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates" / "migrate"
 _SHARED_TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -1109,4 +1109,16 @@ _MIN_CHAPKIT_VERSION = "1.1.0"
 
 def _get_chapkit_requirement() -> str:
     """Build the bounded chapkit requirement rendered into the migrated pyproject."""
-    return chapkit_requirement(_MIN_CHAPKIT_VERSION)
+    return chapkit_requirement(_migrate_chapkit_floor(installed_chapkit_version()))
+
+
+def _migrate_chapkit_floor(running_version: str) -> str:
+    """Return the floor to emit: the fixed minimum, lifted to N.0.0 when the running major is newer."""
+    running = base_version(running_version)
+    if running is None:
+        return _MIN_CHAPKIT_VERSION
+    running_major = int(running.split(".")[0])
+    minimum_major = int(_MIN_CHAPKIT_VERSION.split(".")[0])
+    if running_major > minimum_major:
+        return f"{running_major}.0.0"
+    return _MIN_CHAPKIT_VERSION
