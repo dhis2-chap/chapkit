@@ -348,7 +348,8 @@ def test_migrate_dockerfile_uses_chapkit_r_tidyverse(tmp_path: Path) -> None:
     compose_yml = (tmp_path / "compose.yml").read_text()
     assert "GIT_REVISION: ${GIT_REVISION:-}" in compose_yml
     # Hardened runtime: unprivileged user, switched to only after the build steps.
-    assert "RUN useradd --no-create-home --shell /usr/sbin/nologin chapkit" in dockerfile
+    assert "id -u chapkit >/dev/null 2>&1" in dockerfile
+    assert "useradd --uid 1000 --gid 1000 --no-create-home --shell /usr/sbin/nologin chapkit" in dockerfile
     assert dockerfile.index("USER chapkit") > dockerfile.index("COPY . /work")
     assert "read_only: true" in compose_yml
     assert "user: chapkit:chapkit" in compose_yml

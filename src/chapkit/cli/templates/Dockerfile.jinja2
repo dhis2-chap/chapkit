@@ -21,10 +21,12 @@ FROM ghcr.io/dhis2-chap/chapkit-py:latest
 {% endif %}
 
 # Build steps run as root; the service itself runs as the unprivileged `chapkit`
-# user created here (the switch happens right before CMD). Same posture as
-# chap-core's own images. The base images ship as root, so we add the user ourselves.
+# user (the switch happens right before CMD). Same posture as chap-core's own
+# images. Newer chapkit base images ship the user already (uid/gid 1000); older
+# ones do not, so create it only when it is missing.
 USER root
-RUN useradd --no-create-home --shell /usr/sbin/nologin chapkit
+RUN id -u chapkit >/dev/null 2>&1 \
+    || (groupadd --gid 1000 chapkit && useradd --uid 1000 --gid 1000 --no-create-home --shell /usr/sbin/nologin chapkit)
 
 WORKDIR /work
 # Copy lockfile + manifest first so the dep-install layer caches independently of code changes.
