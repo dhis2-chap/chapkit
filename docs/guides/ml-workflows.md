@@ -421,7 +421,7 @@ MLServiceBuilder(
 | `version` | str | Service version |
 | `description` | str | Service description |
 | `model_metadata` | ModelMetadata | Model documentation (required) |
-| `period_type` | PeriodType | Period type: weekly or monthly (required) |
+| `period_type` | PeriodType | Period type: `weekly`, `monthly`, or `any` for models that handle both (required) |
 | `min_prediction_periods` | int | Minimum prediction periods (default: 0) |
 | `max_prediction_periods` | int | Maximum prediction periods (default: 100) |
 | `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |

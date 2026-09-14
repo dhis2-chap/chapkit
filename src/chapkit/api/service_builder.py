@@ -63,10 +63,15 @@ class AssessedStatus(StrEnum):
 
 
 class PeriodType(StrEnum):
-    """Supported period types for ML services."""
+    """Supported period types for ML services.
+
+    `any` declares that the model accepts both weekly and monthly data; chap-core
+    then skips its period-type check and dispatches whatever the dataset holds.
+    """
 
     weekly = "weekly"
     monthly = "monthly"
+    any = "any"
 
 
 class ModelMetadata(BaseModel):

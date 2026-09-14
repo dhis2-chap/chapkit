@@ -74,6 +74,25 @@ def test_sample_data_honors_tunable_params() -> None:
     assert data["data"][0][period_index].startswith("2020-W")
 
 
+def test_sample_data_any_period_type_defaults_to_monthly() -> None:
+    """A service declaring period_type any gets monthly sample rows unless overridden."""
+    client = _client({"period_type": "any"})
+
+    response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "train", "num_locations": 1})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    period_index = data["columns"].index("time_period")
+    assert data["data"][0][period_index] == "2020-01"
+
+    response = client.get(
+        "/api/v1/ml/$generate-sample-data",
+        params={"kind": "train", "num_locations": 1, "period_type": "weekly"},
+    )
+    data = response.json()["data"]
+    assert data["data"][0][period_index].startswith("2020-W")
+
+
 def test_sample_data_includes_geo_when_requested() -> None:
     """include_geo forces a GeoJSON FeatureCollection into the payload."""
     client = _client()

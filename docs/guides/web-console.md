@@ -106,7 +106,7 @@ Query parameters:
 | `num_locations` | `5` | Panel locations. |
 | `num_periods` | `50` | Time periods per location. |
 | `num_features` | `3` | Extra feature columns. |
-| `period_type` | from service | `monthly` or `weekly`; defaults to the service's declared period type. |
+| `period_type` | from service | `monthly` or `weekly`; defaults to the service's declared period type (`monthly` when the service declares `any`). |
 | `geo_type` | `polygon` | `polygon` or `point`. |
 | `include_geo` | from service | Force geometry on/off; defaults to the service's `requires_geo`. |
 | `seed` | `42` | Generator seed for reproducibility. |
