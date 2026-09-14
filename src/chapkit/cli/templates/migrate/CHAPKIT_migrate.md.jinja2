@@ -179,7 +179,7 @@ Your runtime deps (`[project.dependencies]`) have been auto-merged into the new 
 
 ### [`MLServiceInfo`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlserviceinfo-fields) — who you are
 
-The service's public identity and contract: `id`, `display_name`, `description`, [`model_metadata`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#modelmetadata-fields), [`period_type`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlserviceinfo-fields) (`monthly` / `weekly`), [`required_covariates`](#covariates). This is what chap-core reads via `/api/v1/info` when it decides whether to dispatch a dataset to your model.
+The service's public identity and contract: `id`, `display_name`, `description`, [`model_metadata`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#modelmetadata-fields), [`period_type`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#mlserviceinfo-fields) (`monthly` / `weekly` / `any`), [`required_covariates`](#covariates). This is what chap-core reads via `/api/v1/info` when it decides whether to dispatch a dataset to your model.
 
 ### [`ModelMetadata.author_assessed_status`](https://dhis2-chap.github.io/chapkit/guides/ml-workflows/#modelmetadata-fields) — traffic-light maturity
 

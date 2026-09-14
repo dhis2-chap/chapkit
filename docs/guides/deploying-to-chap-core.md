@@ -70,7 +70,7 @@ Set these in the compose overlay in Step 6, not in code. Hard-coding URLs into `
 |---|---|
 | `id` | Stable slug. Used in URLs and as the registration identity. Do not change after you ship. |
 | `display_name` | Human-readable name shown in DHIS2. |
-| `period_type` | `weekly` or `monthly`. Operators cannot feed mismatched data. |
+| `period_type` | `weekly`, `monthly`, or `any`. chap-core rejects datasets of the wrong granularity for `weekly`/`monthly`; `any` skips that check and lets the model handle both. |
 | `required_covariates` | Column names your model needs on the input data. |
 | `min_prediction_periods` / `max_prediction_periods` | Bounds on forecast horizon. |
 | `model_metadata` | Author, contact email, organization, citation, `AssessedStatus`. |

@@ -432,6 +432,16 @@ def _ml_service_info(**overrides: object) -> MLServiceInfo:
     return MLServiceInfo(**fields)  # type: ignore[arg-type]
 
 
+def test_ml_service_info_period_type_any_is_exposed() -> None:
+    """A service declaring PeriodType.any reports it verbatim on /api/v1/info."""
+    app = ServiceBuilder(info=_ml_service_info(period_type=PeriodType.any)).build()
+
+    with TestClient(app) as client:
+        data = client.get("/api/v1/info").json()
+
+    assert data["period_type"] == "any"
+
+
 def test_ml_service_info_git_revision_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """GIT_REVISION env var populates git_revision when the author left it unset."""
     monkeypatch.setenv("GIT_REVISION", "abc123def456")

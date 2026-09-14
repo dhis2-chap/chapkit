@@ -100,7 +100,11 @@ class MLRouter(Router):
                 return DataFrame.model_validate(frame).with_schema(required_covariates=required_covariates).model_dump()
 
             requires_geo = bool(sample_metadata.get("requires_geo", False))
-            resolved_period = period_type or sample_metadata.get("period_type") or "monthly"
+            # A service declaring `any` accepts both formats; generate monthly rows for it.
+            declared_period = sample_metadata.get("period_type")
+            if declared_period not in ("monthly", "weekly"):
+                declared_period = None
+            resolved_period = period_type or declared_period or "monthly"
             want_geo = requires_geo if include_geo is None else include_geo
             geo = generator.generate_geo_data(num_features=num_locations, geo_type=geo_type) if want_geo else None
 

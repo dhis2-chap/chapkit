@@ -366,8 +366,8 @@ def test_build_service_info_context_ewars(tmp_path: Path) -> None:
     assert ctx["META_ORGANIZATION"] == "HISP Centre, University of Oslo"
     assert ctx["META_ORGANIZATION_LOGO_URL"] == "https://example.org/logo.png"
     assert ctx["META_CITATION_INFO"] == "Cite me."
-    # supported_period_type: any -> monthly (chapkit's PeriodType only has weekly/monthly).
-    assert ctx["PERIOD_TYPE"] == "monthly"
+    # supported_period_type: any passes through unchanged.
+    assert ctx["PERIOD_TYPE"] == "any"
     assert ctx["REQUIRED_COVARIATES"] == ["population"]
     assert ctx["ALLOW_FREE_COVARIATES"] is True
     assert ctx["REQUIRES_GEO"] is False

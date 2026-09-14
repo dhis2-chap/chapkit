@@ -125,7 +125,7 @@ Migrate defaults to `yellow` if you don't set one — adjust up or down to match
 ### 7. Declare service-level flags if they apply
 
 ```yaml
-supported_period_type: monthly                      # or: weekly
+supported_period_type: monthly                      # or: weekly, any
 requires_geo: true                                  # if scripts read geo.json
 allow_free_additional_continuous_covariates: true   # let orchestrators POST extra climate covariates
 target: disease_cases                               # the column being predicted

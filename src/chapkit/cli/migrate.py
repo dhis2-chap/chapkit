@@ -679,16 +679,16 @@ def detect_base_image(
 
 
 _VALID_ASSESSED_STATUS = {"gray", "red", "orange", "yellow", "green"}
-_VALID_PERIOD_TYPES = {"weekly", "monthly"}
+_VALID_PERIOD_TYPES = {"weekly", "monthly", "any"}
 
 
 def build_service_info_context(mlproject: MLProject) -> dict[str, Any]:
     """Build the ModelMetadata + capability-constraints block for MLServiceInfo.
 
     Handles the MLproject -> chapkit vocabulary mismatches:
-    - MLproject `supported_period_type: any` becomes `monthly` (chapkit's
-      PeriodType only has weekly/monthly); otherwise the declared value
-      passes through if recognised, else `monthly`.
+    - MLproject `supported_period_type` passes through when it is one of
+      chapkit's PeriodType values (weekly/monthly/any); anything else, or an
+      absent value, becomes `monthly`.
     - `author_assessed_status` is validated against chapkit's AssessedStatus
       enum; unknown values fall back to None.
     - URL-typed fields (organization_logo_url, repository_url,
