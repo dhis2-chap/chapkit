@@ -26,6 +26,8 @@ class TestRunner:
         self.required_covariates: list[str] = []
         self.requires_geo: bool = False
         self.allow_free_additional_continuous_covariates: bool = False
+        self.min_prediction_periods: int = 0
+        self.max_prediction_periods: int = 100
         self.git_revision: str | None = None
         self.chapkit_version: str | None = None
         self.servicekit_version: str | None = None
@@ -61,6 +63,8 @@ class TestRunner:
                 self.allow_free_additional_continuous_covariates = data.get(
                     "allow_free_additional_continuous_covariates", False
                 )
+                self.min_prediction_periods = int(data.get("min_prediction_periods", 0))
+                self.max_prediction_periods = int(data.get("max_prediction_periods", 100))
                 self.git_revision = data.get("git_revision")
                 self.chapkit_version = data.get("chapkit_version")
                 self.servicekit_version = data.get("servicekit_version")

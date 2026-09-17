@@ -19,6 +19,13 @@ from chapkit.cli.test.utils import (
 from chapkit.data.generator import TestDataGenerator
 
 
+def clamp_prediction_periods(requested: int, minimum: int, maximum: int) -> int:
+    """Clamp a requested horizon into the service's declared [minimum, maximum] bounds, never below 1."""
+    lower = max(1, minimum)
+    upper = max(lower, maximum)
+    return min(max(requested, lower), upper)
+
+
 def test_command(
     url: Annotated[
         str,
@@ -275,8 +282,19 @@ def test_command(
         typer.echo()
 
         # Periods the generated future frame spans; run_info carries it on every
-        # request so train and predict agree on the forecast horizon.
-        future_periods = max(1, num_predict_rows // 5)
+        # request so train and predict agree on the forecast horizon. Clamped to the
+        # bounds the service declares on /api/v1/info so the harness never asks for
+        # a horizon the service would reject.
+        future_periods = clamp_prediction_periods(
+            max(1, num_predict_rows // 5),
+            runner.min_prediction_periods,
+            runner.max_prediction_periods,
+        )
+        if future_periods != max(1, num_predict_rows // 5):
+            typer.echo(
+                f"  Prediction horizon clamped to {future_periods} period(s) to fit the service bounds "
+                f"[{runner.min_prediction_periods}, {runner.max_prediction_periods}]"
+            )
 
         # 5. Run trainings
         total_trainings = num_configs * num_trainings

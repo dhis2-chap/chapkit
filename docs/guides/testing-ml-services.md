@@ -141,7 +141,7 @@ time_period, location, disease_cases, feature_0, feature_1, feature_2
 
 Training data uses periods starting from 2020, prediction future data uses 2025.
 
-`chapkit test` also sends a `run_info` object on `$train`, `$predict` and `$validate`, the way chap-core does. Its `prediction_periods` equals the number of periods in the generated future frame (`--predict-rows` divided by the five generated locations), and its `additional_continuous_covariates` mirrors the generated config. Services therefore resolve the same horizon the test data actually carries. If that horizon exceeds your service's `MLServiceInfo.max_prediction_periods`, lower `--predict-rows` or raise the bound.
+`chapkit test` also sends a `run_info` object on `$train`, `$predict` and `$validate`, the way chap-core does. Its `prediction_periods` equals the number of periods in the generated future frame (`--predict-rows` divided by the five generated locations), and its `additional_continuous_covariates` mirrors the generated config. Services therefore resolve the same horizon the test data actually carries. The horizon is clamped to the `min_prediction_periods` and `max_prediction_periods` your service declares on `/api/v1/info`, so a service with a small maximum gets a correspondingly short future frame instead of a rejected request.
 
 ## Manual Service Startup
 
