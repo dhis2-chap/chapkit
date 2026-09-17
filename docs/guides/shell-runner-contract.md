@@ -154,6 +154,8 @@ For the full traceback, read `error_traceback` on the job record. `docker compos
 
 ## `config.yml` layout
 
+`prediction_periods` in `config.yml` is the horizon resolved for that one request, not the constant stored on the config: chapkit takes it from chap-core's `run_info` when the request carries one, otherwise from the future frame, and only falls back to the config value when neither is available. Your script can read it as the number of periods to forecast. Every other key is the stored config as created.
+
 The shape of `config.yml` depends on which path scaffolded your project:
 
 ### `chapkit init --template shell-py` / `shell-r` / `shell-r-tidyverse` / `shell-r-inla` (flat)
