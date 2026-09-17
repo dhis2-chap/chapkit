@@ -1,6 +1,8 @@
-"""Tests for TestDataGenerator in the CLI test module."""
+"""Tests for the chapkit test CLI harness: data generation and request bodies."""
 
 from __future__ import annotations
+
+from typing import Any
 
 from chapkit.config.schemas import BaseConfig
 from chapkit.data.generator import TestDataGenerator
@@ -106,3 +108,77 @@ class TestGenerateConfigDataFromSchema:
         schema = {"properties": {"flag": {"type": "boolean", "default": False}}}
         data = generator.generate_config_data_from_schema(schema, variation=2)
         assert data["flag"] is False
+
+
+class _StubResponse:
+    """Minimal stand-in for an httpx response, recording nothing but a fixed body."""
+
+    status_code = 202
+    text = ""
+
+    def json(self) -> dict[str, str]:
+        """Return the accepted-job body both submit helpers expect."""
+        return {"message": "submitted", "job_id": "job-1", "artifact_id": "artifact-1"}
+
+
+class _RecordingClient:
+    """Captures the JSON bodies the test harness posts, without any network access."""
+
+    def __init__(self) -> None:
+        """Initialize with an empty list of captured posts."""
+        self.posts: list[tuple[str, dict[str, Any]]] = []
+
+    def post(self, url: str, json: dict[str, Any]) -> _StubResponse:
+        """Record the request body and return a canned 202 response."""
+        self.posts.append((url, json))
+        return _StubResponse()
+
+
+class TestSubmitRunInfo:
+    """Tests that the CLI harness forwards chap-core's run_info on train and predict."""
+
+    def _runner(self) -> tuple[Any, _RecordingClient]:
+        """Build a TestRunner whose HTTP client only records request bodies."""
+        from chapkit.cli.test.runner import TestRunner
+
+        runner = TestRunner(base_url="http://service")
+        client = _RecordingClient()
+        runner.client = client  # type: ignore[assignment]
+        return runner, client
+
+    def test_submit_training_includes_run_info(self) -> None:
+        """A train submission carries the run_info it was given."""
+        runner, client = self._runner()
+        run_info = {"prediction_periods": 30, "additional_continuous_covariates": ["rainfall"]}
+
+        success, _, _, _ = runner.submit_training("config-1", {"columns": [], "data": []}, None, run_info)
+
+        assert success is True
+        _, body = client.posts[0]
+        assert body["run_info"] == run_info
+
+    def test_submit_prediction_includes_run_info(self) -> None:
+        """A predict submission carries the run_info it was given."""
+        runner, client = self._runner()
+        run_info = {"prediction_periods": 30, "additional_continuous_covariates": []}
+
+        success, _, _, _ = runner.submit_prediction(
+            "artifact-1",
+            {"columns": [], "data": []},
+            {"columns": [], "data": []},
+            None,
+            run_info,
+        )
+
+        assert success is True
+        _, body = client.posts[0]
+        assert body["run_info"] == run_info
+
+    def test_submissions_omit_run_info_when_absent(self) -> None:
+        """Without run_info the request bodies are unchanged from before."""
+        runner, client = self._runner()
+
+        runner.submit_training("config-1", {"columns": [], "data": []})
+        runner.submit_prediction("artifact-1", {"columns": [], "data": []}, {"columns": [], "data": []})
+
+        assert all("run_info" not in body for _, body in client.posts)

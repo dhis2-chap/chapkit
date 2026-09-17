@@ -126,13 +126,19 @@ class TestRunner:
             return False, self._format_error("Error calling $validate", e), None
 
     def submit_training(
-        self, config_id: str, data: dict[str, Any], geo: dict[str, Any] | None = None
+        self,
+        config_id: str,
+        data: dict[str, Any],
+        geo: dict[str, Any] | None = None,
+        run_info: dict[str, Any] | None = None,
     ) -> tuple[bool, str, str | None, str | None]:
         """Submit training job and return (success, message, job_id, artifact_id)."""
         try:
             request_body: dict[str, Any] = {"config_id": config_id, "data": data}
             if geo:
                 request_body["geo"] = geo
+            if run_info:
+                request_body["run_info"] = run_info
 
             response = self.client.post(f"{self.base_url}/api/v1/ml/$train", json=request_body)
             if response.status_code == 202:
@@ -148,12 +154,15 @@ class TestRunner:
         historic: dict[str, Any],
         future: dict[str, Any],
         geo: dict[str, Any] | None = None,
+        run_info: dict[str, Any] | None = None,
     ) -> tuple[bool, str, str | None, str | None]:
         """Submit prediction job and return (success, message, job_id, artifact_id)."""
         try:
             request_body: dict[str, Any] = {"artifact_id": artifact_id, "historic": historic, "future": future}
             if geo:
                 request_body["geo"] = geo
+            if run_info:
+                request_body["run_info"] = run_info
 
             response = self.client.post(f"{self.base_url}/api/v1/ml/$predict", json=request_body)
             if response.status_code == 202:
