@@ -1092,3 +1092,69 @@ async def test_train_task_without_run_info_uses_the_config_horizon(
         assert seen["train"] == 7
     finally:
         await db.dispose()
+
+
+async def test_validate_hooks_receive_the_resolved_horizon() -> None:
+    """on_validate_train and on_validate_predict see run_info's horizon, not the stored config value."""
+    from chapkit.ml.schemas import ValidateTrainRequest
+
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        config_id = await _seed_config(db, SampleConfig(prediction_periods=3))
+        seen: dict[str, int] = {}
+
+        async def train_hook(config: Any, data: Any, geo: Any = None) -> list[ValidationDiagnostic]:
+            seen["train"] = config.prediction_periods
+            return []
+
+        async def predict_hook(config: Any, historic: Any, future: Any, geo: Any = None) -> list[ValidationDiagnostic]:
+            seen["predict"] = config.prediction_periods
+            return []
+
+        runner = FunctionalModelRunner(
+            on_train=_noop_train,
+            on_predict=_noop_predict,
+            on_validate_train=train_hook,
+            on_validate_predict=predict_hook,
+        )
+        manager = await _build_manager(runner, db)
+
+        await manager.validate(
+            ValidateTrainRequest(
+                config_id=config_id,
+                data=DataFrame(columns=["rainfall"], data=[[1.0]]),
+                run_info=RunInfo(prediction_periods=7),
+            )
+        )
+
+        artifact_id = await _seed_training_artifact(
+            db,
+            {
+                "type": "ml_training_workspace",
+                "metadata": {"status": "success", "config_id": str(config_id)},
+                "content": _zip_with_pickle({"trained": True}),
+                "content_type": "application/zip",
+            },
+        )
+        future = DataFrame(
+            columns=["time_period", "location"],
+            data=[["2020-01", "a"], ["2020-02", "a"], ["2020-03", "a"], ["2020-04", "a"]],
+        )
+        await manager.validate(
+            ValidatePredictRequest(
+                artifact_id=artifact_id,
+                historic=DataFrame(columns=["time_period", "location"], data=[["2019-12", "a"]]),
+                future=future,
+            )
+        )
+
+        assert seen == {"train": 7, "predict": 4}
+
+        stored = await manager.validate(
+            ValidateTrainRequest(config_id=config_id, data=DataFrame(columns=["rainfall"], data=[[1.0]]))
+        )
+        assert stored.valid is True
+        assert seen["train"] == 3
+    finally:
+        await db.dispose()

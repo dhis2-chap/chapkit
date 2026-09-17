@@ -204,7 +204,7 @@ class MLManager(Generic[ConfigT]):
         hook = getattr(self.runner, "on_validate_train", None)
         if hook is not None:
             runner_diagnostics = await hook(
-                config=config.data,
+                config=config.data.model_copy(update={"prediction_periods": resolved_periods}),
                 data=request.data,
                 geo=request.geo,
             )
@@ -340,7 +340,7 @@ class MLManager(Generic[ConfigT]):
         hook = getattr(self.runner, "on_validate_predict", None)
         if hook is not None:
             runner_diagnostics = await hook(
-                config=config.data,
+                config=config.data.model_copy(update={"prediction_periods": resolved_periods}),
                 historic=request.historic,
                 future=request.future,
                 geo=request.geo,
