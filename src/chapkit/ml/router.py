@@ -45,6 +45,13 @@ def _get_counters() -> tuple[Counter, Counter]:
     return _train_counter, _predict_counter
 
 
+def _clamp_horizon(requested: int, sample_metadata: dict[str, Any]) -> int:
+    """Clamp a requested future horizon into the service's declared prediction period bounds, never below 1."""
+    lower = max(1, int(sample_metadata.get("min_prediction_periods", 0) or 0))
+    upper = max(lower, int(sample_metadata.get("max_prediction_periods", 100) or 100))
+    return min(max(requested, lower), upper)
+
+
 class MLRouter(Router):
     """Router with $train and $predict collection operations."""
 
@@ -109,9 +116,11 @@ class MLRouter(Router):
             geo = generator.generate_geo_data(num_features=num_locations, geo_type=geo_type) if want_geo else None
 
             if kind == "predict":
+                # The future frame's period count is the horizon the service will resolve
+                # at $predict, so keep it inside the bounds the service declares.
                 historic, future = generator.generate_prediction_data(
                     num_locations=num_locations,
-                    num_periods=max(1, num_periods),
+                    num_periods=_clamp_horizon(num_periods, sample_metadata),
                     num_features=num_features,
                     required_covariates=required_covariates,
                     period_type=resolved_period,

@@ -116,3 +116,41 @@ def test_sample_data_omits_geo_by_default() -> None:
 
     assert response.status_code == 200
     assert "geo" not in response.json()
+
+
+def _distinct_periods(frame: dict) -> int:
+    """Count distinct time_period values in a generated frame."""
+    period_index = frame["columns"].index("time_period")
+    return len({row[period_index] for row in frame["data"]})
+
+
+def test_sample_data_predict_clamps_future_to_max_prediction_periods() -> None:
+    """The default 50-period future is shortened to the service's declared maximum."""
+    client = _client({"min_prediction_periods": 0, "max_prediction_periods": 12})
+
+    response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "predict"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert _distinct_periods(payload["future"]) == 12
+    assert _distinct_periods(payload["historic"]) == 12
+
+
+def test_sample_data_predict_raises_future_to_min_prediction_periods() -> None:
+    """A requested horizon below the service minimum is raised to the minimum."""
+    client = _client({"min_prediction_periods": 4, "max_prediction_periods": 100})
+
+    response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "predict", "num_periods": 2})
+
+    assert response.status_code == 200
+    assert _distinct_periods(response.json()["future"]) == 4
+
+
+def test_sample_data_train_is_not_clamped_by_prediction_bounds() -> None:
+    """Training data length is unrelated to the forecast horizon and keeps the requested size."""
+    client = _client({"min_prediction_periods": 0, "max_prediction_periods": 12})
+
+    response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "train", "num_periods": 30})
+
+    assert response.status_code == 200
+    assert _distinct_periods(response.json()["data"]) == 30

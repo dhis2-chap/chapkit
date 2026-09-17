@@ -327,6 +327,8 @@ class ServiceBuilder(BaseServiceBuilder):
                     "required_covariates": list(self.info.required_covariates),
                     "requires_geo": self.info.requires_geo,
                     "period_type": str(self.info.period_type),
+                    "min_prediction_periods": self.info.min_prediction_periods,
+                    "max_prediction_periods": self.info.max_prediction_periods,
                 }
             ml_router = MLRouter.create(
                 prefix=ml_options.prefix,
