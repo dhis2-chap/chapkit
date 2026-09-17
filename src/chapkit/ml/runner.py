@@ -774,6 +774,11 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Copy workspace contents to temp_dir (preserves all training artifacts)
             shutil.copytree(workspace_dir, temp_dir, dirs_exist_ok=True)
 
+            # The restored workspace carries the config.yml written at train time, whose
+            # prediction_periods is the horizon resolved for that training request. Re-emit
+            # it from this request's config so the script reads this prediction's horizon.
+            (temp_dir / "config.yml").write_text(dump_config_yaml(config, self.config_format))
+
             # Write prediction input files (always fresh for each prediction)
             write_prediction_inputs(temp_dir, historic, future, geo)
 

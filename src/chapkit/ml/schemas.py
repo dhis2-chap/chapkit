@@ -20,7 +20,7 @@ import datetime
 from typing import Annotated, Any, Literal, Protocol, TypeVar
 
 from geojson_pydantic import FeatureCollection
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from ulid import ULID
 
 from chapkit.artifact.schemas import (
@@ -35,12 +35,37 @@ ConfigT = TypeVar("ConfigT", bound=BaseConfig, contravariant=True)
 Severity = Literal["error", "warning", "info"]
 
 
+class RunInfo(BaseModel):
+    """Per-request runtime context chap-core attaches to train and predict payloads."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    prediction_periods: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("prediction_periods", "prediction_length"),
+        serialization_alias="prediction_periods",
+        description="Forecast horizon for this request; chap-core spells it prediction_length on the wire",
+    )
+    additional_continuous_covariates: list[str] = Field(
+        default_factory=list,
+        description="Covariate columns chap-core attached to this request beyond the required set",
+    )
+    future_covariate_origin: str | None = Field(
+        default=None,
+        description="Origin chap-core used for the future covariate values, when it supplies one",
+    )
+
+
 class TrainRequest(BaseModel):
     """Request schema for training a model."""
 
     config_id: ULID = Field(description="ID of the config to use for training")
     data: DataFrame = Field(description="Training data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+    run_info: RunInfo | None = Field(
+        default=None,
+        description="Optional per-request runtime context from chap-core, including the forecast horizon",
+    )
 
 
 class TrainResponse(BaseModel):
@@ -58,6 +83,10 @@ class PredictRequest(BaseModel):
     historic: DataFrame = Field(description="Historic data as DataFrame")
     future: DataFrame = Field(description="Future/prediction data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+    run_info: RunInfo | None = Field(
+        default=None,
+        description="Optional per-request runtime context from chap-core, including the forecast horizon",
+    )
 
 
 class PredictResponse(BaseModel):
@@ -113,6 +142,10 @@ class ValidateTrainRequest(BaseModel):
     config_id: ULID = Field(description="ID of the config to use for training")
     data: DataFrame = Field(description="Training data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+    run_info: RunInfo | None = Field(
+        default=None,
+        description="Optional per-request runtime context from chap-core, including the forecast horizon",
+    )
 
 
 class ValidatePredictRequest(BaseModel):
@@ -123,6 +156,10 @@ class ValidatePredictRequest(BaseModel):
     historic: DataFrame = Field(description="Historic data as DataFrame")
     future: DataFrame = Field(description="Future/prediction data as DataFrame")
     geo: FeatureCollection | None = Field(default=None, description="Optional geospatial data")
+    run_info: RunInfo | None = Field(
+        default=None,
+        description="Optional per-request runtime context from chap-core, including the forecast horizon",
+    )
 
 
 ValidateRequest = Annotated[
@@ -197,6 +234,7 @@ class ModelRunnerProtocol(Protocol[ConfigT]):
 
 
 __all__ = [
+    "RunInfo",
     "TrainRequest",
     "TrainResponse",
     "PredictRequest",

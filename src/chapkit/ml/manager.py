@@ -9,14 +9,16 @@ import shutil
 import zipfile
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 
 from servicekit import Database
+from servicekit.logging import get_logger
 from ulid import ULID
 
 from chapkit.artifact import ArtifactIn, ArtifactManager, ArtifactRepository
 from chapkit.config import ConfigManager, ConfigRepository
 from chapkit.config.schemas import BaseConfig
+from chapkit.data import DataFrame
 from chapkit.scheduler import ChapkitScheduler
 
 from .runner import ModelRunFailedError, get_temp_dir
@@ -24,6 +26,7 @@ from .schemas import (
     ModelRunnerProtocol,
     PredictRequest,
     PredictResponse,
+    RunInfo,
     TrainRequest,
     TrainResponse,
     ValidatePredictRequest,
@@ -34,6 +37,48 @@ from .schemas import (
 )
 
 ConfigT = TypeVar("ConfigT", bound=BaseConfig)
+
+logger = get_logger(__name__)
+
+# Where a resolved forecast horizon came from, in precedence order.
+PredictionPeriodsSource = Literal["run_info", "future", "config"]
+
+# Dotted input path reported by a bounds diagnostic, per resolution source.
+_PREDICTION_PERIODS_FIELDS: dict[PredictionPeriodsSource, str] = {
+    "run_info": "run_info.prediction_periods",
+    "future": "future",
+    "config": "config.prediction_periods",
+}
+
+
+def derive_prediction_periods(future: DataFrame) -> int | None:
+    """Return the forecast horizon a future frame implies, or None when its columns do not describe one."""
+    if "time_period" not in future.columns or len(future) == 0:
+        return None
+    if "location" not in future.columns:
+        return future.nunique("time_period")
+
+    time_period_index = future.columns.index("time_period")
+    location_index = future.columns.index("location")
+    periods_by_location: dict[Any, set[Any]] = {}
+    for row in future.data:
+        periods_by_location.setdefault(row[location_index], set()).add(row[time_period_index])
+    return max(len(periods) for periods in periods_by_location.values())
+
+
+def resolve_prediction_periods(
+    config: BaseConfig,
+    run_info: RunInfo | None,
+    future: DataFrame | None,
+) -> tuple[int, PredictionPeriodsSource]:
+    """Resolve the forecast horizon for one request and report which input it came from."""
+    if run_info is not None and run_info.prediction_periods is not None:
+        return run_info.prediction_periods, "run_info"
+    if future is not None:
+        derived = derive_prediction_periods(future)
+        if derived is not None:
+            return derived, "future"
+    return config.prediction_periods, "config"
 
 
 def _exit_code_of(runner_result: Any) -> int:
@@ -75,25 +120,29 @@ class MLManager(Generic[ConfigT]):
         self.min_prediction_periods = min_prediction_periods
         self.max_prediction_periods = max_prediction_periods
 
-    def _validate_prediction_periods(self, config_data: BaseConfig) -> None:
-        """Validate that config prediction_periods is within allowed bounds (raises on failure)."""
-        for diagnostic in self._check_prediction_periods(config_data):
+    def _validate_prediction_periods(self, periods: int, source: PredictionPeriodsSource) -> None:
+        """Validate that the resolved prediction_periods is within allowed bounds (raises on failure)."""
+        for diagnostic in self._check_prediction_periods(periods, source):
             if diagnostic.severity == "error":
                 raise ValueError(diagnostic.message)
 
-    def _check_prediction_periods(self, config_data: BaseConfig) -> list[ValidationDiagnostic]:
-        """Non-raising variant of prediction-periods bounds check returning diagnostics."""
+    def _check_prediction_periods(
+        self,
+        periods: int,
+        source: PredictionPeriodsSource,
+    ) -> list[ValidationDiagnostic]:
+        """Non-raising variant of the prediction-periods bounds check returning diagnostics."""
         diagnostics: list[ValidationDiagnostic] = []
-        periods = config_data.prediction_periods
+        field = _PREDICTION_PERIODS_FIELDS[source]
         if periods < self.min_prediction_periods:
             diagnostics.append(
                 ValidationDiagnostic.error(
                     code="prediction_periods_out_of_bounds",
                     message=(
-                        f"prediction_periods ({periods}) is below the minimum allowed value "
+                        f"prediction_periods ({periods}, from {source}) is below the minimum allowed value "
                         f"({self.min_prediction_periods})"
                     ),
-                    field="config.prediction_periods",
+                    field=field,
                 )
             )
         elif periods > self.max_prediction_periods:
@@ -101,10 +150,10 @@ class MLManager(Generic[ConfigT]):
                 ValidationDiagnostic.error(
                     code="prediction_periods_out_of_bounds",
                     message=(
-                        f"prediction_periods ({periods}) exceeds the maximum allowed value "
+                        f"prediction_periods ({periods}, from {source}) exceeds the maximum allowed value "
                         f"({self.max_prediction_periods})"
                     ),
-                    field="config.prediction_periods",
+                    field=field,
                 )
             )
         return diagnostics
@@ -136,7 +185,9 @@ class MLManager(Generic[ConfigT]):
             )
             return diagnostics
 
-        diagnostics.extend(self._check_prediction_periods(config.data))
+        # No future frame exists at train time, so run info is the only override.
+        resolved_periods, periods_source = resolve_prediction_periods(config.data, request.run_info, None)
+        diagnostics.extend(self._check_prediction_periods(resolved_periods, periods_source))
 
         if len(request.data) == 0:
             diagnostics.append(
@@ -247,7 +298,22 @@ class MLManager(Generic[ConfigT]):
             )
             return diagnostics
 
-        diagnostics.extend(self._check_prediction_periods(config.data))
+        resolved_periods, periods_source = resolve_prediction_periods(config.data, request.run_info, request.future)
+        diagnostics.extend(self._check_prediction_periods(resolved_periods, periods_source))
+
+        if request.run_info is not None and request.run_info.prediction_periods is not None:
+            derived_periods = derive_prediction_periods(request.future)
+            if derived_periods is not None and derived_periods != request.run_info.prediction_periods:
+                diagnostics.append(
+                    ValidationDiagnostic.warning(
+                        code="prediction_periods_mismatch",
+                        message=(
+                            f"run_info.prediction_periods ({request.run_info.prediction_periods}) does not match "
+                            f"the horizon implied by the future frame ({derived_periods}); run info wins"
+                        ),
+                        field="future",
+                    )
+                )
 
         diagnostics.extend(await asyncio.to_thread(self._check_training_workspace, training_data, request.artifact_id))
 
@@ -411,12 +477,17 @@ class MLManager(Generic[ConfigT]):
             if config is None:
                 raise ValueError(f"Config {request.config_id} not found")
 
-            self._validate_prediction_periods(config.data)
+        # Resolve the horizon for this request and hand the runner a config that carries it.
+        # The stored config is never mutated; only the copy passed to the runner is.
+        resolved_periods, periods_source = resolve_prediction_periods(config.data, request.run_info, None)
+        self._validate_prediction_periods(resolved_periods, periods_source)
+        logger.info("prediction_periods_resolved", value=resolved_periods, source=periods_source, operation="train")
+        run_config = config.data.model_copy(update={"prediction_periods": resolved_periods})
 
         # Train model with timing
         training_started_at = datetime.datetime.now(datetime.UTC)
         training_result = await self.runner.on_train(
-            config=config.data,
+            config=run_config,
             data=request.data,
             geo=request.geo,
         )
@@ -561,12 +632,22 @@ class MLManager(Generic[ConfigT]):
                 if config is None:
                     raise ValueError(f"Config {config_id} not found")
 
-                self._validate_prediction_periods(config.data)
+            # Resolve the horizon for this request and hand the runner a config that carries it.
+            # The stored config is never mutated; only the copy passed to the runner is.
+            resolved_periods, periods_source = resolve_prediction_periods(config.data, request.run_info, request.future)
+            self._validate_prediction_periods(resolved_periods, periods_source)
+            logger.info(
+                "prediction_periods_resolved",
+                value=resolved_periods,
+                source=periods_source,
+                operation="predict",
+            )
+            run_config = config.data.model_copy(update={"prediction_periods": resolved_periods})
 
             # Make predictions with timing
             prediction_started_at = datetime.datetime.now(datetime.UTC)
             prediction_result = await self.runner.on_predict(
-                config=config.data,
+                config=run_config,
                 model=trained_model,
                 historic=request.historic,
                 future=request.future,
