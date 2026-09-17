@@ -97,6 +97,7 @@ class DatabaseConfig(BaseConfig):
 **Features:**
 - Inherits from `pydantic.BaseModel`
 - `extra="allow"` - accepts arbitrary additional fields
+- Accepts chap-core's nested payload: a `user_option_values` dict in the request body is hoisted into the top-level fields before validation (flat keys win on conflict)
 - JSON serializable
 - Validation on instantiation
 

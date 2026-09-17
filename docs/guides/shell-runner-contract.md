@@ -189,6 +189,10 @@ Read as `config$user_option_values$n_lags`. This shape matches what existing cha
 
 If you want to switch shapes, set `config_format="flat"` or `config_format="chap_core"` on `ShellModelRunner` in your `main.py`.
 
+### Inbound configs from chap-core
+
+chap-core creates configs with the tunables nested, `{"name": ..., "user_option_values": {...}, "additional_continuous_covariates": [...]}`, while `chapkit test` and hand-written clients post the fields flat. `BaseConfig` accepts both: a `user_option_values` dict in the request body is hoisted into the top-level fields before validation (flat keys win on conflict), so declared tunables receive the values set in the CHAP UI and `config.yml` comes out the same whichever client created the config. Configs that declare no tunables and rely on extra fields still see the options under `user_option_values` in the `chap_core` format, one level deep.
+
 ## Common pitfalls
 
 **My predict script can't find `model.rds` (or `model.pickle`).**
