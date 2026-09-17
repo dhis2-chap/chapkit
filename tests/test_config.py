@@ -6,7 +6,7 @@ from pydantic_core.core_schema import ValidationInfo
 from servicekit import SqliteDatabaseBuilder
 from ulid import ULID
 
-from chapkit import Config, ConfigOut
+from chapkit import BaseConfig, Config, ConfigOut
 
 from .conftest import DemoConfig
 
@@ -258,3 +258,85 @@ class TestConfigModelExtras:
             assert config1.id != config3.id
 
         await db.dispose()
+
+
+class TunableConfig(BaseConfig):
+    """Config with two declared tunables, as a chapkit service would declare them."""
+
+    prediction_periods: int = 3
+    n_samples: int = 100
+    log_transform: bool = True
+
+
+def test_base_config_prediction_periods_defaults_to_three() -> None:
+    """BaseConfig itself validates without prediction_periods, as chap-core never sends it."""
+    config = BaseConfig()
+
+    assert config.prediction_periods == 3
+    assert config.additional_continuous_covariates == []
+
+
+def test_base_config_hoists_into_inherited_prediction_periods() -> None:
+    """A subclass that does not redeclare prediction_periods still receives it from the nested payload."""
+
+    class InheritingConfig(BaseConfig):
+        """Config relying on the base default for prediction_periods."""
+
+        n_samples: int = 100
+
+    default = InheritingConfig.model_validate({"user_option_values": {"n_samples": 7}})
+    explicit = InheritingConfig.model_validate({"user_option_values": {"prediction_periods": 12}})
+
+    assert default.prediction_periods == 3
+    assert default.n_samples == 7
+    assert explicit.prediction_periods == 12
+
+
+def test_base_config_hoists_nested_user_option_values() -> None:
+    """chap-core's nested user_option_values payload populates the declared fields."""
+    config = TunableConfig.model_validate(
+        {"name": "cfg_from_chap_core", "user_option_values": {"n_samples": 7, "log_transform": False}}
+    )
+
+    assert config.n_samples == 7
+    assert config.log_transform is False
+    assert config.prediction_periods == 3
+    assert "user_option_values" not in config.model_dump()
+
+
+def test_base_config_flat_fields_win_over_nested() -> None:
+    """A flat key takes precedence over the same key under user_option_values."""
+    config = TunableConfig.model_validate({"n_samples": 5, "user_option_values": {"n_samples": 7}})
+
+    assert config.n_samples == 5
+
+
+def test_base_config_flat_payload_unchanged() -> None:
+    """Payloads without user_option_values validate exactly as before."""
+    config = TunableConfig.model_validate({"prediction_periods": 6, "n_samples": 9})
+
+    assert config.prediction_periods == 6
+    assert config.n_samples == 9
+
+
+def test_base_config_hoists_undeclared_user_options_as_extras() -> None:
+    """Undeclared user options still surface as top-level extras, not one level deep."""
+
+    class FieldlessConfig(BaseConfig):
+        """Config that declares no tunables and relies on extra fields."""
+
+        prediction_periods: int = 3
+
+    config = FieldlessConfig.model_validate({"user_option_values": {"some_knob": 7}})
+    dumped = config.model_dump()
+
+    assert dumped["some_knob"] == 7
+    assert "user_option_values" not in dumped
+
+
+def test_base_config_non_dict_user_option_values_left_alone() -> None:
+    """A non-dict user_option_values value is not treated as a nested payload."""
+    config = TunableConfig.model_validate({"user_option_values": "not-a-dict"})
+
+    assert config.n_samples == 100
+    assert config.model_dump()["user_option_values"] == "not-a-dict"

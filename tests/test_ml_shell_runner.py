@@ -805,6 +805,29 @@ def test_dump_config_yaml_chap_core_wraps_user_options() -> None:
     }
 
 
+def test_dump_config_yaml_chap_core_from_chap_core_payload() -> None:
+    """A config created from chap-core's nested payload dumps its options one level deep."""
+    import yaml
+
+    from chapkit.ml.runner import dump_config_yaml
+
+    class PortedConfig(BaseConfig):
+        """Config with one declared tunable."""
+
+        prediction_periods: int = 3
+        threshold: float = 0.5
+
+    config = PortedConfig.model_validate(
+        {"name": "ported_cfg", "user_option_values": {"threshold": 0.25, "extra_knob": 1}}
+    )
+    parsed = yaml.safe_load(dump_config_yaml(config, format="chap_core"))
+
+    assert parsed["prediction_periods"] == 3
+    assert parsed["user_option_values"]["threshold"] == 0.25
+    assert parsed["user_option_values"]["extra_knob"] == 1
+    assert "user_option_values" not in parsed["user_option_values"]
+
+
 def test_dump_config_yaml_chap_core_omits_user_options_when_empty() -> None:
     """chap_core format skips the user_option_values key when there are no user fields."""
     import yaml

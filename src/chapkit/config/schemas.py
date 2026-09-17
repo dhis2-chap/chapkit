@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
-from pydantic import BaseModel, field_serializer, field_validator
+from pydantic import BaseModel, field_serializer, field_validator, model_validator
 from pydantic_core.core_schema import ValidationInfo
 from servicekit.schemas import EntityIn, EntityOut
 from ulid import ULID
@@ -15,9 +15,36 @@ class BaseConfig(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    # Reserved parameters (CHAP-interpreted)
-    prediction_periods: int  # Required, no default
+    # Reserved parameters (CHAP-interpreted). chap-core does not send prediction_periods
+    # when it creates a config, so it must have a default; the horizon itself comes from
+    # the future frame at predict time.
+    prediction_periods: int = 3
     additional_continuous_covariates: list[str] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def hoist_user_option_values(cls, data: object) -> object:
+        """Accept chap-core's nested user_option_values payload as flat fields.
+
+        chap-core creates configs as {"name": ..., "user_option_values": {...},
+        "additional_continuous_covariates": [...]}. Without this hook the nested dict
+        would be stored as an opaque extra field, every declared tunable would keep
+        its default, and dump_config_yaml(format="chap_core") would re-nest it one
+        level too deep. Flat keys win on conflict, so payloads that already post the
+        fields flat (chapkit test, hand-written clients) are unchanged. Keys other
+        than user_option_values are left as they are.
+        """
+        if not isinstance(data, dict):
+            return data
+        payload = cast(dict[str, object], data)
+        nested = payload.get("user_option_values")
+        if not isinstance(nested, dict):
+            return payload
+        hoisted: dict[str, object] = {k: v for k, v in payload.items() if k != "user_option_values"}
+        for key, value in cast(dict[str, object], nested).items():
+            if key not in hoisted:
+                hoisted[key] = value
+        return hoisted
 
 
 class ConfigIn[DataT: BaseConfig](EntityIn):
