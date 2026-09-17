@@ -268,6 +268,30 @@ class TunableConfig(BaseConfig):
     log_transform: bool = True
 
 
+def test_base_config_prediction_periods_defaults_to_three() -> None:
+    """BaseConfig itself validates without prediction_periods, as chap-core never sends it."""
+    config = BaseConfig()
+
+    assert config.prediction_periods == 3
+    assert config.additional_continuous_covariates == []
+
+
+def test_base_config_hoists_into_inherited_prediction_periods() -> None:
+    """A subclass that does not redeclare prediction_periods still receives it from the nested payload."""
+
+    class InheritingConfig(BaseConfig):
+        """Config relying on the base default for prediction_periods."""
+
+        n_samples: int = 100
+
+    default = InheritingConfig.model_validate({"user_option_values": {"n_samples": 7}})
+    explicit = InheritingConfig.model_validate({"user_option_values": {"prediction_periods": 12}})
+
+    assert default.prediction_periods == 3
+    assert default.n_samples == 7
+    assert explicit.prediction_periods == 12
+
+
 def test_base_config_hoists_nested_user_option_values() -> None:
     """chap-core's nested user_option_values payload populates the declared fields."""
     config = TunableConfig.model_validate(
