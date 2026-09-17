@@ -95,9 +95,9 @@ Under the hood this calls a small endpoint that is added whenever ML is enabled:
 
 ```
 GET /api/v1/ml/$generate-sample-data?kind=train|predict
+```
 
 For `kind=predict`, the number of future periods is clamped to the `min_prediction_periods` and `max_prediction_periods` the service declares, so a generated payload always carries a horizon the service accepts.
-```
 
 Query parameters:
 
