@@ -26,6 +26,8 @@ class TestRunner:
         self.required_covariates: list[str] = []
         self.requires_geo: bool = False
         self.allow_free_additional_continuous_covariates: bool = False
+        self.min_prediction_periods: int = 0
+        self.max_prediction_periods: int = 100
         self.git_revision: str | None = None
         self.chapkit_version: str | None = None
         self.servicekit_version: str | None = None
@@ -61,6 +63,8 @@ class TestRunner:
                 self.allow_free_additional_continuous_covariates = data.get(
                     "allow_free_additional_continuous_covariates", False
                 )
+                self.min_prediction_periods = int(data.get("min_prediction_periods", 0))
+                self.max_prediction_periods = int(data.get("max_prediction_periods", 100))
                 self.git_revision = data.get("git_revision")
                 self.chapkit_version = data.get("chapkit_version")
                 self.servicekit_version = data.get("servicekit_version")
@@ -126,13 +130,19 @@ class TestRunner:
             return False, self._format_error("Error calling $validate", e), None
 
     def submit_training(
-        self, config_id: str, data: dict[str, Any], geo: dict[str, Any] | None = None
+        self,
+        config_id: str,
+        data: dict[str, Any],
+        geo: dict[str, Any] | None = None,
+        run_info: dict[str, Any] | None = None,
     ) -> tuple[bool, str, str | None, str | None]:
         """Submit training job and return (success, message, job_id, artifact_id)."""
         try:
             request_body: dict[str, Any] = {"config_id": config_id, "data": data}
             if geo:
                 request_body["geo"] = geo
+            if run_info:
+                request_body["run_info"] = run_info
 
             response = self.client.post(f"{self.base_url}/api/v1/ml/$train", json=request_body)
             if response.status_code == 202:
@@ -148,12 +158,15 @@ class TestRunner:
         historic: dict[str, Any],
         future: dict[str, Any],
         geo: dict[str, Any] | None = None,
+        run_info: dict[str, Any] | None = None,
     ) -> tuple[bool, str, str | None, str | None]:
         """Submit prediction job and return (success, message, job_id, artifact_id)."""
         try:
             request_body: dict[str, Any] = {"artifact_id": artifact_id, "historic": historic, "future": future}
             if geo:
                 request_body["geo"] = geo
+            if run_info:
+                request_body["run_info"] = run_info
 
             response = self.client.post(f"{self.base_url}/api/v1/ml/$predict", json=request_body)
             if response.status_code == 202:

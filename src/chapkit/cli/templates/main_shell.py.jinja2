@@ -39,7 +39,9 @@ from chapkit.ml import ShellModelRunner
 class {{ PROJECT_SLUG.replace('_', ' ').title().replace(' ', '') }}Config(BaseConfig):
     """Configuration for {{ PROJECT_NAME }}."""
 
-    # Required: number of prediction periods
+    # Fallback forecast horizon. At request time chapkit overrides it with the
+    # horizon from chap-core's run info, or from the future frame when run info
+    # omits it, so the value your code reads is the one for that request.
     prediction_periods: int = 3
 
     # Add your model-specific parameters here

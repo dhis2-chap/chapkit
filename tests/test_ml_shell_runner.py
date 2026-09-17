@@ -883,3 +883,47 @@ async def test_shell_runner_chap_core_config_format_end_to_end(tmp_path: Path) -
     assert written["prediction_periods"] == 5
     assert written["user_option_values"] == {"threshold": 0.25, "features": ["feature1", "feature2"]}
     shutil.rmtree(result["workspace_dir"], ignore_errors=True)
+
+
+@pytest.mark.asyncio
+async def test_shell_runner_predict_reemits_config_yaml_for_this_request(tmp_path: Path) -> None:
+    """The predict workspace's config.yml carries this request's horizon, not the training one."""
+    import os
+
+    import yaml
+
+    # A restored training workspace whose config.yml was written for a different horizon.
+    training_workspace = tmp_path / "training_workspace"
+    training_workspace.mkdir()
+    (training_workspace / "config.yml").write_text("prediction_periods: 3\n")
+
+    script = tmp_path / "predict.py"
+    script.write_text(
+        "import yaml\n"
+        "with open('config.yml') as f:\n"
+        "    cfg = yaml.safe_load(f)\n"
+        "assert cfg['prediction_periods'] == 7, cfg\n"
+        "with open('predictions.csv', 'w') as f:\n"
+        "    f.write('time_period,location,sample_0\\n2020-01,location_0,1.0\\n')\n"
+    )
+
+    runner: ShellModelRunner[MockConfig] = ShellModelRunner(
+        train_command="true",
+        predict_command=f"python {script}",
+    )
+    config = MockConfig(prediction_periods=7)
+    historic = DataFrame(columns=["time_period", "location"], data=[["2019-12", "location_0"]])
+    future = DataFrame(columns=["time_period", "location"], data=[["2020-01", "location_0"]])
+
+    cwd = os.getcwd()
+    os.chdir(tmp_path)
+    try:
+        runner.project_root = tmp_path
+        result = await runner.on_predict(config, {"workspace_dir": str(training_workspace)}, historic, future)
+    finally:
+        os.chdir(cwd)
+
+    assert result["exit_code"] == 0, result.get("stderr")
+    written = yaml.safe_load((Path(result["workspace_dir"]) / "config.yml").read_text())
+    assert written["prediction_periods"] == 7
+    shutil.rmtree(result["workspace_dir"], ignore_errors=True)

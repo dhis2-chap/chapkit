@@ -143,6 +143,32 @@ All train/predict operations are asynchronous:
 - Monitor progress via Job API or SSE streaming
 - Results stored in artifacts when complete
 
+### Prediction horizon and `run_info`
+
+`$train`, `$predict` and `$validate` accept an optional `run_info` object carrying the runtime context for that one request:
+
+```json
+{
+  "prediction_periods": 12,
+  "additional_continuous_covariates": ["rainfall"],
+  "future_covariate_origin": null
+}
+```
+
+chap-core spells the horizon `prediction_length`; chapkit accepts either spelling for the same field and always emits `prediction_periods`. Unknown keys are ignored, and the whole object is optional.
+
+The horizon for a request is resolved in this order:
+
+1. `run_info.prediction_periods`, when it is set.
+2. The future frame (predict only): the largest number of distinct `time_period` values for any single `location`, or the distinct `time_period` count when the frame has no `location` column. Skipped when the frame has no `time_period` column or no rows.
+3. `config.prediction_periods`, the per-config fallback.
+
+The resolved value is what gets bounds-checked against `min_prediction_periods` / `max_prediction_periods`, and the diagnostic names the source it came from, for example `prediction_periods (12, from run_info) exceeds the maximum allowed value (10)`.
+
+The runner then sees the resolved value: `on_train` and `on_predict` receive a copy of the config whose `prediction_periods` is the resolved horizon, so Python models, shell scripts and `config.yml` all read the same number without any hook change. The stored config is never modified.
+
+On a predict payload, `$validate` adds a `prediction_periods_mismatch` warning when `run_info` and the future frame disagree. `run_info` still wins, and `valid` stays `true`.
+
 ---
 
 ## Model Runners

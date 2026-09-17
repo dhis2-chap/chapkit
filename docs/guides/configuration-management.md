@@ -98,6 +98,7 @@ class DatabaseConfig(BaseConfig):
 - Inherits from `pydantic.BaseModel`
 - `extra="allow"` - accepts arbitrary additional fields
 - Accepts chap-core's nested payload: a `user_option_values` dict in the request body is hoisted into the top-level fields before validation (flat keys win on conflict)
+- `prediction_periods` is a fallback, not the horizon: each `$train` / `$predict` request resolves its own horizon from `run_info` or the future frame and falls back to this value only when neither is present (see [ML Workflows](ml-workflows.md#prediction-horizon-and-run_info))
 - JSON serializable
 - Validation on instantiation
 

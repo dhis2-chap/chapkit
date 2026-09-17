@@ -18,7 +18,14 @@ from chapkit import Artifact, ArtifactRepository
 from chapkit.config import BaseConfig
 from chapkit.data import DataFrame
 from chapkit.ml import FunctionalModelRunner, MLManager, ShellModelRunner
-from chapkit.ml.schemas import ValidatePredictRequest, ValidationDiagnostic
+from chapkit.ml.manager import resolve_prediction_periods
+from chapkit.ml.schemas import (
+    PredictRequest,
+    RunInfo,
+    TrainRequest,
+    ValidatePredictRequest,
+    ValidationDiagnostic,
+)
 
 
 class SampleConfig(BaseConfig):
@@ -38,11 +45,11 @@ class TestCheckPredictionPeriods:
 
     def test_within_bounds_returns_empty(self) -> None:
         manager = self._bare_manager(minimum=1, maximum=10)
-        assert manager._check_prediction_periods(SampleConfig(prediction_periods=5)) == []
+        assert manager._check_prediction_periods(5, "config") == []
 
     def test_below_minimum_returns_error_diagnostic(self) -> None:
         manager = self._bare_manager(minimum=5, maximum=10)
-        diagnostics = manager._check_prediction_periods(SampleConfig(prediction_periods=3))
+        diagnostics = manager._check_prediction_periods(3, "config")
         assert len(diagnostics) == 1
         assert diagnostics[0].severity == "error"
         assert diagnostics[0].code == "prediction_periods_out_of_bounds"
@@ -51,7 +58,7 @@ class TestCheckPredictionPeriods:
 
     def test_above_maximum_returns_error_diagnostic(self) -> None:
         manager = self._bare_manager(minimum=1, maximum=5)
-        diagnostics = manager._check_prediction_periods(SampleConfig(prediction_periods=10))
+        diagnostics = manager._check_prediction_periods(10, "config")
         assert len(diagnostics) == 1
         assert diagnostics[0].severity == "error"
         assert diagnostics[0].code == "prediction_periods_out_of_bounds"
@@ -59,8 +66,148 @@ class TestCheckPredictionPeriods:
 
     def test_at_boundaries_returns_empty(self) -> None:
         manager = self._bare_manager(minimum=3, maximum=7)
-        assert manager._check_prediction_periods(SampleConfig(prediction_periods=3)) == []
-        assert manager._check_prediction_periods(SampleConfig(prediction_periods=7)) == []
+        assert manager._check_prediction_periods(3, "config") == []
+        assert manager._check_prediction_periods(7, "config") == []
+
+    def test_run_info_source_reports_run_info_field(self) -> None:
+        """A horizon that came from run info blames run_info.prediction_periods."""
+        manager = self._bare_manager(minimum=1, maximum=10)
+        diagnostics = manager._check_prediction_periods(12, "run_info")
+        assert len(diagnostics) == 1
+        assert diagnostics[0].field == "run_info.prediction_periods"
+        assert diagnostics[0].message == (
+            "prediction_periods (12, from run_info) exceeds the maximum allowed value (10)"
+        )
+
+    def test_future_source_reports_future_field(self) -> None:
+        """A horizon derived from the future frame blames the future frame."""
+        manager = self._bare_manager(minimum=4, maximum=10)
+        diagnostics = manager._check_prediction_periods(2, "future")
+        assert len(diagnostics) == 1
+        assert diagnostics[0].field == "future"
+        assert "from future" in diagnostics[0].message
+
+
+class TestRunInfoSchema:
+    """Unit tests for the RunInfo request schema."""
+
+    def test_accepts_chap_core_prediction_length_alias(self) -> None:
+        """chap-core sends prediction_length; it populates prediction_periods."""
+        run_info = RunInfo.model_validate({"prediction_length": 7})
+        assert run_info.prediction_periods == 7
+
+    def test_accepts_canonical_prediction_periods(self) -> None:
+        """The canonical spelling validates just as well."""
+        run_info = RunInfo.model_validate({"prediction_periods": 7})
+        assert run_info.prediction_periods == 7
+
+    def test_dumps_under_canonical_name(self) -> None:
+        """Serialization always emits prediction_periods, never the legacy alias."""
+        dumped = RunInfo.model_validate({"prediction_length": 7}).model_dump(by_alias=True)
+        assert dumped["prediction_periods"] == 7
+        assert "prediction_length" not in dumped
+
+    def test_ignores_unknown_keys(self) -> None:
+        """Unknown keys chap-core may add later are dropped, not rejected."""
+        run_info = RunInfo.model_validate({"prediction_length": 3, "some_future_key": "value"})
+        assert run_info.prediction_periods == 3
+        assert not hasattr(run_info, "some_future_key")
+
+    def test_defaults_are_empty(self) -> None:
+        """An empty run info carries no horizon and no covariates."""
+        run_info = RunInfo()
+        assert run_info.prediction_periods is None
+        assert run_info.additional_continuous_covariates == []
+        assert run_info.future_covariate_origin is None
+
+    def test_carries_covariates_and_origin(self) -> None:
+        """The remaining chap-core fields round-trip unchanged."""
+        run_info = RunInfo.model_validate(
+            {
+                "prediction_length": 2,
+                "additional_continuous_covariates": ["rainfall"],
+                "future_covariate_origin": "climate_model",
+            }
+        )
+        assert run_info.additional_continuous_covariates == ["rainfall"]
+        assert run_info.future_covariate_origin == "climate_model"
+
+
+class TestResolvePredictionPeriods:
+    """Unit tests for the pure prediction-horizon resolution helper."""
+
+    def _future(self, periods_by_location: dict[str, int], *, with_location: bool = True) -> DataFrame:
+        """Build a future frame with the given number of periods per location."""
+        columns = ["time_period", "location"] if with_location else ["time_period"]
+        rows: list[list[Any]] = []
+        for location, period_count in periods_by_location.items():
+            for period_index in range(period_count):
+                period = f"2020-{period_index + 1:02d}"
+                rows.append([period, location] if with_location else [period])
+        return DataFrame(columns=columns, data=rows)
+
+    def test_run_info_wins_over_future_and_config(self) -> None:
+        resolved, source = resolve_prediction_periods(
+            SampleConfig(prediction_periods=3),
+            RunInfo(prediction_periods=9),
+            self._future({"a": 4}),
+        )
+        assert (resolved, source) == (9, "run_info")
+
+    def test_future_wins_over_config_when_run_info_absent(self) -> None:
+        resolved, source = resolve_prediction_periods(
+            SampleConfig(prediction_periods=3),
+            None,
+            self._future({"a": 4}),
+        )
+        assert (resolved, source) == (4, "future")
+
+    def test_future_used_when_run_info_omits_the_horizon(self) -> None:
+        """run_info without prediction_periods must not shadow the future frame."""
+        resolved, source = resolve_prediction_periods(
+            SampleConfig(prediction_periods=3),
+            RunInfo(additional_continuous_covariates=["rainfall"]),
+            self._future({"a": 4}),
+        )
+        assert (resolved, source) == (4, "future")
+
+    def test_future_takes_the_max_across_locations(self) -> None:
+        """A ragged panel resolves to the longest per-location horizon, not the row count."""
+        resolved, source = resolve_prediction_periods(
+            SampleConfig(prediction_periods=3),
+            None,
+            self._future({"a": 6, "b": 4, "c": 6}),
+        )
+        assert (resolved, source) == (6, "future")
+
+    def test_future_without_location_column_counts_distinct_periods(self) -> None:
+        resolved, source = resolve_prediction_periods(
+            SampleConfig(prediction_periods=3),
+            None,
+            self._future({"a": 5}, with_location=False),
+        )
+        assert (resolved, source) == (5, "future")
+
+    def test_future_without_time_period_column_falls_back_to_config(self) -> None:
+        resolved, source = resolve_prediction_periods(
+            SampleConfig(prediction_periods=3),
+            None,
+            DataFrame(columns=["location", "rainfall"], data=[["a", 1.0]]),
+        )
+        assert (resolved, source) == (3, "config")
+
+    def test_empty_future_falls_back_to_config(self) -> None:
+        resolved, source = resolve_prediction_periods(
+            SampleConfig(prediction_periods=3),
+            None,
+            DataFrame(columns=["time_period", "location"], data=[]),
+        )
+        assert (resolved, source) == (3, "config")
+
+    def test_no_future_and_no_run_info_falls_back_to_config(self) -> None:
+        """Train has no future frame, so the config value is all that is left."""
+        resolved, source = resolve_prediction_periods(SampleConfig(prediction_periods=3), None, None)
+        assert (resolved, source) == (3, "config")
 
 
 async def _noop_train(config: Any, data: Any, geo: Any = None) -> Any:
@@ -320,6 +467,126 @@ def test_validate_predict_happy_path(client: TestClient) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["valid"] is True, payload
+
+
+def test_validate_predict_warns_when_run_info_and_future_disagree(client: TestClient) -> None:
+    """A run_info horizon that contradicts the future frame is a warning, not an error."""
+    config_id = _create_config(client)
+    train_body = {
+        "config_id": config_id,
+        "data": {
+            "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
+            "data": [
+                [10.0, 25.0, 60.0, 5.0],
+                [15.0, 28.0, 70.0, 8.0],
+                [8.0, 22.0, 55.0, 3.0],
+                [20.0, 30.0, 80.0, 12.0],
+            ],
+        },
+    }
+    train_response = client.post("/api/v1/ml/$train", json=train_body)
+    train_data = train_response.json()
+    job = _wait_for_job(client, train_data["job_id"])
+    assert job["status"] == "completed", job
+
+    validate_body = {
+        "type": "predict",
+        "artifact_id": train_data["artifact_id"],
+        "historic": {
+            "columns": ["time_period", "location", "rainfall", "disease_cases"],
+            "data": [["2019-12", "location_0", 10.0, 5.0]],
+        },
+        # Two future periods, but chap-core claims five.
+        "future": {
+            "columns": ["time_period", "location", "rainfall"],
+            "data": [
+                ["2020-01", "location_0", 11.0],
+                ["2020-02", "location_0", 12.0],
+            ],
+        },
+        "run_info": {"prediction_length": 5},
+    }
+
+    response = client.post("/api/v1/ml/$validate", json=validate_body)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["valid"] is True, payload
+    mismatches = [d for d in payload["diagnostics"] if d["code"] == "prediction_periods_mismatch"]
+    assert len(mismatches) == 1
+    assert mismatches[0]["severity"] == "warning"
+    assert mismatches[0]["field"] == "future"
+    assert "5" in mismatches[0]["message"]
+    assert "2" in mismatches[0]["message"]
+
+
+def test_validate_predict_no_warning_when_run_info_matches_future(client: TestClient) -> None:
+    """Agreement between run_info and the future frame produces no diagnostic."""
+    config_id = _create_config(client)
+    train_body = {
+        "config_id": config_id,
+        "data": {
+            "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
+            "data": [
+                [10.0, 25.0, 60.0, 5.0],
+                [15.0, 28.0, 70.0, 8.0],
+                [8.0, 22.0, 55.0, 3.0],
+                [20.0, 30.0, 80.0, 12.0],
+            ],
+        },
+    }
+    train_response = client.post("/api/v1/ml/$train", json=train_body)
+    train_data = train_response.json()
+    job = _wait_for_job(client, train_data["job_id"])
+    assert job["status"] == "completed", job
+
+    validate_body = {
+        "type": "predict",
+        "artifact_id": train_data["artifact_id"],
+        "historic": {
+            "columns": ["time_period", "location", "rainfall", "disease_cases"],
+            "data": [["2019-12", "location_0", 10.0, 5.0]],
+        },
+        "future": {
+            "columns": ["time_period", "location", "rainfall"],
+            "data": [
+                ["2020-01", "location_0", 11.0],
+                ["2020-02", "location_0", 12.0],
+            ],
+        },
+        "run_info": {"prediction_periods": 2},
+    }
+
+    response = client.post("/api/v1/ml/$validate", json=validate_body)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["valid"] is True, payload
+    assert [d for d in payload["diagnostics"] if d["code"] == "prediction_periods_mismatch"] == []
+
+
+def test_validate_train_rejects_a_run_info_horizon_above_the_maximum(client: TestClient) -> None:
+    """The train bounds check runs on the resolved horizon and names run_info as its source."""
+    config_id = _create_config(client)
+    body = {
+        "type": "train",
+        "config_id": config_id,
+        "data": {
+            "columns": ["rainfall", "mean_temperature", "humidity", "disease_cases"],
+            "data": [[10.0, 25.0, 60.0, 5.0]],
+        },
+        "run_info": {"prediction_length": 200},
+    }
+
+    response = client.post("/api/v1/ml/$validate", json=body)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["valid"] is False
+    out_of_bounds = [d for d in payload["diagnostics"] if d["code"] == "prediction_periods_out_of_bounds"]
+    assert len(out_of_bounds) == 1
+    assert out_of_bounds[0]["field"] == "run_info.prediction_periods"
+    assert "from run_info" in out_of_bounds[0]["message"]
 
 
 def test_validate_predict_empty_historic_and_future(client: TestClient) -> None:
@@ -674,5 +941,220 @@ async def test_validate_train_with_legacy_runner_missing_hook() -> None:
         )
         assert response.valid is True
         assert response.diagnostics == []
+    finally:
+        await db.dispose()
+
+
+async def _seed_config(db: Any, config_data: BaseConfig) -> ULID:
+    """Store a config and return its ID."""
+    from chapkit.config import ConfigManager, ConfigRepository
+    from chapkit.config.schemas import ConfigIn
+
+    async with db.session() as session:
+        config_repository = ConfigRepository(session)
+        config_manager: ConfigManager[BaseConfig] = ConfigManager(config_repository, type(config_data))
+        created = await config_manager.save(ConfigIn(name=f"horizon_config_{ULID()}", data=config_data))
+        return created.id
+
+
+def _future_frame(num_periods: int, locations: tuple[str, ...] = ("location_0", "location_1")) -> DataFrame:
+    """Build a future frame spanning num_periods periods for each location."""
+    rows: list[list[Any]] = []
+    for period_index in range(num_periods):
+        for location in locations:
+            rows.append([f"2020-{period_index + 1:02d}", location, 1.0])
+    return DataFrame(columns=["time_period", "location", "rainfall"], data=rows)
+
+
+async def test_train_task_rejects_a_run_info_horizon_above_the_maximum() -> None:
+    """The bounds check runs on the resolved horizon, so run info can fail a config that passes."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        config_id = await _seed_config(db, SampleConfig(prediction_periods=3))
+        manager = await _build_manager(FunctionalModelRunner(on_train=_noop_train, on_predict=_noop_predict), db)
+
+        with pytest.raises(ValueError) as exc_info:
+            await manager._train_task(
+                TrainRequest(
+                    config_id=config_id,
+                    data=DataFrame(columns=["rainfall"], data=[[1.0]]),
+                    run_info=RunInfo(prediction_periods=200),
+                ),
+                ULID(),
+            )
+
+        assert "prediction_periods (200, from run_info)" in str(exc_info.value)
+        assert "exceeds the maximum allowed value (100)" in str(exc_info.value)
+    finally:
+        await db.dispose()
+
+
+async def test_tasks_hand_the_runner_the_resolved_horizon(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """run_info wins at train and predict, the future frame is the predict fallback, and the config is untouched."""
+    monkeypatch.chdir(tmp_path)
+    seen: dict[str, int] = {}
+
+    async def record_train(config: Any, data: Any, geo: Any = None) -> Any:
+        """Record the horizon the runner was given and return a trivial model."""
+        seen["train"] = config.prediction_periods
+        return {"weights": [1.0]}
+
+    async def record_predict(config: Any, model: Any, historic: Any, future: Any, geo: Any = None) -> Any:
+        """Record the horizon the runner was given and echo the future frame."""
+        seen["predict"] = config.prediction_periods
+        return future
+
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        # The stored horizon is out of bounds on purpose: run info must be what gets checked.
+        config_id = await _seed_config(db, SampleConfig(prediction_periods=200))
+        manager = await _build_manager(FunctionalModelRunner(on_train=record_train, on_predict=record_predict), db)
+
+        training_artifact_id = ULID()
+        await manager._train_task(
+            TrainRequest(
+                config_id=config_id,
+                data=DataFrame(columns=["rainfall", "disease_cases"], data=[[1.0, 2.0]]),
+                run_info=RunInfo(prediction_periods=5),
+            ),
+            training_artifact_id,
+        )
+        assert seen["train"] == 5
+
+        historic = DataFrame(columns=["time_period", "location", "rainfall"], data=[["2019-12", "location_0", 1.0]])
+
+        await manager._predict_task(
+            PredictRequest(
+                artifact_id=training_artifact_id,
+                historic=historic,
+                future=_future_frame(4),
+                run_info=RunInfo(prediction_periods=6),
+            ),
+            ULID(),
+        )
+        assert seen["predict"] == 6
+
+        # Without run info the future frame decides: four periods per location.
+        await manager._predict_task(
+            PredictRequest(
+                artifact_id=training_artifact_id,
+                historic=historic,
+                future=_future_frame(4),
+            ),
+            ULID(),
+        )
+        assert seen["predict"] == 4
+
+        # The stored config is never rewritten by a request.
+        from chapkit.config import ConfigManager, ConfigRepository
+
+        async with db.session() as session:
+            config_manager: ConfigManager[BaseConfig] = ConfigManager(ConfigRepository(session), SampleConfig)
+            stored = await config_manager.find_by_id(config_id)
+        assert stored is not None
+        assert stored.data.prediction_periods == 200
+    finally:
+        await db.dispose()
+
+
+async def test_train_task_without_run_info_uses_the_config_horizon(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: a request without run info behaves exactly as before."""
+    monkeypatch.chdir(tmp_path)
+    seen: dict[str, int] = {}
+
+    async def record_train(config: Any, data: Any, geo: Any = None) -> Any:
+        """Record the horizon the runner was given and return a trivial model."""
+        seen["train"] = config.prediction_periods
+        return {"weights": [1.0]}
+
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        config_id = await _seed_config(db, SampleConfig(prediction_periods=7))
+        manager = await _build_manager(FunctionalModelRunner(on_train=record_train, on_predict=_noop_predict), db)
+
+        await manager._train_task(
+            TrainRequest(
+                config_id=config_id,
+                data=DataFrame(columns=["rainfall", "disease_cases"], data=[[1.0, 2.0]]),
+            ),
+            ULID(),
+        )
+
+        assert seen["train"] == 7
+    finally:
+        await db.dispose()
+
+
+async def test_validate_hooks_receive_the_resolved_horizon() -> None:
+    """on_validate_train and on_validate_predict see run_info's horizon, not the stored config value."""
+    from chapkit.ml.schemas import ValidateTrainRequest
+
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        config_id = await _seed_config(db, SampleConfig(prediction_periods=3))
+        seen: dict[str, int] = {}
+
+        async def train_hook(config: Any, data: Any, geo: Any = None) -> list[ValidationDiagnostic]:
+            seen["train"] = config.prediction_periods
+            return []
+
+        async def predict_hook(config: Any, historic: Any, future: Any, geo: Any = None) -> list[ValidationDiagnostic]:
+            seen["predict"] = config.prediction_periods
+            return []
+
+        runner = FunctionalModelRunner(
+            on_train=_noop_train,
+            on_predict=_noop_predict,
+            on_validate_train=train_hook,
+            on_validate_predict=predict_hook,
+        )
+        manager = await _build_manager(runner, db)
+
+        await manager.validate(
+            ValidateTrainRequest(
+                config_id=config_id,
+                data=DataFrame(columns=["rainfall"], data=[[1.0]]),
+                run_info=RunInfo(prediction_periods=7),
+            )
+        )
+
+        artifact_id = await _seed_training_artifact(
+            db,
+            {
+                "type": "ml_training_workspace",
+                "metadata": {"status": "success", "config_id": str(config_id)},
+                "content": _zip_with_pickle({"trained": True}),
+                "content_type": "application/zip",
+            },
+        )
+        future = DataFrame(
+            columns=["time_period", "location"],
+            data=[["2020-01", "a"], ["2020-02", "a"], ["2020-03", "a"], ["2020-04", "a"]],
+        )
+        await manager.validate(
+            ValidatePredictRequest(
+                artifact_id=artifact_id,
+                historic=DataFrame(columns=["time_period", "location"], data=[["2019-12", "a"]]),
+                future=future,
+            )
+        )
+
+        assert seen == {"train": 7, "predict": 4}
+
+        stored = await manager.validate(
+            ValidateTrainRequest(config_id=config_id, data=DataFrame(columns=["rainfall"], data=[[1.0]]))
+        )
+        assert stored.valid is True
+        assert seen["train"] == 3
     finally:
         await db.dispose()
