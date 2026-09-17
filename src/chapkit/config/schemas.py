@@ -15,8 +15,10 @@ class BaseConfig(BaseModel):
 
     model_config = {"extra": "allow"}
 
-    # Reserved parameters (CHAP-interpreted)
-    prediction_periods: int  # Required, no default
+    # Reserved parameters (CHAP-interpreted). chap-core does not send prediction_periods
+    # when it creates a config, so it must have a default; the horizon itself comes from
+    # the future frame at predict time.
+    prediction_periods: int = 3
     additional_continuous_covariates: list[str] = []
 
     @model_validator(mode="before")
