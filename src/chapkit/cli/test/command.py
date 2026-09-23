@@ -415,6 +415,7 @@ def test_command(
                     historic, future = generator.generate_prediction_data(
                         num_locations=5,
                         num_periods=future_periods,
+                        historic_periods=max(1, num_predict_rows // 5),
                         required_covariates=runner.required_covariates,
                         additional_covariates=pred_acc,
                         extra_covariates=extra_covariates,
