@@ -117,10 +117,12 @@ class MLRouter(Router):
 
             if kind == "predict":
                 # The future frame's period count is the horizon the service will resolve
-                # at $predict, so keep it inside the bounds the service declares.
+                # at $predict, so keep it inside the bounds the service declares. The
+                # historic frame keeps the full requested length as model context.
                 historic, future = generator.generate_prediction_data(
                     num_locations=num_locations,
                     num_periods=_clamp_horizon(num_periods, sample_metadata),
+                    historic_periods=max(1, num_periods),
                     num_features=num_features,
                     required_covariates=required_covariates,
                     period_type=resolved_period,

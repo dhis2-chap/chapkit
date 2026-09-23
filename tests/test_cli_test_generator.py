@@ -61,6 +61,16 @@ class TestGeneratePredictionData:
         assert historic_periods[-1] == "2021-12"
         assert future_periods[0] == "2022-01"
 
+    def test_historic_periods_sets_history_independently_of_horizon(self) -> None:
+        """Verify a short horizon does not shorten the historic context."""
+        generator = TestDataGenerator(seed=42)
+        historic, future = generator.generate_prediction_data(num_locations=1, num_periods=12, historic_periods=30)
+        time_idx = historic["columns"].index("time_period")
+        assert len(historic["data"]) == 30
+        assert len(future["data"]) == 12
+        assert historic["data"][-1][time_idx] == "2022-06"
+        assert future["data"][0][time_idx] == "2022-07"
+
     def test_prediction_data_spans_multiple_years(self) -> None:
         """Verify the generated series covers more than one calendar year."""
         generator = TestDataGenerator(seed=42)

@@ -125,7 +125,7 @@ def _distinct_periods(frame: dict) -> int:
 
 
 def test_sample_data_predict_clamps_future_to_max_prediction_periods() -> None:
-    """The default 50-period future is shortened to the service's declared maximum."""
+    """The default 50-period future is shortened to the service's declared maximum; historic keeps 50."""
     client = _client({"min_prediction_periods": 0, "max_prediction_periods": 12})
 
     response = client.get("/api/v1/ml/$generate-sample-data", params={"kind": "predict"})
@@ -133,7 +133,7 @@ def test_sample_data_predict_clamps_future_to_max_prediction_periods() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert _distinct_periods(payload["future"]) == 12
-    assert _distinct_periods(payload["historic"]) == 12
+    assert _distinct_periods(payload["historic"]) == 50
 
 
 def test_sample_data_predict_raises_future_to_min_prediction_periods() -> None:
