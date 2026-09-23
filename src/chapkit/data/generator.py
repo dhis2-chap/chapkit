@@ -155,12 +155,15 @@ class TestDataGenerator:
         additional_covariates: list[str] | None = None,
         extra_covariates: int = 0,
         period_type: Literal["monthly", "weekly"] = "monthly",
+        historic_periods: int | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Generate historic and future DataFrames for prediction."""
+        """Generate historic and future DataFrames for prediction; historic_periods defaults to num_periods."""
+        if historic_periods is None:
+            historic_periods = num_periods
         # Historic data: actual observations from earlier time periods
         historic = self.generate_training_data(
             num_locations=num_locations,
-            num_periods=num_periods,
+            num_periods=historic_periods,
             num_features=num_features,
             required_covariates=required_covariates,
             additional_covariates=additional_covariates,
@@ -170,7 +173,7 @@ class TestDataGenerator:
         )
 
         # Future data: continue immediately after the historic span (same origin year,
-        # offset by num_periods) so the future horizon is contiguous with history
+        # offset by historic_periods) so the future horizon is contiguous with history
         # instead of jumping to a fixed year and leaving a calendar gap. Then null out
         # disease_cases for prediction.
         future = self.generate_training_data(
@@ -181,7 +184,7 @@ class TestDataGenerator:
             additional_covariates=additional_covariates,
             extra_covariates=extra_covariates,
             start_year=2020,
-            start_period=num_periods,
+            start_period=historic_periods,
             period_type=period_type,
         )
 
