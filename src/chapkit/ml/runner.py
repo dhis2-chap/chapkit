@@ -47,15 +47,36 @@ logger = get_logger(__name__)
 
 
 # Number of trailing stderr lines embedded in a ModelRunFailedError message.
-STDERR_TAIL_LINES = 5
+STDERR_TAIL_LINES = 10
+
+# R prints deferred warnings after the error under one of these headers, pushing the error out of the tail.
+R_DEFERRED_WARNING_HEADERS = ("In addition: Warning message:", "In addition: Warning messages:")
+
+# R error lines start with "Error in <call> :" or "Error:"; one after a warning block means that block is not trailing.
+R_ERROR_LINE_PREFIXES = ("Error in ", "Error:")
+
+
+def _strip_trailing_r_noise(lines: list[str]) -> list[str]:
+    """Drop a trailing R 'Execution halted' line and the deferred warning block printed after the final error."""
+    if lines and lines[-1].strip() == "Execution halted":
+        lines = lines[:-1]
+    for index in range(len(lines) - 1, -1, -1):
+        line = lines[index].strip()
+        if line.startswith(R_ERROR_LINE_PREFIXES):
+            # A later error (e.g. after one caught by try()) is the fatal one; there is no trailing block to drop.
+            return lines
+        if line in R_DEFERRED_WARNING_HEADERS:
+            return lines[:index]
+    return lines
 
 
 def format_stderr_tail(stderr: str, tail_lines: int = STDERR_TAIL_LINES) -> str:
-    """Return the last few non-empty stderr lines joined for a single-line error message."""
+    """Return the last few meaningful stderr lines joined for a single-line error message."""
     lines = [line for line in stderr.strip().splitlines() if line.strip()]
     if not lines:
         return "<no stderr output>"
-    return " | ".join(lines[-tail_lines:])
+    meaningful_lines = _strip_trailing_r_noise(lines) or lines
+    return " | ".join(meaningful_lines[-tail_lines:])
 
 
 class ModelRunFailedError(RuntimeError):

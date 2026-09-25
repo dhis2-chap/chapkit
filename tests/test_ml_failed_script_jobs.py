@@ -175,6 +175,80 @@ def test_format_stderr_tail_keeps_last_lines() -> None:
     assert format_stderr_tail("   \n\n") == "<no stderr output>"
 
 
+R_INLA_STDERR = """\
+sh: 1: /usr/local/lib/R/site-library/INLA/bin/linux/64bit/inla.mkl.run: Permission denied
+Error in inla.inlaprogram.has.crashed() :
+  The inla-program exited with an error. Unless you interupted it yourself, please rerun with verbose=TRUE.
+  If this does not help, please contact the developers at <help@r-inla.org>.
+Calls: predict_chap -> inla -> inla.core -> inla.inlaprogram.has.crashed
+In addition: Warning messages:
+1: In poly2nb(polygons, queen = FALSE) :
+  neighbour object has 5 sub-graphs;
+if this sub-graph count seems unexpected, try increasing the snap argument.
+2: In poly2nb(polygons, queen = FALSE) :
+  neighbour object has 5 sub-graphs;
+if this sub-graph count seems unexpected, try increasing the snap argument.
+Execution halted
+"""
+
+
+def test_format_stderr_tail_drops_trailing_r_warnings() -> None:
+    """R's deferred warnings and 'Execution halted' do not push the actual error out of the tail."""
+    from chapkit.ml.runner import format_stderr_tail
+
+    tail = format_stderr_tail(R_INLA_STDERR)
+
+    assert "Permission denied" in tail
+    assert "Error in inla.inlaprogram.has.crashed()" in tail
+    assert "Calls: predict_chap" in tail
+    assert "poly2nb" not in tail
+    assert "Execution halted" not in tail
+
+
+def test_format_stderr_tail_drops_single_r_warning() -> None:
+    """A single deferred R warning after the error is also dropped."""
+    from chapkit.ml.runner import format_stderr_tail
+
+    stderr = "Error in f() : boom\nIn addition: Warning message:\nIn g() : careful\nExecution halted\n"
+
+    assert format_stderr_tail(stderr) == "Error in f() : boom"
+
+
+def test_format_stderr_tail_keeps_error_after_mid_run_warning() -> None:
+    """A warning printed mid-run, before the error, does not hide the error."""
+    from chapkit.ml.runner import format_stderr_tail
+
+    stderr = "loading\nWarning message:\nIn g() : careful\nError in f() : boom\nExecution halted\n"
+
+    assert format_stderr_tail(stderr).endswith("Error in f() : boom")
+
+
+def test_format_stderr_tail_keeps_fatal_error_after_caught_error_warnings() -> None:
+    """Warnings deferred after an error caught by try() do not hide a later fatal error."""
+    from chapkit.ml.runner import format_stderr_tail
+
+    # Real Rscript output for:
+    #   try({warning("recoverable warning"); stop("recoverable error")}); stop("actual fatal error")
+    stderr = (
+        "Error in try({ : recoverable error\n"
+        "In addition: Warning message:\n"
+        "In doTryCatch(return(expr), name, parentenv, handler) : recoverable warning\n"
+        "Error: actual fatal error\n"
+        "Execution halted\n"
+    )
+
+    assert format_stderr_tail(stderr).endswith("Error: actual fatal error")
+
+
+def test_format_stderr_tail_falls_back_when_only_warnings() -> None:
+    """If stripping leaves nothing, the raw tail is used so the message is never empty."""
+    from chapkit.ml.runner import format_stderr_tail
+
+    stderr = "In addition: Warning message:\nIn g() : careful\nExecution halted\n"
+
+    assert format_stderr_tail(stderr) == "In addition: Warning message: | In g() : careful | Execution halted"
+
+
 def test_model_run_failed_error_message_carries_context() -> None:
     """The failure message names the phase, exit code, artifact id and stderr tail."""
     from chapkit.ml import ModelRunFailedError
