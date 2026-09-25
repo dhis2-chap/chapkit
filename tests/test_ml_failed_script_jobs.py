@@ -227,7 +227,8 @@ def test_format_stderr_tail_keeps_fatal_error_after_caught_error_warnings() -> N
     """Warnings deferred after an error caught by try() do not hide a later fatal error."""
     from chapkit.ml.runner import format_stderr_tail
 
-    # Real Rscript output for: try({warning("recoverable warning"); stop("recoverable error")}); stop("actual fatal error")
+    # Real Rscript output for:
+    #   try({warning("recoverable warning"); stop("recoverable error")}); stop("actual fatal error")
     stderr = (
         "Error in try({ : recoverable error\n"
         "In addition: Warning message:\n"
