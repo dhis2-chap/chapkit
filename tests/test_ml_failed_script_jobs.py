@@ -223,6 +223,22 @@ def test_format_stderr_tail_keeps_error_after_mid_run_warning() -> None:
     assert format_stderr_tail(stderr).endswith("Error in f() : boom")
 
 
+def test_format_stderr_tail_keeps_fatal_error_after_caught_error_warnings() -> None:
+    """Warnings deferred after an error caught by try() do not hide a later fatal error."""
+    from chapkit.ml.runner import format_stderr_tail
+
+    # Real Rscript output for: try({warning("recoverable warning"); stop("recoverable error")}); stop("actual fatal error")
+    stderr = (
+        "Error in try({ : recoverable error\n"
+        "In addition: Warning message:\n"
+        "In doTryCatch(return(expr), name, parentenv, handler) : recoverable warning\n"
+        "Error: actual fatal error\n"
+        "Execution halted\n"
+    )
+
+    assert format_stderr_tail(stderr).endswith("Error: actual fatal error")
+
+
 def test_format_stderr_tail_falls_back_when_only_warnings() -> None:
     """If stripping leaves nothing, the raw tail is used so the message is never empty."""
     from chapkit.ml.runner import format_stderr_tail
