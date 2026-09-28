@@ -8,7 +8,8 @@ from fastapi import Depends, status
 from opentelemetry.metrics import Counter
 from servicekit.api.monitoring import get_meter
 from servicekit.api.router import Router
-from servicekit.exceptions import BadRequestError, ConflictError, ServicekitException
+from servicekit.exceptions import BadRequestError, ConflictError, NotFoundError, ServicekitException
+from ulid import ULID
 
 from .manager import MLManager
 from .schemas import (
@@ -80,7 +81,8 @@ class MLRouter(Router):
             summary="Generate a sample train or predict payload",
             description=(
                 "Return a ready-to-submit sample payload built with chapkit's synthetic data "
-                "generator. Useful for trying out $train and $predict from the console."
+                "generator. Useful for trying out $train and $predict from the console. When "
+                "config_id is given, the config's additional_continuous_covariates are included."
             ),
         )
         async def generate_sample_data(
@@ -93,18 +95,33 @@ class MLRouter(Router):
             geo_type: Literal["polygon", "point"] = "polygon",
             include_geo: bool | None = None,
             seed: int = -1,
+            manager: MLManager = Depends(manager_factory),
         ) -> dict[str, Any]:
             """Build a sample train/predict payload from tunable data-generator parameters."""
             from chapkit.data import DataFrame
             from chapkit.data.generator import TestDataGenerator
 
+            required_covariates = list(sample_metadata.get("required_covariates") or [])
+            # The config's own covariates are part of the data the model reads, on top of
+            # the service-level required set, so the sample must carry them too.
+            config_covariates: list[str] = []
+            if config_id:
+                try:
+                    parsed_config_id = ULID.from_str(config_id)
+                except ValueError as e:
+                    raise BadRequestError(f"Invalid config_id: {config_id!r}") from e
+                found_covariates = await manager.find_config_covariates(parsed_config_id)
+                if found_covariates is None:
+                    raise NotFoundError(f"Config {config_id} not found")
+                config_covariates = found_covariates
+            numeric_covariates = required_covariates + [c for c in config_covariates if c not in required_covariates]
+
             # A negative seed means "fresh data each call"; a concrete seed is reproducible.
             generator = TestDataGenerator(seed=None if seed < 0 else seed)
-            required_covariates = list(sample_metadata.get("required_covariates") or [])
 
             def describe(frame: dict[str, Any]) -> dict[str, Any]:
                 """Attach a contract-derived self-describing schema to a generated frame."""
-                return DataFrame.model_validate(frame).with_schema(required_covariates=required_covariates).model_dump()
+                return DataFrame.model_validate(frame).with_schema(required_covariates=numeric_covariates).model_dump()
 
             requires_geo = bool(sample_metadata.get("requires_geo", False))
             # A service declaring `any` accepts both formats; generate monthly rows for it.
@@ -125,6 +142,7 @@ class MLRouter(Router):
                     historic_periods=max(1, num_periods),
                     num_features=num_features,
                     required_covariates=required_covariates,
+                    additional_covariates=config_covariates,
                     period_type=resolved_period,
                 )
                 payload: dict[str, Any] = {"historic": describe(historic), "future": describe(future)}
@@ -137,6 +155,7 @@ class MLRouter(Router):
                 num_periods=max(1, num_periods),
                 num_features=num_features,
                 required_covariates=required_covariates,
+                additional_covariates=config_covariates,
                 period_type=resolved_period,
             )
             payload = {"data": describe(data)}

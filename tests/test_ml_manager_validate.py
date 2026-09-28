@@ -1158,3 +1158,26 @@ async def test_validate_hooks_receive_the_resolved_horizon() -> None:
         assert seen["train"] == 3
     finally:
         await db.dispose()
+
+
+async def test_find_config_covariates_returns_stored_covariates() -> None:
+    """find_config_covariates returns the stored config's additional_continuous_covariates."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        config_id = await _seed_config(db, SampleConfig(additional_continuous_covariates=["rainfall", "ndvi"]))
+        manager = await _build_manager(FunctionalModelRunner(on_train=_noop_train, on_predict=_noop_predict), db)
+        assert await manager.find_config_covariates(config_id) == ["rainfall", "ndvi"]
+    finally:
+        await db.dispose()
+
+
+async def test_find_config_covariates_returns_none_for_unknown_config() -> None:
+    """find_config_covariates returns None when the config does not exist."""
+    db = SqliteDatabaseBuilder.in_memory().build()
+    await db.init()
+    try:
+        manager = await _build_manager(FunctionalModelRunner(on_train=_noop_train, on_predict=_noop_predict), db)
+        assert await manager.find_config_covariates(ULID()) is None
+    finally:
+        await db.dispose()

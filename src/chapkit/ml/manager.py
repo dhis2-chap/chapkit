@@ -158,6 +158,16 @@ class MLManager(Generic[ConfigT]):
             )
         return diagnostics
 
+    async def find_config_covariates(self, config_id: ULID) -> list[str] | None:
+        """Return a config's additional_continuous_covariates, or None when the config does not exist."""
+        async with self.database.session() as session:
+            config_repo = ConfigRepository(session)
+            config_manager: ConfigManager[ConfigT] = ConfigManager(config_repo, self.config_schema)
+            config = await config_manager.find_by_id(config_id)
+        if config is None:
+            return None
+        return [str(covariate) for covariate in config.data.additional_continuous_covariates]
+
     async def validate(self, request: ValidateRequest) -> ValidationResponse:
         """Run framework-level and runner validations for a train or predict payload."""
         if request.type == "train":

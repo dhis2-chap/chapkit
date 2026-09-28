@@ -84,7 +84,13 @@ export function PredictPage() {
 
   /** Fetch a sample payload, push it into form state, and return the generated predict payload. */
   async function fetchAndFillSample(): Promise<PredictPayload> {
-    const payload = (await api.sampleData('predict', toSampleOptions(generator))) as PredictPayload
+    // The trained model's config names covariates the predict frames must carry too.
+    const trainedConfigId = trainingArtifacts.find((artifact) => artifact.id === artifactId)?.data?.metadata
+      ?.config_id
+    const payload = (await api.sampleData('predict', {
+      config_id: trainedConfigId || undefined,
+      ...toSampleOptions(generator),
+    })) as PredictPayload
     setHistoricText(JSON.stringify(payload.historic, null, 2))
     setFutureText(JSON.stringify(payload.future, null, 2))
     setGeo(payload.geo)
