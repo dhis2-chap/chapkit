@@ -81,10 +81,13 @@ jobs:
       # notes, followed by GitHub's generated list of merged pull requests.
       # Write the tag with a real body, for example:
       #
-      #   git tag -a v1.2.0 -F notes.md
+      #   git tag -a v1.2.0 --cleanup=verbatim -F notes.md
       #
       # where notes.md starts with a one-line subject, a blank line, and then
-      # the prose describing what changed, why, and how to upgrade. A tag with
+      # the prose describing what changed, why, and how to upgrade. Keep
+      # --cleanup=verbatim: without it git treats lines starting with "#" as
+      # comments and strips Markdown headings such as "## Fixed" from the
+      # notes. Check with `git cat-file tag v1.2.0` before pushing. A tag with
       # no body still releases, with only the generated list, and a warning is
       # emitted so the notes get edited afterwards.
       - name: Assemble release notes
