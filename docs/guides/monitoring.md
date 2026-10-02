@@ -1,6 +1,6 @@
 # Monitoring
 
-A scaffolded chapkit service exposes `/metrics` (Prometheus format) by default — `chapkit init` calls `.with_monitoring()` on the builder. This guide shows how to scrape that endpoint with Prometheus and surface it in Grafana, either as a local dev stack or an overlay alongside an existing chapkit service.
+Every chapkit service exposes `/metrics` (Prometheus format) by default; monitoring is on unless the builder calls `.with_monitoring(enabled=False)`. This guide shows how to scrape that endpoint with Prometheus and surface it in Grafana, either as a local dev stack or an overlay alongside an existing chapkit service.
 
 ## What you get out of the box
 
@@ -88,12 +88,12 @@ If your model is registered with chap-core, you generally don't need to run a lo
 
 ## Disabling `/metrics`
 
-If you actively don't want a metrics endpoint exposed (e.g. internal-only deployment with strict surface restrictions), remove the `.with_monitoring()` call from your generated `main.py`:
+If you actively don't want a metrics endpoint exposed (e.g. internal-only deployment with strict surface restrictions), turn monitoring off in your generated `main.py`. Since servicekit 3, monitoring is on by default, so removing the `.with_monitoring()` call is not enough:
 
 ```python
 app = (
     MLServiceBuilder(...)
-    # .with_monitoring()   <- remove this line
+    .with_monitoring(enabled=False)
     .with_registration()
     .build()
 )
