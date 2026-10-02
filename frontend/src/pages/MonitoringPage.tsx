@@ -189,21 +189,21 @@ function buildTiles(snapshots: MetricsSnapshot[]): Tile[] {
   const avgLatency = (): number | null => {
     if (!latest || !prev) return null
     const dc =
-      (latest.values.get('http_server_duration_milliseconds_count') ?? 0) -
-      (prev.values.get('http_server_duration_milliseconds_count') ?? 0)
+      (latest.values.get('http_server_request_duration_seconds_count') ?? 0) -
+      (prev.values.get('http_server_request_duration_seconds_count') ?? 0)
     const ds =
-      (latest.values.get('http_server_duration_milliseconds_sum') ?? 0) -
-      (prev.values.get('http_server_duration_milliseconds_sum') ?? 0)
-    return dc > 0 ? ds / dc : null
+      (latest.values.get('http_server_request_duration_seconds_sum') ?? 0) -
+      (prev.values.get('http_server_request_duration_seconds_sum') ?? 0)
+    return dc > 0 ? (ds / dc) * 1000 : null
   }
 
   return [
     {
       key: 'requests',
       label: 'Requests / sec',
-      value: rateNow('http_server_duration_milliseconds_count'),
+      value: rateNow('http_server_request_duration_seconds_count'),
       format: (v) => formatNumber(v, 2),
-      series: rateSeries('http_server_duration_milliseconds_count'),
+      series: rateSeries('http_server_request_duration_seconds_count'),
     },
     {
       key: 'latency',

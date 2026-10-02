@@ -81,7 +81,7 @@ app = (
 - `GET /api/v1/artifacts` - Browse trained models and predictions
 - `GET /api/v1/jobs` - Monitor training/prediction jobs
 - `GET /health` - Health checks
-- `GET /metrics` - Prometheus metrics (with `.with_monitoring()`)
+- `GET /metrics` - Prometheus metrics (on by default; `.with_monitoring(enabled=False)` turns it off)
 
 Run with: `fastapi dev your_file.py` → Service ready at `http://localhost:9090`
 
