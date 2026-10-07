@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import keyword
 import re
 import string
@@ -13,6 +14,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, cast
 import yaml
 from pydantic import AfterValidator, BaseModel, Field, TypeAdapter, ValidationError, WithJsonSchema, create_model
 from pydantic.fields import FieldInfo
+from pydantic_core import SchemaError as PydanticCoreSchemaError
 
 from chapkit.config.schemas import BaseConfig
 
@@ -491,6 +493,16 @@ class _Member:
         return Annotated[self.annotation, *metadata] if metadata else self.annotation
 
 
+@functools.lru_cache(maxsize=256)
+def _pydantic_compiles(pattern: str) -> bool:
+    """Return True when Pydantic's Rust regex engine can compile a pattern."""
+    try:
+        TypeAdapter(Annotated[str, Field(pattern=pattern)])
+    except PydanticCoreSchemaError:
+        return False
+    return True
+
+
 def _pattern_checker(patterns: list[str]) -> Callable[[str], str]:
     """Return a validator requiring every pattern to match, for strings under more than one `pattern`."""
     compiled = [re.compile(pattern) for pattern in patterns]
@@ -529,12 +541,20 @@ def _normalize(body: dict[str, Any]) -> _Schema:
     pattern = body.get("pattern")
     enum = body.get("enum")
     items = body.get("items")
+    item_schemas: list[dict[str, Any]] = []
+    if items is False:
+        # `items: false` allows no items at all, which is the same as `maxItems: 0`.
+        bounds["maxItems"] = 0
+    elif isinstance(items, dict):
+        item_schemas = [items]
+    elif isinstance(items, str):
+        item_schemas = [{"type": items}]
     return _Schema(
         types=_type_names(body),
         bounds=bounds,
         patterns=[pattern] if isinstance(pattern, str) else [],
         enum=list(enum) if isinstance(enum, list) else None,
-        items=[items if isinstance(items, dict) else {"type": items}] if items is not None else [],
+        items=item_schemas,
     )
 
 
@@ -641,9 +661,12 @@ def _member_for(name: str, schema: _Schema) -> _Member:
         constraints = {kwarg: bounds[key] for key, kwarg in _NUMERIC_CONSTRAINTS.items() if key in bounds}
     elif name == "string":
         constraints = {kwarg: bounds[key] for key, kwarg in _STRING_CONSTRAINTS.items() if key in bounds}
-        if schema.patterns:
-            constraints["pattern"] = schema.patterns[0]
-            extra_patterns = schema.patterns[1:]
+        # Pydantic compiles `pattern` with Rust regex, which has no look-around; such patterns
+        # are checked with Python's re instead, as the JSON Schema validator does.
+        native = [pattern for pattern in schema.patterns if _pydantic_compiles(pattern)]
+        if native:
+            constraints["pattern"] = native[0]
+        extra_patterns = [pattern for pattern in schema.patterns if pattern not in native[:1]]
     return _Member(scalar, _TYPE_SOURCE[scalar], constraints, extra_patterns, scalar)
 
 
@@ -700,9 +723,10 @@ def _resolve(body: dict[str, Any], inherited: _Schema | None = None) -> tuple[li
         )
         return literal_members, any(value is None for value in allowed)
 
-    # No type anywhere means a string, as for options declared before typed options existed.
-    types = schema.types if schema.types is not None else ["string"]
-    return [_member_for(name, schema) for name in types if name != "null"], "null" in types
+    if schema.types is None:
+        # No type anywhere means any value, as in JSON Schema and chap-core.
+        return [_Member(Any, "Any")], False
+    return [_member_for(name, schema) for name in schema.types if name != "null"], "null" in schema.types
 
 
 def _combine(members: list[_Member], nullable: bool) -> tuple[Any, str]:
@@ -715,7 +739,7 @@ def _combine(members: list[_Member], nullable: bool) -> tuple[Any, str]:
     else:
         annotation = cast(Any, Union)[tuple(member.constrained() for member in members)]
     source = " | ".join(member.source for member in members)
-    if nullable:
+    if nullable and annotation is not Any:
         annotation = annotation | None
         source = f"{source} | None"
     return annotation, source
@@ -773,11 +797,25 @@ def _pattern_count(body: Any) -> int:
     return int(isinstance(body.get("pattern"), str)) + sum(_pattern_count(sub) for sub in _subschemas(body))
 
 
+def _has_boolean_schema(body: Any) -> bool:
+    """Return True when a schema uses `true` / `false` as a subschema anywhere."""
+    if not isinstance(body, dict):
+        return False
+    for key in ("anyOf", "oneOf", "allOf"):
+        if isinstance(body.get(key), list) and any(isinstance(sub, bool) for sub in body[key]):
+            return True
+    if any(isinstance(body.get(key), bool) for key in ("not", "items")):
+        return True
+    return any(_has_boolean_schema(sub) for sub in _subschemas(body))
+
+
 def _translated_exactly(body: Any) -> bool:
-    """Return True when the Pydantic type publishes the same JSON Schema the MLproject declares."""
+    """Return True when the Pydantic type accepts and publishes exactly what the MLproject declares."""
     if not isinstance(body, dict):
         return True
-    if set(body) - _TRANSLATED_KEYWORDS:
+    if set(body) - _TRANSLATED_KEYWORDS or _has_boolean_schema(body):
+        return False
+    if isinstance(body.get("pattern"), str) and not _pydantic_compiles(body["pattern"]):
         return False
     branches = [branch for branch in body.get("anyOf", []) if isinstance(branch, dict)]
     item_schemas = [body["items"]] if "items" in body else []
@@ -811,7 +849,10 @@ def _canonical_schema(body: Any) -> Any:
             schema[key] = [_canonical_schema(sub) for sub in schema[key]]
     for key in ("not", "items"):
         if key in schema:
-            schema[key] = _canonical_schema(schema[key] if isinstance(schema[key], dict) else {"type": schema[key]})
+            value = schema[key]
+            # `items: integer` is chapkit's shorthand for `items: {type: integer}`; boolean
+            # schemas (`items: false`, `not: true`) are standard JSON Schema and pass through.
+            schema[key] = _canonical_schema({"type": value} if isinstance(value, str) else value)
     return schema
 
 
@@ -872,14 +913,16 @@ def parse_option(name: str, body: dict[str, Any], issues: list[str] | None = Non
     scalar = members[0].scalar if len(members) == 1 and not nullable else None
     annotation, type_source = _combine(members, nullable)
 
-    # The Pydantic type is never stricter than the schema; the option's own JSON Schema,
-    # checked with the validator chap-core uses, makes acceptance exact. Keywords the
-    # type cannot express (oneOf, allOf, not, const, ...) are published as declared.
+    # The option's own JSON Schema, checked with the validator chap-core uses, makes
+    # acceptance exact. When the typed translation cannot represent the schema (oneOf,
+    # allOf, not, const, boolean schemas, look-around patterns, ...) the annotation is
+    # `Any`, so only that validator decides, and the schema is published as declared.
     check = _json_schema_check(name, body, issues)
     metadata: list[Any] = []
     if check is not None:
         metadata.append(AfterValidator(check))
         if not _translated_exactly(body):
+            annotation, type_source, scalar = Any, "Any", None
             published = {
                 key: value
                 for key, value in _canonical_schema(body).items()

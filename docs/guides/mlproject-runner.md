@@ -154,7 +154,7 @@ Supported keywords:
 
 | Keyword | Becomes |
 | --- | --- |
-| `type`: `integer` / `int`, `number` / `float`, `string` / `str` / `path`, `boolean` / `bool` | `int`, `float`, `str`, `bool` (unknown types fall back to `str`) |
+| `type`: `integer` / `int`, `number` / `float`, `string` / `str` / `path`, `boolean` / `bool` | `int`, `float`, `str`, `bool` (unknown type names fall back to `str`; no `type` at all means any value) |
 | `type: array` with `items` | `list[...]` |
 | `type: object` | `dict[str, Any]` |
 | `type: [a, b]`, `anyOf`, `oneOf` | a union of the members; `null` makes the option optional |
@@ -164,7 +164,7 @@ Supported keywords:
 | `title`, `description` | field title and description |
 | `default` | field default; options without one are required |
 
-Every value is also validated against the option's own JSON Schema with the `jsonschema` validator chap-core uses, so configs are accepted and rejected exactly as chap-core would: every keyword that applies must hold, `oneOf` needs exactly one matching branch, and keywords the table does not list (`allOf`, `not`, `const`, `multipleOf`, `uniqueItems`, ...) are enforced too. Options that use such keywords publish their schema as declared in the MLproject; the rest publish the typed schema shown above. chapkit's legacy type names (`int`, `str`, `path`, ...) and draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` are read as their standard forms.
+Every value is also validated against the option's own JSON Schema with the `jsonschema` validator chap-core uses, so configs are accepted and rejected exactly as chap-core would: every keyword that applies must hold, `oneOf` needs exactly one matching branch, and keywords the table does not list (`allOf`, `not`, `const`, `multipleOf`, `uniqueItems`, ...) are enforced too. Options the typed translation cannot represent exactly (those keywords, boolean schemas such as `items: false`, or a `pattern` with look-around) are typed `Any`, validated by the JSON Schema alone, and publish their schema as declared in the MLproject; the rest publish the typed schema shown above. chapkit's legacy type names (`int`, `str`, `path`, ...) and draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` are read as their standard forms.
 
 A default that does not fit its declared type is kept as written, as before typed options existed, and reported as a warning at startup. Configs then have to set that option explicitly, because the written default fails validation.
 

@@ -570,3 +570,77 @@ def test_items_with_branches_validate_exactly_through_the_api(tmp_path: Path, mo
         assert create(["abc", 9]) == 201
         tags_schema = client.get("/api/v1/configs/$schema").json()["properties"]["tags"]
         assert tags_schema["items"]["anyOf"][1] == {"type": "string", "pattern": "^a"}
+
+
+UNTRANSLATABLE_MLPROJECT = (
+    """
+name: untranslatable
+user_options:
+  threshold:
+    allOf:
+    - type: integer
+    - minimum: 1
+    default: 5
+  fixed:
+    const: 5
+    default: 5
+  not_text:
+    not:
+      type: string
+    default: 1
+  empty:
+    type: array
+    items: false
+    default: []
+  anything:
+    type: array
+    items: true
+    default: []
+  code:
+    type: string
+    pattern: "^(?!x)\\\\w+$"
+    default: abc
+  untyped:
+    default: 5
+"""
+    + ENTRY_POINTS
+)
+
+
+@pytest.mark.parametrize(
+    ("option", "value", "status"),
+    [
+        ("threshold", 5, 201),
+        ("threshold", 0, 422),
+        ("fixed", 5, 201),
+        ("fixed", 6, 422),
+        ("not_text", 1, 201),
+        ("not_text", "a", 422),
+        ("empty", [], 201),
+        ("empty", ["bad"], 422),
+        ("anything", [1, "a"], 201),
+        ("code", "abc", 201),
+        ("code", "xbc", 422),
+        ("untyped", "any value", 201),
+        ("untyped", [1, 2], 201),
+    ],
+)
+def test_untranslatable_schemas_are_decided_by_json_schema_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, option: str, value: Any, status: int
+) -> None:
+    _write_mlproject(tmp_path, UNTRANSLATABLE_MLPROJECT)
+    monkeypatch.chdir(tmp_path)
+    service, _ = build_mlproject_app(parse_mlproject(tmp_path / "MLproject"))
+    with TestClient(service) as client:
+        payload = {"name": "c", "data": {"user_option_values": {option: value}}}
+        assert client.post("/api/v1/configs", json=payload).status_code == status
+
+
+def test_untranslatable_schemas_are_published_as_declared(tmp_path: Path) -> None:
+    schema: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, UNTRANSLATABLE_MLPROJECT)))
+    properties = schema.model_json_schema()["properties"]
+    assert properties["threshold"]["allOf"] == [{"type": "integer"}, {"minimum": 1}]
+    assert properties["fixed"]["const"] == 5
+    assert properties["empty"]["items"] is False
+    assert properties["anything"]["items"] is True
+    assert properties["code"]["pattern"] == "^(?!x)\\w+$"
