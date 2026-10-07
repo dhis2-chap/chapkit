@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, cast
 
 import yaml
-from pydantic import AfterValidator, BaseModel, Field, TypeAdapter, ValidationError, create_model
+from pydantic import AfterValidator, BaseModel, Field, TypeAdapter, ValidationError, WithJsonSchema, create_model
 from pydantic.fields import FieldInfo
 
 from chapkit.config.schemas import BaseConfig
@@ -411,7 +411,6 @@ class OptionSpec:
     default: Any = None
     description: str | None = None
     title: str | None = None
-    constraints: dict[str, Any] = field(default_factory=dict)
 
     @property
     def alias(self) -> str | None:
@@ -420,7 +419,7 @@ class OptionSpec:
 
     def field_info(self) -> FieldInfo:
         """Return the Pydantic field definition for this option."""
-        kwargs: dict[str, Any] = dict(self.constraints)
+        kwargs: dict[str, Any] = {}
         if self.description:
             kwargs["description"] = self.description
         if self.title:
@@ -649,8 +648,15 @@ def _member_for(name: str, schema: _Schema) -> _Member:
 
 
 def _resolve_items(item_schemas: list[dict[str, Any]]) -> tuple[Any, str]:
-    """Map the `items` declarations that apply to an array (all must hold) to (python type, source)."""
+    """Map the `items` declarations that apply to an array (all must hold) to (python type, source).
+
+    Intersecting several item schemas is only done when none of them has branches; otherwise
+    the item type stays `Any` (never stricter than the schema) and the option's JSON Schema
+    validator enforces the items exactly.
+    """
     if not item_schemas:
+        return Any, "Any"
+    if len(item_schemas) > 1 and any(_has_combinator(item_schema) for item_schema in item_schemas):
         return Any, "Any"
     inherited: _Schema | None = None
     for item_schema in item_schemas[:-1]:
@@ -715,15 +721,147 @@ def _combine(members: list[_Member], nullable: bool) -> tuple[Any, str]:
     return annotation, source
 
 
+# Keywords the Pydantic translation reproduces exactly, in validation and in the published schema.
+_TRANSLATED_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "type",
+        "enum",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "minItems",
+        "maxItems",
+        "items",
+        "anyOf",
+        "title",
+        "description",
+        "default",
+        "examples",
+        "$comment",
+    }
+)
+_COMBINATORS: tuple[str, ...] = ("anyOf", "oneOf", "allOf", "not")
+
+
+def _subschemas(body: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the schema objects nested directly in a schema (branches and items)."""
+    nested: list[Any] = []
+    for key in ("anyOf", "oneOf", "allOf"):
+        if isinstance(body.get(key), list):
+            nested.extend(body[key])
+    for key in ("not", "items"):
+        if key in body:
+            nested.append(body[key])
+    return [sub for sub in nested if isinstance(sub, dict)]
+
+
+def _has_combinator(body: Any) -> bool:
+    """Return True when a schema or any schema nested in it has anyOf / oneOf / allOf / not."""
+    if not isinstance(body, dict):
+        return False
+    return any(key in body for key in _COMBINATORS) or any(_has_combinator(sub) for sub in _subschemas(body))
+
+
+def _pattern_count(body: Any) -> int:
+    """Count the `pattern` keywords in a schema and the schemas nested in it."""
+    if not isinstance(body, dict):
+        return 0
+    return int(isinstance(body.get("pattern"), str)) + sum(_pattern_count(sub) for sub in _subschemas(body))
+
+
+def _translated_exactly(body: Any) -> bool:
+    """Return True when the Pydantic type publishes the same JSON Schema the MLproject declares."""
+    if not isinstance(body, dict):
+        return True
+    if set(body) - _TRANSLATED_KEYWORDS:
+        return False
+    branches = [branch for branch in body.get("anyOf", []) if isinstance(branch, dict)]
+    item_schemas = [body["items"]] if "items" in body else []
+    item_schemas += [branch["items"] for branch in branches if "items" in branch]
+    if len(item_schemas) > 1 and any(_has_combinator(item_schema) for item_schema in item_schemas):
+        return False
+    return all(_translated_exactly(sub) for sub in _subschemas(body))
+
+
+def _canonical_schema(body: Any) -> Any:
+    """Return a copy of a schema in standard JSON Schema, read the way the translation reads it.
+
+    chapkit's legacy type aliases (`int`, `str`, `path`, ...) and unknown type names become
+    their JSON Schema types, and draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum`
+    become the numeric form, so MLprojects that ran before stay valid schemas.
+    """
+    if not isinstance(body, dict):
+        return body
+    schema = dict(body)
+    declared = schema.get("type")
+    if isinstance(declared, list):
+        schema["type"] = list(dict.fromkeys(_CANONICAL_TYPES.get(str(name).lower(), "string") for name in declared))
+    elif declared is not None:
+        schema["type"] = _CANONICAL_TYPES.get(str(declared).lower(), "string")
+    for exclusive, inclusive in (("exclusiveMinimum", "minimum"), ("exclusiveMaximum", "maximum")):
+        if isinstance(schema.get(exclusive), bool):
+            if schema.pop(exclusive) and inclusive in schema:
+                schema[exclusive] = schema.pop(inclusive)
+    for key in ("anyOf", "oneOf", "allOf"):
+        if isinstance(schema.get(key), list):
+            schema[key] = [_canonical_schema(sub) for sub in schema[key]]
+    for key in ("not", "items"):
+        if key in schema:
+            schema[key] = _canonical_schema(schema[key] if isinstance(schema[key], dict) else {"type": schema[key]})
+    return schema
+
+
+def _json_schema_check(name: str, body: dict[str, Any], issues: list[str] | None) -> Callable[[Any], Any] | None:
+    """Return a validator enforcing the option's own JSON Schema, as chap-core validates user options.
+
+    Returns None, with an issue, when the option is not a valid JSON Schema (chap-core could
+    not validate it either); the translated Pydantic type then validates on its own. A null
+    default keeps the option optional, so None is accepted for it as before typed options.
+    """
+    from jsonschema.exceptions import SchemaError, best_match
+    from jsonschema.validators import validator_for
+
+    body = _canonical_schema(body)
+    validator_class = validator_for(body)
+    try:
+        validator_class.check_schema(body)
+    except SchemaError as error:
+        if issues is not None:
+            issues.append(
+                f"user_option {name!r} is not a valid JSON Schema ({error.message}); "
+                "it is validated by its translated type only"
+            )
+        return None
+    validator = validator_class(body)
+    none_by_default = "default" in body and body["default"] is None
+
+    def check(value: Any) -> Any:
+        """Raise when the value does not satisfy the option's JSON Schema."""
+        if value is None and none_by_default:
+            return value
+        error = best_match(validator.iter_errors(value))
+        if error is not None:
+            raise ValueError(error.message)
+        return value
+
+    return check
+
+
 def parse_option(name: str, body: dict[str, Any], issues: list[str] | None = None) -> OptionSpec:
     """Translate one user_option, a JSON Schema property as chap-core reads it, into an OptionSpec.
 
     Supports `type` (integer, number, string, boolean, array with `items`, object, or a
     list including "null"), `anyOf` / `oneOf`, `enum`, `minimum` / `maximum` /
     `exclusiveMinimum` / `exclusiveMaximum`, `minLength` / `maxLength` / `pattern`,
-    `minItems` / `maxItems`, `description`, `title` and `default`, with JSON Schema's rule
-    that every keyword that applies must hold (see `_resolve`). The default is checked against the declared
-    type and constraints; a default that does not fit is reported through `issues` and
+    `minItems` / `maxItems`, `description`, `title` and `default` into a typed annotation
+    (see `_resolve`). Values are also validated against the option's own JSON Schema with
+    the `jsonschema` validator chap-core uses, so every keyword (including `oneOf`,
+    `allOf`, `not`, `const`, ...) is enforced exactly as chap-core enforces it. The default
+    is checked the same way; a default that does not fit is reported through `issues` and
     kept as written, so MLprojects that ran before keep running.
     """
     field_name = python_field_name(name)
@@ -731,19 +869,30 @@ def parse_option(name: str, body: dict[str, Any], issues: list[str] | None = Non
     # A null default declares the option optional, as a nullable type does.
     nullable = nullable or ("default" in body and body["default"] is None)
 
-    constraints: dict[str, Any] = {}
-    scalar: type | None = None
-    if len(members) == 1 and not nullable and not members[0].extra_patterns:
-        # A single alternative keeps its constraints on the field itself, as a hand-written class would.
-        only = members[0]
-        annotation, type_source, constraints, scalar = only.annotation, only.source, only.constraints, only.scalar
-    else:
-        annotation, type_source = _combine(members, nullable)
+    scalar = members[0].scalar if len(members) == 1 and not nullable else None
+    annotation, type_source = _combine(members, nullable)
+
+    # The Pydantic type is never stricter than the schema; the option's own JSON Schema,
+    # checked with the validator chap-core uses, makes acceptance exact. Keywords the
+    # type cannot express (oneOf, allOf, not, const, ...) are published as declared.
+    check = _json_schema_check(name, body, issues)
+    metadata: list[Any] = []
+    if check is not None:
+        metadata.append(AfterValidator(check))
+        if not _translated_exactly(body):
+            published = {
+                key: value
+                for key, value in _canonical_schema(body).items()
+                if key not in ("title", "description", "default")
+            }
+            metadata.append(WithJsonSchema(published))
+    if metadata:
+        annotation = Annotated[annotation, *metadata]
 
     required = "default" not in body
     default: Any = None
     if not required and body["default"] is not None:
-        default = _validate_default(name, body["default"], annotation, type_source, constraints, scalar, issues)
+        default = _validate_default(name, body["default"], annotation, type_source, {}, scalar, issues)
 
     return OptionSpec(
         name=name,
@@ -754,7 +903,6 @@ def parse_option(name: str, body: dict[str, Any], issues: list[str] | None = Non
         default=default,
         description=_clean_text(body.get("description")),
         title=_clean_text(body.get("title")),
-        constraints=constraints,
     )
 
 

@@ -164,7 +164,7 @@ Supported keywords:
 | `title`, `description` | field title and description |
 | `default` | field default; options without one are required |
 
-As in JSON Schema, every keyword that applies must hold: keywords next to `anyOf` / `oneOf` apply to each branch (the stricter bound wins, a branch without a `type` inherits the parent's, and parent `items` still apply), and an `enum` keeps only the values that fit the type and bounds beside it. When more than one `pattern` applies, all are enforced, but the published schema shows only the first.
+Every value is also validated against the option's own JSON Schema with the `jsonschema` validator chap-core uses, so configs are accepted and rejected exactly as chap-core would: every keyword that applies must hold, `oneOf` needs exactly one matching branch, and keywords the table does not list (`allOf`, `not`, `const`, `multipleOf`, `uniqueItems`, ...) are enforced too. Options that use such keywords publish their schema as declared in the MLproject; the rest publish the typed schema shown above. chapkit's legacy type names (`int`, `str`, `path`, ...) and draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` are read as their standard forms.
 
 A default that does not fit its declared type is kept as written, as before typed options existed, and reported as a warning at startup. Configs then have to set that option explicitly, because the written default fails validation.
 

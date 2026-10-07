@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import socket
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -386,8 +386,6 @@ def test_generated_schema_matches_hand_written_config_class(tmp_path: Path) -> N
     """The runtime config class has the same JSON Schema as the equivalent hand-written main.py class."""
     from typing import Literal
 
-    from pydantic import Field
-
     from chapkit import BaseConfig
 
     class EwarsTemplateConfig(BaseConfig):
@@ -423,7 +421,7 @@ def test_constraints_beside_any_of_apply_to_each_branch() -> None:
     assert adapter.json_schema() == {"anyOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}]}
 
 
-def test_branch_constraints_win_over_constraints_beside_any_of() -> None:
+def test_branch_bounds_combine_with_bounds_beside_any_of() -> None:
     spec = parse_option(
         "size",
         {"anyOf": [{"type": "integer", "minimum": 5}, {"type": "string", "maxLength": 2}], "minimum": 1, "default": 5},
@@ -438,7 +436,7 @@ def test_branch_constraints_win_over_constraints_beside_any_of() -> None:
 
 def _accepts(body: dict[str, Any], value: Any) -> bool:
     spec = parse_option("option", body)
-    adapter: TypeAdapter[Any] = TypeAdapter(Annotated[spec.annotation, Field(**spec.constraints)])
+    adapter: TypeAdapter[Any] = TypeAdapter(spec.annotation)
     try:
         adapter.validate_python(value)
     except ValidationError:
@@ -492,3 +490,83 @@ def test_every_pattern_that_applies_must_match() -> None:
     assert _accepts(body, "az")
     assert not _accepts(body, "a")
     assert not _accepts(body, "z")
+
+
+def test_one_of_requires_exactly_one_matching_branch() -> None:
+    body = {"oneOf": [{"type": "integer"}, {"type": "number"}], "default": 1.5}
+    assert not _accepts(body, 1)
+    assert _accepts(body, 1.5)
+    published = TypeAdapter(parse_option("option", body).annotation).json_schema()
+    assert published == {"oneOf": [{"type": "integer"}, {"type": "number"}]}
+
+
+def test_keywords_without_a_pydantic_form_are_enforced_and_published() -> None:
+    body = {"type": "integer", "multipleOf": 5, "default": 10}
+    assert _accepts(body, 10)
+    assert not _accepts(body, 7)
+    assert TypeAdapter(parse_option("option", body).annotation).json_schema() == {"type": "integer", "multipleOf": 5}
+    assert not _accepts({"type": "array", "uniqueItems": True, "default": []}, [1, 1])
+    assert not _accepts({"not": {"type": "string"}, "default": 1}, "a")
+
+
+def test_null_default_still_makes_a_typed_option_optional() -> None:
+    assert _accepts({"type": "integer", "minimum": 1, "default": None}, None)
+    assert not _accepts({"type": "integer", "minimum": 1, "default": None}, 0)
+
+
+def test_legacy_type_aliases_and_draft4_bounds_are_valid_schemas() -> None:
+    issues: list[str] = []
+    parse_option("count", {"type": "int", "default": 1}, issues)
+    parse_option("label", {"type": "path", "default": "x"}, issues)
+    rate = parse_option("rate", {"type": "number", "minimum": 0, "exclusiveMinimum": True, "default": 0.5}, issues)
+    assert issues == []
+    assert TypeAdapter(rate.annotation).validate_python(0.5) == 0.5
+    with pytest.raises(ValidationError):
+        TypeAdapter(rate.annotation).validate_python(0)
+
+
+def test_invalid_json_schema_falls_back_to_the_translated_type_with_a_warning() -> None:
+    issues: list[str] = []
+    spec = parse_option("count", {"type": "integer", "minimum": "five", "default": 1}, issues)
+    assert "not a valid JSON Schema" in issues[0]
+    assert TypeAdapter(spec.annotation).validate_python(3) == 3
+
+
+ITEMS_WITH_BRANCHES_MLPROJECT = (
+    """
+name: items_with_branches
+user_options:
+  tags:
+    type: array
+    items:
+      anyOf:
+      - type: integer
+        minimum: 5
+      - type: string
+        pattern: "^a"
+    anyOf:
+    - items:
+        maxLength: 3
+    default: [5]
+"""
+    + ENTRY_POINTS
+)
+
+
+def test_items_with_branches_validate_exactly_through_the_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_mlproject(tmp_path, ITEMS_WITH_BRANCHES_MLPROJECT)
+    monkeypatch.chdir(tmp_path)
+    service, _ = build_mlproject_app(parse_mlproject(tmp_path / "MLproject"))
+
+    def create(tags: list[Any]) -> int:
+        payload = {"name": "c", "data": {"user_option_values": {"tags": tags}}}
+        return client.post("/api/v1/configs", json=payload).status_code
+
+    with TestClient(service) as client:
+        assert create(["bad"]) == 422
+        assert create([4]) == 422
+        assert create(["abcd"]) == 422
+        assert create([5]) == 201
+        assert create(["abc", 9]) == 201
+        tags_schema = client.get("/api/v1/configs/$schema").json()["properties"]["tags"]
+        assert tags_schema["items"]["anyOf"][1] == {"type": "string", "pattern": "^a"}
