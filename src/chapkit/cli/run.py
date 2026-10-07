@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import os
 import socket
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -25,6 +26,11 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from chapkit.api import MLServiceInfo
+
+
+# servicekit's registration settings; registration only happens when the orchestrator URL is set.
+ORCHESTRATOR_URL_ENV = "SERVICEKIT_ORCHESTRATOR_URL"
+ADVERTISED_PORT_ENV = "SERVICEKIT_PORT"
 
 
 def _parse_param_overrides(raw: list[str] | None) -> dict[str, str]:
@@ -155,12 +161,49 @@ def _print_warnings(issues: list[str]) -> None:
         typer.echo(f"WARNING: {issue}", err=True)
 
 
+@dataclass(frozen=True, slots=True)
+class Registration:
+    """Where and how an mlproject service registers itself with an orchestrator such as chap-core."""
+
+    orchestrator_url: str
+    advertised_host: str | None
+    advertised_port: int | None
+    local_port: int | None
+
+
+def resolve_registration(
+    port: int | None,
+    register_url: str | None = None,
+    advertise_host: str | None = None,
+    advertise_port: int | None = None,
+) -> Registration | None:
+    """Resolve registration settings from CLI options with SERVICEKIT_* fallbacks, or None when not configured.
+
+    Each option falls back to its environment variable (SERVICEKIT_ORCHESTRATOR_URL,
+    SERVICEKIT_HOST, SERVICEKIT_PORT). Without an advertised port servicekit would
+    advertise 8000, so the port the service listens on is advertised instead; that port
+    is also probed for readiness before registering.
+    """
+    orchestrator_url = register_url or os.getenv(ORCHESTRATOR_URL_ENV)
+    if not orchestrator_url:
+        return None
+    if advertise_port is None and not os.getenv(ADVERTISED_PORT_ENV):
+        advertise_port = port
+    # None host / port lets servicekit read SERVICEKIT_HOST / SERVICEKIT_PORT (or the hostname).
+    return Registration(orchestrator_url, advertise_host, advertise_port, port)
+
+
 def build_mlproject_app(
     mlproject: MLProject,
     overrides: dict[str, str] | None = None,
     issues: list[str] | None = None,
+    port: int | None = None,
+    registration: Registration | None = None,
 ) -> tuple[FastAPI, MLServiceInfo]:
     """Build the chapkit service for a parsed MLproject without starting a server.
+
+    With `registration` the service registers itself with that orchestrator (chap-core)
+    on startup; by default it is resolved from the SERVICEKIT_* environment variables.
 
     Must be called with the project directory as the working directory: ShellModelRunner
     copies the current directory into each train/predict workspace.
@@ -196,13 +239,22 @@ def build_mlproject_app(
         level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
     )
 
-    app = MLServiceBuilder(
+    builder = MLServiceBuilder(
         info=info,
         config_schema=config_schema,
         hierarchy=hierarchy,
         runner=runner,
-    ).build()
-    return app, info
+    )
+    if registration is None:
+        registration = resolve_registration(port)
+    if registration is not None:
+        builder = builder.with_registration(
+            orchestrator_url=registration.orchestrator_url,
+            host=registration.advertised_host,
+            port=registration.advertised_port,
+            local_port=registration.local_port,
+        )
+    return builder.build(), info
 
 
 def run_command(
@@ -233,6 +285,26 @@ def run_command(
             ),
         ),
     ] = None,
+    register_url: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Register with this orchestrator on startup, e.g. http://chap:8000/v2/services/$register. "
+                "Defaults to SERVICEKIT_ORCHESTRATOR_URL; without either, nothing is registered. "
+                "A shared secret is read from SERVICEKIT_REGISTRATION_KEY."
+            ),
+        ),
+    ] = None,
+    advertise_host: Annotated[
+        str | None,
+        typer.Option(help="Host the orchestrator should call. Defaults to SERVICEKIT_HOST, then the hostname."),
+    ] = None,
+    advertise_port: Annotated[
+        int | None,
+        typer.Option(
+            help="Port the orchestrator should call. Defaults to SERVICEKIT_PORT, then --port.", min=1, max=65535
+        ),
+    ] = None,
 ) -> None:
     """Run an MLproject as a chapkit service."""
     overrides = _parse_param_overrides(param)
@@ -258,7 +330,8 @@ def run_command(
     os.chdir(project_dir)
     issues: list[str] = []
     try:
-        app, info = build_mlproject_app(mlproject, overrides, issues)
+        registration = resolve_registration(port, register_url, advertise_host, advertise_port)
+        app, info = build_mlproject_app(mlproject, overrides, issues, port=port, registration=registration)
     except MLProjectError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1) from error
@@ -268,6 +341,8 @@ def run_command(
     typer.echo(f"  train:   {train_command}")
     typer.echo(f"  predict: {predict_command}")
     _print_contract(info)
+    if registration is not None:
+        typer.echo(f"  registers with: {registration.orchestrator_url}")
     _print_warnings(issues)
 
     _print_docker_hint(project_dir, mlproject, port)
