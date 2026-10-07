@@ -164,6 +164,8 @@ Supported keywords:
 | `title`, `description` | field title and description |
 | `default` | field default; options without one are required |
 
+As in JSON Schema, every keyword that applies must hold: keywords next to `anyOf` / `oneOf` apply to each branch (the stricter bound wins, a branch without a `type` inherits the parent's, and parent `items` still apply), and an `enum` keeps only the values that fit the type and bounds beside it. When more than one `pattern` applies, all are enforced, but the published schema shows only the first.
+
 A default that does not fit its declared type is kept as written, as before typed options existed, and reported as a warning at startup. Configs then have to set that option explicitly, because the written default fails validation.
 
 ---
