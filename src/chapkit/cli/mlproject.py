@@ -449,11 +449,14 @@ def _resolve_scalar(declared: Any) -> tuple[Any, str, str]:
     return scalar, _TYPE_SOURCE[scalar], kind
 
 
-def _enum_values(body: dict[str, Any]) -> list[Any] | None:
-    """Return the enum values of a schema when they can form a Literal, otherwise None."""
+def _enum_values(body: dict[str, Any]) -> tuple[list[Any], bool] | None:
+    """Return (non-null enum values, whether null is allowed) when they can form a Literal, otherwise None."""
     values = body.get("enum")
-    if isinstance(values, list) and values and all(isinstance(v, (str, int, float, bool)) for v in values):
-        return values
+    if not isinstance(values, list):
+        return None
+    non_null = [value for value in values if value is not None]
+    if non_null and all(isinstance(value, (str, int, float, bool)) for value in non_null):
+        return non_null, len(non_null) < len(values)
     return None
 
 
@@ -501,8 +504,10 @@ def _resolve_type(body: dict[str, Any]) -> tuple[Any, str, str]:
     if isinstance(subschemas, list) and subschemas and all(isinstance(sub, dict) for sub in subschemas):
         nullable = any(str(sub.get("type", "")).lower() == "null" for sub in subschemas)
         non_null = [sub for sub in subschemas if str(sub.get("type", "")).lower() != "null"]
+        # Validation keywords beside anyOf / oneOf apply to every branch; a branch's own keywords win.
+        parent = {key: value for key, value in body.items() if key not in ("anyOf", "oneOf")}
         if non_null:
-            annotation, source, kind = _union_of([(*_resolve_type(sub), sub) for sub in non_null])
+            annotation, source, kind = _union_of([(*_resolve_type(sub), {**parent, **sub}) for sub in non_null])
         else:
             annotation, source, kind = str, "str", "string"
     else:
@@ -511,8 +516,10 @@ def _resolve_type(body: dict[str, Any]) -> tuple[Any, str, str]:
         nullable = "null" in names
         non_null_names = list(dict.fromkeys(name for name in names if name != "null")) or ["string"]
 
-        values = _enum_values(body)
-        if values is not None:
+        enum = _enum_values(body)
+        if enum is not None:
+            values, enum_nullable = enum
+            nullable = nullable or enum_nullable
             annotation = cast(Any, Literal)[tuple(values)]
             source = f"Literal[{', '.join(repr(v) for v in values)}]"
             kind = "enum"

@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 from typer.testing import CliRunner
 
 from chapkit.cli.cli import app
@@ -401,3 +401,36 @@ def test_generated_schema_matches_hand_written_config_class(tmp_path: Path) -> N
 
     generated: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, DOCUMENTED_MLPROJECT)))
     assert generated.model_json_schema() == EwarsTemplateConfig.model_json_schema()
+
+
+def test_nullable_enum_keeps_its_non_null_members() -> None:
+    spec = parse_option("mode", {"type": ["string", "null"], "enum": ["a", None], "default": "a"})
+    adapter = TypeAdapter(spec.annotation)
+    assert adapter.validate_python("a") == "a"
+    assert adapter.validate_python(None) is None
+    with pytest.raises(ValidationError):
+        adapter.validate_python("b")
+    assert spec.type_source == "Literal['a'] | None"
+
+
+def test_constraints_beside_any_of_apply_to_each_branch() -> None:
+    spec = parse_option("max_epochs", {"anyOf": [{"type": "integer"}, {"type": "null"}], "minimum": 1, "default": None})
+    adapter = TypeAdapter(spec.annotation)
+    assert adapter.validate_python(1) == 1
+    assert adapter.validate_python(None) is None
+    with pytest.raises(ValidationError):
+        adapter.validate_python(0)
+    assert adapter.json_schema() == {"anyOf": [{"minimum": 1, "type": "integer"}, {"type": "null"}]}
+
+
+def test_branch_constraints_win_over_constraints_beside_any_of() -> None:
+    spec = parse_option(
+        "size",
+        {"anyOf": [{"type": "integer", "minimum": 5}, {"type": "string", "maxLength": 2}], "minimum": 1, "default": 5},
+    )
+    adapter = TypeAdapter(spec.annotation)
+    assert adapter.validate_python(5) == 5
+    assert adapter.validate_python("ab") == "ab"
+    for bad in (3, "abc"):
+        with pytest.raises(ValidationError):
+            adapter.validate_python(bad)

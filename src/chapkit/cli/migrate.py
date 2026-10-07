@@ -25,6 +25,7 @@ from chapkit.cli.mlproject import (
     _python_class_name,
     _python_identifier,
     build_ml_service_info,
+    default_prediction_periods,
     find_mlproject,
     parse_mlproject,
     python_field_name,
@@ -750,7 +751,14 @@ def build_config_fields(mlproject: MLProject) -> list[tuple[str, str, str, str |
     if "prediction_periods" not in seen:
         fields.insert(
             0,
-            ("prediction_periods", "int", "3", "Number of periods to predict into the future.", None),
+            (
+                "prediction_periods",
+                "int",
+                # Same default `chapkit mlproject run` uses: kept inside the declared horizon bounds.
+                str(default_prediction_periods(mlproject)),
+                "Number of periods to predict into the future.",
+                None,
+            ),
         )
     return fields
 
@@ -1002,7 +1010,7 @@ def _run(
         "USER_DEPENDENCIES": user_deps,
         "USER_INDEX_OPTIONS": user_index_options,
         **uv_pyproject_options,
-        "CHAPKIT_REQUIREMENT": _get_chapkit_requirement(),
+        "CHAPKIT_REQUIREMENT": _get_chapkit_requirement(_uses_contract_fields(service_info_context)),
         **service_info_context,
     }
 
@@ -1091,10 +1099,28 @@ def _render_all(context: dict[str, Any]) -> dict[str, str]:
 #: uses, so the two scaffolding paths cannot drift apart.
 _MIN_CHAPKIT_VERSION = "1.1.0"
 
+#: First chapkit release with `ShellModelRunner(adapters=...)` and the `target` /
+#: `hpo_search_space` fields on `MLServiceInfo`. A generated main.py that uses any of
+#: them fails to import on older releases, so the floor is raised to this version.
+_CONTRACT_MIN_CHAPKIT_VERSION = "2.3.0"
 
-def _get_chapkit_requirement() -> str:
+
+def _get_chapkit_requirement(uses_contract_fields: bool = False) -> str:
     """Build the bounded chapkit requirement rendered into the migrated pyproject."""
-    return chapkit_requirement(_migrate_chapkit_floor(installed_chapkit_version()))
+    floor = _migrate_chapkit_floor(installed_chapkit_version())
+    if uses_contract_fields and _version_key(floor) < _version_key(_CONTRACT_MIN_CHAPKIT_VERSION):
+        floor = _CONTRACT_MIN_CHAPKIT_VERSION
+    return chapkit_requirement(floor)
+
+
+def _version_key(version: str) -> tuple[int, ...]:
+    """Return a release version as a comparable tuple of integers."""
+    return tuple(int(part) for part in version.split("."))
+
+
+def _uses_contract_fields(service_info_context: dict[str, Any]) -> bool:
+    """Return True when the generated main.py passes adapters, target or hpo_search_space."""
+    return any(service_info_context[key] for key in ("ADAPTERS_REPR", "TARGET", "HPO_SEARCH_SPACE_REPR"))
 
 
 def _migrate_chapkit_floor(running_version: str) -> str:

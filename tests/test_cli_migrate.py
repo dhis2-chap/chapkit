@@ -1535,3 +1535,65 @@ entry_points:
     assert module.info.target == "Cases"
     assert module.info.hpo_search_space == {"seasonal": {"values": [True, False]}, "prior": None}
     assert module.runner.adapters == {"Cases": "disease_cases", "week": "week"}
+
+
+def test_generated_pyproject_floor_follows_contract_fields(tmp_path: Path) -> None:
+    """adapters / target / hpo_search_space need the chapkit release that introduced them."""
+    contract_dir = tmp_path / "contract"
+    plain_dir = tmp_path / "plain"
+    _seed_project(
+        contract_dir,
+        """
+name: with_adapters
+adapters:
+  Cases: disease_cases
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+""",
+        {"train.py": "...", "predict.py": "..."},
+    )
+    _seed_project(
+        plain_dir,
+        """
+name: without_adapters
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+""",
+        {"train.py": "...", "predict.py": "..."},
+    )
+
+    for project in (contract_dir, plain_dir):
+        result = CliRunner().invoke(app, ["mlproject", "migrate", str(project), "--yes"])
+        assert result.exit_code == 0, result.output
+
+    contract_deps = tomllib.loads((contract_dir / "pyproject.toml").read_text())["project"]["dependencies"]
+    plain_deps = tomllib.loads((plain_dir / "pyproject.toml").read_text())["project"]["dependencies"]
+    assert "chapkit>=2.3.0,<3" in contract_deps
+    assert not any(dep.startswith("chapkit>=2.3.0") for dep in plain_deps)
+
+
+@pytest.mark.parametrize(
+    ("bounds", "expected_default"), [("max_prediction_periods: 1", "1"), ("min_prediction_periods: 6", "6")]
+)
+def test_build_config_fields_clamps_prediction_periods_default(
+    tmp_path: Path, bounds: str, expected_default: str
+) -> None:
+    (tmp_path / "MLproject").write_text(
+        f"""
+name: bounded
+{bounds}
+entry_points:
+  train:
+    command: "echo {{train_data}}"
+  predict:
+    command: "echo {{historic_data}} {{future_data}} {{out_file}}"
+"""
+    )
+    fields = build_config_fields(parse_mlproject(tmp_path))
+    assert fields[0][:3] == ("prediction_periods", "int", expected_default)
