@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from chapkit.cli.migrate import _TIDYVERSE_HINTS, _any_r_script_uses
 from chapkit.cli.mlproject import (
     MLProject,
     MLProjectError,
@@ -64,63 +63,6 @@ def _warn_about_env(mlproject: MLProject) -> None:
         err=True,
     )
     typer.echo("", err=True)
-
-
-def _suggest_chapkit_image(project_dir: Path, mlproject: MLProject) -> str:
-    """Pick the chapkit-images base image best suited to this MLproject.
-
-    Light-touch variant of migrate's detect_base_image - just returns the
-    `chapkit-py` / `chapkit-r` / `chapkit-r-tidyverse` / `chapkit-r-inla`
-    suffix so we can print a ready-made `docker run` one-liner. R + INLA
-    detection mirrors migrate: `library(INLA)` / `library(fmesher)` in any
-    root-level R script, or a `docker_r_inla` image in the MLproject's
-    docker_env. Tidyverse detection reuses migrate's _TIDYVERSE_HINTS list.
-    """
-    has_r = any(project_dir.glob("*.r")) or any(project_dir.glob("*.R"))
-    has_py = any(project_dir.glob("*.py"))
-    # Mixed R + Python at the project root: only chapkit-r-inla bundles both
-    # runtimes. Mirrors migrate.detect_base_image's mixed-language branch so the
-    # `docker run` hint matches what `chapkit mlproject migrate` would build.
-    if has_r and has_py:
-        return "chapkit-r-inla"
-    docker_env_image = mlproject.env_hints.get("docker_env", "")
-    # Match migrate.detect_base_image's substring check so the hint and the
-    # actual migrated image agree on inputs like `docker_r_inla:master` or any
-    # other registry path that still mentions docker_r_inla.
-    uses_inla = "docker_r_inla" in docker_env_image
-    if not uses_inla and has_r:
-        uses_inla = _any_r_script_uses(project_dir, ("INLA", "fmesher", "inla"))
-    if has_r and uses_inla:
-        return "chapkit-r-inla"
-    if has_r and _any_r_script_uses(project_dir, _TIDYVERSE_HINTS):
-        return "chapkit-r-tidyverse"
-    if has_r:
-        return "chapkit-r"
-    if has_py:
-        return "chapkit-py"
-    # Ambiguous (no .r/.R/.py at root); default to Python - works for MLprojects that
-    # call into compiled binaries or do all work inside the entry-point commands.
-    return "chapkit-py"
-
-
-def _print_docker_hint(project_dir: Path, mlproject: MLProject, port: int) -> None:
-    """Tell the user how to run the same MLproject via the prebuilt chapkit-images.
-
-    Skipped when the host already looks like a chapkit container so we don't nest
-    the hint inside itself.
-    """
-    if Path("/app/.venv/bin/chapkit").exists():
-        return
-    image = _suggest_chapkit_image(project_dir, mlproject)
-    platform_flag = " --platform=linux/amd64" if image == "chapkit-r-inla" else ""
-    typer.echo("")
-    typer.echo("Tip: to run the same MLproject in Docker (no local R/Python env needed):")
-    typer.echo(
-        f"  docker run --rm -p {port}:8000{platform_flag} -v {project_dir}:/work ghcr.io/dhis2-chap/{image}:latest"
-    )
-    typer.echo("  # chapkit-images ship WORKDIR=/work + a preinstalled chapkit; model-specific R / Python")
-    typer.echo("  # packages need to be installed separately (e.g. `chapkit mlproject migrate` + `docker build`).")
-    typer.echo("")
 
 
 def _check_port_available(host: str, port: int) -> str | None:
@@ -344,8 +286,6 @@ def run_command(
     if registration is not None:
         typer.echo(f"  registers with: {registration.orchestrator_url}")
     _print_warnings(issues)
-
-    _print_docker_hint(project_dir, mlproject, port)
 
     from chapkit.api import run_app
 
