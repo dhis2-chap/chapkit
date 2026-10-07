@@ -90,7 +90,7 @@ class ewars_templateConfig(BaseConfig):
 
 ## The model contract carries over
 
-The generated `MLServiceInfo` holds the same contract `chapkit mlproject run` serves (see [Model Contract](mlproject-runner.md#model-contract-from-the-mlproject)): `meta_data`, `supported_period_type` (chap-core's `week` / `month` spellings map to `weekly` / `monthly`, and a missing value means `any`), the horizon bounds, `required_covariates`, `target` and `hpo_search_space`. MLproject `adapters` are passed to `ShellModelRunner(adapters=...)` so scripts still find the renamed columns. Values that would make `main.py` fail to import, such as a malformed contact email, are left out and printed as warnings.
+The generated `MLServiceInfo` holds the same contract `chapkit mlproject run` serves (see [Model Contract](mlproject-runner.md#model-contract-from-the-mlproject)): `meta_data`, `supported_period_type` (chap-core's `week` / `month` spellings map to `weekly` / `monthly`, and a missing value means `any`), the horizon bounds, `required_covariates`, `target` and `hpo_search_space`. MLproject `adapters` are passed to `ShellModelRunner(adapters=...)` so scripts still find the renamed columns. Values that would make `main.py` fail to import, such as a malformed contact email, are left out and printed as warnings. When the generated `main.py` uses `adapters`, `target` or `hpo_search_space`, the generated `pyproject.toml` requires `chapkit>=2.3.0`, the first release with them.
 
 ## Interactive prompts
 
