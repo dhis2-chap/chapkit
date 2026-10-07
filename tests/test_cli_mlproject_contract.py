@@ -1,0 +1,400 @@
+"""Tests for the model contract and typed user_options that chapkit mlproject run reads from an MLproject."""
+
+from __future__ import annotations
+
+import socket
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+from typer.testing import CliRunner
+
+from chapkit.cli.cli import app
+from chapkit.cli.mlproject import (
+    build_config_schema,
+    build_ml_service_info,
+    normalize_period_type,
+    parse_mlproject,
+    parse_option,
+    resolve_mlproject,
+)
+from chapkit.cli.run import _check_port_available, build_mlproject_app
+
+ENTRY_POINTS = """
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+
+CONTRACT_MLPROJECT = (
+    """
+name: contract_model
+version: 2.1.0
+supported_period_type: week
+required_covariates: [population]
+allow_free_additional_continuous_covariates: true
+requires_geo: true
+min_prediction_length: 2
+maxPredictionPeriods: 8
+source_url: https://github.com/chap-models/contract_model
+meta_data:
+  display_name: Contract Model
+  description: Model with a full contract.
+  author: CHAP team
+  author_note: Use with care.
+  author_assessed_status: orange
+  contact_email: chap@example.org
+  organization: HISP Centre, University of Oslo
+  organization_logo_url: https://example.org/logo.png
+  citation_info: Cite me.
+  documentation_url: https://example.org/docs
+"""
+    + ENTRY_POINTS
+)
+
+USER_OPTIONS = """
+user_options:
+  n_lags:
+    type: [array, integer]
+    items:
+      type: integer
+    default: [3]
+    description: Lags per covariate, or one value for all.
+  cell:
+    title: Recurrent cell type
+    type: string
+    enum: [gru, simple]
+    default: gru
+  learning_rate:
+    type: number
+    minimum: 0
+    exclusiveMaximum: 1
+    default: 0.01
+  candidate_lags:
+    type: array
+    items:
+      type: integer
+    minItems: 1
+    default: [7, 10, 12]
+  max_epochs:
+    anyOf:
+    - type: integer
+      minimum: 1
+    - type: 'null'
+    default: null
+  label:
+    type: string
+    pattern: "^[a-z]+$"
+    default: abc
+  settings:
+    type: object
+    default: {}
+"""
+
+TYPED_MLPROJECT = "name: typed_model\n" + USER_OPTIONS + ENTRY_POINTS
+
+
+def _write_mlproject(tmp_path: Path, contents: str) -> Path:
+    target = tmp_path / "MLproject"
+    target.write_text(contents)
+    return target
+
+
+def test_parse_reads_horizon_bounds_under_chap_core_aliases(tmp_path: Path) -> None:
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, CONTRACT_MLPROJECT))
+    assert mlproject.min_prediction_periods == 2
+    assert mlproject.max_prediction_periods == 8
+    assert mlproject.version == "2.1.0"
+    assert mlproject.parse_warnings == []
+
+
+@pytest.mark.parametrize(
+    ("bounds", "expected_warning"),
+    [
+        ("min_prediction_periods: -1", "non-negative integer"),
+        ("max_prediction_periods: soon", "non-negative integer"),
+        ("min_prediction_periods: 5\nmax_prediction_periods: 2", "greater than"),
+    ],
+)
+def test_parse_ignores_invalid_horizon_bounds_with_a_warning(
+    tmp_path: Path, bounds: str, expected_warning: str
+) -> None:
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, f"name: bad_bounds\n{bounds}\n{ENTRY_POINTS}"))
+    assert mlproject.min_prediction_periods is None
+    assert mlproject.max_prediction_periods is None
+    assert any(expected_warning in warning for warning in mlproject.parse_warnings)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("week", "weekly"),
+        ("weekly", "weekly"),
+        ("month", "monthly"),
+        ("Monthly", "monthly"),
+        ("any", "any"),
+        (None, "any"),
+        ("", "any"),
+    ],
+)
+def test_normalize_period_type(raw: str | None, expected: str) -> None:
+    issues: list[str] = []
+    assert normalize_period_type(raw, issues) == expected
+    assert issues == []
+
+
+def test_normalize_period_type_unknown_value_falls_back_to_any_with_a_warning() -> None:
+    issues: list[str] = []
+    assert normalize_period_type("daily", issues) == "any"
+    assert "daily" in issues[0]
+
+
+def test_build_ml_service_info_maps_full_contract(tmp_path: Path) -> None:
+    issues: list[str] = []
+    info = build_ml_service_info(parse_mlproject(_write_mlproject(tmp_path, CONTRACT_MLPROJECT)), issues)
+
+    assert issues == []
+    assert info.id == "contract-model"
+    assert info.display_name == "Contract Model"
+    assert info.description == "Model with a full contract."
+    assert info.version == "2.1.0"
+    assert info.period_type.value == "weekly"
+    assert info.min_prediction_periods == 2
+    assert info.max_prediction_periods == 8
+    assert info.required_covariates == ["population"]
+    assert info.allow_free_additional_continuous_covariates is True
+    assert info.requires_geo is True
+
+    metadata = info.model_metadata
+    assert metadata.author == "CHAP team"
+    assert metadata.author_note == "Use with care."
+    assert metadata.author_assessed_status is not None
+    assert metadata.author_assessed_status.value == "orange"
+    assert metadata.contact_email == "chap@example.org"
+    assert metadata.organization == "HISP Centre, University of Oslo"
+    assert str(metadata.organization_logo_url) == "https://example.org/logo.png"
+    assert metadata.citation_info == "Cite me."
+    assert str(metadata.repository_url) == "https://github.com/chap-models/contract_model"
+    assert str(metadata.documentation_url) == "https://example.org/docs"
+
+
+def test_build_ml_service_info_minimal_mlproject_uses_defaults(tmp_path: Path) -> None:
+    info = build_ml_service_info(parse_mlproject(_write_mlproject(tmp_path, f"name: bare\n{ENTRY_POINTS}")))
+    assert info.display_name == "bare"
+    assert info.description == "Chapkit service for the bare MLproject"
+    assert info.period_type.value == "any"
+    assert info.min_prediction_periods == 0
+    assert info.max_prediction_periods == 100
+    assert info.model_metadata.author is None
+    assert info.model_metadata.author_assessed_status is None
+
+
+def test_build_ml_service_info_drops_invalid_metadata_with_warnings(tmp_path: Path) -> None:
+    contents = f"""
+name: sloppy_meta
+meta_data:
+  description: Falls back into author_note.
+  author_assessed_status: magenta
+  contact_email: not-an-email
+  organization_logo_url: /local/logo.png
+{ENTRY_POINTS}
+"""
+    issues: list[str] = []
+    info = build_ml_service_info(parse_mlproject(_write_mlproject(tmp_path, contents)), issues)
+
+    metadata = info.model_metadata
+    assert metadata.author_assessed_status is None
+    assert metadata.contact_email is None
+    assert metadata.organization_logo_url is None
+    assert metadata.author_note == "Falls back into author_note."
+    assert len(issues) == 3
+    assert any("author_assessed_status" in issue for issue in issues)
+    assert any("contact_email" in issue for issue in issues)
+    assert any("organization_logo_url" in issue for issue in issues)
+
+
+def test_typed_options_json_schema_matches_the_mlproject(tmp_path: Path) -> None:
+    schema: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, TYPED_MLPROJECT)))
+    properties = schema.model_json_schema()["properties"]
+
+    assert schema.model_json_schema()["description"] == "Configuration for typed_model."
+    assert properties["n_lags"]["anyOf"] == [{"items": {"type": "integer"}, "type": "array"}, {"type": "integer"}]
+    assert properties["n_lags"]["description"] == "Lags per covariate, or one value for all."
+    assert properties["cell"]["enum"] == ["gru", "simple"]
+    assert properties["cell"]["title"] == "Recurrent cell type"
+    assert properties["learning_rate"]["minimum"] == 0
+    assert properties["learning_rate"]["exclusiveMaximum"] == 1
+    assert properties["candidate_lags"]["minItems"] == 1
+    assert properties["max_epochs"]["anyOf"] == [{"minimum": 1, "type": "integer"}, {"type": "null"}]
+    assert properties["label"]["pattern"] == "^[a-z]+$"
+    assert properties["settings"]["type"] == "object"
+
+
+def test_typed_options_validate_values(tmp_path: Path) -> None:
+    schema: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, TYPED_MLPROJECT)))
+
+    defaults = schema()
+    assert defaults.n_lags == [3]
+    assert defaults.candidate_lags == [7, 10, 12]
+    assert defaults.max_epochs is None
+
+    accepted = schema(n_lags=2, cell="simple", learning_rate=0.5, max_epochs=10, settings={"a": 1})
+    assert accepted.n_lags == 2
+    assert accepted.max_epochs == 10
+
+    bad_values: list[dict[str, Any]] = [
+        {"cell": "lstm"},
+        {"learning_rate": 1},
+        {"learning_rate": -0.1},
+        {"candidate_lags": []},
+        {"max_epochs": 0},
+        {"label": "ABC"},
+        {"n_lags": "three"},
+    ]
+    for bad in bad_values:
+        with pytest.raises(ValidationError):
+            schema(**bad)
+
+
+def test_typed_options_accept_chap_core_user_option_values(tmp_path: Path) -> None:
+    """chap-core creates configs with user options nested under user_option_values."""
+    schema: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, TYPED_MLPROJECT)))
+    instance = schema.model_validate({"user_option_values": {"cell": "simple", "n_lags": [1, 2]}})
+    assert instance.cell == "simple"
+    assert instance.n_lags == [1, 2]
+
+
+def test_option_default_that_does_not_fit_is_kept_with_a_warning() -> None:
+    issues: list[str] = []
+    spec = parse_option("cell", {"type": "string", "enum": ["gru", "simple"], "default": "lstm"}, issues)
+    assert spec.default == "lstm"
+    assert "cell" in issues[0]
+
+
+def test_option_default_is_coerced_as_before_typed_options() -> None:
+    issues: list[str] = []
+    assert parse_option("count", {"type": "integer", "default": "10"}, issues).default == 10
+    assert parse_option("label", {"type": "mystery", "default": 5}, issues).default == "5"
+    assert parse_option("flag", {"type": "boolean", "default": "yes"}, issues).default is True
+    assert issues == []
+
+
+def test_prediction_periods_default_is_clamped_into_declared_bounds(tmp_path: Path) -> None:
+    contents = f"name: short_horizon\nmax_prediction_periods: 1\n{ENTRY_POINTS}"
+    schema: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, contents)))
+    assert schema().prediction_periods == 1
+
+
+def test_resolve_mlproject_accepts_file_or_directory(tmp_path: Path) -> None:
+    mlproject_file = _write_mlproject(tmp_path, CONTRACT_MLPROJECT)
+    assert resolve_mlproject(mlproject_file) == mlproject_file
+    assert resolve_mlproject(tmp_path) == mlproject_file
+
+
+def test_build_mlproject_app_serves_contract_and_typed_schema(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_mlproject(tmp_path, CONTRACT_MLPROJECT + USER_OPTIONS)
+    monkeypatch.chdir(tmp_path)
+    service, _, _ = build_mlproject_app(tmp_path)
+
+    with TestClient(service) as client:
+        info = client.get("/api/v1/info").json()
+        assert info["period_type"] == "weekly"
+        assert info["min_prediction_periods"] == 2
+        assert info["max_prediction_periods"] == 8
+        assert info["model_metadata"]["author"] == "CHAP team"
+        assert info["model_metadata"]["contact_email"] == "chap@example.org"
+
+        config_schema = client.get("/api/v1/configs/$schema").json()
+        assert config_schema["properties"]["cell"]["enum"] == ["gru", "simple"]
+
+        rejected = client.post("/api/v1/configs", json={"name": "bad", "data": {"cell": "lstm"}})
+        assert rejected.status_code == 422
+        created = client.post("/api/v1/configs", json={"name": "ok", "data": {"user_option_values": {"n_lags": 4}}})
+        assert created.status_code == 201
+        assert created.json()["data"]["n_lags"] == 4
+
+    # Nothing is written into the MLproject directory.
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["MLproject"]
+
+
+def test_check_port_available_reports_port_in_use() -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        port = listener.getsockname()[1]
+        problem = _check_port_available("127.0.0.1", port)
+    assert problem is not None
+    assert "already in use" in problem
+    assert "--port" in problem
+
+
+def test_check_port_available_accepts_free_port() -> None:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    assert _check_port_available("127.0.0.1", port) is None
+
+
+def test_run_command_exits_when_port_is_in_use(tmp_path: Path) -> None:
+    _write_mlproject(tmp_path, CONTRACT_MLPROJECT)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        port = listener.getsockname()[1]
+        result = CliRunner().invoke(app, ["mlproject", "run", str(tmp_path / "MLproject"), "--port", str(port)])
+    assert result.exit_code == 1
+    assert "already in use" in result.output
+
+
+DOCUMENTED_MLPROJECT = (
+    """
+name: ewars_template
+user_options:
+  n_lags:
+    type: [array, integer]
+    items:
+      type: integer
+    default: [3]
+    description: Number of lags per covariate, or one value for all.
+  cell:
+    title: Recurrent cell type
+    type: string
+    enum: [gru, simple]
+    default: gru
+  precision:
+    type: number
+    minimum: 0
+    default: 0.01
+  max_epochs:
+    anyOf:
+    - type: integer
+    - type: 'null'
+    default: null
+"""
+    + ENTRY_POINTS
+)
+
+
+def test_generated_schema_matches_hand_written_config_class(tmp_path: Path) -> None:
+    """The runtime config class has the same JSON Schema as the equivalent hand-written main.py class."""
+    from typing import Literal
+
+    from pydantic import Field
+
+    from chapkit import BaseConfig
+
+    class EwarsTemplateConfig(BaseConfig):
+        """Configuration for ewars_template."""
+
+        n_lags: list[int] | int = Field([3], description="Number of lags per covariate, or one value for all.")
+        cell: Literal["gru", "simple"] = Field("gru", title="Recurrent cell type")
+        precision: float = Field(0.01, ge=0)
+        max_epochs: int | None = None
+        prediction_periods: int = Field(3, description="Number of periods to predict into the future.")
+
+    generated: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, DOCUMENTED_MLPROJECT)))
+    assert generated.model_json_schema() == EwarsTemplateConfig.model_json_schema()

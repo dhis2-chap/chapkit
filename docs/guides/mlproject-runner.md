@@ -4,15 +4,17 @@
 
 ## Quick Start
 
-Point it at a directory. All three forms work:
+Point it at an MLproject file or the directory that holds one:
 
 ```bash
-chapkit mlproject run              # uses current directory
-chapkit mlproject run .            # same
+chapkit mlproject run                              # uses current directory
 chapkit mlproject run /path/to/my_mlproject
+chapkit mlproject run /path/to/my_mlproject/MLproject.yaml
 ```
 
-This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`.
+This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`. If the port is already taken, `chapkit mlproject run` stops with an error before starting anything.
+
+Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory, and each train/predict runs in a temporary copy of the project.
 
 A minimal R MLproject like `dhis2-chap/minimalist_example_r`:
 
@@ -66,26 +68,85 @@ The `--param NAME=FILENAME` flag is repeatable. Overrides win over the canonical
 
 ---
 
-## Dynamic Config from `user_options`
+## Model Contract from the MLproject
 
-MLproject `user_options` become typed fields on a chapkit `BaseConfig` subclass, generated at startup with `pydantic.create_model`. Given:
+`/api/v1/info` serves the same contract chap-core reads from an MLproject (`ModelTemplateConfigV2` in chap-core), so chap-core sees the model the same way whether it runs the MLproject itself or talks to `chapkit mlproject run`:
+
+| MLproject field | Served as |
+| --- | --- |
+| `name` | `id` (slugified) |
+| `version` | `version` |
+| `meta_data.display_name` | `display_name` (falls back to `name`) |
+| `meta_data.description` | `description` |
+| `meta_data.author`, `author_note`, `author_assessed_status`, `contact_email`, `organization`, `organization_logo_url`, `citation_info`, `documentation_url` | `model_metadata.*` (`author_note` falls back to `description`) |
+| `source_url` (top level or in `meta_data`) | `model_metadata.repository_url` |
+| `supported_period_type` | `period_type`: `week` / `weekly`, `month` / `monthly`, or `any` (the default) |
+| `min_prediction_periods`, `max_prediction_periods` (also the `*_prediction_length` and camelCase spellings) | `min_prediction_periods`, `max_prediction_periods` |
+| `required_covariates`, `allow_free_additional_continuous_covariates`, `requires_geo` | same names |
+
+Values that would not validate (a logo path that is not a URL, a malformed email, an unknown assessed status, a negative horizon bound) are reported as warnings at startup and left out, so an MLproject that ran before keeps running. `target`, `adapters` and `hpo_search_space` are not served.
+
+---
+
+## Typed Config from `user_options`
+
+MLproject `user_options` are JSON Schema properties, the same way chap-core validates them. `chapkit mlproject run` turns them into typed fields on a `BaseConfig` subclass generated at startup with `pydantic.create_model`, so the config's JSON Schema, the OpenAPI document, the console's config form and request validation match what a hand-written `main.py` would produce. Given:
 
 ```yaml
 name: ewars_template
 user_options:
   n_lags:
-    type: integer
-    default: 3
-    description: Number of lags to include in the model.
+    type: [array, integer]
+    items:
+      type: integer
+    default: [3]
+    description: Number of lags per covariate, or one value for all.
+  cell:
+    title: Recurrent cell type
+    type: string
+    enum: [gru, simple]
+    default: gru
   precision:
     type: number
+    minimum: 0
     default: 0.01
-    description: Prior on the precision of fixed effects.
+  max_epochs:
+    anyOf:
+    - type: integer
+    - type: 'null'
+    default: null
 ```
 
-`chapkit mlproject run` builds an `ewars_templateConfig` with `n_lags: int = 3`, `precision: float = 0.01`, and the standard `prediction_periods: int = 3` injected automatically. Scripts read these values from `config.yml`, which chapkit writes to the workspace root before invoking your train/predict command.
+`chapkit mlproject run` builds an `EwarsTemplateConfig` equivalent to:
 
-Supported `type` values: `integer`/`int`, `number`/`float`, `string`/`str`, `boolean`/`bool`, `path` (treated as string). Unknown types fall back to `str`. Options without a `default` become required fields.
+```python
+class EwarsTemplateConfig(BaseConfig):
+    """Configuration for ewars_template."""
+
+    n_lags: list[int] | int = Field([3], description="Number of lags per covariate, or one value for all.")
+    cell: Literal["gru", "simple"] = Field("gru", title="Recurrent cell type")
+    precision: float = Field(0.01, ge=0)
+    max_epochs: int | None = None
+    prediction_periods: int = Field(3, description="Number of periods to predict into the future.")
+```
+
+`prediction_periods` is added when the MLproject does not declare it; its default is kept inside the declared horizon bounds. Scripts read the values from `config.yml`, which chapkit writes to the workspace root before invoking your train/predict command.
+
+Supported keywords:
+
+| Keyword | Becomes |
+| --- | --- |
+| `type`: `integer` / `int`, `number` / `float`, `string` / `str` / `path`, `boolean` / `bool` | `int`, `float`, `str`, `bool` (unknown types fall back to `str`) |
+| `type: array` with `items` | `list[...]` |
+| `type: object` | `dict[str, Any]` |
+| `type: [a, b]`, `anyOf`, `oneOf` | a union of the members; `null` makes the option optional |
+| `enum` | `Literal[...]` |
+| `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum` | `ge`, `le`, `gt`, `lt` |
+| `minLength`, `maxLength`, `pattern`, `minItems`, `maxItems` | length and pattern constraints |
+| `title`, `description` | field title and description |
+| `default` | field default; options without one are required |
+
+A default that does not fit its declared type is kept as written and reported as a warning at startup.
 
 ---
 

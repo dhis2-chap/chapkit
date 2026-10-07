@@ -76,12 +76,12 @@ This creates a ready-to-run service with configuration, artifacts, and API endpo
 
 ### `chapkit mlproject run` - Serve an existing MLproject
 
-If you already have an MLflow-style `MLproject` directory (R, Python, or mixed), `chapkit mlproject run` stands it up as a chapkit service with no code generation:
+If you already have an MLflow-style `MLproject` (R, Python, or mixed), `chapkit mlproject run` stands it up as a chapkit service with no code generation and no files written. The service serves the MLproject's model contract (metadata, period type, covariates, horizon bounds) and turns its `user_options` into a typed config schema:
 
 ```bash
-chapkit mlproject run              # serve the MLproject in the current directory
-chapkit mlproject run .            # same
+chapkit mlproject run                              # serve the MLproject in the current directory
 chapkit mlproject run /path/to/mlproject
+chapkit mlproject run /path/to/mlproject/MLproject.yaml --port 9091
 ```
 
 ### `chapkit mlproject migrate` - Adopt an existing MLproject as a chapkit project
