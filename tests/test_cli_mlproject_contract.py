@@ -301,7 +301,7 @@ def test_resolve_mlproject_accepts_file_or_directory(tmp_path: Path) -> None:
 def test_build_mlproject_app_serves_contract_and_typed_schema(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_mlproject(tmp_path, CONTRACT_MLPROJECT + USER_OPTIONS)
     monkeypatch.chdir(tmp_path)
-    service, _, _ = build_mlproject_app(tmp_path)
+    service, _ = build_mlproject_app(parse_mlproject(tmp_path / "MLproject"))
 
     with TestClient(service) as client:
         info = client.get("/api/v1/info").json()

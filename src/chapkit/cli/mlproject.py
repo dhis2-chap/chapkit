@@ -138,6 +138,8 @@ class MLProject(BaseModel):
     target: str | None = None
     version: str | None = None
     source_url: str | None = None
+    adapters: dict[str, str] = Field(default_factory=dict)
+    hpo_search_space: dict[str, Any] | None = None
     min_prediction_periods: int | None = None
     max_prediction_periods: int | None = None
     source_path: Path | None = None
@@ -256,6 +258,20 @@ def parse_mlproject(path: Path) -> MLProject:
 
     raw_version = raw.get("version")
 
+    raw_adapters = raw.get("adapters") or {}
+    adapters: dict[str, str] = {}
+    if isinstance(raw_adapters, dict):
+        adapters = {str(to_name): str(from_name) for to_name, from_name in raw_adapters.items()}
+    else:
+        parse_warnings.append(f"adapters must be a mapping of column names, got {raw_adapters!r}; ignoring it")
+
+    raw_search_space = raw.get("hpo_search_space")
+    hpo_search_space: dict[str, Any] | None = None
+    if isinstance(raw_search_space, dict):
+        hpo_search_space = dict(raw_search_space)
+    elif raw_search_space is not None:
+        parse_warnings.append(f"hpo_search_space must be a mapping, got {raw_search_space!r}; ignoring it")
+
     return MLProject(
         name=name.strip(),
         entry_points=entry_points,
@@ -269,6 +285,8 @@ def parse_mlproject(path: Path) -> MLProject:
         target=str(raw["target"]) if "target" in raw and raw["target"] is not None else None,
         version=_clean_text(raw_version),
         source_url=_clean_text(raw.get("source_url")),
+        adapters=adapters,
+        hpo_search_space=hpo_search_space,
         min_prediction_periods=min_prediction_periods,
         max_prediction_periods=max_prediction_periods,
         source_path=mlproject_file,
@@ -769,6 +787,8 @@ def build_ml_service_info(mlproject: MLProject, issues: list[str] | None = None)
         "required_covariates": list(mlproject.required_covariates),
         "allow_free_additional_continuous_covariates": mlproject.allow_free_additional_continuous_covariates,
         "requires_geo": mlproject.requires_geo,
+        "target": mlproject.target or "disease_cases",
+        "hpo_search_space": mlproject.hpo_search_space,
     }
     if mlproject.version is not None:
         info["version"] = mlproject.version

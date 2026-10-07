@@ -16,7 +16,6 @@ from chapkit.cli.mlproject import (
     MLProjectError,
     build_config_schema,
     build_ml_service_info,
-    find_mlproject,
     parse_mlproject,
     resolve_mlproject,
     translate_command,
@@ -157,12 +156,11 @@ def _print_warnings(issues: list[str]) -> None:
 
 
 def build_mlproject_app(
-    project_dir: Path,
+    mlproject: MLProject,
     overrides: dict[str, str] | None = None,
     issues: list[str] | None = None,
-    mlproject_file: Path | None = None,
-) -> tuple[FastAPI, MLProject, MLServiceInfo]:
-    """Build the chapkit service for an MLproject directory without starting a server.
+) -> tuple[FastAPI, MLServiceInfo]:
+    """Build the chapkit service for a parsed MLproject without starting a server.
 
     Must be called with the project directory as the working directory: ShellModelRunner
     copies the current directory into each train/predict workspace.
@@ -173,7 +171,6 @@ def build_mlproject_app(
     from chapkit.artifact import ArtifactHierarchy
     from chapkit.ml import ShellModelRunner
 
-    mlproject = parse_mlproject(mlproject_file or find_mlproject(project_dir))
     if issues is not None:
         issues.extend(mlproject.parse_warnings)
     train_command = translate_command(mlproject.entry_points["train"].command, overrides)
@@ -190,6 +187,9 @@ def build_mlproject_app(
         train_command=train_command,
         predict_command=predict_command,
         config_format="chap_core",
+        # chap-core applies MLproject adapters itself only for models it runs directly,
+        # not for chapkit services, so the runner adds the adapted columns.
+        adapters=mlproject.adapters,
     )
     hierarchy = ArtifactHierarchy(
         name="mlproject",
@@ -202,7 +202,7 @@ def build_mlproject_app(
         hierarchy=hierarchy,
         runner=runner,
     ).build()
-    return app, mlproject, info
+    return app, info
 
 
 def run_command(
@@ -237,12 +237,6 @@ def run_command(
     """Run an MLproject as a chapkit service."""
     overrides = _parse_param_overrides(param)
 
-    # Fail before any parsing output when the service could never start.
-    port_problem = _check_port_available(host, port)
-    if port_problem is not None:
-        typer.echo(f"Error: {port_problem}", err=True)
-        raise typer.Exit(code=1)
-
     try:
         mlproject_file = resolve_mlproject(path.resolve())
         project_dir = mlproject_file.parent
@@ -253,12 +247,18 @@ def run_command(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1) from error
 
+    # Fail before building the service when it could never start listening.
+    port_problem = _check_port_available(host, port)
+    if port_problem is not None:
+        typer.echo(f"Error: {port_problem}", err=True)
+        raise typer.Exit(code=1)
+
     _warn_about_env(mlproject)
 
     os.chdir(project_dir)
     issues: list[str] = []
     try:
-        app, mlproject, info = build_mlproject_app(project_dir, overrides, issues, mlproject_file)
+        app, info = build_mlproject_app(mlproject, overrides, issues)
     except MLProjectError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1) from error

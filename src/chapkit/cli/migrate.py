@@ -24,6 +24,7 @@ from chapkit.cli.mlproject import (
     _coerce_default,
     _python_class_name,
     _python_identifier,
+    build_ml_service_info,
     find_mlproject,
     parse_mlproject,
     python_field_name,
@@ -678,62 +679,41 @@ def detect_base_image(
     raise MigrateError("No Python (.py) or R (.r/.R) scripts at the project root; cannot pick a base image.")
 
 
-_VALID_ASSESSED_STATUS = {"gray", "red", "orange", "yellow", "green"}
-_VALID_PERIOD_TYPES = {"weekly", "monthly", "any"}
-
-
-def build_service_info_context(mlproject: MLProject) -> dict[str, Any]:
+def build_service_info_context(mlproject: MLProject, issues: list[str] | None = None) -> dict[str, Any]:
     """Build the ModelMetadata + capability-constraints block for MLServiceInfo.
 
-    Handles the MLproject -> chapkit vocabulary mismatches:
-    - MLproject `supported_period_type` passes through when it is one of
-      chapkit's PeriodType values (weekly/monthly/any); anything else, or an
-      absent value, becomes `monthly`.
-    - `author_assessed_status` is validated against chapkit's AssessedStatus
-      enum; unknown values fall back to None.
-    - URL-typed fields (organization_logo_url, repository_url,
-      documentation_url) are only emitted if the value looks like a URL
-      (starts with http:// or https://) - MLServiceInfo validates them as
-      HttpUrl and we don't want to crash on a free-text slot.
+    Reads the contract the same way `chapkit mlproject run` serves it (see
+    `build_ml_service_info`): chap-core's `week` / `month` period spellings are mapped
+    and a missing period type means `any`; values that would fail MLServiceInfo
+    validation (non-URL links, malformed email, unknown assessed status) are left out
+    and reported through `issues`, so the generated main.py always imports cleanly.
     """
-    meta = mlproject.meta_data
+    info = build_ml_service_info(mlproject, issues)
+    metadata = info.model_metadata
 
-    def _str_or_none(key: str) -> str | None:
-        value = meta.get(key)
-        if value is None:
-            return None
-        text = str(value).strip()
-        return text or None
-
-    def _url_or_none(key: str) -> str | None:
-        value = _str_or_none(key)
-        if value and (value.startswith("http://") or value.startswith("https://")):
-            return value
-        return None
-
-    assessed_raw = _str_or_none("author_assessed_status")
-    assessed_status = assessed_raw if assessed_raw in _VALID_ASSESSED_STATUS else None
-
-    period_raw = (mlproject.supported_period_type or "").strip().lower()
-    if period_raw in _VALID_PERIOD_TYPES:
-        period_type = period_raw
-    else:
-        period_type = "monthly"
+    def _text(value: object | None) -> str | None:
+        return None if value is None else str(value)
 
     return {
-        "META_AUTHOR": _str_or_none("author"),
-        "META_AUTHOR_NOTE": _str_or_none("author_note") or _str_or_none("description"),
-        "META_ASSESSED_STATUS": assessed_status,
-        "META_CONTACT_EMAIL": _str_or_none("contact_email"),
-        "META_ORGANIZATION": _str_or_none("organization"),
-        "META_ORGANIZATION_LOGO_URL": _url_or_none("organization_logo_url"),
-        "META_CITATION_INFO": _str_or_none("citation_info"),
-        "META_REPOSITORY_URL": _url_or_none("repository_url") or _url_or_none("source_url"),
-        "META_DOCUMENTATION_URL": _url_or_none("documentation_url"),
-        "PERIOD_TYPE": period_type,
-        "REQUIRED_COVARIATES": list(mlproject.required_covariates),
-        "ALLOW_FREE_COVARIATES": mlproject.allow_free_additional_continuous_covariates,
-        "REQUIRES_GEO": mlproject.requires_geo,
+        "META_AUTHOR": metadata.author,
+        "META_AUTHOR_NOTE": metadata.author_note,
+        "META_ASSESSED_STATUS": metadata.author_assessed_status.value if metadata.author_assessed_status else None,
+        "META_CONTACT_EMAIL": metadata.contact_email,
+        "META_ORGANIZATION": metadata.organization,
+        "META_ORGANIZATION_LOGO_URL": _text(metadata.organization_logo_url),
+        "META_CITATION_INFO": metadata.citation_info,
+        "META_REPOSITORY_URL": _text(metadata.repository_url),
+        "META_DOCUMENTATION_URL": _text(metadata.documentation_url),
+        "PERIOD_TYPE": info.period_type.value,
+        "MIN_PREDICTION_PERIODS": mlproject.min_prediction_periods,
+        "MAX_PREDICTION_PERIODS": mlproject.max_prediction_periods,
+        "REQUIRED_COVARIATES": list(info.required_covariates),
+        "ALLOW_FREE_COVARIATES": info.allow_free_additional_continuous_covariates,
+        "REQUIRES_GEO": info.requires_geo,
+        "TARGET": info.target if info.target != "disease_cases" else None,
+        # Python literals (not JSON) so booleans and nulls render as True / None in main.py.
+        "HPO_SEARCH_SPACE_REPR": repr(info.hpo_search_space) if info.hpo_search_space else None,
+        "ADAPTERS_REPR": repr(mlproject.adapters) if mlproject.adapters else None,
     }
 
 
@@ -999,6 +979,11 @@ def _run(
     else:
         project_display_name = mlproject.name
 
+    contract_issues: list[str] = list(mlproject.parse_warnings)
+    service_info_context = build_service_info_context(mlproject, contract_issues)
+    for issue in contract_issues:
+        typer.echo(f"WARNING: {issue}", err=True)
+
     context: dict[str, Any] = {
         "PROJECT_NAME": mlproject.name,
         "PROJECT_DISPLAY_NAME": project_display_name,
@@ -1018,7 +1003,7 @@ def _run(
         "USER_INDEX_OPTIONS": user_index_options,
         **uv_pyproject_options,
         "CHAPKIT_REQUIREMENT": _get_chapkit_requirement(),
-        **build_service_info_context(mlproject),
+        **service_info_context,
     }
 
     rendered = _render_all(context)

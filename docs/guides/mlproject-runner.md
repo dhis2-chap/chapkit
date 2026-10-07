@@ -83,8 +83,26 @@ The `--param NAME=FILENAME` flag is repeatable. Overrides win over the canonical
 | `supported_period_type` | `period_type`: `week` / `weekly`, `month` / `monthly`, or `any` (the default) |
 | `min_prediction_periods`, `max_prediction_periods` (also the `*_prediction_length` and camelCase spellings) | `min_prediction_periods`, `max_prediction_periods` |
 | `required_covariates`, `allow_free_additional_continuous_covariates`, `requires_geo` | same names |
+| `target` | `target` (default `disease_cases`) |
+| `hpo_search_space` | `hpo_search_space` |
 
-Values that would not validate (a logo path that is not a URL, a malformed email, an unknown assessed status, a negative horizon bound) are reported as warnings at startup and left out, so an MLproject that ran before keeps running. `target`, `adapters` and `hpo_search_space` are not served.
+Values that would not validate (a logo path that is not a URL, a malformed email, an unknown assessed status, a negative horizon bound) are reported as warnings at startup and left out, so an MLproject that ran before keeps running.
+
+### Adapters
+
+chap-core renames columns for MLproject models it runs itself, using the `adapters` mapping, but not for chapkit services. `chapkit mlproject run` therefore applies `adapters` in the runner, so scripts written for chap-core find the same columns in `data.csv`, `historic.csv` and `future.csv`:
+
+```yaml
+adapters:
+  Cases: disease_cases   # copy a column under a new name
+  E: population
+  ID_spat: location
+  ID_year: year          # derived from time_period
+  month: month           # monthly data only
+  week: week             # weekly data only
+```
+
+The rules follow chap-core: the original columns are kept, `year` / `month` / `week` are derived from `time_period` (the ISO week of a weekly period's start, the year of its end), and a source column that is missing, such as `disease_cases` in the future frame, is skipped. The same mapping is available to any shell model as `ShellModelRunner(..., adapters={...})`.
 
 ---
 

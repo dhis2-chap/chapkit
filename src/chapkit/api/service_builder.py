@@ -106,6 +106,8 @@ class MLServiceInfo(ServiceInfo):
     allow_free_additional_continuous_covariates: bool = False
     required_covariates: list[str] = Field(default_factory=list)
     requires_geo: bool = False
+    target: str = "disease_cases"
+    hpo_search_space: dict[str, Any] | None = None
 
 
 GIT_REVISION_ENV = "GIT_REVISION"

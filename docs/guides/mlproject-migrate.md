@@ -88,6 +88,10 @@ class ewars_templateConfig(BaseConfig):
 
 `prediction_periods: int = 3` is injected automatically if your MLproject doesn't declare it — chapkit's ML runner requires it.
 
+## The model contract carries over
+
+The generated `MLServiceInfo` holds the same contract `chapkit mlproject run` serves (see [Model Contract](mlproject-runner.md#model-contract-from-the-mlproject)): `meta_data`, `supported_period_type` (chap-core's `week` / `month` spellings map to `weekly` / `monthly`, and a missing value means `any`), the horizon bounds, `required_covariates`, `target` and `hpo_search_space`. MLproject `adapters` are passed to `ShellModelRunner(adapters=...)` so scripts still find the renamed columns. Values that would make `main.py` fail to import, such as a malformed contact email, are left out and printed as warnings.
+
 ## Interactive prompts
 
 By default migrate asks for confirmation before executing the plan, asks for missing filename mappings if a placeholder like `{dataset}` isn't in the canonical set (`train_data`, `historic_data`, `future_data`, `out_file`, `model`, `model_config`, `polygons`), and asks before accepting an ambiguous base-image pick. `--yes` skips all prompts with the sensible defaults; `--dry-run` never prompts.
