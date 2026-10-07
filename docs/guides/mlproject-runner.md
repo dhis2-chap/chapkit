@@ -146,7 +146,7 @@ Supported keywords:
 | `title`, `description` | field title and description |
 | `default` | field default; options without one are required |
 
-A default that does not fit its declared type is kept as written and reported as a warning at startup.
+A default that does not fit its declared type is kept as written, as before typed options existed, and reported as a warning at startup. Configs then have to set that option explicitly, because the written default fails validation.
 
 ---
 

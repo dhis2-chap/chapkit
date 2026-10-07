@@ -78,6 +78,7 @@ user_options:
     type: array
     items:
       type: integer
+      minimum: 1
     minItems: 1
     default: [7, 10, 12]
   max_epochs:
@@ -229,6 +230,7 @@ def test_typed_options_json_schema_matches_the_mlproject(tmp_path: Path) -> None
     assert properties["learning_rate"]["minimum"] == 0
     assert properties["learning_rate"]["exclusiveMaximum"] == 1
     assert properties["candidate_lags"]["minItems"] == 1
+    assert properties["candidate_lags"]["items"] == {"minimum": 1, "type": "integer"}
     assert properties["max_epochs"]["anyOf"] == [{"minimum": 1, "type": "integer"}, {"type": "null"}]
     assert properties["label"]["pattern"] == "^[a-z]+$"
     assert properties["settings"]["type"] == "object"
@@ -251,6 +253,7 @@ def test_typed_options_validate_values(tmp_path: Path) -> None:
         {"learning_rate": 1},
         {"learning_rate": -0.1},
         {"candidate_lags": []},
+        {"candidate_lags": [0]},
         {"max_epochs": 0},
         {"label": "ABC"},
         {"n_lags": "three"},

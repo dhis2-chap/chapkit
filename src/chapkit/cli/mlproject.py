@@ -440,18 +440,14 @@ def _enum_values(body: dict[str, Any]) -> list[Any] | None:
 
 
 def _resolve_items(items: Any) -> tuple[Any, str]:
-    """Map a JSON Schema `items` declaration to (python type, source spelling)."""
+    """Map a JSON Schema `items` declaration to (python type, source spelling), keeping item constraints."""
     if items is None:
         return Any, "Any"
     if not isinstance(items, dict):
         items = {"type": items}
-    values = _enum_values(items)
-    if values is not None:
-        return cast(Any, Literal)[tuple(values)], f"Literal[{', '.join(repr(v) for v in values)}]"
-    if str(items.get("type", "")).lower() == "object":
-        return dict[str, Any], "dict[str, Any]"
-    scalar, source, _ = _resolve_scalar(items.get("type", "string"))
-    return scalar, source
+    annotation, source, kind = _resolve_type(items)
+    constraints = _collect_constraints(items, kind)
+    return (Annotated[annotation, Field(**constraints)] if constraints else annotation), source
 
 
 def _resolve_declared(declared: str, body: dict[str, Any]) -> tuple[Any, str, str]:
@@ -598,7 +594,7 @@ def _validate_default(
     if issues is not None:
         issues.append(
             f"user_option {name!r} default {raw_default!r} does not match its declared type {type_source} "
-            f"({reason}); keeping it as written"
+            f"({reason}); keeping it as written, so configs must set {name!r} explicitly"
         )
     return raw_default
 
