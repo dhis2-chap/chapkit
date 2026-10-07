@@ -61,6 +61,11 @@ runner: ShellModelRunner[{{ PROJECT_CLASS_NAME }}Config] = ShellModelRunner(
     train_command={{ TRAIN_COMMAND | tojson }},
     predict_command={{ PREDICT_COMMAND | tojson }},
     config_format="chap_core",
+{% if ADAPTERS_REPR %}
+    # MLproject adapters: extra columns added to the data, historic and future CSVs
+    # (new column -> source column, or year / month / week derived from time_period).
+    adapters={{ ADAPTERS_REPR }},
+{% endif %}
 )
 
 info = MLServiceInfo(
@@ -99,6 +104,12 @@ info = MLServiceInfo(
 {% endif %}
     ),
     period_type=PeriodType.{{ PERIOD_TYPE }},
+{% if MIN_PREDICTION_PERIODS is not none %}
+    min_prediction_periods={{ MIN_PREDICTION_PERIODS }},
+{% endif %}
+{% if MAX_PREDICTION_PERIODS is not none %}
+    max_prediction_periods={{ MAX_PREDICTION_PERIODS }},
+{% endif %}
 {% if REQUIRED_COVARIATES %}
     required_covariates={{ REQUIRED_COVARIATES | tojson }},
 {% endif %}
@@ -107,6 +118,12 @@ info = MLServiceInfo(
 {% endif %}
 {% if REQUIRES_GEO %}
     requires_geo=True,
+{% endif %}
+{% if TARGET %}
+    target={{ TARGET | tojson }},
+{% endif %}
+{% if HPO_SEARCH_SPACE_REPR %}
+    hpo_search_space={{ HPO_SEARCH_SPACE_REPR }},
 {% endif %}
 )
 

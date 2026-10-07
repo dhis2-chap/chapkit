@@ -453,6 +453,8 @@ MLServiceBuilder(
 | `allow_free_additional_continuous_covariates` | bool | Allow extra covariates beyond required |
 | `required_covariates` | list[str] | Required input covariate names |
 | `requires_geo` | bool | Whether the model requires GeoJSON spatial data for training/prediction |
+| `target` | str | Name of the variable the model predicts (default: `disease_cases`) |
+| `hpo_search_space` | dict | Search space chap-core uses when tuning the model's user options (default: none) |
 | `git_revision` | str | Commit the image was built from. Filled automatically from the `GIT_REVISION` environment variable; set explicitly to override |
 | `chapkit_version` | str | Installed chapkit version. Filled automatically; set explicitly to override |
 | `servicekit_version` | str | Installed servicekit version. Filled automatically; set explicitly to override |

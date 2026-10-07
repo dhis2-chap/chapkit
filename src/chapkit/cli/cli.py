@@ -113,7 +113,7 @@ mlproject_app = typer.Typer(
     help="Run or migrate an MLflow-style MLproject directory",
     no_args_is_help=True,
 )
-mlproject_app.command(name="run", help="Run an MLproject directory as a chapkit service")(run_command)
+mlproject_app.command(name="run", help="Run an MLproject file or directory as a chapkit service")(run_command)
 mlproject_app.command(name="migrate", help="Migrate an MLproject directory into a chapkit project")(migrate_command)
 app.add_typer(mlproject_app, name="mlproject", hidden=not _has_mlproject())
 

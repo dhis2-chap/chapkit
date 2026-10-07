@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import os
 import pickle
+import re
 import shutil
 import tempfile
 import zipfile
@@ -140,6 +141,67 @@ WORKSPACE_EXCLUDE_PATTERNS = (
     "*.sqlite3-shm",
     "*.sqlite3-journal",
 )
+
+
+# A monthly period is "YYYY-MM"; anything else chap-core sends is weekly ("YYYY-Www" or "start/end" dates).
+_MONTHLY_PERIOD = re.compile(r"^\d{4}-\d{2}$")
+
+
+def _period_year(period: str) -> int:
+    """Return the year of a period the way chap-core's adapters compute it (the end date's year for ranges)."""
+    if "/" in period:
+        return datetime.date.fromisoformat(period.split("/")[1]).year
+    return int(re.split(r"[-WS]", period, maxsplit=1)[0])
+
+
+def _period_week(period: str) -> int:
+    """Return the week number of a weekly period the way chap-core's adapters compute it (ISO week of the start)."""
+    if "/" in period:
+        return datetime.date.fromisoformat(period.split("/")[0]).isocalendar().week
+    return int(re.split(r"SunW|-W|-S|W", period)[-1])
+
+
+def apply_adapters(frame: DataFrame, adapters: dict[str, str]) -> DataFrame:
+    """Add the columns an MLproject `adapters` mapping declares, following chap-core's rules.
+
+    Each entry maps a new column name to a source. The sources `year`, `month` and `week`
+    are derived from `time_period` (month only for monthly data, week only for weekly
+    data, as in chap-core); any other source copies that column. A missing source column
+    is skipped, which covers `disease_cases` in a future frame.
+    """
+    if not adapters:
+        return frame
+    columns = list(frame.columns)
+    rows = [list(row) for row in frame.data]
+    periods = [str(value) for value in frame.get_column("time_period")] if "time_period" in columns else []
+    monthly = bool(periods) and all(_MONTHLY_PERIOD.match(period) for period in periods)
+
+    for to_name, from_name in adapters.items():
+        values: list[Any] | None
+        if from_name == "year" and periods:
+            values = [_period_year(period) for period in periods]
+        elif from_name == "month" and periods:
+            values = [int(period.split("-")[1]) for period in periods] if monthly else None
+        elif from_name == "week" and periods:
+            values = [_period_week(period) for period in periods] if not monthly else None
+        elif from_name in columns:
+            source_index = columns.index(from_name)
+            values = [row[source_index] for row in rows]
+        else:
+            if from_name != "disease_cases":
+                logger.warning("adapter_source_missing", to_name=to_name, from_name=from_name)
+            values = None
+        if values is None:
+            continue
+        if to_name in columns:
+            target_index = columns.index(to_name)
+            for row, value in zip(rows, values):
+                row[target_index] = value
+        else:
+            columns.append(to_name)
+            for row, value in zip(rows, values):
+                row.append(value)
+    return DataFrame(columns=columns, data=rows)
 
 
 def prepare_workspace(source_dir: Path, dest_dir: Path) -> None:
@@ -585,6 +647,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
         on_validate_train: ValidateTrainFunction[ConfigT] | None = None,
         on_validate_predict: ValidatePredictFunction[ConfigT] | None = None,
         config_format: Literal["flat", "chap_core"] = "flat",
+        adapters: dict[str, str] | None = None,
     ) -> None:
         """Initialize shell runner with full isolation support.
 
@@ -603,12 +666,16 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
                 under user_option_values, matching chap-core's ModelConfiguration schema so
                 scripts ported from chap-models repos can read
                 ``config["user_option_values"]["<key>"]`` unchanged.
+            adapters: Optional MLproject `adapters` mapping (new column -> source column, or
+                `year` / `month` / `week` derived from time_period). The columns are added to
+                the data, historic and future CSVs, as chap-core does for MLproject models.
         """
         self.train_command = train_command
         self.predict_command = predict_command
         self._on_validate_train = on_validate_train
         self._on_validate_predict = on_validate_predict
         self.config_format: Literal["flat", "chap_core"] = config_format
+        self.adapters: dict[str, str] = dict(adapters or {})
 
         # Project root is current working directory
         # Users run: fastapi dev main.py (from project dir)
@@ -693,6 +760,7 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             # Copy entire project directory to temp workspace for full isolation
             prepare_workspace(self.project_root, temp_dir)
             # Write training input files
+            data = apply_adapters(data, self.adapters)
             write_training_inputs(temp_dir, config, data, geo, config_format=self.config_format)
 
             # Substitute variables in command (use relative paths)
@@ -801,6 +869,8 @@ class ShellModelRunner(BaseModelRunner[ConfigT]):
             (temp_dir / "config.yml").write_text(dump_config_yaml(config, self.config_format))
 
             # Write prediction input files (always fresh for each prediction)
+            historic = apply_adapters(historic, self.adapters)
+            future = apply_adapters(future, self.adapters)
             write_prediction_inputs(temp_dir, historic, future, geo)
 
             # Output file path

@@ -380,7 +380,7 @@ def test_build_service_info_context_minimalist_defaults(tmp_path: Path) -> None:
 
     assert ctx["META_AUTHOR"] is None
     assert ctx["META_ASSESSED_STATUS"] is None
-    assert ctx["PERIOD_TYPE"] == "monthly"  # default when supported_period_type absent
+    assert ctx["PERIOD_TYPE"] == "any"  # default when supported_period_type absent, as in chap-core
     assert ctx["REQUIRED_COVARIATES"] == []
     assert ctx["ALLOW_FREE_COVARIATES"] is False
 
@@ -1431,3 +1431,169 @@ def test_chapkit_requirement_helper_handles_dev_and_unknown_versions() -> None:
     assert chapkit_requirement("2.0.0rc1") == "chapkit>=2.0.0,<3"
     assert chapkit_requirement("1.1.0") == "chapkit>=1.1.0,<2"
     assert chapkit_requirement("unknown") == "chapkit"
+
+
+@pytest.mark.parametrize(("declared", "expected"), [("week", "weekly"), ("month", "monthly"), ("any", "any")])
+def test_build_service_info_context_maps_chap_core_period_spellings(
+    tmp_path: Path, declared: str, expected: str
+) -> None:
+    (tmp_path / "MLproject").write_text(
+        f"""
+name: period_model
+supported_period_type: {declared}
+entry_points:
+  train:
+    command: "echo {{train_data}}"
+  predict:
+    command: "echo {{historic_data}} {{future_data}} {{out_file}}"
+"""
+    )
+    assert build_service_info_context(parse_mlproject(tmp_path))["PERIOD_TYPE"] == expected
+
+
+def test_build_service_info_context_carries_full_contract(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(
+        """
+name: contract_model
+target: Cases
+min_prediction_length: 1
+max_prediction_length: 6
+hpo_search_space:
+  n_lags: {low: 1, high: 6, type: int}
+  seasonal: {values: [true, false]}
+adapters:
+  Cases: disease_cases
+  ID_year: year
+meta_data:
+  contact_email: not-an-email
+entry_points:
+  train:
+    command: "echo {train_data}"
+  predict:
+    command: "echo {historic_data} {future_data} {out_file}"
+"""
+    )
+    issues: list[str] = []
+    ctx = build_service_info_context(parse_mlproject(tmp_path), issues)
+
+    assert ctx["MIN_PREDICTION_PERIODS"] == 1
+    assert ctx["MAX_PREDICTION_PERIODS"] == 6
+    assert ctx["TARGET"] == "Cases"
+    assert ctx["ADAPTERS_REPR"] == "{'Cases': 'disease_cases', 'ID_year': 'year'}"
+    # Python literals, so booleans render as True / False in main.py.
+    assert "True" in ctx["HPO_SEARCH_SPACE_REPR"]
+    # A malformed email would make the generated main.py fail to import; it is dropped with a warning.
+    assert ctx["META_CONTACT_EMAIL"] is None
+    assert any("contact_email" in issue for issue in issues)
+
+
+def test_build_service_info_context_omits_default_target(tmp_path: Path) -> None:
+    (tmp_path / "MLproject").write_text(MINIMALIST_MLPROJECT)
+    ctx = build_service_info_context(parse_mlproject(tmp_path))
+    assert ctx["TARGET"] is None
+    assert ctx["MIN_PREDICTION_PERIODS"] is None
+    assert ctx["HPO_SEARCH_SPACE_REPR"] is None
+    assert ctx["ADAPTERS_REPR"] is None
+
+
+def test_generated_main_py_serves_full_contract_and_adapters(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The migrated main.py imports cleanly and carries period, horizon, target, HPO space and adapters."""
+    import importlib.util
+
+    mlproject_yaml = """
+name: full_contract
+target: Cases
+supported_period_type: week
+min_prediction_length: 1
+max_prediction_length: 12
+hpo_search_space:
+  seasonal: {values: [true, false]}
+  prior: null
+adapters:
+  Cases: disease_cases
+  week: week
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+"""
+    _seed_project(tmp_path, mlproject_yaml, {"train.py": "...", "predict.py": "..."})
+    result = CliRunner().invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    spec = importlib.util.spec_from_file_location("migrated_full_contract_main", tmp_path / "main.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.info.period_type.value == "weekly"
+    assert module.info.min_prediction_periods == 1
+    assert module.info.max_prediction_periods == 12
+    assert module.info.target == "Cases"
+    assert module.info.hpo_search_space == {"seasonal": {"values": [True, False]}, "prior": None}
+    assert module.runner.adapters == {"Cases": "disease_cases", "week": "week"}
+
+
+def test_generated_pyproject_floor_follows_contract_fields(tmp_path: Path) -> None:
+    """adapters / target / hpo_search_space need the chapkit release that introduced them."""
+    contract_dir = tmp_path / "contract"
+    plain_dir = tmp_path / "plain"
+    _seed_project(
+        contract_dir,
+        """
+name: with_adapters
+adapters:
+  Cases: disease_cases
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+""",
+        {"train.py": "...", "predict.py": "..."},
+    )
+    _seed_project(
+        plain_dir,
+        """
+name: without_adapters
+entry_points:
+  train:
+    command: "python train.py {train_data} {model}"
+  predict:
+    command: "python predict.py {model} {historic_data} {future_data} {out_file}"
+""",
+        {"train.py": "...", "predict.py": "..."},
+    )
+
+    for project in (contract_dir, plain_dir):
+        result = CliRunner().invoke(app, ["mlproject", "migrate", str(project), "--yes"])
+        assert result.exit_code == 0, result.output
+
+    contract_deps = tomllib.loads((contract_dir / "pyproject.toml").read_text())["project"]["dependencies"]
+    plain_deps = tomllib.loads((plain_dir / "pyproject.toml").read_text())["project"]["dependencies"]
+    assert "chapkit>=2.3.0,<3" in contract_deps
+    assert not any(dep.startswith("chapkit>=2.3.0") for dep in plain_deps)
+
+
+@pytest.mark.parametrize(
+    ("bounds", "expected_default"), [("max_prediction_periods: 1", "1"), ("min_prediction_periods: 6", "6")]
+)
+def test_build_config_fields_clamps_prediction_periods_default(
+    tmp_path: Path, bounds: str, expected_default: str
+) -> None:
+    (tmp_path / "MLproject").write_text(
+        f"""
+name: bounded
+{bounds}
+entry_points:
+  train:
+    command: "echo {{train_data}}"
+  predict:
+    command: "echo {{historic_data}} {{future_data}} {{out_file}}"
+"""
+    )
+    fields = build_config_fields(parse_mlproject(tmp_path))
+    assert fields[0][:3] == ("prediction_periods", "int", expected_default)
