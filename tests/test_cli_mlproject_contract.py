@@ -644,3 +644,72 @@ def test_untranslatable_schemas_are_published_as_declared(tmp_path: Path) -> Non
     assert properties["empty"]["items"] is False
     assert properties["anything"]["items"] is True
     assert properties["code"]["pattern"] == "^(?!x)\\w+$"
+
+
+LOSSY_MLPROJECT = (
+    """
+name: lossy
+user_options:
+  untyped_bounded:
+    minimum: 1
+    default: 5
+  anchored:
+    type: string
+    pattern: "^a$"
+    default: a
+  two_patterns:
+    type: string
+    pattern: "^a"
+    anyOf:
+    - pattern: "z$"
+    default: az
+  tagged:
+    type: array
+    items:
+      type: string
+      pattern: "^a"
+    default: []
+"""
+    + ENTRY_POINTS
+)
+
+
+def test_published_schema_keeps_every_enforced_constraint(tmp_path: Path) -> None:
+    schema: Any = build_config_schema(parse_mlproject(_write_mlproject(tmp_path, LOSSY_MLPROJECT)))
+    properties = schema.model_json_schema()["properties"]
+    assert properties["untyped_bounded"]["minimum"] == 1
+    assert properties["anchored"]["pattern"] == "^a$"
+    assert properties["two_patterns"]["pattern"] == "^a"
+    assert properties["two_patterns"]["anyOf"] == [{"pattern": "z$"}]
+    assert properties["tagged"]["items"] == {"type": "string", "pattern": "^a"}
+
+
+@pytest.mark.parametrize(
+    ("option", "value", "status"),
+    [
+        ("untyped_bounded", 0, 422),
+        ("untyped_bounded", 5, 201),
+        # Python re (used by jsonschema and chap-core) lets `$` match before a trailing newline.
+        ("anchored", "a\n", 201),
+        ("anchored", "b", 422),
+        ("two_patterns", "az", 201),
+        ("two_patterns", "a", 422),
+        ("tagged", ["ab"], 201),
+        ("tagged", ["b"], 422),
+    ],
+)
+def test_lossy_options_validate_like_chap_core(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, option: str, value: Any, status: int
+) -> None:
+    _write_mlproject(tmp_path, LOSSY_MLPROJECT)
+    monkeypatch.chdir(tmp_path)
+    service, _ = build_mlproject_app(parse_mlproject(tmp_path / "MLproject"))
+    with TestClient(service) as client:
+        payload = {"name": "c", "data": {"user_option_values": {option: value}}}
+        assert client.post("/api/v1/configs", json=payload).status_code == status
+
+
+def test_plain_bounds_keep_the_typed_schema() -> None:
+    spec = parse_option("count", {"type": "integer", "minimum": 1, "default": 1})
+    assert spec.type_source == "int"
+    assert TypeAdapter(spec.annotation).json_schema() == {"minimum": 1, "type": "integer"}

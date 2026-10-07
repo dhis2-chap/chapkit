@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools
 import keyword
 import re
 import string
@@ -14,7 +13,6 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, cast
 import yaml
 from pydantic import AfterValidator, BaseModel, Field, TypeAdapter, ValidationError, WithJsonSchema, create_model
 from pydantic.fields import FieldInfo
-from pydantic_core import SchemaError as PydanticCoreSchemaError
 
 from chapkit.config.schemas import BaseConfig
 
@@ -482,6 +480,9 @@ class _Member:
     constraints: dict[str, Any] = field(default_factory=dict)
     extra_patterns: list[str] = field(default_factory=list)
     scalar: type | None = None
+    # True when the annotation drops a constraint from its published schema (a pattern, or
+    # bounds on a value of any type), so the option must publish its declared schema.
+    lossy: bool = False
 
     def constrained(self) -> Any:
         """Return the annotation with its constraints attached, for use inside a union."""
@@ -493,18 +494,8 @@ class _Member:
         return Annotated[self.annotation, *metadata] if metadata else self.annotation
 
 
-@functools.lru_cache(maxsize=256)
-def _pydantic_compiles(pattern: str) -> bool:
-    """Return True when Pydantic's Rust regex engine can compile a pattern."""
-    try:
-        TypeAdapter(Annotated[str, Field(pattern=pattern)])
-    except PydanticCoreSchemaError:
-        return False
-    return True
-
-
 def _pattern_checker(patterns: list[str]) -> Callable[[str], str]:
-    """Return a validator requiring every pattern to match, for strings under more than one `pattern`."""
+    """Return a validator requiring every pattern to match with Python's re, as the JSON Schema validator does."""
     compiled = [re.compile(pattern) for pattern in patterns]
 
     def check(value: str) -> str:
@@ -648,11 +639,16 @@ def _member_for(name: str, schema: _Schema) -> _Member:
     bounds = schema.bounds
     constraints: dict[str, Any] = {}
     if name == "array":
-        item_annotation, item_source = _resolve_items(schema.items)
+        item_annotation, item_source, items_lossy = _resolve_items(schema.items)
         for key, kwarg in (("minItems", "min_length"), ("maxItems", "max_length")):
             if key in bounds:
                 constraints[kwarg] = bounds[key]
-        return _Member(list[item_annotation], f"list[{item_source}]", constraints)  # type: ignore[valid-type]
+        return _Member(
+            list[item_annotation],  # type: ignore[valid-type]
+            f"list[{item_source}]",
+            constraints,
+            lossy=items_lossy,
+        )
     if name == "object":
         return _Member(dict[str, Any], "dict[str, Any]")
     scalar = _SCALAR_TYPES[name]
@@ -661,33 +657,31 @@ def _member_for(name: str, schema: _Schema) -> _Member:
         constraints = {kwarg: bounds[key] for key, kwarg in _NUMERIC_CONSTRAINTS.items() if key in bounds}
     elif name == "string":
         constraints = {kwarg: bounds[key] for key, kwarg in _STRING_CONSTRAINTS.items() if key in bounds}
-        # Pydantic compiles `pattern` with Rust regex, which has no look-around; such patterns
-        # are checked with Python's re instead, as the JSON Schema validator does.
-        native = [pattern for pattern in schema.patterns if _pydantic_compiles(pattern)]
-        if native:
-            constraints["pattern"] = native[0]
-        extra_patterns = [pattern for pattern in schema.patterns if pattern not in native[:1]]
-    return _Member(scalar, _TYPE_SOURCE[scalar], constraints, extra_patterns, scalar)
+        # Patterns are never handed to Pydantic: its Rust regex differs from Python's re (for
+        # example `$` before a trailing newline), so they are checked with re, the engine the
+        # JSON Schema validator uses, and the option publishes its declared schema.
+        extra_patterns = list(schema.patterns)
+    return _Member(scalar, _TYPE_SOURCE[scalar], constraints, extra_patterns, scalar, lossy=bool(extra_patterns))
 
 
-def _resolve_items(item_schemas: list[dict[str, Any]]) -> tuple[Any, str]:
-    """Map the `items` declarations that apply to an array (all must hold) to (python type, source).
+def _resolve_items(item_schemas: list[dict[str, Any]]) -> tuple[Any, str, bool]:
+    """Map the `items` declarations that apply to an array (all must hold) to (python type, source, lossy).
 
     Intersecting several item schemas is only done when none of them has branches; otherwise
     the item type stays `Any` (never stricter than the schema) and the option's JSON Schema
     validator enforces the items exactly.
     """
     if not item_schemas:
-        return Any, "Any"
+        return Any, "Any", False
     if len(item_schemas) > 1 and any(_has_combinator(item_schema) for item_schema in item_schemas):
-        return Any, "Any"
+        return Any, "Any", True
     inherited: _Schema | None = None
     for item_schema in item_schemas[:-1]:
         normalized = _normalize(item_schema)
         inherited = normalized if inherited is None else _merge(inherited, normalized)
     members, nullable = _resolve(item_schemas[-1], inherited)
     annotation, source = _combine(members, nullable)
-    return annotation, source
+    return annotation, source, any(member.lossy for member in members)
 
 
 def _resolve(body: dict[str, Any], inherited: _Schema | None = None) -> tuple[list[_Member], bool]:
@@ -724,8 +718,9 @@ def _resolve(body: dict[str, Any], inherited: _Schema | None = None) -> tuple[li
         return literal_members, any(value is None for value in allowed)
 
     if schema.types is None:
-        # No type anywhere means any value, as in JSON Schema and chap-core.
-        return [_Member(Any, "Any")], False
+        # No type anywhere means any value, as in JSON Schema and chap-core. `Any` carries no
+        # bounds, so any that apply here are only enforced and published through the schema.
+        return [_Member(Any, "Any", lossy=bool(schema.bounds or schema.patterns or schema.items))], False
     return [_member_for(name, schema) for name in schema.types if name != "null"], "null" in schema.types
 
 
@@ -814,8 +809,6 @@ def _translated_exactly(body: Any) -> bool:
     if not isinstance(body, dict):
         return True
     if set(body) - _TRANSLATED_KEYWORDS or _has_boolean_schema(body):
-        return False
-    if isinstance(body.get("pattern"), str) and not _pydantic_compiles(body["pattern"]):
         return False
     branches = [branch for branch in body.get("anyOf", []) if isinstance(branch, dict)]
     item_schemas = [body["items"]] if "items" in body else []
@@ -915,14 +908,18 @@ def parse_option(name: str, body: dict[str, Any], issues: list[str] | None = Non
 
     # The option's own JSON Schema, checked with the validator chap-core uses, makes
     # acceptance exact. When the typed translation cannot represent the schema (oneOf,
-    # allOf, not, const, boolean schemas, look-around patterns, ...) the annotation is
-    # `Any`, so only that validator decides, and the schema is published as declared.
+    # allOf, not, const, boolean schemas, ...) the annotation is `Any`, so only that
+    # validator decides. Whenever the typed schema would leave out a constraint (those
+    # keywords, or a pattern or bounds the annotation cannot carry), the option publishes
+    # its schema as declared, so schema consumers reject what the service rejects.
     check = _json_schema_check(name, body, issues)
     metadata: list[Any] = []
     if check is not None:
         metadata.append(AfterValidator(check))
-        if not _translated_exactly(body):
+        exact = _translated_exactly(body)
+        if not exact:
             annotation, type_source, scalar = Any, "Any", None
+        if not exact or any(member.lossy for member in members):
             published = {
                 key: value
                 for key, value in _canonical_schema(body).items()
