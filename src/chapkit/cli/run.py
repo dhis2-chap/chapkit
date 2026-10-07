@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import errno
 import os
+import socket
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -13,11 +15,16 @@ from chapkit.cli.mlproject import (
     MLProject,
     MLProjectError,
     build_config_schema,
-    find_mlproject,
+    build_ml_service_info,
     parse_mlproject,
-    slugify,
+    resolve_mlproject,
     translate_command,
 )
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+
+    from chapkit.api import MLServiceInfo
 
 
 def _parse_param_overrides(raw: list[str] | None) -> dict[str, str]:
@@ -110,68 +117,67 @@ def _print_docker_hint(project_dir: Path, mlproject: MLProject, port: int) -> No
     typer.echo("")
 
 
-def run_command(
-    path: Annotated[
-        Path,
-        typer.Argument(
-            help="Directory containing the MLproject file (default: current directory).",
-        ),
-    ] = Path("."),
-    host: Annotated[
-        str,
-        typer.Option(help="Host interface to bind to."),
-    ] = "127.0.0.1",
-    port: Annotated[
-        int,
-        typer.Option(help="Port to listen on."),
-    ] = 9090,
-    param: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--param",
-            help=(
-                "Override the filename substituted for an MLproject parameter, "
-                "e.g. --param dataset=data.csv. Repeatable."
-            ),
-        ),
-    ] = None,
-) -> None:
-    """Run an MLproject directory as a chapkit service."""
-    project_dir = path.resolve()
+def _check_port_available(host: str, port: int) -> str | None:
+    """Return why host:port cannot be bound, or None when it is free."""
     try:
-        mlproject_file = find_mlproject(project_dir)
-        mlproject = parse_mlproject(mlproject_file)
-    except MLProjectError as error:
-        typer.echo(f"Error: {error}", err=True)
-        raise typer.Exit(code=1) from error
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, flags=socket.AI_PASSIVE)
+    except socket.gaierror as error:
+        return f"Cannot resolve host {host!r}: {error.strerror}"
+    family, socktype, proto, _, address = infos[0]
+    with socket.socket(family, socktype, proto) as probe:
+        # Match uvicorn, which sets SO_REUSEADDR: a port in TIME_WAIT is free, one with a listener is not.
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            probe.bind(address)
+        except OSError as error:
+            if error.errno == errno.EADDRINUSE:
+                return f"Port {port} on {host} is already in use. Stop the other process or pick another with --port."
+            return f"Cannot bind to {host}:{port}: {error.strerror}"
+    return None
 
-    overrides = _parse_param_overrides(param)
 
-    try:
-        train_command = translate_command(mlproject.entry_points["train"].command, overrides)
-        predict_command = translate_command(mlproject.entry_points["predict"].command, overrides)
-    except MLProjectError as error:
-        typer.echo(f"Error: {error}", err=True)
-        raise typer.Exit(code=1) from error
+def _print_contract(info: MLServiceInfo) -> None:
+    """Print the service contract chap-core will read from /api/v1/info."""
+    metadata = info.model_metadata
+    horizon = f"{info.min_prediction_periods}-{info.max_prediction_periods}"
+    typer.echo(f"  period:  {info.period_type.value} (horizon {horizon} periods)")
+    if info.required_covariates:
+        typer.echo(f"  covariates: {', '.join(info.required_covariates)}")
+    if metadata.author or metadata.organization:
+        typer.echo(f"  author:  {', '.join(part for part in (metadata.author, metadata.organization) if part)}")
+    if metadata.author_assessed_status is not None:
+        typer.echo(f"  status:  {metadata.author_assessed_status.value}")
 
-    _warn_about_env(mlproject)
 
-    typer.echo(f"Starting chapkit service for MLproject '{mlproject.name}'")
-    typer.echo(f"  source: {mlproject_file}")
-    typer.echo(f"  train:   {train_command}")
-    typer.echo(f"  predict: {predict_command}")
+def _print_warnings(issues: list[str]) -> None:
+    """Print MLproject values that were ignored or kept as written."""
+    for issue in issues:
+        typer.echo(f"WARNING: {issue}", err=True)
 
-    _print_docker_hint(project_dir, mlproject, port)
 
-    os.chdir(project_dir)
+def build_mlproject_app(
+    mlproject: MLProject,
+    overrides: dict[str, str] | None = None,
+    issues: list[str] | None = None,
+) -> tuple[FastAPI, MLServiceInfo]:
+    """Build the chapkit service for a parsed MLproject without starting a server.
 
+    Must be called with the project directory as the working directory: ShellModelRunner
+    copies the current directory into each train/predict workspace.
+    """
     # Lazy imports: avoid a circular import triggered by chapkit.__init__ loading the CLI.
     from chapkit import BaseConfig
-    from chapkit.api import MLServiceBuilder, ServiceInfo, run_app
+    from chapkit.api import MLServiceBuilder
     from chapkit.artifact import ArtifactHierarchy
     from chapkit.ml import ShellModelRunner
 
-    config_schema = build_config_schema(mlproject)
+    if issues is not None:
+        issues.extend(mlproject.parse_warnings)
+    train_command = translate_command(mlproject.entry_points["train"].command, overrides)
+    predict_command = translate_command(mlproject.entry_points["predict"].command, overrides)
+
+    config_schema = build_config_schema(mlproject, issues)
+    info = build_ml_service_info(mlproject, issues)
     # Match `chapkit mlproject migrate`'s default: emit config.yml in chap-core's
     # ModelConfiguration shape (reserved keys at top level, everything else
     # nested under user_option_values). Keeps runtime and code-generated
@@ -181,12 +187,9 @@ def run_command(
         train_command=train_command,
         predict_command=predict_command,
         config_format="chap_core",
-    )
-
-    info = ServiceInfo(
-        id=slugify(mlproject.name),
-        display_name=mlproject.name,
-        description=f"Auto-discovered MLproject service for '{mlproject.name}'",
+        # chap-core applies MLproject adapters itself only for models it runs directly,
+        # not for chapkit services, so the runner adds the adapted columns.
+        adapters=mlproject.adapters,
     )
     hierarchy = ArtifactHierarchy(
         name="mlproject",
@@ -199,5 +202,76 @@ def run_command(
         hierarchy=hierarchy,
         runner=runner,
     ).build()
+    return app, info
+
+
+def run_command(
+    path: Annotated[
+        Path,
+        typer.Argument(
+            help=(
+                "MLproject file, or the directory containing it (default: current directory). "
+                "Nothing is written to it: the service keeps its state in memory."
+            ),
+        ),
+    ] = Path("."),
+    host: Annotated[
+        str,
+        typer.Option(help="Host interface to bind to."),
+    ] = "127.0.0.1",
+    port: Annotated[
+        int,
+        typer.Option(help="Port to listen on.", min=1, max=65535),
+    ] = 9090,
+    param: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--param",
+            help=(
+                "Override the filename substituted for an MLproject parameter, "
+                "e.g. --param dataset=data.csv. Repeatable."
+            ),
+        ),
+    ] = None,
+) -> None:
+    """Run an MLproject as a chapkit service."""
+    overrides = _parse_param_overrides(param)
+
+    try:
+        mlproject_file = resolve_mlproject(path.resolve())
+        project_dir = mlproject_file.parent
+        mlproject = parse_mlproject(mlproject_file)
+        train_command = translate_command(mlproject.entry_points["train"].command, overrides)
+        predict_command = translate_command(mlproject.entry_points["predict"].command, overrides)
+    except MLProjectError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(code=1) from error
+
+    # Fail before building the service when it could never start listening.
+    port_problem = _check_port_available(host, port)
+    if port_problem is not None:
+        typer.echo(f"Error: {port_problem}", err=True)
+        raise typer.Exit(code=1)
+
+    _warn_about_env(mlproject)
+
+    os.chdir(project_dir)
+    issues: list[str] = []
+    try:
+        app, info = build_mlproject_app(mlproject, overrides, issues)
+    except MLProjectError as error:
+        typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(code=1) from error
+
+    typer.echo(f"Starting chapkit service for MLproject '{mlproject.name}'")
+    typer.echo(f"  source:  {mlproject_file}")
+    typer.echo(f"  train:   {train_command}")
+    typer.echo(f"  predict: {predict_command}")
+    _print_contract(info)
+    _print_warnings(issues)
+
+    _print_docker_hint(project_dir, mlproject, port)
+
+    from chapkit.api import run_app
 
     run_app(app, host=host, port=port)

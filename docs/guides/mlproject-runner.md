@@ -4,15 +4,17 @@
 
 ## Quick Start
 
-Point it at a directory. All three forms work:
+Point it at an MLproject file or the directory that holds one:
 
 ```bash
-chapkit mlproject run              # uses current directory
-chapkit mlproject run .            # same
+chapkit mlproject run                              # uses current directory
 chapkit mlproject run /path/to/my_mlproject
+chapkit mlproject run /path/to/my_mlproject/MLproject.yaml
 ```
 
-This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`.
+This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`. If the port is already taken, `chapkit mlproject run` stops with an error before starting anything.
+
+Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory, and each train/predict runs in a temporary copy of the project.
 
 A minimal R MLproject like `dhis2-chap/minimalist_example_r`:
 
@@ -66,26 +68,105 @@ The `--param NAME=FILENAME` flag is repeatable. Overrides win over the canonical
 
 ---
 
-## Dynamic Config from `user_options`
+## Model Contract from the MLproject
 
-MLproject `user_options` become typed fields on a chapkit `BaseConfig` subclass, generated at startup with `pydantic.create_model`. Given:
+`/api/v1/info` serves the same contract chap-core reads from an MLproject (`ModelTemplateConfigV2` in chap-core), so chap-core sees the model the same way whether it runs the MLproject itself or talks to `chapkit mlproject run`:
+
+| MLproject field | Served as |
+| --- | --- |
+| `name` | `id` (slugified) |
+| `version` | `version` |
+| `meta_data.display_name` | `display_name` (falls back to `name`) |
+| `meta_data.description` | `description` |
+| `meta_data.author`, `author_note`, `author_assessed_status`, `contact_email`, `organization`, `organization_logo_url`, `citation_info`, `documentation_url` | `model_metadata.*` (`author_note` falls back to `description`) |
+| `source_url` (top level or in `meta_data`) | `model_metadata.repository_url` |
+| `supported_period_type` | `period_type`: `week` / `weekly`, `month` / `monthly`, or `any` (the default) |
+| `min_prediction_periods`, `max_prediction_periods` (also the `*_prediction_length` and camelCase spellings) | `min_prediction_periods`, `max_prediction_periods` |
+| `required_covariates`, `allow_free_additional_continuous_covariates`, `requires_geo` | same names |
+| `target` | `target` (default `disease_cases`) |
+| `hpo_search_space` | `hpo_search_space` |
+
+Values that would not validate (a logo path that is not a URL, a malformed email, an unknown assessed status, a negative horizon bound) are reported as warnings at startup and left out, so an MLproject that ran before keeps running.
+
+### Adapters
+
+chap-core renames columns for MLproject models it runs itself, using the `adapters` mapping, but not for chapkit services. `chapkit mlproject run` therefore applies `adapters` in the runner, so scripts written for chap-core find the same columns in `data.csv`, `historic.csv` and `future.csv`:
+
+```yaml
+adapters:
+  Cases: disease_cases   # copy a column under a new name
+  E: population
+  ID_spat: location
+  ID_year: year          # derived from time_period
+  month: month           # monthly data only
+  week: week             # weekly data only
+```
+
+The rules follow chap-core: the original columns are kept, `year` / `month` / `week` are derived from `time_period` (the ISO week of a weekly period's start, the year of its end), and a source column that is missing, such as `disease_cases` in the future frame, is skipped. The same mapping is available to any shell model as `ShellModelRunner(..., adapters={...})`.
+
+---
+
+## Typed Config from `user_options`
+
+MLproject `user_options` are JSON Schema properties, the same way chap-core validates them. `chapkit mlproject run` turns them into typed fields on a `BaseConfig` subclass generated at startup with `pydantic.create_model`, so the config's JSON Schema, the OpenAPI document, the console's config form and request validation match what a hand-written `main.py` would produce. Given:
 
 ```yaml
 name: ewars_template
 user_options:
   n_lags:
-    type: integer
-    default: 3
-    description: Number of lags to include in the model.
+    type: [array, integer]
+    items:
+      type: integer
+    default: [3]
+    description: Number of lags per covariate, or one value for all.
+  cell:
+    title: Recurrent cell type
+    type: string
+    enum: [gru, simple]
+    default: gru
   precision:
     type: number
+    minimum: 0
     default: 0.01
-    description: Prior on the precision of fixed effects.
+  max_epochs:
+    anyOf:
+    - type: integer
+    - type: 'null'
+    default: null
 ```
 
-`chapkit mlproject run` builds an `ewars_templateConfig` with `n_lags: int = 3`, `precision: float = 0.01`, and the standard `prediction_periods: int = 3` injected automatically. Scripts read these values from `config.yml`, which chapkit writes to the workspace root before invoking your train/predict command.
+`chapkit mlproject run` builds an `EwarsTemplateConfig` equivalent to:
 
-Supported `type` values: `integer`/`int`, `number`/`float`, `string`/`str`, `boolean`/`bool`, `path` (treated as string). Unknown types fall back to `str`. Options without a `default` become required fields.
+```python
+class EwarsTemplateConfig(BaseConfig):
+    """Configuration for ewars_template."""
+
+    n_lags: list[int] | int = Field([3], description="Number of lags per covariate, or one value for all.")
+    cell: Literal["gru", "simple"] = Field("gru", title="Recurrent cell type")
+    precision: float = Field(0.01, ge=0)
+    max_epochs: int | None = None
+    prediction_periods: int = Field(3, description="Number of periods to predict into the future.")
+```
+
+`prediction_periods` is added when the MLproject does not declare it; its default is kept inside the declared horizon bounds. Scripts read the values from `config.yml`, which chapkit writes to the workspace root before invoking your train/predict command.
+
+Supported keywords:
+
+| Keyword | Becomes |
+| --- | --- |
+| `type`: `integer` / `int`, `number` / `float`, `string` / `str` / `path`, `boolean` / `bool` | `int`, `float`, `str`, `bool` (unknown type names fall back to `str`; no `type` at all means any value) |
+| `type: array` with `items` | `list[...]` |
+| `type: object` | `dict[str, Any]` |
+| `type: [a, b]`, `anyOf`, `oneOf` | a union of the members; `null` makes the option optional |
+| `enum` | `Literal[...]` |
+| `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum` | `ge`, `le`, `gt`, `lt` |
+| `minLength`, `maxLength`, `pattern`, `minItems`, `maxItems` | length and pattern constraints |
+| `title`, `description` | field title and description |
+| `default` | field default; options without one are required |
+
+Every value is also validated against the option's own JSON Schema with the `jsonschema` validator chap-core uses, so configs are accepted and rejected exactly as chap-core would: every keyword that applies must hold, `oneOf` needs exactly one matching branch, and keywords the table does not list (`allOf`, `not`, `const`, `multipleOf`, `uniqueItems`, ...) are enforced too. Options the typed translation cannot represent (those keywords, or boolean schemas such as `items: false`) are typed `Any` and validated by the JSON Schema alone. `pattern` is always checked by the JSON Schema validator (Python's `re`, as in chap-core), never by Pydantic's regex engine. Any option whose typed schema would leave out a constraint (those keywords, a `pattern`, or bounds on an option without a `type`) publishes its schema as declared in the MLproject, so schema consumers reject what the service rejects; the rest publish the typed schema shown above. chapkit's legacy type names (`int`, `str`, `path`, ...) and draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` are read as their standard forms.
+
+A default that does not fit its declared type is kept as written, as before typed options existed, and reported as a warning at startup. Configs then have to set that option explicitly, because the written default fails validation.
 
 ---
 
