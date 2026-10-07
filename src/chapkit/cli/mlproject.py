@@ -5,12 +5,13 @@ from __future__ import annotations
 import keyword
 import re
 import string
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, cast
 
 import yaml
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError, create_model
+from pydantic import AfterValidator, BaseModel, Field, TypeAdapter, ValidationError, create_model
 from pydantic.fields import FieldInfo
 
 from chapkit.config.schemas import BaseConfig
@@ -74,7 +75,8 @@ _TYPE_SOURCE: dict[type, str] = {int: "int", float: "float", str: "str", bool: "
 
 # JSON Schema validation keywords mapped to the Pydantic Field kwarg they become, grouped by
 # the kind of value they apply to. A keyword on the wrong kind of value is ignored, matching
-# JSON Schema's own semantics (e.g. `minimum` has no effect on a string).
+# JSON Schema's own semantics (e.g. `minimum` has no effect on a string). Array lengths
+# (`minItems` / `maxItems`) are mapped in `_member_for`.
 _NUMERIC_CONSTRAINTS: dict[str, str] = {
     "minimum": "ge",
     "maximum": "le",
@@ -85,10 +87,6 @@ _STRING_CONSTRAINTS: dict[str, str] = {
     "minLength": "min_length",
     "maxLength": "max_length",
     "pattern": "pattern",
-}
-_ARRAY_CONSTRAINTS: dict[str, str] = {
-    "minItems": "min_length",
-    "maxItems": "max_length",
 }
 
 # Every spelling chap-core accepts for the forecast horizon bounds, canonical first.
@@ -442,145 +440,310 @@ def _clean_text(value: Any) -> str | None:
     return text or None
 
 
-def _resolve_scalar(declared: Any) -> tuple[Any, str, str]:
-    """Map a JSON Schema scalar type name to (python type, source spelling, value kind)."""
-    scalar = TYPE_MAP.get(str(declared).lower(), str)
-    kind = "number" if scalar in (int, float) else "boolean" if scalar is bool else "string"
-    return scalar, _TYPE_SOURCE[scalar], kind
+# MLproject type names (JSON Schema plus the aliases chapkit always accepted) to canonical JSON Schema names.
+# Unknown names fall back to "string", as they did before typed options existed.
+_CANONICAL_TYPES: dict[str, str] = {
+    "integer": "integer",
+    "int": "integer",
+    "number": "number",
+    "float": "number",
+    "string": "string",
+    "str": "string",
+    "path": "string",
+    "boolean": "boolean",
+    "bool": "boolean",
+    "array": "array",
+    "object": "object",
+    "null": "null",
+}
+_LOWER_BOUNDS: tuple[str, ...] = ("minimum", "exclusiveMinimum", "minLength", "minItems")
+_UPPER_BOUNDS: tuple[str, ...] = ("maximum", "exclusiveMaximum", "maxLength", "maxItems")
+_SCALAR_TYPES: dict[str, type] = {"integer": int, "number": float, "string": str, "boolean": bool}
 
 
-def _enum_values(body: dict[str, Any]) -> tuple[list[Any], bool] | None:
-    """Return (non-null enum values, whether null is allowed) when they can form a Literal, otherwise None."""
-    values = body.get("enum")
-    if not isinstance(values, list):
-        return None
-    non_null = [value for value in values if value is not None]
-    if non_null and all(isinstance(value, (str, int, float, bool)) for value in non_null):
-        return non_null, len(non_null) < len(values)
-    return None
+@dataclass(slots=True)
+class _Schema:
+    """The validation keywords that apply at one point of a user_option schema, already intersected."""
+
+    types: list[str] | None = None
+    bounds: dict[str, int | float] = field(default_factory=dict)
+    patterns: list[str] = field(default_factory=list)
+    enum: list[Any] | None = None
+    items: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _resolve_items(items: Any) -> tuple[Any, str]:
-    """Map a JSON Schema `items` declaration to (python type, source spelling), keeping item constraints."""
-    if items is None:
-        return Any, "Any"
-    if not isinstance(items, dict):
-        items = {"type": items}
-    annotation, source, kind = _resolve_type(items)
-    constraints = _collect_constraints(items, kind)
-    return (Annotated[annotation, Field(**constraints)] if constraints else annotation), source
+@dataclass(slots=True)
+class _Member:
+    """One non-null alternative of an option's type, with the Field kwargs that constrain it."""
 
-
-def _resolve_declared(declared: str, body: dict[str, Any]) -> tuple[Any, str, str]:
-    """Map one JSON Schema type name to (annotation, source spelling, value kind)."""
-    if declared == "array":
-        item_annotation, item_source = _resolve_items(body.get("items"))
-        return list[item_annotation], f"list[{item_source}]", "array"  # type: ignore[valid-type]
-    if declared == "object":
-        return dict[str, Any], "dict[str, Any]", "object"
-    return _resolve_scalar(declared)
-
-
-def _union_of(variants: list[tuple[Any, str, str, dict[str, Any]]]) -> tuple[Any, str, str]:
-    """Combine (annotation, source, kind, schema) variants into one union, each keeping its own constraints."""
-    members: list[Any] = []
-    for annotation, _, kind, schema in variants:
-        constraints = _collect_constraints(schema, kind)
-        members.append(Annotated[annotation, Field(**constraints)] if constraints else annotation)
-    if len(members) == 1:
-        return members[0], variants[0][1], "union"
-    return cast(Any, Union)[tuple(members)], " | ".join(variant[1] for variant in variants), "union"
-
-
-def _resolve_type(body: dict[str, Any]) -> tuple[Any, str, str]:
-    """Map a user_option body to (annotation, source spelling, value kind).
-
-    A list `type` (e.g. `[array, integer]`) or an `anyOf` / `oneOf` list becomes a union of
-    its members, each carrying the validation keywords that apply to it; the returned kind
-    is then "union" so no keyword is applied to the union as a whole.
-    """
     annotation: Any
+    source: str
+    constraints: dict[str, Any] = field(default_factory=dict)
+    extra_patterns: list[str] = field(default_factory=list)
+    scalar: type | None = None
+
+    def constrained(self) -> Any:
+        """Return the annotation with its constraints attached, for use inside a union."""
+        metadata: list[Any] = []
+        if self.constraints:
+            metadata.append(Field(**self.constraints))
+        if self.extra_patterns:
+            metadata.append(AfterValidator(_pattern_checker(self.extra_patterns)))
+        return Annotated[self.annotation, *metadata] if metadata else self.annotation
+
+
+def _pattern_checker(patterns: list[str]) -> Callable[[str], str]:
+    """Return a validator requiring every pattern to match, for strings under more than one `pattern`."""
+    compiled = [re.compile(pattern) for pattern in patterns]
+
+    def check(value: str) -> str:
+        """Reject a string that does not match all patterns."""
+        for pattern in compiled:
+            if not pattern.search(value):
+                raise ValueError(f"String should match pattern '{pattern.pattern}'")
+        return value
+
+    return check
+
+
+def _type_names(body: dict[str, Any]) -> list[str] | None:
+    """Return the canonical type names a schema declares, or None when it declares no type."""
+    declared = body.get("type")
+    if declared is None:
+        return None
+    names = declared if isinstance(declared, list) else [declared]
+    return list(dict.fromkeys(_CANONICAL_TYPES.get(str(name).lower(), "string") for name in names))
+
+
+def _normalize(body: dict[str, Any]) -> _Schema:
+    """Read the validation keywords of one schema object."""
+    bounds: dict[str, int | float] = {}
+    for key in _LOWER_BOUNDS + _UPPER_BOUNDS:
+        value = body.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            bounds[key] = value
+    # Draft 4 spells exclusive bounds as booleans that modify minimum / maximum.
+    if body.get("exclusiveMinimum") is True and "minimum" in bounds:
+        bounds["exclusiveMinimum"] = bounds.pop("minimum")
+    if body.get("exclusiveMaximum") is True and "maximum" in bounds:
+        bounds["exclusiveMaximum"] = bounds.pop("maximum")
+    pattern = body.get("pattern")
+    enum = body.get("enum")
+    items = body.get("items")
+    return _Schema(
+        types=_type_names(body),
+        bounds=bounds,
+        patterns=[pattern] if isinstance(pattern, str) else [],
+        enum=list(enum) if isinstance(enum, list) else None,
+        items=[items if isinstance(items, dict) else {"type": items}] if items is not None else [],
+    )
+
+
+def _same_value(left: Any, right: Any) -> bool:
+    """Compare JSON values the way JSON Schema does, so True is not 1."""
+    return type(left) is type(right) and left == right
+
+
+def _intersect_types(left: list[str] | None, right: list[str] | None) -> list[str] | None:
+    """Return the types allowed by both declarations (None means any type)."""
+    if left is None or right is None:
+        return right if left is None else left
+    allowed: list[str] = []
+    for name in left:
+        for other in right:
+            if name == other:
+                allowed.append(name)
+            elif {name, other} == {"integer", "number"}:
+                allowed.append("integer")
+    return list(dict.fromkeys(allowed))
+
+
+def _merge(parent: _Schema, child: _Schema) -> _Schema:
+    """Intersect two schemas: a value must satisfy both, so every bound takes its stricter side."""
+    bounds = dict(parent.bounds)
+    for key, value in child.bounds.items():
+        if key not in bounds:
+            bounds[key] = value
+        elif key in _LOWER_BOUNDS:
+            bounds[key] = max(bounds[key], value)
+        else:
+            bounds[key] = min(bounds[key], value)
+    if parent.enum is None or child.enum is None:
+        enum = child.enum if parent.enum is None else parent.enum
+    else:
+        enum = [value for value in parent.enum if any(_same_value(value, other) for other in child.enum)]
+    return _Schema(
+        types=_intersect_types(parent.types, child.types),
+        bounds=bounds,
+        patterns=parent.patterns + [pattern for pattern in child.patterns if pattern not in parent.patterns],
+        enum=enum,
+        items=parent.items + child.items,
+    )
+
+
+def _fits_type(value: Any, name: str) -> bool:
+    """Return True when a JSON value is an instance of the named JSON Schema type."""
+    if name == "null":
+        return value is None
+    if name == "boolean":
+        return isinstance(value, bool)
+    if name == "integer":
+        return (isinstance(value, int) and not isinstance(value, bool)) or (
+            isinstance(value, float) and value.is_integer()
+        )
+    if name == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if name == "string":
+        return isinstance(value, str)
+    if name == "array":
+        return isinstance(value, list)
+    return name == "object" and isinstance(value, dict)
+
+
+def _fits_schema(value: Any, schema: _Schema) -> bool:
+    """Return True when an enum value satisfies the types and bounds that apply beside the enum."""
+    if schema.types is not None and not any(_fits_type(value, name) for name in schema.types):
+        return False
+    bounds = schema.bounds
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in bounds and value < bounds["minimum"]:
+            return False
+        if "maximum" in bounds and value > bounds["maximum"]:
+            return False
+        if "exclusiveMinimum" in bounds and value <= bounds["exclusiveMinimum"]:
+            return False
+        if "exclusiveMaximum" in bounds and value >= bounds["exclusiveMaximum"]:
+            return False
+    if isinstance(value, str):
+        if "minLength" in bounds and len(value) < bounds["minLength"]:
+            return False
+        if "maxLength" in bounds and len(value) > bounds["maxLength"]:
+            return False
+        if not all(re.search(pattern, value) for pattern in schema.patterns):
+            return False
+    return True
+
+
+def _member_for(name: str, schema: _Schema) -> _Member:
+    """Build the alternative for one non-null type name, with the bounds that apply to it."""
+    bounds = schema.bounds
+    constraints: dict[str, Any] = {}
+    if name == "array":
+        item_annotation, item_source = _resolve_items(schema.items)
+        for key, kwarg in (("minItems", "min_length"), ("maxItems", "max_length")):
+            if key in bounds:
+                constraints[kwarg] = bounds[key]
+        return _Member(list[item_annotation], f"list[{item_source}]", constraints)  # type: ignore[valid-type]
+    if name == "object":
+        return _Member(dict[str, Any], "dict[str, Any]")
+    scalar = _SCALAR_TYPES[name]
+    extra_patterns: list[str] = []
+    if name in ("integer", "number"):
+        constraints = {kwarg: bounds[key] for key, kwarg in _NUMERIC_CONSTRAINTS.items() if key in bounds}
+    elif name == "string":
+        constraints = {kwarg: bounds[key] for key, kwarg in _STRING_CONSTRAINTS.items() if key in bounds}
+        if schema.patterns:
+            constraints["pattern"] = schema.patterns[0]
+            extra_patterns = schema.patterns[1:]
+    return _Member(scalar, _TYPE_SOURCE[scalar], constraints, extra_patterns, scalar)
+
+
+def _resolve_items(item_schemas: list[dict[str, Any]]) -> tuple[Any, str]:
+    """Map the `items` declarations that apply to an array (all must hold) to (python type, source)."""
+    if not item_schemas:
+        return Any, "Any"
+    inherited: _Schema | None = None
+    for item_schema in item_schemas[:-1]:
+        normalized = _normalize(item_schema)
+        inherited = normalized if inherited is None else _merge(inherited, normalized)
+    members, nullable = _resolve(item_schemas[-1], inherited)
+    annotation, source = _combine(members, nullable)
+    return annotation, source
+
+
+def _resolve(body: dict[str, Any], inherited: _Schema | None = None) -> tuple[list[_Member], bool]:
+    """Resolve a schema into its non-null alternatives and whether null is allowed.
+
+    Keywords beside `anyOf` / `oneOf` are intersected into every branch, so a branch
+    inherits the parent's type, bounds, items and enum and can only tighten them. A
+    branch whose type cannot meet the parent's (e.g. `null` under `type: integer`) is
+    dropped. An enum keeps only the values that fit the types and bounds beside it.
+    """
+    own = _normalize(body)
+    schema = own if inherited is None else _merge(inherited, own)
+
     subschemas = body.get("anyOf") or body.get("oneOf")
     if isinstance(subschemas, list) and subschemas and all(isinstance(sub, dict) for sub in subschemas):
-        nullable = any(str(sub.get("type", "")).lower() == "null" for sub in subschemas)
-        non_null = [sub for sub in subschemas if str(sub.get("type", "")).lower() != "null"]
-        # Validation keywords beside anyOf / oneOf apply to every branch; a branch's own keywords win.
-        parent = {key: value for key, value in body.items() if key not in ("anyOf", "oneOf")}
-        if non_null:
-            annotation, source, kind = _union_of([(*_resolve_type(sub), {**parent, **sub}) for sub in non_null])
-        else:
-            annotation, source, kind = str, "str", "string"
+        members: list[_Member] = []
+        nullable = False
+        for subschema in subschemas:
+            branch_members, branch_nullable = _resolve(subschema, schema)
+            members.extend(branch_members)
+            nullable = nullable or branch_nullable
+        return members, nullable
+
+    if schema.enum is not None and all(
+        value is None or isinstance(value, (str, int, float, bool)) for value in schema.enum
+    ):
+        allowed = [value for value in schema.enum if _fits_schema(value, schema)]
+        values = [value for value in allowed if value is not None]
+        literal_members = (
+            [_Member(cast(Any, Literal)[tuple(values)], f"Literal[{', '.join(repr(v) for v in values)}]")]
+            if values
+            else []
+        )
+        return literal_members, any(value is None for value in allowed)
+
+    # No type anywhere means a string, as for options declared before typed options existed.
+    types = schema.types if schema.types is not None else ["string"]
+    return [_member_for(name, schema) for name in types if name != "null"], "null" in types
+
+
+def _combine(members: list[_Member], nullable: bool) -> tuple[Any, str]:
+    """Join resolved alternatives into one annotation and its source spelling."""
+    if not members:
+        annotation: Any = type(None) if nullable else str
+        return annotation, "None" if nullable else "str"
+    if len(members) == 1:
+        annotation = members[0].constrained()
     else:
-        declared: Any = body.get("type", "string")
-        names = [str(name).lower() for name in declared] if isinstance(declared, list) else [str(declared).lower()]
-        nullable = "null" in names
-        non_null_names = list(dict.fromkeys(name for name in names if name != "null")) or ["string"]
-
-        enum = _enum_values(body)
-        if enum is not None:
-            values, enum_nullable = enum
-            nullable = nullable or enum_nullable
-            annotation = cast(Any, Literal)[tuple(values)]
-            source = f"Literal[{', '.join(repr(v) for v in values)}]"
-            kind = "enum"
-        elif len(non_null_names) == 1:
-            annotation, source, kind = _resolve_declared(non_null_names[0], body)
-        else:
-            annotation, source, kind = _union_of([(*_resolve_declared(name, body), body) for name in non_null_names])
-
-    # A null default declares the option optional, as a nullable type does.
-    if nullable or ("default" in body and body["default"] is None):
+        annotation = cast(Any, Union)[tuple(member.constrained() for member in members)]
+    source = " | ".join(member.source for member in members)
+    if nullable:
         annotation = annotation | None
         source = f"{source} | None"
-    return annotation, source, kind
-
-
-def _collect_constraints(body: dict[str, Any], kind: str) -> dict[str, Any]:
-    """Translate JSON Schema validation keywords into Pydantic Field kwargs for the given value kind."""
-    constraints: dict[str, Any] = {}
-    if kind == "number":
-        for keyword_name, kwarg in _NUMERIC_CONSTRAINTS.items():
-            value = body.get(keyword_name)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                constraints[kwarg] = value
-        # Draft 4 spells exclusive bounds as booleans that modify minimum / maximum.
-        if body.get("exclusiveMinimum") is True and "ge" in constraints:
-            constraints["gt"] = constraints.pop("ge")
-        if body.get("exclusiveMaximum") is True and "le" in constraints:
-            constraints["lt"] = constraints.pop("le")
-    elif kind == "string":
-        for keyword_name, kwarg in _STRING_CONSTRAINTS.items():
-            value = body.get(keyword_name)
-            if kwarg == "pattern" and isinstance(value, str):
-                constraints[kwarg] = value
-            elif kwarg != "pattern" and isinstance(value, int) and not isinstance(value, bool):
-                constraints[kwarg] = value
-    elif kind == "array":
-        for keyword_name, kwarg in _ARRAY_CONSTRAINTS.items():
-            value = body.get(keyword_name)
-            if isinstance(value, int) and not isinstance(value, bool):
-                constraints[kwarg] = value
-    return constraints
+    return annotation, source
 
 
 def parse_option(name: str, body: dict[str, Any], issues: list[str] | None = None) -> OptionSpec:
     """Translate one user_option, a JSON Schema property as chap-core reads it, into an OptionSpec.
 
     Supports `type` (integer, number, string, boolean, array with `items`, object, or a
-    list including "null"), `enum`, `minimum` / `maximum` / `exclusiveMinimum` /
-    `exclusiveMaximum`, `minLength` / `maxLength` / `pattern`, `minItems` / `maxItems`,
-    `description`, `title` and `default`. The default is checked against the declared
+    list including "null"), `anyOf` / `oneOf`, `enum`, `minimum` / `maximum` /
+    `exclusiveMinimum` / `exclusiveMaximum`, `minLength` / `maxLength` / `pattern`,
+    `minItems` / `maxItems`, `description`, `title` and `default`, with JSON Schema's rule
+    that every keyword that applies must hold (see `_resolve`). The default is checked against the declared
     type and constraints; a default that does not fit is reported through `issues` and
     kept as written, so MLprojects that ran before keep running.
     """
     field_name = python_field_name(name)
-    annotation, type_source, kind = _resolve_type(body)
-    constraints = _collect_constraints(body, kind)
+    members, nullable = _resolve(body)
+    # A null default declares the option optional, as a nullable type does.
+    nullable = nullable or ("default" in body and body["default"] is None)
+
+    constraints: dict[str, Any] = {}
+    scalar: type | None = None
+    if len(members) == 1 and not nullable and not members[0].extra_patterns:
+        # A single alternative keeps its constraints on the field itself, as a hand-written class would.
+        only = members[0]
+        annotation, type_source, constraints, scalar = only.annotation, only.source, only.constraints, only.scalar
+    else:
+        annotation, type_source = _combine(members, nullable)
 
     required = "default" not in body
     default: Any = None
     if not required and body["default"] is not None:
-        default = _validate_default(name, body["default"], annotation, type_source, constraints, issues)
+        default = _validate_default(name, body["default"], annotation, type_source, constraints, scalar, issues)
 
     return OptionSpec(
         name=name,
@@ -601,6 +764,7 @@ def _validate_default(
     annotation: Any,
     type_source: str,
     constraints: dict[str, Any],
+    scalar: type | None,
     issues: list[str] | None,
 ) -> Any:
     """Return the default validated against its option's type, or the best-effort coerced value with an issue."""
@@ -609,9 +773,9 @@ def _validate_default(
         return adapter.validate_python(raw_default)
     except ValidationError as error:
         reason = error.errors()[0].get("msg", str(error))
-    if annotation in _TYPE_SOURCE:
+    if scalar is not None:
         # Same coercion chapkit applied before typed options existed (e.g. 5 -> "5" for a string).
-        coerced = _coerce_default(raw_default, annotation)
+        coerced = _coerce_default(raw_default, scalar)
         try:
             return adapter.validate_python(coerced)
         except ValidationError:

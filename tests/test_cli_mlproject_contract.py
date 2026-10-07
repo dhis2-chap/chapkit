@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import socket
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import TypeAdapter, ValidationError
+from pydantic import Field, TypeAdapter, ValidationError
 from typer.testing import CliRunner
 
 from chapkit.cli.cli import app
@@ -434,3 +434,61 @@ def test_branch_constraints_win_over_constraints_beside_any_of() -> None:
     for bad in (3, "abc"):
         with pytest.raises(ValidationError):
             adapter.validate_python(bad)
+
+
+def _accepts(body: dict[str, Any], value: Any) -> bool:
+    spec = parse_option("option", body)
+    adapter: TypeAdapter[Any] = TypeAdapter(Annotated[spec.annotation, Field(**spec.constraints)])
+    try:
+        adapter.validate_python(value)
+    except ValidationError:
+        return False
+    return True
+
+
+def test_parent_and_branch_bounds_must_both_hold() -> None:
+    body = {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}], "minimum": 5, "default": None}
+    assert not _accepts(body, 3)
+    assert _accepts(body, 5)
+    assert _accepts(body, None)
+
+
+def test_parent_items_apply_inside_any_of_branches() -> None:
+    body = {"anyOf": [{"type": "array"}, {"type": "integer"}], "items": {"type": "integer", "minimum": 1}, "default": 1}
+    assert not _accepts(body, ["bad"])
+    assert not _accepts(body, [0])
+    assert _accepts(body, [1, 2])
+    assert _accepts(body, 3)
+
+
+def test_untyped_branch_inherits_parent_type() -> None:
+    body = {"type": ["integer", "null"], "anyOf": [{"minimum": 1}, {"type": "null"}], "default": None}
+    assert _accepts(body, 1)
+    assert _accepts(body, None)
+    assert not _accepts(body, 0)
+    assert not _accepts(body, "a")
+
+
+def test_branch_that_cannot_meet_parent_type_is_dropped() -> None:
+    body = {"type": "integer", "anyOf": [{"minimum": 1}, {"type": "null"}], "default": 1}
+    assert parse_option("option", body).type_source == "int"
+    assert not _accepts(body, None)
+
+
+def test_enum_is_filtered_by_type_and_bounds() -> None:
+    assert not _accepts({"type": ["string", "null"], "enum": ["a"], "default": "a"}, None)
+    integer_enum = {"type": "integer", "enum": [0, 1, 2], "minimum": 1, "default": 1}
+    assert not _accepts(integer_enum, 0)
+    assert _accepts(integer_enum, 2)
+    assert parse_option("option", integer_enum).type_source == "Literal[1, 2]"
+
+
+def test_enum_distinguishes_booleans_from_numbers() -> None:
+    assert parse_option("option", {"type": "integer", "enum": [True, 1], "default": 1}).type_source == "Literal[1]"
+
+
+def test_every_pattern_that_applies_must_match() -> None:
+    body = {"type": "string", "pattern": "^a", "anyOf": [{"pattern": "z$"}], "default": "az"}
+    assert _accepts(body, "az")
+    assert not _accepts(body, "a")
+    assert not _accepts(body, "z")
