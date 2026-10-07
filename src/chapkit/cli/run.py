@@ -5,12 +5,12 @@ from __future__ import annotations
 import errno
 import os
 import socket
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from chapkit.cli.migrate import _TIDYVERSE_HINTS, _any_r_script_uses
 from chapkit.cli.mlproject import (
     MLProject,
     MLProjectError,
@@ -25,6 +25,11 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
 
     from chapkit.api import MLServiceInfo
+
+
+# servicekit's registration settings; registration only happens when the orchestrator URL is set.
+ORCHESTRATOR_URL_ENV = "SERVICEKIT_ORCHESTRATOR_URL"
+ADVERTISED_PORT_ENV = "SERVICEKIT_PORT"
 
 
 def _parse_param_overrides(raw: list[str] | None) -> dict[str, str]:
@@ -58,63 +63,6 @@ def _warn_about_env(mlproject: MLProject) -> None:
         err=True,
     )
     typer.echo("", err=True)
-
-
-def _suggest_chapkit_image(project_dir: Path, mlproject: MLProject) -> str:
-    """Pick the chapkit-images base image best suited to this MLproject.
-
-    Light-touch variant of migrate's detect_base_image - just returns the
-    `chapkit-py` / `chapkit-r` / `chapkit-r-tidyverse` / `chapkit-r-inla`
-    suffix so we can print a ready-made `docker run` one-liner. R + INLA
-    detection mirrors migrate: `library(INLA)` / `library(fmesher)` in any
-    root-level R script, or a `docker_r_inla` image in the MLproject's
-    docker_env. Tidyverse detection reuses migrate's _TIDYVERSE_HINTS list.
-    """
-    has_r = any(project_dir.glob("*.r")) or any(project_dir.glob("*.R"))
-    has_py = any(project_dir.glob("*.py"))
-    # Mixed R + Python at the project root: only chapkit-r-inla bundles both
-    # runtimes. Mirrors migrate.detect_base_image's mixed-language branch so the
-    # `docker run` hint matches what `chapkit mlproject migrate` would build.
-    if has_r and has_py:
-        return "chapkit-r-inla"
-    docker_env_image = mlproject.env_hints.get("docker_env", "")
-    # Match migrate.detect_base_image's substring check so the hint and the
-    # actual migrated image agree on inputs like `docker_r_inla:master` or any
-    # other registry path that still mentions docker_r_inla.
-    uses_inla = "docker_r_inla" in docker_env_image
-    if not uses_inla and has_r:
-        uses_inla = _any_r_script_uses(project_dir, ("INLA", "fmesher", "inla"))
-    if has_r and uses_inla:
-        return "chapkit-r-inla"
-    if has_r and _any_r_script_uses(project_dir, _TIDYVERSE_HINTS):
-        return "chapkit-r-tidyverse"
-    if has_r:
-        return "chapkit-r"
-    if has_py:
-        return "chapkit-py"
-    # Ambiguous (no .r/.R/.py at root); default to Python - works for MLprojects that
-    # call into compiled binaries or do all work inside the entry-point commands.
-    return "chapkit-py"
-
-
-def _print_docker_hint(project_dir: Path, mlproject: MLProject, port: int) -> None:
-    """Tell the user how to run the same MLproject via the prebuilt chapkit-images.
-
-    Skipped when the host already looks like a chapkit container so we don't nest
-    the hint inside itself.
-    """
-    if Path("/app/.venv/bin/chapkit").exists():
-        return
-    image = _suggest_chapkit_image(project_dir, mlproject)
-    platform_flag = " --platform=linux/amd64" if image == "chapkit-r-inla" else ""
-    typer.echo("")
-    typer.echo("Tip: to run the same MLproject in Docker (no local R/Python env needed):")
-    typer.echo(
-        f"  docker run --rm -p {port}:8000{platform_flag} -v {project_dir}:/work ghcr.io/dhis2-chap/{image}:latest"
-    )
-    typer.echo("  # chapkit-images ship WORKDIR=/work + a preinstalled chapkit; model-specific R / Python")
-    typer.echo("  # packages need to be installed separately (e.g. `chapkit mlproject migrate` + `docker build`).")
-    typer.echo("")
 
 
 def _check_port_available(host: str, port: int) -> str | None:
@@ -155,12 +103,49 @@ def _print_warnings(issues: list[str]) -> None:
         typer.echo(f"WARNING: {issue}", err=True)
 
 
+@dataclass(frozen=True, slots=True)
+class Registration:
+    """Where and how an mlproject service registers itself with an orchestrator such as chap-core."""
+
+    orchestrator_url: str
+    advertised_host: str | None
+    advertised_port: int | None
+    local_port: int | None
+
+
+def resolve_registration(
+    port: int | None,
+    register_url: str | None = None,
+    advertise_host: str | None = None,
+    advertise_port: int | None = None,
+) -> Registration | None:
+    """Resolve registration settings from CLI options with SERVICEKIT_* fallbacks, or None when not configured.
+
+    Each option falls back to its environment variable (SERVICEKIT_ORCHESTRATOR_URL,
+    SERVICEKIT_HOST, SERVICEKIT_PORT). Without an advertised port servicekit would
+    advertise 8000, so the port the service listens on is advertised instead; that port
+    is also probed for readiness before registering.
+    """
+    orchestrator_url = register_url or os.getenv(ORCHESTRATOR_URL_ENV)
+    if not orchestrator_url:
+        return None
+    if advertise_port is None and not os.getenv(ADVERTISED_PORT_ENV):
+        advertise_port = port
+    # None host / port lets servicekit read SERVICEKIT_HOST / SERVICEKIT_PORT (or the hostname).
+    return Registration(orchestrator_url, advertise_host, advertise_port, port)
+
+
 def build_mlproject_app(
     mlproject: MLProject,
     overrides: dict[str, str] | None = None,
     issues: list[str] | None = None,
+    port: int | None = None,
+    registration: Registration | None = None,
 ) -> tuple[FastAPI, MLServiceInfo]:
     """Build the chapkit service for a parsed MLproject without starting a server.
+
+    With `registration` the service registers itself with that orchestrator (chap-core)
+    on startup; by default it is resolved from the SERVICEKIT_* environment variables.
 
     Must be called with the project directory as the working directory: ShellModelRunner
     copies the current directory into each train/predict workspace.
@@ -196,13 +181,22 @@ def build_mlproject_app(
         level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
     )
 
-    app = MLServiceBuilder(
+    builder = MLServiceBuilder(
         info=info,
         config_schema=config_schema,
         hierarchy=hierarchy,
         runner=runner,
-    ).build()
-    return app, info
+    )
+    if registration is None:
+        registration = resolve_registration(port)
+    if registration is not None:
+        builder = builder.with_registration(
+            orchestrator_url=registration.orchestrator_url,
+            host=registration.advertised_host,
+            port=registration.advertised_port,
+            local_port=registration.local_port,
+        )
+    return builder.build(), info
 
 
 def run_command(
@@ -233,6 +227,26 @@ def run_command(
             ),
         ),
     ] = None,
+    register_url: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Register with this orchestrator on startup, e.g. http://chap:8000/v2/services/$register. "
+                "Defaults to SERVICEKIT_ORCHESTRATOR_URL; without either, nothing is registered. "
+                "A shared secret is read from SERVICEKIT_REGISTRATION_KEY."
+            ),
+        ),
+    ] = None,
+    advertise_host: Annotated[
+        str | None,
+        typer.Option(help="Host the orchestrator should call. Defaults to SERVICEKIT_HOST, then the hostname."),
+    ] = None,
+    advertise_port: Annotated[
+        int | None,
+        typer.Option(
+            help="Port the orchestrator should call. Defaults to SERVICEKIT_PORT, then --port.", min=1, max=65535
+        ),
+    ] = None,
 ) -> None:
     """Run an MLproject as a chapkit service."""
     overrides = _parse_param_overrides(param)
@@ -258,7 +272,8 @@ def run_command(
     os.chdir(project_dir)
     issues: list[str] = []
     try:
-        app, info = build_mlproject_app(mlproject, overrides, issues)
+        registration = resolve_registration(port, register_url, advertise_host, advertise_port)
+        app, info = build_mlproject_app(mlproject, overrides, issues, port=port, registration=registration)
     except MLProjectError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1) from error
@@ -268,9 +283,9 @@ def run_command(
     typer.echo(f"  train:   {train_command}")
     typer.echo(f"  predict: {predict_command}")
     _print_contract(info)
+    if registration is not None:
+        typer.echo(f"  registers with: {registration.orchestrator_url}")
     _print_warnings(issues)
-
-    _print_docker_hint(project_dir, mlproject, port)
 
     from chapkit.api import run_app
 

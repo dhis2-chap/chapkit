@@ -300,7 +300,17 @@ services:
       - chap
 ```
 
-No chapkit-side configuration is needed — if `SERVICEKIT_ORCHESTRATOR_URL` is set, the service registers itself with chap-core on startup.
+No chapkit-side configuration is needed: if `SERVICEKIT_ORCHESTRATOR_URL` is set, the service registers itself with chap-core on startup, and the startup output shows `registers with: <url>`. It advertises `SERVICEKIT_HOST` (default: the container's hostname) and `SERVICEKIT_PORT` (default: the `--port` it listens on), and waits until that local port answers before registering. Set both when chap-core reaches the service through a different address, for example a published host port. Without `SERVICEKIT_ORCHESTRATOR_URL` nothing is registered.
+
+The same settings are available as options, which take precedence over the variables. This is handy outside compose:
+
+```bash
+chapkit mlproject run ./my_mlproject --host 0.0.0.0 --port 9090 \
+  --register-url 'http://localhost:8000/v2/services/$register' \
+  --advertise-host host.docker.internal --advertise-port 9090
+```
+
+The shared registration secret is only read from `SERVICEKIT_REGISTRATION_KEY`, so it never appears in the process list or shell history.
 
 ---
 

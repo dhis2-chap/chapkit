@@ -713,3 +713,69 @@ def test_plain_bounds_keep_the_typed_schema() -> None:
     spec = parse_option("count", {"type": "integer", "minimum": 1, "default": 1})
     assert spec.type_source == "int"
     assert TypeAdapter(spec.annotation).json_schema() == {"minimum": 1, "type": "integer"}
+
+
+REGISTER_URL = "http://chap:8000/v2/services/$register"
+
+
+@pytest.mark.parametrize(
+    ("environment", "options", "expected"),
+    [
+        ({}, {}, None),
+        ({"SERVICEKIT_ORCHESTRATOR_URL": REGISTER_URL}, {}, (REGISTER_URL, None, 9191, 9191)),
+        # SERVICEKIT_PORT is left to servicekit, which advertises it.
+        (
+            {"SERVICEKIT_ORCHESTRATOR_URL": REGISTER_URL, "SERVICEKIT_PORT": "18701"},
+            {},
+            (REGISTER_URL, None, None, 9191),
+        ),
+        ({}, {"register_url": "http://other/$register"}, ("http://other/$register", None, 9191, 9191)),
+        (
+            {"SERVICEKIT_ORCHESTRATOR_URL": REGISTER_URL, "SERVICEKIT_PORT": "18701"},
+            {"register_url": "http://other/$register", "advertise_host": "model", "advertise_port": 18800},
+            ("http://other/$register", "model", 18800, 9191),
+        ),
+    ],
+)
+def test_resolve_registration_prefers_options_over_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    environment: dict[str, str],
+    options: dict[str, Any],
+    expected: tuple[str, str | None, int | None, int] | None,
+) -> None:
+    from dataclasses import astuple
+
+    from chapkit.cli.run import resolve_registration
+
+    for name in ("SERVICEKIT_ORCHESTRATOR_URL", "SERVICEKIT_PORT"):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    registration = resolve_registration(9191, **options)
+    assert (astuple(registration) if registration else None) == expected
+
+
+def test_build_mlproject_app_enables_registration_only_with_an_orchestrator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chapkit.api import MLServiceBuilder
+
+    calls: list[dict[str, Any]] = []
+    original = MLServiceBuilder.with_registration
+
+    def spy(self: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs)
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(MLServiceBuilder, "with_registration", spy)
+    monkeypatch.delenv("SERVICEKIT_PORT", raising=False)
+    monkeypatch.delenv("SERVICEKIT_ORCHESTRATOR_URL", raising=False)
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, CONTRACT_MLPROJECT))
+    monkeypatch.chdir(tmp_path)
+
+    build_mlproject_app(mlproject, port=9191)
+    assert calls == []
+
+    monkeypatch.setenv("SERVICEKIT_ORCHESTRATOR_URL", REGISTER_URL)
+    build_mlproject_app(mlproject, port=9191)
+    assert calls == [{"orchestrator_url": REGISTER_URL, "host": None, "port": 9191, "local_port": 9191}]
