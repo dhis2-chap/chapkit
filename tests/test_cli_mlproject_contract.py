@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import socket
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,13 @@ from chapkit.cli.mlproject import (
     parse_option,
     resolve_mlproject,
 )
-from chapkit.cli.run import _check_port_available, build_mlproject_app
+from chapkit.cli.run import (
+    ConfigFormat,
+    Registration,
+    _check_port_available,
+    build_mlproject_app,
+    resolve_database_url,
+)
 
 ENTRY_POINTS = """
 entry_points:
@@ -722,26 +729,33 @@ REGISTER_URL = "http://chap:8000/v2/services/$register"
     ("environment", "options", "expected"),
     [
         ({}, {}, None),
-        ({"SERVICEKIT_ORCHESTRATOR_URL": REGISTER_URL}, {}, (REGISTER_URL, None, 9191, 9191)),
+        ({"SERVICEKIT_ORCHESTRATOR_URL": REGISTER_URL}, {}, (REGISTER_URL, None, 9191, 9191, None)),
         # SERVICEKIT_PORT is left to servicekit, which advertises it.
         (
             {"SERVICEKIT_ORCHESTRATOR_URL": REGISTER_URL, "SERVICEKIT_PORT": "18701"},
             {},
-            (REGISTER_URL, None, None, 9191),
+            (REGISTER_URL, None, None, 9191, None),
         ),
-        ({}, {"register_url": "http://other/$register"}, ("http://other/$register", None, 9191, 9191)),
+        ({}, {"register_url": "http://other/$register"}, ("http://other/$register", None, 9191, 9191, None)),
         (
             {"SERVICEKIT_ORCHESTRATOR_URL": REGISTER_URL, "SERVICEKIT_PORT": "18701"},
-            {"register_url": "http://other/$register", "advertise_host": "model", "advertise_port": 18800},
-            ("http://other/$register", "model", 18800, 9191),
+            {
+                "register_url": "http://other/$register",
+                "advertise_host": "model",
+                "advertise_port": 18800,
+                "keepalive_interval": 15.0,
+            },
+            ("http://other/$register", "model", 18800, 9191, 15.0),
         ),
+        # Without an orchestrator a keepalive interval alone does not enable registration.
+        ({}, {"keepalive_interval": 15.0}, None),
     ],
 )
 def test_resolve_registration_prefers_options_over_environment(
     monkeypatch: pytest.MonkeyPatch,
     environment: dict[str, str],
     options: dict[str, Any],
-    expected: tuple[str, str | None, int | None, int] | None,
+    expected: tuple[str, str | None, int | None, int, float | None] | None,
 ) -> None:
     from dataclasses import astuple
 
@@ -779,3 +793,303 @@ def test_build_mlproject_app_enables_registration_only_with_an_orchestrator(
     monkeypatch.setenv("SERVICEKIT_ORCHESTRATOR_URL", REGISTER_URL)
     build_mlproject_app(mlproject, port=9191)
     assert calls == [{"orchestrator_url": REGISTER_URL, "host": None, "port": 9191, "local_port": 9191}]
+
+    build_mlproject_app(mlproject, port=9191, registration=Registration(REGISTER_URL, None, 9191, 9191, 15.0))
+    assert calls[-1] == {
+        "orchestrator_url": REGISTER_URL,
+        "host": None,
+        "port": 9191,
+        "local_port": 9191,
+        "keepalive_interval": 15.0,
+    }
+
+
+def _spy_ml_service_builder(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Record the keyword arguments every MLServiceBuilder is constructed with."""
+    from chapkit.api import MLServiceBuilder
+
+    calls: list[dict[str, Any]] = []
+    original = MLServiceBuilder.__init__
+
+    def spy(self: Any, **kwargs: Any) -> None:
+        calls.append(kwargs)
+        original(self, **kwargs)
+
+    monkeypatch.setattr(MLServiceBuilder, "__init__", spy)
+    return calls
+
+
+def test_build_mlproject_app_names_the_hierarchy_after_the_mlproject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _spy_ml_service_builder(monkeypatch)
+    mlproject = parse_mlproject(
+        _write_mlproject(tmp_path, CONTRACT_MLPROJECT.replace("contract_model", "contract-model v2"))
+    )
+    monkeypatch.chdir(tmp_path)
+
+    build_mlproject_app(mlproject)
+    hierarchy = calls[0]["hierarchy"]
+    assert hierarchy.name == "contract_model_v2"
+    assert dict(hierarchy.level_labels) == {0: "ml_training_workspace", 1: "ml_prediction"}
+
+
+@pytest.mark.parametrize(
+    ("config_format", "expected"),
+    [(None, "chap_core"), (ConfigFormat.chap_core, "chap_core"), (ConfigFormat.flat, "flat")],
+)
+def test_build_mlproject_app_passes_the_config_format_to_the_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, config_format: ConfigFormat | None, expected: str
+) -> None:
+    calls = _spy_ml_service_builder(monkeypatch)
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, CONTRACT_MLPROJECT))
+    monkeypatch.chdir(tmp_path)
+
+    options: dict[str, Any] = {} if config_format is None else {"config_format": config_format}
+    build_mlproject_app(mlproject, **options)
+    assert calls[0]["runner"].config_format == expected
+
+
+def test_resolve_database_url_defaults_to_memory() -> None:
+    assert resolve_database_url(None) == "sqlite+aiosqlite:///:memory:"
+
+
+def test_resolve_database_url_resolves_relative_paths_and_creates_parents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    url = resolve_database_url(Path("state/chapkit.db"))
+    assert url == f"sqlite+aiosqlite:///{(tmp_path / 'state' / 'chapkit.db').resolve()}"
+    assert (tmp_path / "state").is_dir()
+
+
+def test_resolve_database_url_rejects_a_directory(tmp_path: Path) -> None:
+    from chapkit.cli.mlproject import MLProjectError
+
+    with pytest.raises(MLProjectError, match="not a directory"):
+        resolve_database_url(tmp_path)
+
+
+def test_build_mlproject_app_keeps_state_in_the_database_across_restarts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    mlproject = parse_mlproject(_write_mlproject(project, CONTRACT_MLPROJECT + USER_OPTIONS))
+    database_url = resolve_database_url(tmp_path / "state" / "chapkit.db")
+    monkeypatch.chdir(project)
+
+    first, _ = build_mlproject_app(mlproject, database_url=database_url)
+    with TestClient(first) as client:
+        created = client.post("/api/v1/configs", json={"name": "kept", "data": {"n_lags": 4}})
+        assert created.status_code == 201
+
+    second, _ = build_mlproject_app(mlproject, database_url=database_url)
+    with TestClient(second) as client:
+        assert [config["name"] for config in client.get("/api/v1/configs").json()] == ["kept"]
+
+    assert (tmp_path / "state" / "chapkit.db").is_file()
+    assert sorted(path.name for path in project.iterdir()) == ["MLproject"]
+
+
+def test_database_keeps_trained_models_but_not_job_history(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    project = tmp_path / "project"
+    project.mkdir()
+    mlproject = parse_mlproject(_write_mlproject(project, "name: persisted_model\n" + ENTRY_POINTS))
+    database_url = resolve_database_url(tmp_path / "chapkit.db")
+    monkeypatch.chdir(project)
+    training_data = {
+        "columns": ["time_period", "location", "disease_cases"],
+        "data": [["2024-01", "a", 1], ["2024-02", "a", 2]],
+    }
+
+    first, _ = build_mlproject_app(mlproject, database_url=database_url)
+    with TestClient(first) as client:
+        config_id = client.post("/api/v1/configs", json={"name": "c", "data": {}}).json()["id"]
+        submitted = client.post("/api/v1/ml/$train", json={"config_id": config_id, "data": training_data}).json()
+        status = "pending"
+        for _ in range(100):
+            status = client.get(f"/api/v1/jobs/{submitted['job_id']}").json()["status"]
+            if status not in ("pending", "running"):
+                break
+            time.sleep(0.05)
+        assert status == "completed"
+
+    second, _ = build_mlproject_app(mlproject, database_url=database_url)
+    with TestClient(second) as client:
+        artifact = client.get(f"/api/v1/artifacts/{submitted['artifact_id']}")
+        assert artifact.status_code == 200
+        assert client.get("/api/v1/jobs").json() == []
+
+
+def test_run_command_applies_the_new_options(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import chapkit.api
+
+    calls = _spy_ml_service_builder(monkeypatch)
+    run_app_calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(chapkit.api, "run_app", lambda app, **kwargs: run_app_calls.append(kwargs))
+    monkeypatch.setenv("LOG_LEVEL", "INFO")
+    monkeypatch.delenv("SERVICEKIT_ORCHESTRATOR_URL", raising=False)
+    # run_command changes into the project directory; monkeypatch restores the working directory afterwards.
+    monkeypatch.chdir(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    _write_mlproject(project, CONTRACT_MLPROJECT)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "mlproject",
+            "run",
+            "project",
+            "--port",
+            str(port),
+            "--config-format",
+            "flat",
+            "--database",
+            "state/chapkit.db",
+            "--log-level",
+            "DEBUG",
+            "--keepalive-interval",
+            "15",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    database = (tmp_path / "state" / "chapkit.db").resolve()
+    assert calls[0]["runner"].config_format == "flat"
+    assert calls[0]["database_url"] == f"sqlite+aiosqlite:///{database}"
+    assert run_app_calls == [{"host": "127.0.0.1", "port": port, "log_level": "debug"}]
+    assert os.environ["LOG_LEVEL"] == "DEBUG"
+    assert "config:  config.yml (flat layout)" in result.output
+    assert f"storage: {database}" in result.output
+    assert "--keepalive-interval has no effect" in result.output
+
+
+def test_run_command_rejects_an_unknown_config_format(tmp_path: Path) -> None:
+    _write_mlproject(tmp_path, CONTRACT_MLPROJECT)
+    result = CliRunner().invoke(app, ["mlproject", "run", str(tmp_path), "--config-format", "nested"])
+    assert result.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("meta_data", "override", "expected", "warned"),
+    [
+        ("", None, "chap_core", False),
+        ("meta_data:\n  config_format: flat\n", None, "flat", False),
+        ("meta_data:\n  config_format: FLAT\n", None, "flat", False),
+        ("meta_data:\n  config_format: flat\n", ConfigFormat.chap_core, "chap_core", False),
+        ("meta_data:\n  config_format: nested\n", None, "chap_core", True),
+    ],
+)
+def test_resolve_config_format_prefers_the_flag_then_meta_data(
+    tmp_path: Path, meta_data: str, override: ConfigFormat | None, expected: str, warned: bool
+) -> None:
+    from chapkit.cli.run import resolve_config_format
+
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, "name: layout_model\n" + meta_data + ENTRY_POINTS))
+    issues: list[str] = []
+    assert resolve_config_format(mlproject, override, issues).value == expected
+    assert any("meta_data.config_format" in issue for issue in issues) == warned
+
+
+def test_build_mlproject_app_reads_the_config_format_from_meta_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _spy_ml_service_builder(monkeypatch)
+    mlproject_text = "name: layout_model\nmeta_data:\n  config_format: flat\n" + ENTRY_POINTS
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, mlproject_text))
+    monkeypatch.chdir(tmp_path)
+
+    build_mlproject_app(mlproject)
+    assert calls[0]["runner"].config_format == "flat"
+
+
+@pytest.mark.parametrize(
+    ("relative", "copied"),
+    [
+        ("state/chapkit", True),
+        ("chapkit.state", True),
+        ("state/chapkit.db", False),
+        ("chapkit.sqlite3", False),
+        (".venv/chapkit", False),
+    ],
+)
+def test_copied_into_workspaces_follows_the_workspace_excludes(tmp_path: Path, relative: str, copied: bool) -> None:
+    from chapkit.cli.run import copied_into_workspaces
+
+    assert copied_into_workspaces(tmp_path / relative, tmp_path) is copied
+
+
+def test_copied_into_workspaces_ignores_a_database_outside_the_project(tmp_path: Path) -> None:
+    from chapkit.cli.run import copied_into_workspaces
+
+    assert copied_into_workspaces(tmp_path / "chapkit", tmp_path / "project") is False
+
+
+def _invoke_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *options: str) -> Any:
+    """Invoke `chapkit mlproject run project` with run_app stubbed out, from tmp_path."""
+    import chapkit.api
+
+    monkeypatch.setattr(chapkit.api, "run_app", lambda app, **kwargs: None)
+    monkeypatch.delenv("SERVICEKIT_ORCHESTRATOR_URL", raising=False)
+    monkeypatch.chdir(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir(exist_ok=True)
+    if not (project / "MLproject").exists():
+        _write_mlproject(project, CONTRACT_MLPROJECT)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    return CliRunner().invoke(app, ["mlproject", "run", "project", "--port", str(port), *options])
+
+
+def test_run_command_warns_about_a_database_copied_into_workspaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _invoke_run(tmp_path, monkeypatch, "--database", "project/state/chapkit")
+    assert result.exit_code == 0, result.output
+    assert "copied into every train/predict workspace" in result.output
+
+    quiet = _invoke_run(tmp_path, monkeypatch, "--database", "project/state/chapkit.db")
+    assert quiet.exit_code == 0, quiet.output
+    assert "copied into every" not in quiet.output
+
+
+def test_run_command_shows_the_config_format_from_meta_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    _write_mlproject(project, "name: layout_model\nmeta_data:\n  config_format: flat\n" + ENTRY_POINTS)
+    result = _invoke_run(tmp_path, monkeypatch)
+    assert result.exit_code == 0, result.output
+    assert "config:  config.yml (flat layout)" in result.output
+
+
+def test_run_command_configures_logging_before_building_the_service(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import servicekit.logging
+
+    from chapkit.api import MLServiceBuilder
+
+    events: list[str] = []
+    original_init = MLServiceBuilder.__init__
+
+    def spy_init(self: Any, **kwargs: Any) -> None:
+        events.append("build")
+        original_init(self, **kwargs)
+
+    monkeypatch.setattr(MLServiceBuilder, "__init__", spy_init)
+    monkeypatch.setattr(
+        servicekit.logging, "configure_logging", lambda: events.append(f"logging:{os.environ['LOG_LEVEL']}")
+    )
+    monkeypatch.setenv("LOG_LEVEL", "INFO")
+
+    result = _invoke_run(tmp_path, monkeypatch, "--log-level", "warning")
+    assert result.exit_code == 0, result.output
+    assert events == ["logging:WARNING", "build"]
