@@ -14,7 +14,7 @@ chapkit mlproject run /path/to/my_mlproject/MLproject.yaml
 
 This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`. If the port is already taken, `chapkit mlproject run` stops with an error before starting anything.
 
-Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory, and each train/predict runs in a temporary copy of the project.
+Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory (or in a SQLite file of your choosing with `--database`, see [Service Options](#service-options)), and each train/predict runs in a temporary copy of the project.
 
 A minimal R MLproject like `dhis2-chap/minimalist_example_r`:
 
@@ -65,6 +65,51 @@ chapkit mlproject run . --param dataset=data.csv
 ```
 
 The `--param NAME=FILENAME` flag is repeatable. Overrides win over the canonical map, which lets you re-point `{model}` or any other parameter if your scripts expect a different filename.
+
+---
+
+## Service Options
+
+These options cover what a hand-written `main.py` service can set and an MLproject cannot. All of them are optional; without any, the service keeps its state in memory and writes `config.yml` in chap-core's layout.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `--config-format chap_core\|flat` | `chap_core` | Layout of the `config.yml` your scripts read (see below). |
+| `--database PATH` | in memory | Keep configs, jobs and trained models in this SQLite file so they survive a restart. The file and its directory are created if missing, and migrations run on startup. A relative path is relative to where you run the command. |
+| `--keepalive-interval SECONDS` | `10` | Seconds between keepalive pings once registered with chap-core. Only applies when registration is configured ([Integration with chap-core](#integration-with-chap-core)). |
+| `--log-level LEVEL` | `LOG_LEVEL`, then `info` | `debug`, `info`, `warning`, `error` or `critical`. |
+
+The startup output shows the config layout and where state is stored:
+
+```
+  config:  config.yml (chap_core layout)
+  storage: in memory
+```
+
+### Config layout
+
+By default `config.yml` follows chap-core's `ModelConfiguration` shape, the same file chap-core gives MLproject models it runs itself, and the one `chapkit mlproject migrate` generates services for:
+
+```yaml
+user_option_values:
+  n_lags: 3
+  cell: gru
+additional_continuous_covariates: []
+prediction_periods: 3
+```
+
+Scripts written for a hand-written chapkit service usually read a flat file instead. `--config-format flat` writes every option at the top level:
+
+```yaml
+n_lags: 3
+cell: gru
+additional_continuous_covariates: []
+prediction_periods: 3
+```
+
+### Artifacts
+
+Artifacts belong to a hierarchy named after the MLproject's `name` (as a Python identifier, e.g. `my-model` becomes `my_model`), with the levels `ml_training_workspace` (trained models) and `ml_prediction`. This matches the services `chapkit mlproject migrate` and `chapkit init` generate.
 
 ---
 
@@ -311,6 +356,8 @@ chapkit mlproject run ./my_mlproject --host 0.0.0.0 --port 9090 \
 ```
 
 The shared registration secret is only read from `SERVICEKIT_REGISTRATION_KEY`, so it never appears in the process list or shell history.
+
+Once registered, the service pings chap-core every 10 seconds to stay listed. Change that with `--keepalive-interval SECONDS`.
 
 ---
 
