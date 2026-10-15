@@ -503,7 +503,8 @@ def test_one_of_requires_exactly_one_matching_branch() -> None:
     body = {"oneOf": [{"type": "integer"}, {"type": "number"}], "default": 1.5}
     assert not _accepts(body, 1)
     assert _accepts(body, 1.5)
-    published = TypeAdapter(parse_option("option", body).annotation).json_schema()
+    spec = parse_option("option", body)
+    published = TypeAdapter(spec.annotation).json_schema()
     assert published == {"oneOf": [{"type": "integer"}, {"type": "number"}]}
 
 
@@ -511,7 +512,8 @@ def test_keywords_without_a_pydantic_form_are_enforced_and_published() -> None:
     body = {"type": "integer", "multipleOf": 5, "default": 10}
     assert _accepts(body, 10)
     assert not _accepts(body, 7)
-    assert TypeAdapter(parse_option("option", body).annotation).json_schema() == {"type": "integer", "multipleOf": 5}
+    spec = parse_option("option", body)
+    assert TypeAdapter(spec.annotation).json_schema() == {"type": "integer", "multipleOf": 5}
     assert not _accepts({"type": "array", "uniqueItems": True, "default": []}, [1, 1])
     assert not _accepts({"not": {"type": "string"}, "default": 1}, "a")
 

@@ -956,7 +956,8 @@ def _validate_default(
     issues: list[str] | None,
 ) -> Any:
     """Return the default validated against its option's type, or the best-effort coerced value with an issue."""
-    adapter: TypeAdapter[Any] = TypeAdapter(Annotated[annotation, Field(**constraints)])
+    constrained: Any = Annotated[annotation, Field(**constraints)]
+    adapter: TypeAdapter[Any] = TypeAdapter(constrained)
     try:
         return adapter.validate_python(raw_default)
     except ValidationError as error:
