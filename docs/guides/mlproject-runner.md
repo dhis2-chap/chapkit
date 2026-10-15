@@ -14,7 +14,7 @@ chapkit mlproject run /path/to/my_mlproject/MLproject.yaml
 
 This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`. If the port is already taken, `chapkit mlproject run` stops with an error before starting anything.
 
-Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory, and each train/predict runs in a temporary copy of the project.
+Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory (configs and artifacts can go in a SQLite file of your choosing with `--database`, see [Service Options](#service-options)), and each train/predict runs in a temporary copy of the project.
 
 A minimal R MLproject like `dhis2-chap/minimalist_example_r`:
 
@@ -65,6 +65,60 @@ chapkit mlproject run . --param dataset=data.csv
 ```
 
 The `--param NAME=FILENAME` flag is repeatable. Overrides win over the canonical map, which lets you re-point `{model}` or any other parameter if your scripts expect a different filename.
+
+---
+
+## Service Options
+
+These options cover what a hand-written `main.py` service can set and an MLproject cannot. All of them are optional; without any, the service keeps its state in memory and writes `config.yml` in chap-core's layout.
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `--config-format chap_core\|flat` | `meta_data.config_format`, then `chap_core` | Layout of the `config.yml` your scripts read (see below). |
+| `--database PATH` | in memory | Keep configs and trained models (artifacts) in this SQLite file so they survive a restart; predict still works on a model trained before the restart. Job history is not stored and starts empty after a restart. The file and its directory are created if missing, and migrations run on startup. A relative path is relative to where you run the command. Keep it outside the project or give it a `.db` extension: train/predict workspaces are copies of the project that skip `*.db` / `*.sqlite*` files, and any other file in it would be copied into every one (the startup output warns about this). |
+| `--keepalive-interval SECONDS` | `10` | Seconds between keepalive pings once registered with chap-core. Only applies when registration is configured ([Integration with chap-core](#integration-with-chap-core)). |
+| `--log-level LEVEL` | `LOG_LEVEL`, then `info` | `debug`, `info`, `warning`, `error` or `critical`. Applies from the first log line, including those written while the service is built. |
+
+The startup output shows the config layout and where state is stored:
+
+```
+  config:  config.yml (chap_core layout)
+  storage: in memory
+```
+
+### Config layout
+
+By default `config.yml` follows chap-core's `ModelConfiguration` shape, the same file chap-core gives MLproject models it runs itself, and the one `chapkit mlproject migrate` generates services for:
+
+```yaml
+user_option_values:
+  n_lags: 3
+  cell: gru
+additional_continuous_covariates: []
+prediction_periods: 3
+```
+
+Scripts written for a hand-written chapkit service usually read a flat file instead, with every option at the top level:
+
+```yaml
+n_lags: 3
+cell: gru
+additional_continuous_covariates: []
+prediction_periods: 3
+```
+
+Declare that in the MLproject, so it applies however the service is started, including by `chap eval --run-config.as-chapkit` and the `-cli` images, which run `chapkit mlproject run .` without extra options:
+
+```yaml
+meta_data:
+  config_format: flat
+```
+
+It goes under `meta_data` because chap-core rejects MLprojects with unknown top-level keys but ignores unknown `meta_data` keys, so the file stays loadable by every chap-core version. `--config-format` overrides it for a single run, and `chapkit mlproject migrate` uses it for the generated `main.py`.
+
+### Artifacts
+
+Artifacts belong to a hierarchy named after the MLproject's `name` (as a Python identifier, e.g. `my-model` becomes `my_model`), with the levels `ml_training_workspace` (trained models) and `ml_prediction`. This matches the services `chapkit mlproject migrate` and `chapkit init` generate.
 
 ---
 
@@ -312,6 +366,8 @@ chapkit mlproject run ./my_mlproject --host 0.0.0.0 --port 9090 \
 
 The shared registration secret is only read from `SERVICEKIT_REGISTRATION_KEY`, so it never appears in the process list or shell history.
 
+Once registered, the service pings chap-core every 10 seconds to stay listed. Change that with `--keepalive-interval SECONDS`.
+
 ---
 
 ## Limitations and When to Prefer `chapkit mlproject migrate` or `chapkit init`
@@ -331,3 +387,4 @@ Use [`chapkit init`](cli-scaffolding.md) instead when you want to start a **gree
 | An MLproject you want to quickly evaluate | `chapkit mlproject run` |
 | An MLproject you want to own as a chapkit project | `chapkit mlproject migrate` |
 | Nothing yet | `chapkit init` |
+| A chapkit service you also want to run from an MLproject | [`chapkit mlproject export`](mlproject-export.md) |

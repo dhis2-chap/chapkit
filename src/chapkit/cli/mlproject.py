@@ -1078,6 +1078,26 @@ def _validated_text(
     return value
 
 
+CONFIG_FORMATS: tuple[str, ...] = ("chap_core", "flat")
+
+
+def mlproject_config_format(mlproject: MLProject, issues: list[str] | None = None) -> str | None:
+    """Return the config.yml layout an MLproject declares in meta_data.config_format, or None.
+
+    It lives in meta_data because chap-core rejects unknown top-level MLproject keys but
+    ignores unknown meta_data keys, so the MLproject stays loadable by every chap-core version.
+    """
+    raw = mlproject.meta_data.get("config_format")
+    if raw is None:
+        return None
+    value = str(raw).strip().lower()
+    if value in CONFIG_FORMATS:
+        return value
+    if issues is not None:
+        issues.append(f"meta_data.config_format {raw!r} is not one of {', '.join(CONFIG_FORMATS)}; ignoring it")
+    return None
+
+
 def build_model_metadata(mlproject: MLProject, issues: list[str] | None = None) -> ModelMetadata:
     """Build the ModelMetadata block (authors, organization, citation, ...) from an MLproject's meta_data.
 
