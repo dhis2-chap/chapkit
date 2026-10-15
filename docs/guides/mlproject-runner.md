@@ -74,10 +74,10 @@ These options cover what a hand-written `main.py` service can set and an MLproje
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `--config-format chap_core\|flat` | `chap_core` | Layout of the `config.yml` your scripts read (see below). |
-| `--database PATH` | in memory | Keep configs and trained models (artifacts) in this SQLite file so they survive a restart; predict still works on a model trained before the restart. Job history is not stored and starts empty after a restart. The file and its directory are created if missing, and migrations run on startup. A relative path is relative to where you run the command. |
+| `--config-format chap_core\|flat` | `meta_data.config_format`, then `chap_core` | Layout of the `config.yml` your scripts read (see below). |
+| `--database PATH` | in memory | Keep configs and trained models (artifacts) in this SQLite file so they survive a restart; predict still works on a model trained before the restart. Job history is not stored and starts empty after a restart. The file and its directory are created if missing, and migrations run on startup. A relative path is relative to where you run the command. Keep it outside the project or give it a `.db` extension: train/predict workspaces are copies of the project that skip `*.db` / `*.sqlite*` files, and any other file in it would be copied into every one (the startup output warns about this). |
 | `--keepalive-interval SECONDS` | `10` | Seconds between keepalive pings once registered with chap-core. Only applies when registration is configured ([Integration with chap-core](#integration-with-chap-core)). |
-| `--log-level LEVEL` | `LOG_LEVEL`, then `info` | `debug`, `info`, `warning`, `error` or `critical`. |
+| `--log-level LEVEL` | `LOG_LEVEL`, then `info` | `debug`, `info`, `warning`, `error` or `critical`. Applies from the first log line, including those written while the service is built. |
 
 The startup output shows the config layout and where state is stored:
 
@@ -98,7 +98,7 @@ additional_continuous_covariates: []
 prediction_periods: 3
 ```
 
-Scripts written for a hand-written chapkit service usually read a flat file instead. `--config-format flat` writes every option at the top level:
+Scripts written for a hand-written chapkit service usually read a flat file instead, with every option at the top level:
 
 ```yaml
 n_lags: 3
@@ -106,6 +106,15 @@ cell: gru
 additional_continuous_covariates: []
 prediction_periods: 3
 ```
+
+Declare that in the MLproject, so it applies however the service is started, including by `chap eval --run-config.as-chapkit` and the `-cli` images, which run `chapkit mlproject run .` without extra options:
+
+```yaml
+meta_data:
+  config_format: flat
+```
+
+It goes under `meta_data` because chap-core rejects MLprojects with unknown top-level keys but ignores unknown `meta_data` keys, so the file stays loadable by every chap-core version. `--config-format` overrides it for a single run, and `chapkit mlproject migrate` uses it for the generated `main.py`.
 
 ### Artifacts
 

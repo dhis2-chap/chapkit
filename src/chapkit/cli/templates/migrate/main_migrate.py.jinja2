@@ -57,10 +57,11 @@ class {{ PROJECT_CLASS_NAME }}Config(BaseConfig):
 # shape (prediction_periods + additional_continuous_covariates at the top level,
 # remaining fields nested under user_option_values) so scripts ported from
 # chap-models repos can read config["user_option_values"][...] unchanged.
+# "flat" (from the MLproject's meta_data.config_format) puts every option at the top level.
 runner: ShellModelRunner[{{ PROJECT_CLASS_NAME }}Config] = ShellModelRunner(
     train_command={{ TRAIN_COMMAND | tojson }},
     predict_command={{ PREDICT_COMMAND | tojson }},
-    config_format="chap_core",
+    config_format="{{ CONFIG_FORMAT }}",
 {% if ADAPTERS_REPR %}
     # MLproject adapters: extra columns added to the data, historic and future CSVs
     # (new column -> source column, or year / month / week derived from time_period).

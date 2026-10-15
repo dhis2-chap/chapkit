@@ -108,12 +108,13 @@ def test_export_writes_an_mlproject_that_runs_as_the_same_service(
     mlproject_file = tmp_path / "MLproject"
     text = mlproject_file.read_text()
     assert text.startswith("# Generated from main.py by `chapkit mlproject export`")
-    assert "--config-format flat" in text
 
     document = yaml.safe_load(text)
     assert document["name"] == "export_model"
     assert document["supported_period_type"] == "month"
     assert document["adapters"] == {"Cases": "disease_cases"}
+    # The runner writes a flat config.yml; chap-core ignores meta_data keys it does not know.
+    assert document["meta_data"]["config_format"] == "flat"
     assert document["entry_points"]["train"] == {
         "parameters": {"train_data": "path", "polygons": "path"},
         "command": "Rscript train.R --data {train_data} --geo {polygons}",
@@ -362,3 +363,53 @@ def test_exported_commands_run_as_the_runner_would(runner_command: str) -> None:
 def test_export_rejects_a_runner_placeholder_without_an_mlproject_parameter() -> None:
     with pytest.raises(MLProjectError, match=r"\{dataset\} has no MLproject parameter"):
         mlproject_command("python train.py {dataset}")
+
+
+def test_export_writes_no_config_format_for_a_chap_core_runner(tmp_path: Path) -> None:
+    module = _write_service(
+        tmp_path, SERVICE_MODULE.replace("    adapters=", '    config_format="chap_core",\n    adapters=')
+    )
+    assert CliRunner().invoke(app, ["mlproject", "export", str(module)]).exit_code == 0
+    assert "config_format" not in yaml.safe_load((tmp_path / "MLproject").read_text())["meta_data"]
+
+
+def test_check_reports_a_config_layout_the_service_does_not_write(tmp_path: Path) -> None:
+    module = _write_service(tmp_path)
+    assert CliRunner().invoke(app, ["mlproject", "export", str(module)]).exit_code == 0
+    mlproject_file = tmp_path / "MLproject"
+    mlproject_file.write_text(mlproject_file.read_text().replace("  config_format: flat\n", ""))
+
+    problems = semantic_problems(mlproject_file, find_service_parts(load_service_module(module)))
+    assert "config.yml layout: the MLproject gives 'chap_core', the service writes 'flat'" in problems
+
+
+def test_export_warns_about_settings_the_mlproject_cannot_carry(tmp_path: Path) -> None:
+    source = SERVICE_MODULE.replace(
+        "runner = ShellModelRunner(\n",
+        "async def reject_train(*args, **kwargs):\n"
+        '    """Validate training data."""\n\n\n'
+        "runner = ShellModelRunner(\n    on_validate_train=reject_train,\n",
+    )
+    source = source.replace(
+        'level_labels={0: "ml_training_workspace", 1: "ml_prediction"}', 'level_labels={0: "trained", 1: "predicted"}'
+    )
+    source = source.replace(
+        "runner=runner).build()",
+        'runner=runner).with_auth(api_keys=["secret"]).build()\n\n\n@app.get("/custom")\ndef custom() -> dict:\n'
+        '    """Serve an extra route."""\n    return {}\n',
+    )
+    module = _write_service(tmp_path, source)
+
+    result = CliRunner().invoke(app, ["mlproject", "export", str(module)])
+    assert result.exit_code == 0, result.output
+    assert "on_validate_train hook" in result.stderr
+    assert "on_validate_predict" not in result.stderr
+    assert "artifact level labels" in result.stderr
+    assert "API key authentication" in result.stderr
+    assert "routes mlproject run does not serve: /custom" in result.stderr
+
+    # --check still passes: the MLproject is what export writes; the warnings repeat on stderr.
+    checked = CliRunner().invoke(app, ["mlproject", "export", str(module), "--check"])
+    assert checked.exit_code == 0, checked.output
+    assert "on_validate_train hook" in checked.stderr
+    assert "WARNING" not in checked.stdout

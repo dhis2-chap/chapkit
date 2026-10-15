@@ -12,7 +12,7 @@ chapkit mlproject export path/to/main.py
 chapkit mlproject export --check         # write nothing; exit 1 when MLproject is stale
 ```
 
-The module is executed the way the service itself would run it, from its own directory, so imports and relative paths in `main.py` work. Output it prints while building the app goes to stderr.
+Export **runs the module**: it executes `main.py` the way the service itself starts, from its own directory, so imports and relative paths work, and so anything `main.py` does at import time happens too, such as creating a `data/` directory or building the whole app. Output it prints while doing so goes to stderr.
 
 Add the check to CI or `make lint` so a change to `main.py` without regenerating the MLproject fails the build:
 
@@ -40,11 +40,23 @@ Literal braces in a runner command (`{{` / `}}`) are escaped once more in the ML
 
 ### Config Layout
 
-`ShellModelRunner` writes a flat `config.yml` by default, while `chapkit mlproject run` writes chap-core's nested layout. When the runner uses the flat layout, the generated header says so:
+`ShellModelRunner` writes a flat `config.yml` by default, while `chapkit mlproject run` writes chap-core's nested layout unless told otherwise. When the runner uses the flat layout, export writes it into the MLproject, where `chapkit mlproject run` picks it up however it is started (see [Config layout](mlproject-runner.md#config-layout)):
 
+```yaml
+meta_data:
+  config_format: flat
 ```
-# The scripts read a flat config.yml: run with `chapkit mlproject run . --config-format flat`.
-```
+
+### Not Carried Over
+
+Some service settings have no place in an MLproject, so `chapkit mlproject run` does not apply them. Export and `--check` print a warning for each one it finds, without failing:
+
+- the runner's `on_validate_train` / `on_validate_predict` hooks: data the service rejects is accepted by the MLproject service;
+- artifact `level_labels` other than `ml_training_workspace` / `ml_prediction`;
+- API key authentication (`with_auth`);
+- routes the MLproject service does not serve, such as extra endpoints added to the app.
+
+Two settings cannot be detected from the built app and are not warned about: the keepalive interval set in `with_registration` (use `--keepalive-interval` on `chapkit mlproject run`), and custom health checks.
 
 ## The Check
 
@@ -61,7 +73,7 @@ The generated file starts with a `Generated from ... by chapkit mlproject export
 
 | Option | Effect |
 | --- | --- |
-| `PATH` | Service module to read (default: `main.py`). |
+| `PATH` | Service module to read (default: `main.py`). It is executed, import-time side effects included. |
 | `-o`, `--output FILE` | MLproject to write (default: the `MLproject`, `MLproject.yaml` or `MLproject.yml` next to the module, else a new `MLproject`). |
 | `--check` | Write nothing; exit 1 when the MLproject is stale or would be read as a different service. |
 | `--config NAME` | Config class to use when the module defines several. |

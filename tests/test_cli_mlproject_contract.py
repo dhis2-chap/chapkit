@@ -975,3 +975,121 @@ def test_run_command_rejects_an_unknown_config_format(tmp_path: Path) -> None:
     _write_mlproject(tmp_path, CONTRACT_MLPROJECT)
     result = CliRunner().invoke(app, ["mlproject", "run", str(tmp_path), "--config-format", "nested"])
     assert result.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("meta_data", "override", "expected", "warned"),
+    [
+        ("", None, "chap_core", False),
+        ("meta_data:\n  config_format: flat\n", None, "flat", False),
+        ("meta_data:\n  config_format: FLAT\n", None, "flat", False),
+        ("meta_data:\n  config_format: flat\n", ConfigFormat.chap_core, "chap_core", False),
+        ("meta_data:\n  config_format: nested\n", None, "chap_core", True),
+    ],
+)
+def test_resolve_config_format_prefers_the_flag_then_meta_data(
+    tmp_path: Path, meta_data: str, override: ConfigFormat | None, expected: str, warned: bool
+) -> None:
+    from chapkit.cli.run import resolve_config_format
+
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, "name: layout_model\n" + meta_data + ENTRY_POINTS))
+    issues: list[str] = []
+    assert resolve_config_format(mlproject, override, issues).value == expected
+    assert any("meta_data.config_format" in issue for issue in issues) == warned
+
+
+def test_build_mlproject_app_reads_the_config_format_from_meta_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _spy_ml_service_builder(monkeypatch)
+    mlproject_text = "name: layout_model\nmeta_data:\n  config_format: flat\n" + ENTRY_POINTS
+    mlproject = parse_mlproject(_write_mlproject(tmp_path, mlproject_text))
+    monkeypatch.chdir(tmp_path)
+
+    build_mlproject_app(mlproject)
+    assert calls[0]["runner"].config_format == "flat"
+
+
+@pytest.mark.parametrize(
+    ("relative", "copied"),
+    [
+        ("state/chapkit", True),
+        ("chapkit.state", True),
+        ("state/chapkit.db", False),
+        ("chapkit.sqlite3", False),
+        (".venv/chapkit", False),
+    ],
+)
+def test_copied_into_workspaces_follows_the_workspace_excludes(tmp_path: Path, relative: str, copied: bool) -> None:
+    from chapkit.cli.run import copied_into_workspaces
+
+    assert copied_into_workspaces(tmp_path / relative, tmp_path) is copied
+
+
+def test_copied_into_workspaces_ignores_a_database_outside_the_project(tmp_path: Path) -> None:
+    from chapkit.cli.run import copied_into_workspaces
+
+    assert copied_into_workspaces(tmp_path / "chapkit", tmp_path / "project") is False
+
+
+def _invoke_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *options: str) -> Any:
+    """Invoke `chapkit mlproject run project` with run_app stubbed out, from tmp_path."""
+    import chapkit.api
+
+    monkeypatch.setattr(chapkit.api, "run_app", lambda app, **kwargs: None)
+    monkeypatch.delenv("SERVICEKIT_ORCHESTRATOR_URL", raising=False)
+    monkeypatch.chdir(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir(exist_ok=True)
+    if not (project / "MLproject").exists():
+        _write_mlproject(project, CONTRACT_MLPROJECT)
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    return CliRunner().invoke(app, ["mlproject", "run", "project", "--port", str(port), *options])
+
+
+def test_run_command_warns_about_a_database_copied_into_workspaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    result = _invoke_run(tmp_path, monkeypatch, "--database", "project/state/chapkit")
+    assert result.exit_code == 0, result.output
+    assert "copied into every train/predict workspace" in result.output
+
+    quiet = _invoke_run(tmp_path, monkeypatch, "--database", "project/state/chapkit.db")
+    assert quiet.exit_code == 0, quiet.output
+    assert "copied into every" not in quiet.output
+
+
+def test_run_command_shows_the_config_format_from_meta_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    _write_mlproject(project, "name: layout_model\nmeta_data:\n  config_format: flat\n" + ENTRY_POINTS)
+    result = _invoke_run(tmp_path, monkeypatch)
+    assert result.exit_code == 0, result.output
+    assert "config:  config.yml (flat layout)" in result.output
+
+
+def test_run_command_configures_logging_before_building_the_service(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import servicekit.logging
+
+    from chapkit.api import MLServiceBuilder
+
+    events: list[str] = []
+    original_init = MLServiceBuilder.__init__
+
+    def spy_init(self: Any, **kwargs: Any) -> None:
+        events.append("build")
+        original_init(self, **kwargs)
+
+    monkeypatch.setattr(MLServiceBuilder, "__init__", spy_init)
+    monkeypatch.setattr(
+        servicekit.logging, "configure_logging", lambda: events.append(f"logging:{os.environ['LOG_LEVEL']}")
+    )
+    monkeypatch.setenv("LOG_LEVEL", "INFO")
+
+    result = _invoke_run(tmp_path, monkeypatch, "--log-level", "warning")
+    assert result.exit_code == 0, result.output
+    assert events == ["logging:WARNING", "build"]

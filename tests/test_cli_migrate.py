@@ -1597,3 +1597,11 @@ entry_points:
     )
     fields = build_config_fields(parse_mlproject(tmp_path))
     assert fields[0][:3] == ("prediction_periods", "int", expected_default)
+
+
+def test_migrate_uses_the_config_format_the_mlproject_declares(tmp_path: Path) -> None:
+    mlproject = MINIMALIST_MLPROJECT.replace("entry_points:", "meta_data:\n  config_format: flat\nentry_points:", 1)
+    _seed_project(tmp_path, mlproject, {"train.R": "\n", "predict.R": "\n"})
+    result = CliRunner().invoke(app, ["mlproject", "migrate", str(tmp_path), "--yes"])
+    assert result.exit_code == 0, result.output
+    assert 'config_format="flat"' in (tmp_path / "main.py").read_text()

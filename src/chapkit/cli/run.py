@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import errno
+import fnmatch
 import os
 import socket
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from chapkit.cli.mlproject import (
     _python_identifier,
     build_config_schema,
     build_ml_service_info,
+    mlproject_config_format,
     parse_mlproject,
     resolve_mlproject,
     translate_command,
@@ -33,6 +35,7 @@ if TYPE_CHECKING:
 ORCHESTRATOR_URL_ENV = "SERVICEKIT_ORCHESTRATOR_URL"
 ADVERTISED_PORT_ENV = "SERVICEKIT_PORT"
 IN_MEMORY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+MLPROJECT_LEVEL_LABELS = {0: "ml_training_workspace", 1: "ml_prediction"}
 
 
 class ConfigFormat(StrEnum):
@@ -102,6 +105,27 @@ def _check_port_available(host: str, port: int) -> str | None:
                 return f"Port {port} on {host} is already in use. Stop the other process or pick another with --port."
             return f"Cannot bind to {host}:{port}: {error.strerror}"
     return None
+
+
+def resolve_config_format(
+    mlproject: MLProject, override: ConfigFormat | None = None, issues: list[str] | None = None
+) -> ConfigFormat:
+    """Return the config.yml layout: the --config-format override, else meta_data.config_format, else chap_core."""
+    if override is not None:
+        return override
+    return ConfigFormat(mlproject_config_format(mlproject, issues) or ConfigFormat.chap_core)
+
+
+def copied_into_workspaces(database_path: Path, project_dir: Path) -> bool:
+    """Return whether a database file inside the project would be copied into every train/predict workspace."""
+    from chapkit.ml.runner import WORKSPACE_EXCLUDE_PATTERNS
+
+    try:
+        relative = database_path.relative_to(project_dir)
+    except ValueError:
+        return False
+    # The copy skips any file or directory whose name matches an exclude pattern, at every level.
+    return not any(fnmatch.fnmatch(part, pattern) for part in relative.parts for pattern in WORKSPACE_EXCLUDE_PATTERNS)
 
 
 def resolve_database_url(database: Path | None) -> str:
@@ -181,14 +205,15 @@ def build_mlproject_app(
     issues: list[str] | None = None,
     port: int | None = None,
     registration: Registration | None = None,
-    config_format: ConfigFormat = ConfigFormat.chap_core,
+    config_format: ConfigFormat | None = None,
     database_url: str = IN_MEMORY_DATABASE_URL,
 ) -> tuple[FastAPI, MLServiceInfo]:
     """Build the chapkit service for a parsed MLproject without starting a server.
 
     With `registration` the service registers itself with that orchestrator (chap-core)
     on startup; by default it is resolved from the SERVICEKIT_* environment variables.
-    State lives in memory unless `database_url` points at a SQLite file.
+    State lives in memory unless `database_url` points at a SQLite file. Without `config_format`
+    the MLproject's meta_data.config_format applies, else chap_core.
 
     Must be called with the project directory as the working directory: ShellModelRunner
     copies the current directory into each train/predict workspace.
@@ -206,6 +231,7 @@ def build_mlproject_app(
 
     config_schema = build_config_schema(mlproject, issues)
     info = build_ml_service_info(mlproject, issues)
+    config_format = resolve_config_format(mlproject, config_format, issues)
     # The chap_core default matches `chapkit mlproject migrate`: config.yml in chap-core's
     # ModelConfiguration shape (reserved keys at top level, everything else nested under
     # user_option_values), so scripts written for the chap-models ecosystem behave the same
@@ -219,10 +245,7 @@ def build_mlproject_app(
         adapters=mlproject.adapters,
     )
     # Named after the MLproject, like the hierarchies `chapkit mlproject migrate` and `chapkit init` generate.
-    hierarchy = ArtifactHierarchy(
-        name=_python_identifier(mlproject.name),
-        level_labels={0: "ml_training_workspace", 1: "ml_prediction"},
-    )
+    hierarchy = ArtifactHierarchy(name=_python_identifier(mlproject.name), level_labels=MLPROJECT_LEVEL_LABELS)
 
     builder = MLServiceBuilder(
         info=info,
@@ -304,15 +327,17 @@ def run_command(
         ),
     ] = None,
     config_format: Annotated[
-        ConfigFormat,
+        ConfigFormat | None,
         typer.Option(
             help=(
                 "Layout of the config.yml your scripts read: chap_core nests the user options under "
-                "user_option_values, as chap-core does; flat puts every option at the top level."
+                "user_option_values, as chap-core does; flat puts every option at the top level. "
+                "Defaults to the MLproject's meta_data.config_format, then chap_core."
             ),
             case_sensitive=False,
+            show_default=False,
         ),
-    ] = ConfigFormat.chap_core,
+    ] = None,
     database: Annotated[
         Path | None,
         typer.Option(
@@ -348,6 +373,10 @@ def run_command(
     if log_level is not None:
         # servicekit's structured logging reads LOG_LEVEL; uvicorn gets the same level from run_app.
         os.environ["LOG_LEVEL"] = log_level.value.upper()
+    from servicekit.logging import configure_logging
+
+    # Configured now, not only when run_app starts, so the level also covers what is logged while building.
+    configure_logging()
 
     # Fail before building the service when it could never start listening.
     port_problem = _check_port_available(host, port)
@@ -359,6 +388,12 @@ def run_command(
 
     os.chdir(project_dir)
     issues: list[str] = []
+    if database is not None and copied_into_workspaces(Path(storage), project_dir):
+        issues.append(
+            f"--database {storage} is inside the project and is copied into every train/predict workspace; "
+            "give it a .db extension or keep it outside the project"
+        )
+    resolved_config_format = resolve_config_format(mlproject, config_format, issues)
     try:
         registration = resolve_registration(port, register_url, advertise_host, advertise_port, keepalive_interval)
         app, info = build_mlproject_app(
@@ -367,7 +402,7 @@ def run_command(
             issues,
             port=port,
             registration=registration,
-            config_format=config_format,
+            config_format=resolved_config_format,
             database_url=database_url,
         )
     except MLProjectError as error:
@@ -378,7 +413,7 @@ def run_command(
     typer.echo(f"  source:  {mlproject_file}")
     typer.echo(f"  train:   {train_command}")
     typer.echo(f"  predict: {predict_command}")
-    typer.echo(f"  config:  config.yml ({config_format.value} layout)")
+    typer.echo(f"  config:  config.yml ({resolved_config_format.value} layout)")
     typer.echo(f"  storage: {storage}")
     _print_contract(info)
     if registration is not None:

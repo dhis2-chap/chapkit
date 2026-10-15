@@ -27,6 +27,7 @@ from chapkit.cli.mlproject import (
     slugify,
     translate_to_runner_template,
 )
+from chapkit.cli.run import MLPROJECT_LEVEL_LABELS, build_mlproject_app, resolve_config_format
 
 if TYPE_CHECKING:
     from chapkit.api import MLServiceInfo
@@ -315,6 +316,9 @@ def build_mlproject(parts: ServiceParts) -> dict[str, Any]:
     if info.hpo_search_space is not None:
         document["hpo_search_space"] = info.hpo_search_space
     document["meta_data"] = {key: value for key, value in meta_data.items() if value is not None}
+    if parts.runner.config_format == "flat":
+        # chap-core ignores unknown meta_data keys but rejects unknown top-level ones.
+        document["meta_data"]["config_format"] = "flat"
     user_options = mlproject_user_options(parts.config_schema)
     if user_options:
         document["user_options"] = user_options
@@ -333,8 +337,6 @@ def render_mlproject(parts: ServiceParts, source: str) -> str:
         f"# Generated from {source} {GENERATED_MARKER} -- do not edit by hand.",
         f"# Regenerate with `chapkit mlproject export {source}`; add --check to fail when it is stale.",
     ]
-    if parts.runner.config_format == "flat":
-        header.append("# The scripts read a flat config.yml: run with `chapkit mlproject run . --config-format flat`.")
     body = yaml.safe_dump(build_mlproject(parts), sort_keys=False, allow_unicode=True, width=100)
     return "\n".join(header) + "\n\n" + body
 
@@ -388,6 +390,13 @@ def semantic_problems(mlproject_file: Path, parts: ServiceParts) -> list[str]:
         if command != runner_command:
             problems.append(f"{name} command: the MLproject runs {command!r}, the service runs {runner_command!r}")
 
+    config_format = resolve_config_format(mlproject, None, issues).value
+    if config_format != parts.runner.config_format:
+        problems.append(
+            f"config.yml layout: the MLproject gives {config_format!r}, "
+            f"the service writes {parts.runner.config_format!r}"
+        )
+
     if mlproject.adapters != parts.runner.adapters:
         problems.append(
             f"adapters: the MLproject has {mlproject.adapters!r}, the service has {parts.runner.adapters!r}"
@@ -395,6 +404,47 @@ def semantic_problems(mlproject_file: Path, parts: ServiceParts) -> list[str]:
 
     problems += [f"chapkit warning: {issue}" for issue in issues]
     return problems
+
+
+def _route_paths(app: Any) -> set[str]:
+    """Return the paths an app serves, mounts included."""
+    return {path for route in app.routes if isinstance(path := getattr(route, "path", None), str)}
+
+
+def dropped_settings(module: ModuleType, parts: ServiceParts, mlproject_file: Path) -> list[str]:
+    """List settings of the service that an MLproject cannot carry, so mlproject run would not apply them."""
+    from fastapi import FastAPI
+
+    dropped: list[str] = []
+    for phase in ("train", "predict"):
+        if getattr(parts.runner, f"_on_validate_{phase}", None) is not None:
+            dropped.append(
+                f"the runner's on_validate_{phase} hook: mlproject run accepts {phase} data this service rejects"
+            )
+    if parts.hierarchy is not None and dict(parts.hierarchy.level_labels) != MLPROJECT_LEVEL_LABELS:
+        dropped.append(
+            f"artifact level labels {dict(parts.hierarchy.level_labels)!r}: "
+            f"mlproject run uses {MLPROJECT_LEVEL_LABELS!r}"
+        )
+
+    apps = _unique_instances(module, FastAPI)
+    if apps:
+        app = apps[0]
+        if getattr(app.state, "auth_source", None) is not None:
+            dropped.append("API key authentication (with_auth): mlproject run serves without it")
+        # What the MLproject would serve, built the way mlproject run builds it; its startup logs go to stderr.
+        with _inside(mlproject_file.parent), redirect_stdout(sys.stderr):
+            mlproject_app, _ = build_mlproject_app(parse_mlproject(mlproject_file))
+        extra_paths = sorted(_route_paths(app) - _route_paths(mlproject_app))
+        if extra_paths:
+            dropped.append(f"routes mlproject run does not serve: {', '.join(extra_paths)}")
+    return dropped
+
+
+def _print_dropped(dropped: list[str]) -> None:
+    """Warn about each service setting the MLproject does not carry."""
+    for setting in dropped:
+        typer.echo(f"WARNING: not carried over to the MLproject: {setting}", err=True)
 
 
 def _default_output(module_path: Path) -> Path:
@@ -409,7 +459,12 @@ def _default_output(module_path: Path) -> Path:
 def export_command(
     path: Annotated[
         Path,
-        typer.Argument(help="Service module to read (default: main.py in the current directory)."),
+        typer.Argument(
+            help=(
+                "Service module to read (default: main.py in the current directory). "
+                "It is executed, as when the service starts, so its import-time side effects run."
+            )
+        ),
     ] = Path("main.py"),
     output: Annotated[
         Path | None,
@@ -444,7 +499,8 @@ def export_command(
     target = output.expanduser().resolve() if output is not None else _default_output(module_path)
 
     try:
-        parts = find_service_parts(load_service_module(module_path), config)
+        module = load_service_module(module_path)
+        parts = find_service_parts(module, config)
     except MLProjectError as error:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1) from error
@@ -468,6 +524,7 @@ def export_command(
             for problem in problems:
                 typer.echo(f"  - {problem}")
             raise typer.Exit(code=1)
+        _print_dropped(dropped_settings(module, parts, target))
         typer.echo(f"{target.name} is up to date with {module_path.name}")
         return
 
@@ -481,3 +538,4 @@ def export_command(
     typer.echo(f"Wrote {target}")
     for problem in semantic_problems(target, parts):
         typer.echo(f"WARNING: {problem}", err=True)
+    _print_dropped(dropped_settings(module, parts, target))
