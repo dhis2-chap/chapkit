@@ -209,7 +209,7 @@ Every train and predict call produces an [artifact](https://dhis2-chap.github.io
 
 ## `config.yml` layout
 
-Your scripts receive a `config.yml` in the working directory on every train/predict call. The generated `main.py` picks `config_format="chap_core"` so the file matches [chap-core's `ModelConfiguration` shape](https://github.com/dhis2-chap/chap-core/blob/master/chap_core/database/model_templates_and_config_tables.py):
+Your scripts receive a `config.yml` in the working directory on every train/predict call. The generated `main.py` picks `config_format="chap_core"` (or `"flat"` when the MLproject sets `meta_data.config_format: flat`) so the file matches [chap-core's `ModelConfiguration` shape](https://github.com/dhis2-chap/chap-core/blob/master/chap_core/database/model_templates_and_config_tables.py):
 
 ```yaml
 prediction_periods: 3

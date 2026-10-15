@@ -253,6 +253,13 @@ class ServiceBuilder(BaseServiceBuilder):
         )
         return self
 
+    def build(self) -> FastAPI:
+        """Build the app, recording its registration settings on app.state for tools that inspect a service."""
+        app = super().build()
+        # `chapkit mlproject export` reads these to warn about settings an MLproject cannot carry.
+        app.state.registration_options = self._registration_options
+        return app
+
     # --------------------------------------------------------------------- Extension point implementations
 
     def _validate_module_configuration(self) -> None:

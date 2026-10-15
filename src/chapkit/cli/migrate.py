@@ -27,6 +27,7 @@ from chapkit.cli.mlproject import (
     build_ml_service_info,
     default_prediction_periods,
     find_mlproject,
+    mlproject_config_format,
     parse_mlproject,
     python_field_name,
     slugify,
@@ -989,6 +990,7 @@ def _run(
 
     contract_issues: list[str] = list(mlproject.parse_warnings)
     service_info_context = build_service_info_context(mlproject, contract_issues)
+    config_format = mlproject_config_format(mlproject, contract_issues) or "chap_core"
     for issue in contract_issues:
         typer.echo(f"WARNING: {issue}", err=True)
 
@@ -1004,6 +1006,7 @@ def _run(
         "TRAIN_COMMAND": train_command,
         "PREDICT_COMMAND": predict_command,
         "CONFIG_FIELDS": build_config_fields(mlproject),
+        "CONFIG_FORMAT": config_format,
         "HAS_RENV": (project_path / "renv.lock").is_file(),
         "HAS_INSTALL_PACKAGES_R": (project_path / "install_packages.R").is_file(),
         "HAS_USER_PYPROJECT": (project_path / "pyproject.toml").is_file(),
