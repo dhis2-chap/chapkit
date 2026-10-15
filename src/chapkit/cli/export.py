@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import inspect
 import os
 import string
 import sys
@@ -406,6 +407,13 @@ def semantic_problems(mlproject_file: Path, parts: ServiceParts) -> list[str]:
     return problems
 
 
+def _default_keepalive_interval() -> Any:
+    """Return servicekit's default keepalive interval, the one mlproject run uses without --keepalive-interval."""
+    from servicekit.api.service_builder import BaseServiceBuilder
+
+    return inspect.signature(BaseServiceBuilder.with_registration).parameters["keepalive_interval"].default
+
+
 def _route_paths(app: Any) -> set[str]:
     """Return the paths an app serves, mounts included."""
     return {path for route in app.routes if isinstance(path := getattr(route, "path", None), str)}
@@ -432,6 +440,12 @@ def dropped_settings(module: ModuleType, parts: ServiceParts, mlproject_file: Pa
         app = apps[0]
         if getattr(app.state, "auth_source", None) is not None:
             dropped.append("API key authentication (with_auth): mlproject run serves without it")
+        keepalive_interval = getattr(getattr(app.state, "registration_options", None), "keepalive_interval", None)
+        if keepalive_interval is not None and keepalive_interval != _default_keepalive_interval():
+            dropped.append(
+                f"registration keepalive interval {keepalive_interval:g}s: "
+                f"pass --keepalive-interval {keepalive_interval:g} to chapkit mlproject run to keep it"
+            )
         # What the MLproject would serve, built the way mlproject run builds it; its startup logs go to stderr.
         with _inside(mlproject_file.parent), redirect_stdout(sys.stderr):
             mlproject_app, _ = build_mlproject_app(parse_mlproject(mlproject_file))

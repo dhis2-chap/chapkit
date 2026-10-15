@@ -54,9 +54,10 @@ Some service settings have no place in an MLproject, so `chapkit mlproject run` 
 - the runner's `on_validate_train` / `on_validate_predict` hooks: data the service rejects is accepted by the MLproject service;
 - artifact `level_labels` other than `ml_training_workspace` / `ml_prediction`;
 - API key authentication (`with_auth`);
+- a keepalive interval set in `with_registration` other than servicekit's default (pass it to `chapkit mlproject run --keepalive-interval`);
 - routes the MLproject service does not serve, such as extra endpoints added to the app.
 
-Two settings cannot be detected from the built app and are not warned about: the keepalive interval set in `with_registration` (use `--keepalive-interval` on `chapkit mlproject run`), and custom health checks.
+Custom health checks cannot be detected from the built app and are not warned about.
 
 ## The Check
 

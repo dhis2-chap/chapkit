@@ -413,3 +413,25 @@ def test_export_warns_about_settings_the_mlproject_cannot_carry(tmp_path: Path) 
     assert checked.exit_code == 0, checked.output
     assert "on_validate_train hook" in checked.stderr
     assert "WARNING" not in checked.stdout
+
+
+def test_export_warns_about_a_custom_keepalive_interval(tmp_path: Path) -> None:
+    module = _write_service(
+        tmp_path,
+        SERVICE_MODULE.replace(
+            "runner=runner).build()", "runner=runner).with_registration(keepalive_interval=15).build()"
+        ),
+    )
+    result = CliRunner().invoke(app, ["mlproject", "export", str(module)])
+    assert result.exit_code == 0, result.output
+    assert "registration keepalive interval 15s" in result.stderr
+    assert "--keepalive-interval 15" in result.stderr
+
+
+def test_export_does_not_warn_about_the_default_keepalive_interval(tmp_path: Path) -> None:
+    module = _write_service(
+        tmp_path, SERVICE_MODULE.replace("runner=runner).build()", "runner=runner).with_registration().build()")
+    )
+    result = CliRunner().invoke(app, ["mlproject", "export", str(module)])
+    assert result.exit_code == 0, result.output
+    assert "keepalive" not in result.stderr
