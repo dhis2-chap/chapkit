@@ -7,6 +7,7 @@ import typer
 
 from chapkit import __version__
 from chapkit.cli.artifact import artifact_app
+from chapkit.cli.export import export_command
 from chapkit.cli.init import init_command
 from chapkit.cli.migrate import migrate_command
 from chapkit.cli.mlproject import MLPROJECT_FILENAMES
@@ -105,16 +106,19 @@ if _find_chapkit_project() is None:
 if _find_chapkit_project() is not None:
     app.command(name="test", help="Run end-to-end test of the ML service workflow")(test_command)
 
-# 'run' and 'migrate' operate on MLflow-style MLproject directories - the canonical
+# 'run', 'migrate' and 'export' work with MLflow-style MLproject files - the canonical
 # surface lives under `chapkit mlproject`, hidden from --help when no MLproject file
 # is in the current directory.
 mlproject_app = typer.Typer(
     name="mlproject",
-    help="Run or migrate an MLflow-style MLproject directory",
+    help="Run, migrate or export an MLflow-style MLproject",
     no_args_is_help=True,
 )
 mlproject_app.command(name="run", help="Run an MLproject file or directory as a chapkit service")(run_command)
 mlproject_app.command(name="migrate", help="Migrate an MLproject directory into a chapkit project")(migrate_command)
+mlproject_app.command(name="export", help="Generate an MLproject from a chapkit service module such as main.py")(
+    export_command
+)
 app.add_typer(mlproject_app, name="mlproject", hidden=not _has_mlproject())
 
 # Top-level `chapkit run` / `chapkit migrate` stay registered (hidden) as backwards-

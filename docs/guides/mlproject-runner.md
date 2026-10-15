@@ -378,3 +378,4 @@ Use [`chapkit init`](cli-scaffolding.md) instead when you want to start a **gree
 | An MLproject you want to quickly evaluate | `chapkit mlproject run` |
 | An MLproject you want to own as a chapkit project | `chapkit mlproject migrate` |
 | Nothing yet | `chapkit init` |
+| A chapkit service you also want to run from an MLproject | [`chapkit mlproject export`](mlproject-export.md) |
