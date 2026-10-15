@@ -14,7 +14,7 @@ chapkit mlproject run /path/to/my_mlproject/MLproject.yaml
 
 This parses the `MLproject` file, translates the entry-point commands to chapkit's workspace conventions, builds a FastAPI service with `/api/v1/ml/$train` and `/$predict` endpoints, and serves on `127.0.0.1:9090` by default. Override host/port with `--host` and `--port`. If the port is already taken, `chapkit mlproject run` stops with an error before starting anything.
 
-Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory (or in a SQLite file of your choosing with `--database`, see [Service Options](#service-options)), and each train/predict runs in a temporary copy of the project.
+Nothing is written to your MLproject directory: configs, artifacts and jobs live in memory (configs and artifacts can go in a SQLite file of your choosing with `--database`, see [Service Options](#service-options)), and each train/predict runs in a temporary copy of the project.
 
 A minimal R MLproject like `dhis2-chap/minimalist_example_r`:
 
@@ -75,7 +75,7 @@ These options cover what a hand-written `main.py` service can set and an MLproje
 | Option | Default | Effect |
 | --- | --- | --- |
 | `--config-format chap_core\|flat` | `chap_core` | Layout of the `config.yml` your scripts read (see below). |
-| `--database PATH` | in memory | Keep configs, jobs and trained models in this SQLite file so they survive a restart. The file and its directory are created if missing, and migrations run on startup. A relative path is relative to where you run the command. |
+| `--database PATH` | in memory | Keep configs and trained models (artifacts) in this SQLite file so they survive a restart; predict still works on a model trained before the restart. Job history is not stored and starts empty after a restart. The file and its directory are created if missing, and migrations run on startup. A relative path is relative to where you run the command. |
 | `--keepalive-interval SECONDS` | `10` | Seconds between keepalive pings once registered with chap-core. Only applies when registration is configured ([Integration with chap-core](#integration-with-chap-core)). |
 | `--log-level LEVEL` | `LOG_LEVEL`, then `info` | `debug`, `info`, `warning`, `error` or `critical`. |
 

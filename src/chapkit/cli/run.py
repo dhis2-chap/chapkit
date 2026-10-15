@@ -317,7 +317,8 @@ def run_command(
         Path | None,
         typer.Option(
             help=(
-                "Keep configs, jobs and trained models in this SQLite file so they survive a restart. "
+                "Keep configs and trained models in this SQLite file so they survive a restart "
+                "(job history stays in memory). "
                 "Created if missing. Without it, everything is kept in memory."
             ),
             dir_okay=False,

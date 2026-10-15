@@ -10,8 +10,20 @@ from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
 from chapkit.cli.cli import app
-from chapkit.cli.export import PROVENANCE_FIELDS, find_service_parts, load_service_module
-from chapkit.cli.mlproject import MLProjectError, build_ml_service_info, parse_mlproject
+from chapkit.cli.export import (
+    PROVENANCE_FIELDS,
+    find_service_parts,
+    load_service_module,
+    mlproject_command,
+    semantic_problems,
+)
+from chapkit.cli.mlproject import (
+    MLProjectError,
+    build_ml_service_info,
+    parse_mlproject,
+    translate_command,
+    translate_to_runner_template,
+)
 from chapkit.cli.run import build_mlproject_app
 
 SERVICE_MODULE = '''
@@ -289,3 +301,64 @@ def test_load_service_module_leaves_no_trace(tmp_path: Path) -> None:
     load_service_module(module)
     assert (os.getcwd(), list(sys.path)) == before
     assert not (tmp_path / "__pycache__").exists()
+
+
+def test_export_keeps_constraints_on_a_reserved_field_with_its_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = SERVICE_MODULE.replace(
+        "    max_epochs: int | None = None\n",
+        "    max_epochs: int | None = None\n    prediction_periods: int = Field(default=3, ge=2, le=6)\n",
+    )
+    module = _write_service(tmp_path, source)
+    assert CliRunner().invoke(app, ["mlproject", "export", str(module)]).exit_code == 0
+    option = yaml.safe_load((tmp_path / "MLproject").read_text())["user_options"]["prediction_periods"]
+    assert option == {"type": "integer", "maximum": 6, "minimum": 2, "default": 3}
+
+    monkeypatch.chdir(tmp_path)
+    service, _ = build_mlproject_app(parse_mlproject(tmp_path / "MLproject"))
+    with TestClient(service) as client:
+        rejected = client.post("/api/v1/configs", json={"name": "c", "data": {"prediction_periods": 1000}})
+        assert rejected.status_code == 422
+
+
+def test_export_leaves_out_a_reserved_field_that_only_gains_a_description(tmp_path: Path) -> None:
+    source = SERVICE_MODULE.replace(
+        "    max_epochs: int | None = None\n",
+        '    max_epochs: int | None = None\n    prediction_periods: int = Field(default=3, description="Horizon.")\n',
+    )
+    module = _write_service(tmp_path, source)
+    assert CliRunner().invoke(app, ["mlproject", "export", str(module)]).exit_code == 0
+    assert "prediction_periods" not in yaml.safe_load((tmp_path / "MLproject").read_text())["user_options"]
+
+
+def test_check_reports_an_option_that_accepts_different_values(tmp_path: Path) -> None:
+    module = _write_service(tmp_path)
+    assert CliRunner().invoke(app, ["mlproject", "export", str(module)]).exit_code == 0
+    mlproject_file = tmp_path / "MLproject"
+    mlproject_file.write_text(mlproject_file.read_text().replace("    minimum: 1\n", ""))
+
+    problems = semantic_problems(mlproject_file, find_service_parts(load_service_module(module)))
+    assert any(problem.startswith("config.n_samples: the MLproject accepts") for problem in problems)
+
+
+@pytest.mark.parametrize(
+    "runner_command",
+    [
+        'python -c "print({{}})" {data_file}',
+        "awk '{{print $1}}' {historic_file} > {output_file}",
+        "Rscript predict.R {historic_file} {future_file} {output_file}",
+    ],
+)
+def test_exported_commands_run_as_the_runner_would(runner_command: str) -> None:
+    command = mlproject_command(runner_command)
+    assert translate_to_runner_template(command) == runner_command
+    # mlproject run formats twice: MLproject parameters, then the runner's placeholders.
+    runner_values = {"data_file": "data.csv", "historic_file": "historic.csv", "output_file": "predictions.csv"}
+    runner_values |= {"future_file": "future.csv", "geo_file": ""}
+    assert translate_command(command).format(**runner_values) == runner_command.format(**runner_values)
+
+
+def test_export_rejects_a_runner_placeholder_without_an_mlproject_parameter() -> None:
+    with pytest.raises(MLProjectError, match=r"\{dataset\} has no MLproject parameter"):
+        mlproject_command("python train.py {dataset}")

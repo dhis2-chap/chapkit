@@ -34,7 +34,9 @@ The command finds the objects by type, so their names do not matter:
 
 Only `ShellModelRunner` services can be exported, because an MLproject runs train and predict as shell commands. If the module defines several config classes, pick one with `--config NAME`.
 
-`prediction_periods` and `additional_continuous_covariates`, which every chapkit config has, are left out of `user_options` unless the config changes their default.
+`prediction_periods` and `additional_continuous_covariates`, which every chapkit config has, are left out of `user_options` unless the config changes their default or what they accept (for example `prediction_periods: int = Field(default=3, ge=2, le=6)`).
+
+Literal braces in a runner command (`{{` / `}}`) are escaped once more in the MLproject, because `chapkit mlproject run` formats the command twice: first the MLproject parameters, then the runner's own placeholders.
 
 ### Config Layout
 
@@ -49,7 +51,7 @@ Only `ShellModelRunner` services can be exported, because an MLproject runs trai
 `--check` fails in two cases:
 
 1. The MLproject differs from what `export` would write now. The diff is printed.
-2. The MLproject matches, but `chapkit mlproject run` would read it as a different service. The file is parsed with chapkit's own MLproject reader, and the served `/api/v1/info`, the config options and their defaults, the runner commands and the adapters are compared with the module. This catches a generator bug that a matching text diff would hide, and contract differences that come from how `run` reads an MLproject. For example, a service without `author_note` fails, because `run` serves the description in its place.
+2. The MLproject matches, but `chapkit mlproject run` would read it as a different service. The file is parsed with chapkit's own MLproject reader, and the served `/api/v1/info`, the config options with their defaults and the values each accepts, the runner commands and the adapters are compared with the module. This catches a generator bug that a matching text diff would hide, and contract differences that come from how `run` reads an MLproject. For example, a service without `author_note` fails, because `run` serves the description in its place.
 
 ## Safety
 

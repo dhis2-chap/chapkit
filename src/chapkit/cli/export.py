@@ -43,10 +43,15 @@ PROVENANCE_FIELDS: set[str] = {"git_revision", "chapkit_version", "servicekit_ve
 # chapkit's PeriodType values, spelled the way chap-core MLprojects write them.
 MLPROJECT_PERIOD_TYPES = {"weekly": "week", "monthly": "month", "any": "any"}
 
-# ShellModelRunner placeholder -> MLproject parameter; literal paths (model, config.yml) stay as written.
+# ShellModelRunner placeholder name -> MLproject parameter; literal paths (model, config.yml) stay as written.
 MLPROJECT_PARAMETERS = {
-    placeholder: parameter for parameter, placeholder in RUNNER_PLACEHOLDERS.items() if placeholder.startswith("{")
+    placeholder.strip("{}"): parameter
+    for parameter, placeholder in RUNNER_PLACEHOLDERS.items()
+    if placeholder.startswith("{")
 }
+
+# Schema keys that document an option without changing what it accepts.
+ANNOTATION_KEYS = frozenset({"title", "description"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,10 +171,22 @@ def mlproject_name(parts: ServiceParts) -> str:
 
 
 def mlproject_command(runner_command: str) -> str:
-    """Translate a ShellModelRunner command to MLproject placeholders, the inverse of translate_to_runner_template."""
-    for placeholder, parameter in MLPROJECT_PARAMETERS.items():
-        runner_command = runner_command.replace(placeholder, "{" + parameter + "}")
-    return runner_command
+    """Translate a ShellModelRunner command to MLproject placeholders, the inverse of translate_to_runner_template.
+
+    An MLproject command goes through str.format twice before it runs (MLproject parameters,
+    then the runner's own placeholders), so a literal brace is written four times: {{ in the
+    runner command becomes {{{{.
+    """
+    parts: list[str] = []
+    for literal, field_name, format_spec, conversion in string.Formatter().parse(runner_command):
+        parts.append(literal.replace("{", "{{{{").replace("}", "}}}}"))
+        if field_name is None:
+            continue
+        parameter = MLPROJECT_PARAMETERS.get(field_name)
+        if parameter is None or format_spec or conversion:
+            raise MLProjectError(f"Runner command placeholder {{{field_name}}} has no MLproject parameter")
+        parts.append("{" + parameter + "}")
+    return "".join(parts)
 
 
 def _entry_point(runner_command: str) -> dict[str, Any]:
@@ -195,6 +212,27 @@ def _inline_refs(schema: Any, definitions: dict[str, Any]) -> Any:
     return {key: _inline_refs(value, definitions) for key, value in schema.items()}
 
 
+def _validation_schema(schema: Any) -> Any:
+    """Return a property schema without its default and documentation keys: what it accepts, nothing else."""
+    if isinstance(schema, list):
+        return [_validation_schema(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    return {key: _validation_schema(value) for key, value in schema.items() if key not in ANNOTATION_KEYS}
+
+
+def _field_validation_schemas(config_schema: type[BaseConfig]) -> dict[str, Any]:
+    """Return what each config option accepts, keyed by option name, with $refs inlined and the default left out."""
+    schema = config_schema.model_json_schema()
+    definitions = schema.get("$defs", {})
+    schemas: dict[str, Any] = {}
+    for option_name, option in schema.get("properties", {}).items():
+        accepted = _validation_schema(_inline_refs(option, definitions))
+        accepted.pop("default", None)
+        schemas[option_name] = accepted
+    return schemas
+
+
 def _generated_title(name: str) -> str:
     """Return the title Pydantic derives from a field name."""
     return name.replace("_", " ").title()
@@ -204,7 +242,7 @@ def mlproject_user_options(config_schema: type[BaseConfig]) -> dict[str, dict[st
     """Turn a config class into MLproject user_options, one JSON Schema property per field.
 
     Fields chapkit adds to every config (prediction_periods, additional_continuous_covariates)
-    are left out unless the class changes their default.
+    are left out unless the class changes their default or what they accept.
     """
     from chapkit.config import BaseConfig
 
@@ -212,13 +250,19 @@ def mlproject_user_options(config_schema: type[BaseConfig]) -> dict[str, dict[st
     definitions = schema.get("$defs", {})
     properties = schema.get("properties", {})
     reserved = BaseConfig.model_fields
+    accepted = _field_validation_schemas(config_schema)
+    accepted_by_base = _field_validation_schemas(BaseConfig)
 
     options: dict[str, dict[str, Any]] = {}
     for field_name, field in config_schema.model_fields.items():
         default = None if field.is_required() else field.get_default(call_default_factory=True)
-        if field_name in reserved and default == reserved[field_name].get_default(call_default_factory=True):
-            continue
         option_name = field.alias or field_name
+        if (
+            field_name in reserved
+            and default == reserved[field_name].get_default(call_default_factory=True)
+            and accepted[option_name] == accepted_by_base[field_name]
+        ):
+            continue
         option = _inline_refs(dict(properties[option_name]), definitions)
         if option.get("title") in {_generated_title(field_name), _generated_title(option_name)}:
             option.pop("title")
@@ -327,6 +371,15 @@ def semantic_problems(mlproject_file: Path, parts: ServiceParts) -> list[str]:
         elif generated[key] != defaults[key]:
             problems.append(
                 f"config.{key}: the MLproject default is {generated[key]!r}, the service default is {defaults[key]!r}"
+            )
+
+    generated_schemas = _field_validation_schemas(build_config_schema(mlproject, issues))
+    service_schemas = _field_validation_schemas(parts.config_schema)
+    for key in sorted(set(generated_schemas) & set(service_schemas)):
+        if generated_schemas[key] != service_schemas[key]:
+            problems.append(
+                f"config.{key}: the MLproject accepts {generated_schemas[key]!r}, "
+                f"the service accepts {service_schemas[key]!r}"
             )
 
     for name in ("train", "predict"):

@@ -892,6 +892,38 @@ def test_build_mlproject_app_keeps_state_in_the_database_across_restarts(
     assert sorted(path.name for path in project.iterdir()) == ["MLproject"]
 
 
+def test_database_keeps_trained_models_but_not_job_history(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    project = tmp_path / "project"
+    project.mkdir()
+    mlproject = parse_mlproject(_write_mlproject(project, "name: persisted_model\n" + ENTRY_POINTS))
+    database_url = resolve_database_url(tmp_path / "chapkit.db")
+    monkeypatch.chdir(project)
+    training_data = {
+        "columns": ["time_period", "location", "disease_cases"],
+        "data": [["2024-01", "a", 1], ["2024-02", "a", 2]],
+    }
+
+    first, _ = build_mlproject_app(mlproject, database_url=database_url)
+    with TestClient(first) as client:
+        config_id = client.post("/api/v1/configs", json={"name": "c", "data": {}}).json()["id"]
+        submitted = client.post("/api/v1/ml/$train", json={"config_id": config_id, "data": training_data}).json()
+        status = "pending"
+        for _ in range(100):
+            status = client.get(f"/api/v1/jobs/{submitted['job_id']}").json()["status"]
+            if status not in ("pending", "running"):
+                break
+            time.sleep(0.05)
+        assert status == "completed"
+
+    second, _ = build_mlproject_app(mlproject, database_url=database_url)
+    with TestClient(second) as client:
+        artifact = client.get(f"/api/v1/artifacts/{submitted['artifact_id']}")
+        assert artifact.status_code == 200
+        assert client.get("/api/v1/jobs").json() == []
+
+
 def test_run_command_applies_the_new_options(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import chapkit.api
 
