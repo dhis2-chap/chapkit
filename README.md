@@ -100,8 +100,8 @@ See the [MLproject Migrate guide](docs/guides/mlproject-migrate.md) for the clas
 Or use the published `-cli` container images (no local chapkit install needed):
 
 ```bash
-docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-py-cli:latest    # Python model
-docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r-cli:latest     # R model (no INLA)
+docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-py-data-cli:latest  # Python model (numpy, pandas, scikit-learn, ...)
+docker run --rm -p 8000:8000 -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r-tidyverse-cli:latest  # R model (tidyverse, no INLA)
 docker run --rm -p 8000:8000 --platform=linux/amd64 \
     -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-r-inla-cli:latest                          # R + INLA
 ```
@@ -113,7 +113,7 @@ docker run --rm -v "$(pwd):/work" ghcr.io/dhis2-chap/chapkit-py-cli:latest \
     chapkit mlproject migrate . --yes
 ```
 
-The unsuffixed images (`chapkit-py`, `chapkit-r`, `chapkit-r-inla`) are runtime-only bases without chapkit pre-installed — that's what `chapkit init` and `chapkit mlproject migrate` use as the `FROM` line in the Dockerfiles they generate, where `uv sync` then installs chapkit from the project's `pyproject.toml`. See the [MLproject Runner guide](docs/guides/mlproject-runner.md) for canonical parameter mapping, `user_options` -> dynamic config, env hints, and compose integration with chap-core.
+The unsuffixed images (`chapkit-py`, `chapkit-py-data`, `chapkit-r`, `chapkit-r-tidyverse`, `chapkit-r-inla`) are runtime-only bases without chapkit pre-installed — that's what `chapkit init` and `chapkit mlproject migrate` use as the `FROM` line in the Dockerfiles they generate, where `uv sync` then installs chapkit from the project's `pyproject.toml`. See the [MLproject Runner guide](docs/guides/mlproject-runner.md) for canonical parameter mapping, `user_options` -> dynamic config, env hints, and compose integration with chap-core.
 
 ## Quick Start
 
@@ -260,4 +260,4 @@ AGPL-3.0-or-later
 ## Related Projects
 
 - **[servicekit](https://github.com/dhis2-chap/servicekit)** - Core framework foundation (FastAPI, SQLAlchemy, CRUD, auth, etc.) ([docs](https://dhis2-chap.github.io/servicekit))
-- **[chapkit-images](https://github.com/dhis2-chap/chapkit-images)** - Dockerfiles and CI for the `chapkit-py`, `chapkit-r`, and `chapkit-r-inla` runtime images used by `chapkit mlproject run`.
+- **[chapkit-images](https://github.com/dhis2-chap/chapkit-images)** - Dockerfiles and CI for the `chapkit-py`, `chapkit-py-data`, `chapkit-r`, `chapkit-r-tidyverse` and `chapkit-r-inla` runtime images (and their `-cli` variants) used by `chapkit mlproject run`.
