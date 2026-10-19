@@ -209,6 +209,39 @@ def test_detect_base_image_python(tmp_path: Path) -> None:
     assert language == "python"
 
 
+def test_detect_base_image_reads_python_scripts_from_the_commands(tmp_path: Path) -> None:
+    mlproject = _seed_project(
+        tmp_path,
+        PYTHON_MLPROJECT.replace("python train.py", "python scripts/train.py").replace(
+            "python predict.py", "python scripts/predict.py"
+        ),
+        {"scripts/train.py": "import pandas\n", "scripts/predict.py": "import pandas\n"},
+    )
+    image, language, _ = detect_base_image(tmp_path, mlproject, override=None)
+    assert image == "chapkit-py"
+    assert language == "python"
+
+
+def test_detect_base_image_reads_r_scripts_from_the_commands(tmp_path: Path) -> None:
+    mlproject = _seed_project(
+        tmp_path,
+        MINIMALIST_MLPROJECT.replace("Rscript train.r", "Rscript scripts/train.r").replace(
+            "Rscript predict.r", "Rscript scripts/predict.r"
+        ),
+        {"scripts/train.r": "library(INLA)\n", "scripts/predict.r": "library(INLA)\n"},
+    )
+    image, language, rationale = detect_base_image(tmp_path, mlproject, override=None)
+    assert image == "chapkit-r-inla"
+    assert language == "r"
+    assert "INLA" in rationale
+
+
+def test_detect_base_image_without_scripts_names_the_commands(tmp_path: Path) -> None:
+    mlproject = _seed_project(tmp_path, PYTHON_MLPROJECT, {})
+    with pytest.raises(MigrateError, match="entry-point commands"):
+        detect_base_image(tmp_path, mlproject, override=None)
+
+
 def test_detect_base_image_mixed_picks_fat(tmp_path: Path) -> None:
     mlproject = _seed_project(
         tmp_path,

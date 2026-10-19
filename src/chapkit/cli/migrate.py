@@ -5,6 +5,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import re
+import shlex
 import shutil
 import tomllib
 from dataclasses import dataclass
@@ -614,8 +615,29 @@ def _check_entry_points_reference_main_py(mlproject: MLProject) -> None:
     )
 
 
-def _any_r_script_uses(project_path: Path, packages: tuple[str, ...]) -> bool:
-    """Return True if any root-level R script imports one of the given packages.
+_SCRIPT_SUFFIXES = (".py", ".r", ".R")
+
+
+def _model_scripts(project_path: Path, mlproject: MLProject) -> list[Path]:
+    """Return the root-level scripts plus the scripts the entry-point commands name, such as scripts/train.py."""
+    scripts = [path for path in sorted(project_path.iterdir()) if path.is_file() and path.suffix in _SCRIPT_SUFFIXES]
+    root = project_path.resolve()
+    for entry_point in mlproject.entry_points.values():
+        try:
+            tokens = shlex.split(entry_point.command)
+        except ValueError:
+            tokens = entry_point.command.split()
+        for token in tokens:
+            if "{" in token or not token.endswith(_SCRIPT_SUFFIXES):
+                continue
+            path = (project_path / token).resolve()
+            if path.is_file() and path.is_relative_to(root) and path not in {script.resolve() for script in scripts}:
+                scripts.append(project_path / token)
+    return scripts
+
+
+def _any_r_script_uses(r_scripts: list[Path], packages: tuple[str, ...]) -> bool:
+    """Return True if any of the given R scripts imports one of the given packages.
 
     Matches library / require / requireNamespace with optional whitespace before
     the opening paren, optional single or double quotes around the package name,
@@ -629,7 +651,7 @@ def _any_r_script_uses(project_path: Path, packages: tuple[str, ...]) -> bool:
         + "|".join(re.escape(pkg) for pkg in packages)
         + r")['\"]?\s*[,\)]"
     )
-    for script in project_path.glob("*.[rR]"):
+    for script in r_scripts:
         try:
             text = script.read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -650,11 +672,12 @@ def detect_base_image(
             raise MigrateError(f"--base-image must be one of {', '.join(_VALID_BASE_IMAGES)}; got {override!r}")
         return override, _language_from_image(override), f"explicit --base-image {override}"
 
-    r_scripts = list(project_path.glob("*.r")) + list(project_path.glob("*.R"))
-    py_scripts = list(project_path.glob("*.py"))
+    scripts = _model_scripts(project_path, mlproject)
+    r_scripts = [script for script in scripts if script.suffix in (".r", ".R")]
+    py_scripts = [script for script in scripts if script.suffix == ".py"]
     docker_env = mlproject.env_hints.get("docker_env", "")
     env_suggests_inla = "docker_r_inla" in docker_env
-    uses_inla = env_suggests_inla or _any_r_script_uses(project_path, ("INLA", "fmesher", "inla"))
+    uses_inla = env_suggests_inla or _any_r_script_uses(r_scripts, ("INLA", "fmesher", "inla"))
 
     if r_scripts and py_scripts:
         rationale = "found both R and Python scripts; chapkit-r-inla covers both"
@@ -662,7 +685,7 @@ def detect_base_image(
         # ship the full tidyverse / forecasting stack. Flag this when the R
         # side imports tidyverse-style packages so the user knows to bake them
         # in via install_packages.R / renv.lock.
-        if _any_r_script_uses(project_path, _TIDYVERSE_HINTS):
+        if _any_r_script_uses(r_scripts, _TIDYVERSE_HINTS):
             rationale += (
                 "; R side imports tidyverse-style packages - chapkit-r-inla does not ship "
                 "the full tidyverse/forecasting stack, bake missing packages in via "
@@ -673,12 +696,15 @@ def detect_base_image(
         if uses_inla:
             hint = "MLproject declares docker_r_inla" if env_suggests_inla else "R script imports INLA"
             return "chapkit-r-inla", "r", f"R + INLA ({hint})"
-        if _any_r_script_uses(project_path, _TIDYVERSE_HINTS):
+        if _any_r_script_uses(r_scripts, _TIDYVERSE_HINTS):
             return "chapkit-r-tidyverse", "r", "R + tidyverse stack (tidyverse/fable/forecast/etc. detected)"
         return "chapkit-r", "r", "R scripts, no INLA or tidyverse hints detected"
     if py_scripts:
         return "chapkit-py", "python", "Python scripts only"
-    raise MigrateError("No Python (.py) or R (.r/.R) scripts at the project root; cannot pick a base image.")
+    raise MigrateError(
+        "No Python (.py) or R (.r/.R) scripts at the project root or in the entry-point commands; "
+        "cannot pick a base image."
+    )
 
 
 def build_service_info_context(mlproject: MLProject, issues: list[str] | None = None) -> dict[str, Any]:

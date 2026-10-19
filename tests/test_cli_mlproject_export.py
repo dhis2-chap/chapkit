@@ -178,15 +178,24 @@ def test_check_passes_for_a_fresh_export_and_fails_when_stale(tmp_path: Path) ->
 
 
 def test_check_reports_semantic_drift_that_the_text_does_not_show(tmp_path: Path) -> None:
-    module = _write_service(tmp_path)
+    # chapkit mlproject run strips the surrounding blanks the service keeps.
+    module = _write_service(tmp_path, SERVICE_MODULE.replace('author_note="Test only."', 'author_note="Test only.  "'))
     assert CliRunner().invoke(app, ["mlproject", "export", str(module)]).exit_code == 0
-    # Without author_note, chapkit mlproject run serves the description in its place.
-    _write_service(tmp_path, SERVICE_MODULE.replace('        author_note="Test only.",\n', ""))
-    assert CliRunner().invoke(app, ["mlproject", "export", str(module), "--force"]).exit_code == 0
 
     result = CliRunner().invoke(app, ["mlproject", "export", str(module), "--check"])
     assert result.exit_code == 1
     assert "info.model_metadata" in result.stdout
+
+
+def test_check_accepts_a_service_without_author_note(tmp_path: Path) -> None:
+    # chapkit mlproject run serves the description in its place, as chap-core does.
+    module = _write_service(tmp_path, SERVICE_MODULE.replace('        author_note="Test only.",\n', ""))
+    exported = CliRunner().invoke(app, ["mlproject", "export", str(module)])
+    assert exported.exit_code == 0
+    assert "author_note" not in exported.output
+
+    result = CliRunner().invoke(app, ["mlproject", "export", str(module), "--check"])
+    assert result.exit_code == 0, result.output
 
 
 def test_check_fails_without_an_mlproject(tmp_path: Path) -> None:

@@ -10,7 +10,6 @@ from chapkit.cli.artifact import artifact_app
 from chapkit.cli.export import export_command
 from chapkit.cli.init import init_command
 from chapkit.cli.migrate import migrate_command
-from chapkit.cli.mlproject import MLPROJECT_FILENAMES
 from chapkit.cli.run import run_command
 from chapkit.cli.test import test_command
 
@@ -38,12 +37,6 @@ def _find_chapkit_project() -> Path | None:
             except Exception:
                 pass
     return None
-
-
-def _has_mlproject() -> bool:
-    """Return True if the current directory contains an MLproject file."""
-    cwd = Path.cwd()
-    return any((cwd / name).is_file() for name in MLPROJECT_FILENAMES)
 
 
 _TOP_HELP = """\
@@ -107,8 +100,8 @@ if _find_chapkit_project() is not None:
     app.command(name="test", help="Run end-to-end test of the ML service workflow")(test_command)
 
 # 'run', 'migrate' and 'export' work with MLflow-style MLproject files - the canonical
-# surface lives under `chapkit mlproject`, hidden from --help when no MLproject file
-# is in the current directory.
+# surface lives under `chapkit mlproject`. It is always listed: `export` runs in a service
+# directory with no MLproject, and `run DIR` / `migrate DIR` take a directory elsewhere.
 mlproject_app = typer.Typer(
     name="mlproject",
     help="Run, migrate or export an MLflow-style MLproject",
@@ -119,7 +112,7 @@ mlproject_app.command(name="migrate", help="Migrate an MLproject directory into 
 mlproject_app.command(name="export", help="Generate an MLproject from a chapkit service module such as main.py")(
     export_command
 )
-app.add_typer(mlproject_app, name="mlproject", hidden=not _has_mlproject())
+app.add_typer(mlproject_app, name="mlproject")
 
 # Top-level `chapkit run` / `chapkit migrate` stay registered (hidden) as backwards-
 # compatible aliases so the chapkit-py base image's existing CMD (`chapkit run .`)
