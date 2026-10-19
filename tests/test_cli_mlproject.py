@@ -360,3 +360,13 @@ entry_points:
     combined = result.output + result.stdout
     assert "dataset" in combined
     assert "--param" in combined
+
+
+def test_top_level_help_lists_mlproject_without_an_mlproject_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # `mlproject export` runs in a service directory, which has no MLproject file.
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(app, ["--help"])
+    assert result.exit_code == 0
+    assert "mlproject" in result.output

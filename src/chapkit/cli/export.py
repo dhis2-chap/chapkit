@@ -359,6 +359,9 @@ def semantic_problems(mlproject_file: Path, parts: ServiceParts) -> list[str]:
 
     served = build_ml_service_info(mlproject, issues).model_dump(mode="json", exclude=PROVENANCE_FIELDS)
     expected = parts.info.model_dump(mode="json", exclude=PROVENANCE_FIELDS)
+    # mlproject run serves the description as author_note when the MLproject has none.
+    if expected["model_metadata"]["author_note"] is None:
+        expected["model_metadata"]["author_note"] = expected["description"]
     for key in sorted(set(served) | set(expected)):
         if served.get(key) != expected.get(key):
             problems.append(
