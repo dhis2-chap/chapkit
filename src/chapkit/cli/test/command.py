@@ -156,7 +156,7 @@ def test_command(
     runner = TestRunner(url, timeout=timeout, verbose=verbose, debug=debug)
     # A negative seed means "fresh random data each run"; report the chosen seed so
     # a failing run can be reproduced with `--seed <value>`.
-    actual_seed = random.randrange(1, 2**31) if seed < 0 else seed
+    actual_seed = random.randrange(1, 2**31) if seed < 0 else seed  # noqa: S311 -- a data seed, not a secret
     if seed < 0:
         typer.echo(f"Using random seed {actual_seed} (re-run with --seed {actual_seed} to reproduce)")
         typer.echo()

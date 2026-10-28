@@ -277,9 +277,10 @@ def list_command(
     # Fetch artifacts
     if database is not None:
         success, error, artifacts = asyncio.run(_list_from_database(database))
-    else:
-        assert url is not None  # Guaranteed by mutual exclusivity check above
+    elif url is not None:
         success, error, artifacts = _list_from_url(url)
+    else:
+        raise typer.Exit(code=1)  # Unreachable: the mutual exclusivity check above requires one of them
 
     if not success:
         typer.echo(f"Error: {error}", err=True)
@@ -424,15 +425,14 @@ def download_command(
     # Fetch content
     if database is not None:
         success, error, content = asyncio.run(_fetch_from_database(database, ulid))
-    else:
-        assert url is not None  # Guaranteed by mutual exclusivity check above
+    elif url is not None:
         success, error, content = _fetch_from_url(url, ulid)
+    else:
+        raise typer.Exit(code=1)  # Unreachable: the mutual exclusivity check above requires one of them
 
-    if not success:
+    if not success or content is None:
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1)
-
-    assert content is not None  # Guaranteed by success=True
 
     # Save or extract
     if extract:

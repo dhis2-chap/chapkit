@@ -420,7 +420,7 @@ class MLManager(Generic[ConfigT]):
             return diagnostics
 
         try:
-            pickle.loads(pickle_bytes)
+            pickle.loads(pickle_bytes)  # noqa: S301 -- the service's own training workspace
         except (
             pickle.UnpicklingError,
             EOFError,
@@ -617,7 +617,7 @@ class MLManager(Generic[ConfigT]):
                     model_pickle_path = extracted_workspace / "model.pickle"
                     if model_pickle_path.exists():
                         try:
-                            trained_model = pickle.loads(model_pickle_path.read_bytes())
+                            trained_model = pickle.loads(model_pickle_path.read_bytes())  # noqa: S301 -- the service's own training workspace
                         except (pickle.UnpicklingError, EOFError, TypeError) as e:
                             raise ValueError(
                                 f"Failed to load model from {model_pickle_path}: "

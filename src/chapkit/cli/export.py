@@ -93,7 +93,7 @@ def load_service_module(path: Path) -> ModuleType:
         code = compile(path.read_text(encoding="utf-8"), str(path), "exec")
         # Whatever the module prints while it builds its app (startup logs) goes to stderr, keeping stdout ours.
         with _inside(path.parent), redirect_stdout(sys.stderr):
-            exec(code, module.__dict__)
+            exec(code, module.__dict__)  # noqa: S102 -- running the project's own main.py is what export does
     except Exception as error:
         raise MLProjectError(f"Importing {path} failed: {type(error).__name__}: {error}") from error
     finally:
