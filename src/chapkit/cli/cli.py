@@ -34,8 +34,8 @@ def _find_chapkit_project() -> Path | None:
                 deps = data.get("project", {}).get("dependencies", [])
                 if any("chapkit" in dep for dep in deps):
                     return parent
-            except Exception:
-                pass
+            except (OSError, tomllib.TOMLDecodeError):
+                continue
     return None
 
 

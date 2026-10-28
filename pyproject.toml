@@ -27,7 +27,7 @@ dependencies = [
   "geojson-pydantic>=2.1.1",
   "typer>=0.24.2",
   "jinja2>=3.1.6",
-  "servicekit>=3.0.1,<4",
+  "servicekit>=3.1.0,<4",
   "httpx>=0.28.1",
   "jsonschema>=4.26.0",
 ]
@@ -80,18 +80,22 @@ exclude = ["*.md"]
 
 [tool.ruff.lint]
 fixable = ["ALL"]
-select = ["E", "W", "F", "I", "D"]
+select = ["E", "W", "F", "I", "D", "S"]
 ignore = ["D203", "D213"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["D"]
+# Tests assert, run subprocesses, unpickle their own fixtures and bind test servers; fine outside product code.
+"tests/**/*.py" = ["D", "S101", "S104", "S301", "S311", "S603", "S607"]
+"scripts/**/*.py" = ["S108", "S603", "S607"]
 "src/chapkit/alembic/**/*.py" = ["D"]
 "**/__init__.py" = ["D104"]
 "src/**/*.py" = ["D102", "D105", "D107"]
-"examples/**/*.py" = []
+"examples/**/*.py" = ["S104", "S311"]
+# Seeded synthetic test data, not cryptography.
+"src/chapkit/data/generator.py" = ["S311"]
 
 [tool.ruff.format]
 quote-style = "double"
