@@ -11,6 +11,8 @@
 
 Chapkit provides domain-specific modules for building machine learning services on top of servicekit's core framework. Includes artifact storage, configuration management, and ML train/predict workflows.
 
+**Want to run a forecasting model in Chap?** You do not need to write a chapkit service. Write train and predict scripts and an `MLproject` file, and evaluate them with `chap eval --run-config.as-chapkit`. See [Bring your existing model to Chap](https://chap.dhis2.org/chap-modeling-platform/external_models/existing_model/) and [Build a new model from a template](https://chap.dhis2.org/chap-modeling-platform/external_models/mlproject_tutorial/) in the Chap docs.
+
 ## Features
 
 - **Artifact Module**: Hierarchical storage for models, data, and experiment tracking with parent-child relationships

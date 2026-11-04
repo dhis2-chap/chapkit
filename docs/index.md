@@ -7,6 +7,9 @@
 
 Build production-ready ML services with train/predict workflows, artifact storage, config management, and job scheduling - all in a few lines of code.
 
+!!! tip "Want to run a forecasting model in Chap?"
+    You do not need to write a chapkit service or install chapkit yourself. Write a train and a predict script in R or Python and a short `MLproject` file, and evaluate the model with `chap eval --run-config.as-chapkit`, which starts the chapkit service for you. The Chap docs walk through it: [Bring your existing model to Chap](https://chap.dhis2.org/chap-modeling-platform/external_models/existing_model/) and [Build a new model from a template](https://chap.dhis2.org/chap-modeling-platform/external_models/mlproject_tutorial/).
+
 ## Quick Start: ML Service
 
 ```python

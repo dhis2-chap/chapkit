@@ -2,6 +2,8 @@
 
 `chapkit mlproject run` turns any directory containing an MLflow-style `MLproject` file into a running chapkit service — no code generation, no changes to the MLproject repo. It is aimed at users coming to chapkit with an existing `train.r` / `predict.py` (or any shell-command-driven model) who want a chapkit HTTP API around their scripts in seconds.
 
+To evaluate an MLproject model with Chap, you do not need to start the service yourself: `chap eval --model-name <directory> --run-config.as-chapkit` runs `chapkit mlproject run` for you. The Chap docs cover the whole flow, from your scripts to a published Docker image: [Bring your existing model to Chap](https://chap.dhis2.org/chap-modeling-platform/external_models/existing_model/) and [Build a new model from a template](https://chap.dhis2.org/chap-modeling-platform/external_models/mlproject_tutorial/).
+
 ## Quick Start
 
 Point it at an MLproject file or the directory that holds one:
