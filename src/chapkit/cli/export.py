@@ -332,11 +332,12 @@ def build_mlproject(parts: ServiceParts) -> dict[str, Any]:
     return document
 
 
-def render_mlproject(parts: ServiceParts, source: str) -> str:
+def render_mlproject(parts: ServiceParts, source: str, output: str | None = None) -> str:
     """Render the MLproject file, with a header saying where it comes from and how to regenerate it."""
+    command = f"chapkit mlproject export {source}" + (f" -o {output}" if output else "")
     header = [
         f"# Generated from {source} {GENERATED_MARKER} -- do not edit by hand.",
-        f"# Regenerate with `chapkit mlproject export {source}`; add --check to fail when it is stale.",
+        f"# Regenerate with `{command}`; add --check to fail when it is stale.",
     ]
     body = yaml.safe_dump(build_mlproject(parts), sort_keys=False, allow_unicode=True, width=100)
     return "\n".join(header) + "\n\n" + body
@@ -464,6 +465,14 @@ def _print_dropped(dropped: list[str]) -> None:
         typer.echo(f"WARNING: not carried over to the MLproject: {setting}", err=True)
 
 
+def _source_label(module_path: Path, target: Path) -> str:
+    """Name the module relative to the MLproject's folder, so the header holds no machine-specific path."""
+    try:
+        return Path(os.path.relpath(module_path, target.parent)).as_posix()
+    except ValueError:  # On Windows, a module on another drive has no relative path.
+        return str(module_path)
+
+
 def _default_output(module_path: Path) -> Path:
     """Return the existing MLproject next to the module, or where a new one goes."""
     for filename in MLPROJECT_FILENAMES:
@@ -522,8 +531,10 @@ def export_command(
         typer.echo(f"Error: {error}", err=True)
         raise typer.Exit(code=1) from error
 
-    source = module_path.name if target.parent == module_path.parent else str(module_path)
-    wanted = render_mlproject(parts, source)
+    source = _source_label(module_path, target)
+    # Export writes next to the module by default, so a module in another folder needs -o to land here again.
+    output_flag = None if target.parent == module_path.parent else target.name
+    wanted = render_mlproject(parts, source, output_flag)
     current = target.read_text(encoding="utf-8") if target.is_file() else None
 
     if check:

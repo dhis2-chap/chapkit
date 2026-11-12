@@ -219,6 +219,28 @@ def test_export_refuses_to_overwrite_a_hand_written_mlproject(tmp_path: Path) ->
     assert "chapkit mlproject export" in (tmp_path / "MLproject").read_text()
 
 
+def test_export_names_a_module_in_a_subfolder_relative_to_the_mlproject(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A src-layout service gets a portable header that regenerates the same file."""
+    package = tmp_path / "src" / "pkg"
+    package.mkdir(parents=True)
+    module = package / "service.py"
+    module.write_text(SERVICE_MODULE)
+    target = tmp_path / "MLproject"
+
+    assert CliRunner().invoke(app, ["mlproject", "export", str(module), "-o", str(target)]).exit_code == 0
+    header = target.read_text().splitlines()[:2]
+    assert header[0] == "# Generated from src/pkg/service.py by `chapkit mlproject export` -- do not edit by hand."
+    assert "`chapkit mlproject export src/pkg/service.py -o MLproject`" in header[1]
+    assert str(tmp_path) not in target.read_text()
+
+    # The command in the header, run from the MLproject's folder, reproduces the same file.
+    monkeypatch.chdir(tmp_path)
+    check = CliRunner().invoke(app, ["mlproject", "export", "src/pkg/service.py", "-o", "MLproject", "--check"])
+    assert check.exit_code == 0, check.output
+
+
 def test_export_writes_to_output_and_updates_an_existing_mlproject_yaml(tmp_path: Path) -> None:
     module = _write_service(tmp_path)
     other = tmp_path / "out" / "MLproject"
