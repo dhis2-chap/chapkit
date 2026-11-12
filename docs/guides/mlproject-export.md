@@ -70,6 +70,14 @@ Custom health checks cannot be detected from the built app and are not warned ab
 
 The generated file starts with a `Generated from ... by chapkit mlproject export` header. `export` refuses to overwrite an MLproject without it, so a hand-written file is not lost. Pass `--force` to replace it once; from then on it is regenerated freely.
 
+The header names the module relative to the MLproject's folder, so it holds no machine-specific path and `--check` gives the same result on every machine. A service in a package (a `src/` layout) can be exported straight to the project root:
+
+```bash
+chapkit mlproject export src/my_model/service.py -o MLproject
+```
+
+The header then reads `Generated from src/my_model/service.py`, and its regenerate command includes `-o MLproject`, because `export` otherwise writes next to the module.
+
 ## Options
 
 | Option | Effect |
